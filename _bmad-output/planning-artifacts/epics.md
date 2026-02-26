@@ -1,5 +1,5 @@
 ---
-stepsCompleted: ['step-01-validate-prerequisites']
+stepsCompleted: ['step-01-validate-prerequisites', 'step-02-design-epics']
 inputDocuments: ['_bmad-output/planning-artifacts/ai-ugc-generator-prd.md']
 ---
 
@@ -116,8 +116,90 @@ PT4: Async job processing — real-time progress indicator, email notification, 
 
 ### FR Coverage Map
 
-{{requirements_coverage_map}}
+FR1 → Epic 1 (Store URL submission and scraping initiation)
+FR2 → Epic 1 (Product data extraction)
+FR3 → Epic 1 (AI brand summary generation)
+FR4 → Epic 1 (Product data review and editing)
+FR5 → Epic 1 (Manual upload fallback)
+FR6 → Epic 1 (Shopify-first + generic fallback)
+FR7 → Epic 2 (Email + password auth)
+FR8 → Epic 2 (Google OAuth)
+FR9 → Epic 2 (Soft auth gate after scraping)
+FR10 → Epic 2 (Account settings and subscription management)
+FR11 → Epic 3 (Visual character builder with 9 attributes)
+FR12 → Epic 3 (Visual controls — sliders, pickers, grids)
+FR13 → Epic 3 (4 persona image generation via NanoBanana)
+FR14 → Epic 3 (Persona selection from 4 options)
+FR15 → Epic 3 (Persistent persona reference)
+FR16 → Epic 3 (Persona regeneration)
+FR17 → Epic 3 (Persona slot limits per tier)
+FR18 → Epic 5 (Product selection + Easy Mode initiation)
+FR19 → Epic 5 (AI script generation — Hook/Body/CTA via OpenRouter)
+FR20 → Epic 5 (POV composite image generation via NanoBanana)
+FR21 → Epic 6 (Segmented video generation via Kling 3.0)
+FR22 → Epic 6 (Body segment splitting for lip-sync quality)
+FR23 → Epic 6 (FFmpeg segment stitching with transitions)
+FR24 → Epic 6 (4 video variations with prompt diversity)
+FR25 → Epic 6 (Side-by-side video comparison view)
+FR26 → Epic 6 (MP4 download)
+FR31 → Epic 4 (Paywall trigger at generation)
+FR32 → Epic 4 (Plan comparison — Starter + Growth)
+FR33 → Epic 4 (Stripe checkout)
+FR34 → Epic 4 (Free trial — 1 generation)
+FR35 → Epic 4 (Credit balance tracking + dashboard display)
+FR36 → Epic 4 (Overage billing)
+FR37 → Epic 7 (Generation history view)
+FR38 → Epic 7 (Video library re-download)
 
 ## Epic List
 
-{{epics_list}}
+### Epic 1: Product Discovery — Landing Page, Scraping & Import
+Users can land on the platform, paste their store URL, and see their products auto-imported with an AI-generated brand summary — or manually upload products. The landing page serves as both marketing site and product entry point.
+**FRs covered:** FR1, FR2, FR3, FR4, FR5, FR6
+**NFRs addressed:** NFR1, NFR11
+**Domain:** DR2 (scraping privacy, robots.txt, 24h purge)
+**Note:** Landing page frontend (marketing content, URL input UI) can be parallelized with scraping backend — zero dependency between the two workstreams.
+
+### Epic 2: User Authentication & Account Management
+Users can create accounts via email or Google OAuth, log in, and manage their account settings. Auth gate appears after scraping to maximize conversion intent.
+**FRs covered:** FR7, FR8, FR9, FR10
+**NFRs addressed:** NFR12 (token expiry), NFR9 (encryption at rest), NFR10 (TLS 1.3)
+**Domain:** DR4 (encryption standards)
+**Project-type:** PT1 (multi-tenancy isolation), PT3 (browser compat)
+
+### Epic 3: AI Persona Creation
+Users build a custom AI spokesperson using the Sims-like visual character builder, generate 4 persona image options, select their preferred persona, and persist it for future video generations.
+**FRs covered:** FR11, FR12, FR13, FR14, FR15, FR16, FR17
+**NFRs addressed:** NFR2
+**Depends on:** Epic 2 (auth required)
+**Parallel with:** Epic 4 (Billing) — no dependency between persona and billing
+
+### Epic 4: Paywall & Subscription Billing
+Users can subscribe to Starter or Growth plans via Stripe checkout, receive a free trial generation, track credit balance in their dashboard, and handle overage charges. Credit management integrates with Inngest pipeline for generation gating.
+**FRs covered:** FR31, FR32, FR33, FR34, FR35, FR36
+**NFRs addressed:** NFR13 (PCI DSS via Stripe)
+**Domain:** DR1 (PCI compliance, no card data on app servers)
+**Project-type:** PT2 (subscription lifecycle)
+**Depends on:** Epic 2 (auth required)
+**Parallel with:** Epic 3 (Persona) — build simultaneously, both need auth, neither needs each other
+**Priority note:** Must ship before Epic 6 (video pipeline) goes to production — billing gates generation.
+
+### Epic 5: AI Script & POV Image Generation
+Users select a product and persona, and the system generates an AI-written Hook/Body/CTA script (via OpenRouter) and a composite POV-style image of the persona holding/using the product (via NanoBanana). This is the content preparation stage before video generation.
+**FRs covered:** FR18, FR19, FR20
+**NFRs addressed:** NFR7 (retry on AI provider failure)
+**Depends on:** Epic 1 (products), Epic 2 (auth), Epic 3 (persona)
+**Independently testable:** Script quality and POV image compositing can be validated without the video pipeline. Faster feedback loops on prompt engineering.
+
+### Epic 6: Video Generation, Assembly & Delivery
+The system takes the script and POV image, generates video segments independently via Kling 3.0, stitches them via FFmpeg, and delivers 4 complete video variations. Users review videos side-by-side and download as MP4.
+**FRs covered:** FR21, FR22, FR23, FR24, FR25, FR26
+**NFRs addressed:** NFR3, NFR4, NFR5, NFR7, NFR8, NFR14, NFR15
+**Project-type:** PT4 (async jobs, progress indicator, email notification, priority lanes, auto-retry)
+**Depends on:** Epic 4 (billing gates production use), Epic 5 (script + POV image as input)
+
+### Epic 7: User Dashboard & Video Library
+Returning users can view their generation history with timestamps and thumbnails, browse their video library, and re-download previously generated videos.
+**FRs covered:** FR37, FR38
+**NFRs addressed:** NFR16 (database performance)
+**Depends on:** Epic 2 (auth), Epic 6 (generated content to display)

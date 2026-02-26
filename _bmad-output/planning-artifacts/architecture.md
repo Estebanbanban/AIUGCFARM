@@ -27,8 +27,8 @@ completedAt: '2026-02-26'
 - Sims-like persona creator with configurable attributes
 - AI image generation via NanoBanana API (4 persona variants)
 - AI script generation via OpenRouter (Hook / Body / CTA structure)
-- AI video generation via Kling 3.0 (segmented for lip-sync quality)
-- Video assembly via FFmpeg (segment stitching, crossfade/jump cut)
+- AI video generation via Kling 3.0 (`kling-v3` model, image-to-video with multi-shot support)
+- Video assembly: Kling multi-shot for Easy Mode (single API call), FFmpeg for Expert Mode fallback
 - 4-variant output per generation with side-by-side review
 - Stripe billing (subscriptions + metered credits + overage)
 - User dashboard with video library and download
@@ -721,9 +721,15 @@ aiugc/
 │   │   │   │   ├── shopify.ts              # Shopify Storefront API client
 │   │   │   │   └── generic.ts              # Playwright generic scraper
 │   │   │   ├── nanobanana.ts               # NanoBanana API client
-│   │   │   ├── kling.ts                    # Kling 3.0 API client
+│   │   │   ├── kling/
+│   │   │   │   ├── client.ts               # Kling API client (auth, base HTTP)
+│   │   │   │   ├── image-to-video.ts       # POST /v1/videos/image2video
+│   │   │   │   ├── text-to-video.ts        # POST /v1/videos/text2video
+│   │   │   │   ├── elements.ts             # Element CRUD (persona consistency)
+│   │   │   │   ├── query.ts                # GET task status polling/webhook
+│   │   │   │   └── types.ts                # Kling API types (models, params, responses)
 │   │   │   ├── openrouter.ts               # OpenRouter API client
-│   │   │   └── ffmpeg.ts                   # FFmpeg wrapper
+│   │   │   └── ffmpeg.ts                   # FFmpeg wrapper (Expert Mode only)
 │   │   ├── lib/
 │   │   │   ├── env.ts                      # Worker environment validation
 │   │   │   ├── storage.ts                  # R2 client for worker
@@ -798,6 +804,10 @@ aiugc/
 
 ### Data Flow: Video Generation Pipeline
 
+#### Easy Mode (Multi-Shot — Recommended)
+
+Uses Kling V3's native multi-shot feature to generate Hook/Body/CTA in a single API call.
+
 ```
 User clicks "Generate"
     │
@@ -812,22 +822,36 @@ POST /api/generations
     Inngest: generate-video function
          │
          ├── step.run('generate-script')
-         │   └── Worker: OpenRouter → script (hook/body/cta)
+         │   └── Worker: OpenRouter → script (hook/body/cta with durations)
          │   └── Update generation record with script
          │
          ├── step.run('generate-pov-image')
-         │   └── Worker: NanoBanana → POV composite image
+         │   └── Worker: NanoBanana → POV composite image (persona + product)
          │   └── Upload to R2
          │
-         ├── step.run('generate-hook-segment')    ─┐
-         ├── step.run('generate-body-segment')     ├── Parallel (x4 variants)
-         ├── step.run('generate-cta-segment')     ─┘
-         │   └── Worker: Kling 3.0 → video segments
-         │   └── Upload segments to R2
+         ├── step.run('create-kling-tasks') (x4 variants in parallel)
+         │   └── Worker: POST /v1/videos/image2video
+         │       ├── model_name: "kling-v3"
+         │       ├── image: POV image URL from R2
+         │       ├── multi_shot: true
+         │       ├── shot_type: "customize"
+         │       ├── multi_prompt: [
+         │       │   { index: 1, prompt: hook_prompt, duration: "5" },
+         │       │   { index: 2, prompt: body_prompt, duration: "10" },
+         │       │   { index: 3, prompt: cta_prompt, duration: "5" }
+         │       │ ]
+         │       ├── mode: "pro" (1080p) or "std" (720p per tier)
+         │       ├── duration: "15" (total, adjustable)
+         │       ├── aspect_ratio: "9:16" (vertical for social)
+         │       └── callback_url: worker webhook endpoint
          │
-         ├── step.run('assemble-videos')
-         │   └── Worker: FFmpeg → stitch segments
-         │   └── Upload final videos to R2
+         ├── step.waitForEvent('kling-task-completed') (x4 variants)
+         │   └── Kling calls our callback_url on succeed/failed
+         │   └── Inngest resumes on webhook event (no polling needed)
+         │
+         ├── step.run('download-and-store') (x4 variants)
+         │   └── Download video from Kling URL (expires after 30 days)
+         │   └── Upload to Cloudflare R2
          │   └── Create video records in Supabase
          │
          └── step.run('notify-user')
@@ -837,6 +861,52 @@ POST /api/generations
                   ▼
          User reviews 4 videos in dashboard
 ```
+
+**Key insight:** Kling V3 multi-shot eliminates FFmpeg stitching for Easy Mode.
+Each variant is a single 15-20s video with Hook/Body/CTA as native storyboard shots.
+
+#### Expert Mode (Segmented + FFmpeg — Future)
+
+For Expert Mode (post-MVP), where users customize individual segments:
+
+```
+Same as above, except:
+    ├── Generate 3 separate Kling tasks per variant (hook, body, cta)
+    ├── Wait for all 3 to complete
+    ├── FFmpeg stitch on worker with crossfade transitions
+    └── Upload assembled video to R2
+```
+
+#### Kling Element Integration (Persona Consistency)
+
+For improved persona consistency across multiple generations:
+
+```
+First generation:
+    ├── Create Kling Element from NanoBanana persona image
+    │   POST /v1/general/advanced-custom-elements
+    │   ├── reference_type: "image_refer"
+    │   ├── element_image_list: { frontal_image: persona_url }
+    │   └── Store element_id in personas table
+    │
+Subsequent generations:
+    ├── Reference element_id in video generation
+    │   element_list: [{ element_id: stored_id }]
+    └── Better persona consistency than raw image reference
+```
+
+#### Cost Model
+
+| Mode | Duration | Per Variant | Per Generation (x4) |
+|---|---|---|---|
+| Std (720p), no audio | 15s | $1.26 | $5.04 |
+| Pro (1080p), no audio | 15s | $1.68 | $6.72 |
+| Pro (1080p), with audio | 15s | $2.52 | $10.08 |
+
+At $15/mo Starter (10 generations): COGS = $50-67 → **needs volume pricing negotiation**
+At $59/mo Growth (50 generations): COGS = $252-336 → **negative margin without enterprise rates**
+
+**Action item:** Negotiate enterprise/volume pricing with Kling before launch. Current unit economics require ~60-70% discount to be viable at Growth tier.
 
 ---
 
@@ -866,6 +936,8 @@ POST /api/generations
 - Email notification service not specified (Resend recommended when needed)
 - Video cleanup/retention policy not defined (define post-launch based on storage costs)
 - Monitoring alerting thresholds not specified (configure after baseline metrics)
+- **CRITICAL: Unit economics** — At retail Kling pricing, COGS exceeds revenue at Growth tier. Must negotiate enterprise volume pricing (target ~60-70% discount) before launch. Consider std mode (720p) as default for Starter tier to reduce costs.
+- Kling API authentication (JWT generation) details need to be confirmed during developer onboarding
 
 ### Architecture Readiness Assessment
 
