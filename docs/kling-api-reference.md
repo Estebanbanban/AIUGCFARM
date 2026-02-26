@@ -364,18 +364,30 @@ Server sends notification on task status changes (submitted → processing → s
 
 ## Architecture Implications
 
-### Multi-shot as Alternative to FFmpeg Stitching
+### Model Decision: V2.6 std (720p) for MVP
 
-Kling V3's `multi_shot` feature lets us generate multi-segment videos **in a single API call** instead of:
-1. Generating 3 separate segments (hook/body/cta)
-2. Downloading all 3
-3. FFmpeg stitching them together
+**Why V2.6 over V3:**
+- V2.6 std is **50% cheaper** per second ($0.042/s vs $0.084/s)
+- At 720p, quality difference is minimal for UGC-style social ads
+- Enables healthy margins (62-74%) without enterprise pricing negotiation
+- V3 can be offered as a premium feature later
 
-**Trade-off:**
-- Multi-shot: Simpler pipeline, single API call, but less control over individual segments
-- Segmented + FFmpeg: More control, can retry individual failed segments, but more complex pipeline
+**Why NOT multi-shot:**
+- Our product model is **modular segments** — users generate hooks, bodies, CTAs independently
+- Users mix and match segments to create N×N×N video combinations
+- Multi-shot would lock segments into a single video, destroying the combinatorial value
+- Individual segments allow per-segment retry on failure
+- FFmpeg stitching is needed anyway for on-demand combo assembly
 
-**Recommendation:** Use multi-shot for Easy Mode (simpler), keep segmented approach for Expert Mode (more control).
+### Modular Segment Pipeline
+
+Each segment is generated as an independent Kling image-to-video task:
+1. **Hook segments** (3-5s): Short attention-grabbers
+2. **Body segments** (5-10s): Product benefits / social proof
+3. **CTA segments** (3-5s): Urgency-driven close
+
+Each uses the same POV image (persona + product) as the start frame.
+FFmpeg stitches user-selected combos on-demand (free — no Kling cost).
 
 ### Element Library for Persona Consistency
 
@@ -388,7 +400,28 @@ Instead of passing the persona reference image every time, we can:
 
 Kling supports `callback_url` — use this with Inngest to avoid polling:
 1. Create Kling task with `callback_url` pointing to our worker
-2. Inngest step waits for webhook event
+2. Inngest `step.waitForEvent()` waits for webhook
 3. On callback, Inngest continues pipeline
 
 This is more efficient than polling every 10s.
+
+### V2.6 API Endpoint Usage
+
+For our pipeline, we use the **legacy image-to-video endpoint** (not omni-video):
+
+```
+POST /v1/videos/image2video
+{
+  "model_name": "kling-v2-6",
+  "image": "<POV_image_url>",
+  "prompt": "<segment_script>",
+  "mode": "std",
+  "duration": "5",          // or "10" for body segments
+  "aspect_ratio": "9:16",
+  "callback_url": "<worker_webhook>",
+  "external_task_id": "<segment_uuid>"
+}
+```
+
+Note: `kling-v2-6` does NOT support `multi_shot`, `sound`, `voice_list`, or `element_list`.
+These are V3+ features we may adopt later.
