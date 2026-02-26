@@ -1,17 +1,28 @@
 ---
-stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8]
-inputDocuments: ['ai-ugc-generator-prd.md']
 workflowType: 'architecture'
-project_name: 'AIUGC'
+project_name: 'AI UGC Generator'
 user_name: 'Estebanronsin'
 date: '2026-02-26'
 status: 'complete'
-completedAt: '2026-02-26'
+stepsCompleted:
+  - 'step-01-init'
+  - 'step-02-context'
+  - 'step-03-starter'
+  - 'step-04-decisions'
+  - 'step-05-patterns'
+  - 'step-06-structure'
+  - 'step-07-validation'
+  - 'step-08-complete'
+inputDocuments:
+  - 'ai-ugc-generator-prd.md'
 ---
 
-# Architecture Decision Document
+# Architecture Document — AI UGC Generator
 
-## AI UGC Generator
+**Author:** Architecture Agent
+**Date:** February 2026
+**Version:** 1.0
+**Status:** Complete — Ready for Implementation
 
 ---
 
@@ -19,52 +30,36 @@ completedAt: '2026-02-26'
 
 ### Requirements Overview
 
-**Functional Requirements:**
-- Landing page with URL input CTA and marketing content
-- Website scraping engine (Shopify-first via Storefront API, generic fallback via Playwright)
-- Product data import with AI-generated brand summary
-- Authentication (email + Google OAuth + Shopify OAuth)
-- Sims-like persona creator with configurable attributes
-- AI image generation via NanoBanana API (4 persona variants)
-- AI script generation via OpenRouter (Hook / Body / CTA structure)
-- AI video generation via Kling 3.0 (`kling-v3` model, image-to-video with multi-shot support)
-- Video assembly: Kling multi-shot for Easy Mode (single API call), FFmpeg for Expert Mode fallback
-- 4-variant output per generation with side-by-side review
-- Stripe billing (subscriptions + metered credits + overage)
-- User dashboard with video library and download
+The AI UGC Generator is a B2B SaaS platform enabling e-commerce brands to generate UGC-style video ads from their store URL. The core loop is: **Scrape → Persona → Generate → Download**.
 
-**Non-Functional Requirements:**
-- Website scraping: < 15s for up to 50 products
-- Persona generation: < 30s for 4 images
-- Video generation: < 3min per segment, < 10min total
-- 50 concurrent generation jobs minimum
-- 99.5% uptime SLA
-- Graceful degradation on third-party API failure (queue + retry)
-- Job status tracking with email notification on completion
-- All scraped data encrypted at rest
-- Rate limiting on scraping endpoints
+**Functional Requirements:** 38 FRs across 6 domains (Product Import, Auth, Persona, Video Generation, Billing, Dashboard)
+**Non-Functional Requirements:** 16 NFRs (Performance, Reliability, Security, Scalability)
 
-### Scale & Complexity
+### Scale & Complexity Assessment
 
-- **Domain:** Media/E-commerce (high complexity — async pipelines, external AI APIs, video processing)
-- **Project type:** Full-stack SaaS with heavy backend processing
-- **Primary bottleneck:** Video pipeline throughput and third-party API reliability
-- **Data volume:** Large binary assets (images, videos), moderate relational data (users, products, personas)
+| Dimension | Assessment |
+|-----------|-----------|
+| Expected users (M6) | ~1,000–5,000 registered, ~500 active |
+| Concurrent video jobs | 50 (NFR5) |
+| Data sensitivity | Low-medium (product data + payment via Stripe) |
+| API integrations | 4 external (OpenAI, NanoBanana, Kling 3.0, Stripe) |
+| Async complexity | High (video generation = multi-minute jobs) |
+| Multi-tenancy | Per-user isolation with future team support |
 
-### Technical Constraints & Dependencies
+### Technical Constraints
 
-- NanoBanana API — persona image generation (external dependency, rate limits unknown)
-- Kling 3.0 API — video generation (external dependency, commercial rate limits TBD)
-- OpenRouter — LLM script generation (multi-model, single billing)
-- FFmpeg — must run on worker servers (not serverless-friendly without containers)
-- Shopify Storefront API — requires app registration for native stores
+- Video generation (Kling 3.0) takes 2–10 minutes — must be async
+- Edge Functions have ~60s execution timeout — long jobs require fire-and-poll pattern
+- All payment data handled by Stripe (PCI compliance)
+- Storage needed for generated videos and persona images
 
 ### Cross-Cutting Concerns
 
-- **Job orchestration:** Every generation involves 4+ async steps across multiple APIs
-- **Credit management:** Must decrement credits atomically, handle overage billing
-- **File lifecycle:** Generated assets need cleanup policies (storage costs)
-- **Error recovery:** Each pipeline step can fail independently — need per-step retry
+- Authentication & authorization on every Edge Function
+- Credit balance checking before any generation
+- Rate limiting on public endpoints (scraping)
+- SSRF protection on URL scraping
+- Consistent error handling and response format
 
 ---
 
@@ -72,959 +67,1010 @@ completedAt: '2026-02-26'
 
 ### Primary Technology Domain
 
-Full-stack TypeScript web application with async processing pipeline.
+Full-stack TypeScript SaaS application with serverless backend.
 
-### Selected Starter: `create-next-app` (Next.js 15 App Router)
+### Selected Stack
 
-**Initialization Command:**
+| Layer | Technology | Rationale |
+|-------|-----------|-----------|
+| **Frontend** | Next.js 14 (App Router) | SSR/SSG, file-based routing, Vercel native |
+| **Styling** | Tailwind CSS + shadcn/ui | Rapid UI development, consistent design system |
+| **Backend** | Supabase Edge Functions (Deno) | Zero infra management, native DB/Auth/Storage integration |
+| **Database** | Supabase PostgreSQL | Managed, RLS built-in, realtime capable |
+| **Auth** | Supabase Auth | Native JWT, RLS integration, OAuth support |
+| **Storage** | Supabase Storage | Managed buckets with access policies |
+| **Payments** | Stripe | PCI compliant, subscription + one-time credits |
+| **AI — Scripts** | OpenAI API (GPT-4o) | Best-in-class text generation for ad scripts |
+| **AI — Images** | NanoBanana API | Persona image generation from attribute prompts |
+| **AI — Video** | Kling 3.0 API | UGC-style video generation with lip-sync |
+| **Hosting** | Vercel (frontend) + Supabase (everything else) | 2 services total, minimal ops |
 
-```bash
-bunx create-next-app@latest aiugc --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"
-```
+### Architectural Decisions Provided by Starter
 
-**Rationale:**
-- Next.js 15 App Router provides SSR for landing page SEO + client-side interactivity for the dashboard and persona builder
-- Tailwind v4 for rapid UI development
-- Bun as runtime and package manager (project preference)
-- TypeScript throughout
-
-**Architectural Decisions Provided by Starter:**
-- Language & Runtime: TypeScript on Bun
-- Styling: Tailwind CSS v4
-- Build Tooling: Next.js built-in (Turbopack for dev)
-- Routing: App Router (file-based)
-- Code Organization: `src/` directory with `@/*` import alias
+- **Language & Runtime:** TypeScript (frontend + Edge Functions in Deno)
+- **Styling:** Tailwind CSS with shadcn/ui component library
+- **Build Tooling:** Next.js built-in (Turbopack dev, Webpack prod)
+- **Testing:** Vitest (unit) + Playwright (e2e)
+- **Code Organization:** Feature-based modules
+- **Dev Experience:** Hot reload, type safety end-to-end
 
 ---
 
 ## Core Architectural Decisions
 
-### Decision Priority Analysis
+### AD1: Full Supabase Backend (No External Server)
 
-**Critical Decisions (Block Implementation):**
-1. Database: Supabase (PostgreSQL)
-2. Auth: Clerk
-3. Job Orchestration: Inngest
-4. Worker Runtime: Hono on Bun (Railway)
-5. Payment Processing: Stripe Billing
-6. Object Storage: Cloudflare R2
+**Decision:** All backend logic runs in Supabase Edge Functions. No Python/FastAPI server.
 
-**Important Decisions (Shape Architecture):**
-1. LLM Provider: OpenRouter (multi-model)
-2. Scraping Strategy: Shopify Storefront API + Playwright fallback
-3. Video Pipeline: NanoBanana → Kling 3.0 → FFmpeg
-4. Frontend State: Zustand for client state, React Query for server state
-5. UI Components: shadcn/ui
+**Rationale:**
+- Single backend platform = simpler ops, fewer services, lower cost
+- Edge Functions handle all API calls (scraping, AI, Stripe) via `fetch()`
+- Native integration with Auth, DB, Storage — no sync issues
+- Scales automatically with Supabase infrastructure
 
-**Deferred Decisions (Post-MVP):**
-1. CDN strategy for video delivery (evaluate Cloudflare Stream vs R2 public buckets)
-2. Multi-region deployment
-3. WebSocket vs SSE for real-time generation progress
-4. API access for Scale tier
+**Trade-off:** Edge Functions have a ~60s timeout. Video generation (2–10 min) uses fire-and-poll pattern instead of long-running processes.
 
----
+### AD2: Supabase Auth (Not Clerk)
 
-### Data Architecture
+**Decision:** Use Supabase Auth for all authentication.
 
-**Database:** Supabase (PostgreSQL)
-- Managed PostgreSQL with Row Level Security (RLS)
-- Built-in realtime subscriptions for generation status updates
-- Supabase Auth as backup/fallback (primary auth is Clerk)
-- Direct SQL access + Supabase client SDK
+**Rationale:**
+- Native RLS integration — `auth.uid()` works everywhere
+- No user sync between systems
+- JWT verified natively in Edge Functions
+- Free, included in Supabase plan
+- OAuth (Google) built-in
 
-**Data Modeling Approach:**
-- Relational model with clear foreign keys
-- UUID primary keys across all tables
-- `created_at` / `updated_at` timestamps on all tables
-- Soft deletes where needed (`deleted_at` nullable timestamp)
+### AD3: Fire-and-Poll for Video Generation
 
-**Core Tables:**
+**Decision:** Video generation uses an async fire-and-poll pattern, not WebSockets.
 
-| Table | Purpose |
-|---|---|
-| `users` | Synced from Clerk via webhook, stores subscription state |
-| `brands` | Brand profiles created from scraped data |
-| `products` | Imported product data per brand |
-| `personas` | AI persona configurations + selected reference image URL + Kling element_id |
-| `segments` | Individual generated segments (type: hook/body/cta, status, video_url, script_text, duration) |
-| `segment_batches` | Groups of segments generated together (links to product, persona, credits used) |
-| `video_combos` | User-assembled combinations of segments (hook_segment_id + body_segment_id + cta_segment_id) |
-| `subscriptions` | Stripe subscription state, segment credit balance |
-| `credit_transactions` | Segment credit usage ledger (audit trail) |
+**Flow:**
+1. `generate-video/` Edge Function calls Kling 3.0 API → gets `job_id` → saves to DB with `status: 'processing'` → returns `job_id` to frontend
+2. Frontend polls `video-status/` Edge Function every 5 seconds
+3. `video-status/` checks Kling API with `job_id` → when ready, downloads video to Storage, updates DB `status: 'completed'`
 
-**Modular Video Model:**
-The core product model is segment-based, not video-based:
-- Users generate **segments** (hooks, bodies, CTAs) independently
-- Each segment is a standalone 3-10s video clip stored in R2
-- Users **combine** segments into full videos via the mixer UI (N hooks × N bodies × N CTAs)
-- FFmpeg stitches selected segments on-demand when user previews or downloads a combo
-- 1 credit = 1 segment generation. A batch of 3H + 3B + 3C = 9 credits = 27 possible combos
+**Rationale:**
+- Simpler than WebSockets for MVP
+- Works within Edge Function timeout
+- Stateless — any Edge Function instance can check status
+- Easy to add webhook callback from Kling later (Phase 2)
 
-**Data Validation:** Zod schemas shared between frontend and backend. Single source of truth for all data shapes.
+### AD4: Credit-Based Billing via Stripe
 
-**Migration Approach:** Supabase migrations via `supabase db push` for dev, `supabase db migrate` for production.
+**Decision:** Stripe Checkout for subscriptions + credit balance managed in Supabase.
 
-**Caching Strategy:**
-- Product data: Cache scraped results in Supabase for 24h (avoid re-scraping)
-- Session data: Clerk handles session caching
-- No application-level Redis cache at MVP — Supabase connection pooling via Supavisor is sufficient
+**Flow:**
+1. Stripe webhook → Edge Function → updates `subscriptions` + `credit_balances` tables
+2. Before generation: check `credit_balances.remaining >= 1`
+3. After generation: decrement balance in `credit_ledger`
 
----
+**Rationale:**
+- Stripe handles all PCI-sensitive operations
+- Credit ledger in DB provides audit trail
+- Webhook idempotency via `audit_logs` table (check event ID before processing)
 
-### Authentication & Security
+### AD5: Signed URLs for Storage Access
 
-**Authentication: Clerk**
-- Handles email + password, Google OAuth, and custom Shopify OAuth
-- Pre-built React components (`<SignIn>`, `<SignUp>`, `<UserButton>`)
-- Webhook sync to Supabase `users` table on user creation/update
-- JWT tokens for API route protection via `@clerk/nextjs` middleware
+**Decision:** All generated media (videos, persona images) served via signed URLs with expiry.
 
-**Authorization Patterns:**
-- Clerk middleware protects all `/dashboard/*` routes
-- Supabase RLS policies enforce data isolation per user
-- Clerk `userId` mapped to Supabase `users.clerk_id` for RLS context
-- Tier-based feature gating checked at API route level (not frontend-only)
+**Rationale:**
+- No public bucket access
+- URLs expire after 1 hour — prevents hotlinking
+- RLS not needed on Storage if Edge Functions generate signed URLs after auth check
 
-**Security Middleware:**
-- Next.js middleware (`middleware.ts`) for route protection
-- Rate limiting on public endpoints (scraping, generation triggers) via Vercel Edge Middleware or Upstash Rate Limit
-- CORS restricted to application domains only
-- Input sanitization on all user-provided URLs before scraping
+### AD6: SSRF Protection on Scraping
 
-**API Security:**
-- All API routes require Clerk session token
-- Inngest function signatures verified via webhook signing
-- Stripe webhooks verified via `stripe.webhooks.constructEvent()`
-- External API keys stored in environment variables, never client-side
+**Decision:** URL scraping validates target before fetching.
+
+**Rules:**
+- Block private IPs (RFC1918, localhost, 169.254.x.x metadata)
+- Block internal Supabase URLs
+- Allow only HTTP/HTTPS schemes
+- Enforce response size limit (5MB)
+- Timeout after 15 seconds
 
 ---
 
-### API & Communication Patterns
+## Database Schema
 
-**API Design: Next.js Route Handlers (REST)**
-- `/api/scrape` — Trigger website scraping
-- `/api/brands` — CRUD brand profiles
-- `/api/products` — CRUD products per brand
-- `/api/personas` — CRUD persona configurations
-- `/api/personas/generate` — Trigger NanoBanana image generation
-- `/api/generations` — Trigger video generation, list generations
-- `/api/generations/[id]` — Get generation status + video outputs
-- `/api/webhooks/clerk` — Clerk user sync
-- `/api/webhooks/stripe` — Stripe subscription events
-- `/api/webhooks/inngest` — Inngest function endpoint
+### Tables
 
-**API Response Format:**
+#### `profiles`
+Extends Supabase `auth.users`. Created automatically via trigger on signup.
 
-```typescript
-// Success
-{ data: T, error: null }
-
-// Error
-{ data: null, error: { code: string, message: string } }
+```sql
+CREATE TABLE profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  full_name TEXT,
+  avatar_url TEXT,
+  plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'starter', 'growth', 'scale')),
+  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ```
 
-**Error Handling Standards:**
-- HTTP status codes: 200 (success), 400 (validation), 401 (unauthorized), 403 (forbidden), 404 (not found), 429 (rate limited), 500 (server error)
-- All errors include machine-readable `code` and human-readable `message`
-- Validation errors include `field` property
+#### `subscriptions`
+Stripe subscription state, managed by webhook.
 
-**Service Communication:**
-- Next.js API routes → Inngest: Event-driven (`inngest.send()`)
-- Inngest → Worker (Hono): HTTP calls to worker endpoints
-- Worker → External APIs: Direct HTTP (NanoBanana, Kling, OpenRouter)
-- Worker → Supabase: Direct client for status updates
-- Worker → R2: S3-compatible SDK for file uploads
+```sql
+CREATE TABLE subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  stripe_customer_id TEXT NOT NULL,
+  stripe_subscription_id TEXT UNIQUE,
+  plan TEXT NOT NULL CHECK (plan IN ('starter', 'growth', 'scale')),
+  status TEXT NOT NULL CHECK (status IN ('active', 'past_due', 'canceled', 'incomplete')),
+  current_period_start TIMESTAMPTZ,
+  current_period_end TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+#### `credit_balances`
+Current credit state per user.
+
+```sql
+CREATE TABLE credit_balances (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id UUID NOT NULL UNIQUE REFERENCES profiles(id) ON DELETE CASCADE,
+  remaining INTEGER NOT NULL DEFAULT 0 CHECK (remaining >= 0),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+#### `credit_ledger`
+Immutable transaction log for credits.
+
+```sql
+CREATE TABLE credit_ledger (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  amount INTEGER NOT NULL, -- positive = credit, negative = debit
+  reason TEXT NOT NULL CHECK (reason IN ('subscription_renewal', 'generation', 'refund', 'bonus', 'free_trial')),
+  reference_id UUID, -- scan_id, subscription_id, etc.
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+#### `products`
+Scraped product data.
+
+```sql
+CREATE TABLE products (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  store_url TEXT,
+  name TEXT NOT NULL,
+  description TEXT,
+  price DECIMAL(10,2),
+  currency TEXT DEFAULT 'USD',
+  category TEXT,
+  images JSONB NOT NULL DEFAULT '[]', -- array of image URLs
+  brand_summary JSONB, -- { tone, demographic, selling_points }
+  source TEXT NOT NULL CHECK (source IN ('shopify', 'generic', 'manual')),
+  confirmed BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+#### `personas`
+AI personas created by users.
+
+```sql
+CREATE TABLE personas (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  attributes JSONB NOT NULL, -- { gender, skin_tone, age, hair_color, hair_style, eye_color, body_type, clothing_style, accessories }
+  selected_image_url TEXT, -- chosen from generated options
+  generated_images JSONB DEFAULT '[]', -- array of 4 image URLs
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+#### `generations`
+Video generation jobs.
+
+```sql
+CREATE TABLE generations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  persona_id UUID NOT NULL REFERENCES personas(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL DEFAULT 'easy' CHECK (mode IN ('easy', 'expert')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'scripting', 'generating_image', 'generating_video', 'stitching', 'completed', 'failed')),
+  script JSONB, -- { hook: { text, duration }, body: { text, duration }, cta: { text, duration } }
+  composite_image_url TEXT, -- persona + product composite
+  videos JSONB DEFAULT '[]', -- array of 4 { url, thumbnail_url, duration, variation_index }
+  error_message TEXT,
+  external_job_ids JSONB DEFAULT '{}', -- { hook_job_id, body_job_id, cta_job_id, ... }
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+#### `audit_logs`
+Idempotency tracking + audit trail.
+
+```sql
+CREATE TABLE audit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  action TEXT NOT NULL, -- 'generation', 'subscription', 'scrape', 'stripe_event', etc.
+  event_id TEXT UNIQUE, -- Stripe event ID for idempotency
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+### Row Level Security Policies
+
+```sql
+-- profiles: users can only read/update their own profile
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users read own profile" ON profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Users update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+
+-- products: users can only CRUD their own products
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users manage own products" ON products FOR ALL USING (auth.uid() = owner_id);
+
+-- personas: users can only CRUD their own personas
+ALTER TABLE personas ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users manage own personas" ON personas FOR ALL USING (auth.uid() = owner_id);
+
+-- generations: users can only read their own generations
+ALTER TABLE generations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users read own generations" ON generations FOR SELECT USING (auth.uid() = owner_id);
+
+-- credit_balances: users can only read their own balance
+ALTER TABLE credit_balances ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users read own balance" ON credit_balances FOR SELECT USING (auth.uid() = owner_id);
+
+-- credit_ledger: users can only read their own ledger
+ALTER TABLE credit_ledger ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users read own ledger" ON credit_ledger FOR SELECT USING (auth.uid() = owner_id);
+
+-- subscriptions: users can only read their own subscription
+ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users read own subscription" ON subscriptions FOR SELECT USING (auth.uid() = owner_id);
+
+-- audit_logs: service_role only (no direct user access)
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+```
+
+### Database Triggers
+
+```sql
+-- Auto-create profile on signup
+CREATE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO profiles (id, email, full_name, avatar_url)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    NEW.raw_user_meta_data->>'full_name',
+    NEW.raw_user_meta_data->>'avatar_url'
+  );
+  INSERT INTO credit_balances (owner_id, remaining) VALUES (NEW.id, 1); -- 1 free trial credit
+  INSERT INTO credit_ledger (owner_id, amount, reason) VALUES (NEW.id, 1, 'free_trial');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- Auto-update updated_at
+CREATE FUNCTION update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON personas FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON subscriptions FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON credit_balances FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+```
+
+### Indexes
+
+```sql
+CREATE INDEX idx_products_owner ON products(owner_id);
+CREATE INDEX idx_personas_owner ON personas(owner_id);
+CREATE INDEX idx_generations_owner ON generations(owner_id);
+CREATE INDEX idx_generations_status ON generations(status);
+CREATE INDEX idx_credit_ledger_owner ON credit_ledger(owner_id);
+CREATE INDEX idx_audit_logs_event_id ON audit_logs(event_id);
+CREATE INDEX idx_subscriptions_stripe_customer ON subscriptions(stripe_customer_id);
+```
 
 ---
 
-### Frontend Architecture
+## Supabase Storage Buckets
 
-**State Management:**
-- **Server state:** TanStack Query (React Query) — handles caching, refetching, optimistic updates for all API data
-- **Client state:** Zustand — minimal stores for UI state (persona builder selections, generation form state)
-- **URL state:** `nuqs` for search params (filters, pagination)
+| Bucket | Access | Purpose |
+|--------|--------|---------|
+| `persona-images` | Private — signed URLs via Edge Functions | Generated persona images (4 per generation) |
+| `generated-videos` | Private — signed URLs via Edge Functions | Final video outputs (4 per generation) |
+| `composite-images` | Private — signed URLs via Edge Functions | Persona + product composite images |
+| `product-images` | Private — signed URLs via Edge Functions | Manually uploaded product images |
 
-**Component Architecture:**
-- **UI primitives:** shadcn/ui (based on Radix UI) — fully owned, customizable components
-- **Feature components:** Co-located by feature domain (`/components/persona-builder/`, `/components/generation/`, etc.)
-- **Layout components:** App Router layouts for shared UI (sidebar, header)
+### Storage Policies
 
-**Persona Builder (Sims-like UI):**
-- Custom React component with attribute selectors (dropdowns, sliders, color pickers)
-- Real-time preview panel showing current attribute selections
-- Uses canvas or SVG for visual persona preview (pre-generation)
-- Communicates with NanoBanana API through server action for image generation
+All buckets are **private**. Access is granted via signed URLs generated by Edge Functions after auth verification. No direct client-side uploads except for `product-images` (with auth).
 
-**Routing Strategy:**
-- App Router file-based routing
-- Route groups: `(marketing)` for public pages, `(dashboard)` for authenticated app
-- Parallel routes for modals (generation progress, video review)
+```sql
+-- product-images: authenticated users can upload to their own folder
+CREATE POLICY "Users upload own product images"
+ON storage.objects FOR INSERT
+WITH CHECK (
+  bucket_id = 'product-images'
+  AND auth.uid()::text = (storage.foldername(name))[1]
+);
 
-**Performance:**
-- Landing page: Static generation (ISR) for SEO
-- Dashboard: Client-side with React Query prefetching
-- Images: Next.js `<Image>` with Cloudflare R2 loader
-- Videos: Native `<video>` with R2 signed URLs
+-- All buckets: service_role handles reads/writes from Edge Functions
+-- No public SELECT policies — all access via signed URLs
+```
 
 ---
 
-### Infrastructure & Deployment
+## Edge Functions
 
-**Architecture Overview:**
+### Shared Helpers (`_shared/`)
 
+| File | Purpose |
+|------|---------|
+| `cors.ts` | CORS headers (allow frontend origin) |
+| `auth.ts` | `requireUserId(req)` — extract & verify JWT, return user ID |
+| `response.ts` | `json(body, cors, status)` — standard JSON response builder |
+| `supabase.ts` | `getAdminClient()` — service_role Supabase client |
+| `credits.ts` | `checkCredits(userId)` / `debitCredit(userId, generationId)` |
+| `ssrf.ts` | `validateUrl(url)` — block private IPs, enforce scheme |
+| `rate-limit.ts` | In-memory rate limiter (IP-based for public, user-based for auth) |
+
+### Endpoints
+
+#### Product Import & Scraping
+
+**`scrape-product/`** — POST
 ```
-┌─────────────────────────────┐
-│  Vercel                      │
-│  ├── Next.js 15 (App Router)│  ← Landing page (SSR/ISR)
-│  ├── Dashboard (CSR)         │  ← Authenticated app
-│  ├── API Routes              │  ← CRUD operations
-│  └── Inngest Endpoint        │  ← /api/webhooks/inngest
-└──────────┬──────────────────┘
-           │ inngest.send() events
-           ▼
-┌─────────────────────────────┐
-│  Inngest (Cloud)             │
-│  ├── scrape-website          │  Step function
-│  ├── generate-persona-images │  Step function
-│  ├── generate-segments        │  Step function (fan-out per segment)
-│  │   ├── step: generate-script (per segment type)
-│  │   ├── step: generate-pov-image
-│  │   └── step: generate-kling-video (per segment)
-│  ├── assemble-combo           │  On-demand FFmpeg stitch
-│  └── send-completion-email   │  Step function
-└──────────┬──────────────────┘
-           │ Executes on
-           ▼
-┌─────────────────────────────┐
-│  Railway (Worker Service)    │
-│  ├── Hono on Bun             │  ← Lightweight HTTP server
-│  ├── FFmpeg (system binary)  │  ← Video stitching
-│  ├── Playwright (headless)   │  ← Generic site scraping
-│  └── External API clients    │
-│      ├── NanoBanana SDK      │
-│      ├── Kling 3.0 SDK       │
-│      └── OpenRouter SDK      │
-└──────────┬──────────────────┘
-           │
-     ┌─────┴──────────┐
-     ▼                ▼
-┌──────────┐   ┌──────────────┐
-│ Supabase │   │ Cloudflare   │
-│ Postgres │   │ R2 + CDN     │
-│ + Auth   │   │ (videos,     │
-│ + Realtime│  │  images)     │
-└──────────┘   └──────────────┘
-     │
-     ▼
-┌──────────┐
-│ Stripe   │
-│ Billing  │
-└──────────┘
+Input:  { url: string }
+Auth:   Optional (soft gate — works without auth)
+Flow:
+  1. validateUrl(url) — SSRF check
+  2. Rate limit check (10/hr unauthenticated, 60/hr authenticated)
+  3. Fetch URL HTML
+  4. Detect platform (Shopify JSON endpoint vs generic HTML)
+  5. Extract: name, images, description, price, category
+  6. Call OpenAI → generate brand_summary { tone, demographic, selling_points }
+  7. If authenticated: save to products table (confirmed = false)
+Output: { products: Product[], brand_summary: BrandSummary }
 ```
 
-**Hosting:**
-- **Frontend + API:** Vercel (Pro plan for team features + 100GB bandwidth)
-- **Worker Service:** Railway (Docker container with FFmpeg + Playwright pre-installed)
-- **Database:** Supabase (Pro plan for connection pooling + daily backups)
-- **Storage:** Cloudflare R2 (free egress, S3-compatible)
-- **Job Orchestration:** Inngest Cloud (managed, generous free tier)
+**`confirm-products/`** — POST
+```
+Input:  { product_ids: string[], edits: Record<string, Partial<Product>> }
+Auth:   Required
+Flow:
+  1. Update products with edits
+  2. Set confirmed = true
+Output: { success: true }
+```
 
-**CI/CD Pipeline:**
-- GitHub Actions for CI (lint, type-check, unit tests)
-- Vercel auto-deploy on push to `main` (frontend + API)
-- Railway auto-deploy on push to `main` (worker service)
-- Supabase CLI for database migrations in CI
+**`upload-product/`** — POST (multipart)
+```
+Input:  { name, description, price, images: File[] }
+Auth:   Required
+Flow:
+  1. Upload images to product-images bucket
+  2. Create product record with source = 'manual'
+Output: { product: Product }
+```
 
-**Environment Configuration:**
-- `.env.local` for development
-- Vercel environment variables for production (frontend)
-- Railway environment variables for production (worker)
-- Shared secrets: Supabase URL/key, Stripe keys, Clerk keys, Inngest key, R2 credentials
+#### Persona
 
-**Monitoring & Logging:**
-- Vercel Analytics for frontend performance
-- Inngest Dashboard for pipeline observability (step-level visibility, retries, failures)
-- Sentry for error tracking (frontend + worker)
-- Supabase Dashboard for database monitoring
+**`generate-persona/`** — POST
+```
+Input:  { name: string, attributes: PersonaAttributes }
+Auth:   Required
+Flow:
+  1. Check persona slot limit (Starter=1, Growth=3, Scale=10)
+  2. Build prompt from attributes
+  3. Call NanoBanana API → 4 images
+  4. Upload images to persona-images bucket
+  5. Create persona record with generated_images
+Output: { persona: Persona }
+Timeout: ~20-30s (within Edge Function limit)
+```
 
-**Scaling Strategy (MVP → Growth):**
-- Vercel: Scales automatically (serverless)
-- Railway: Vertical scaling initially, horizontal with Railway replicas when needed
-- Inngest: Handles concurrency limits and queue management
-- Supabase: Connection pooler handles 200+ concurrent connections on Pro
-- R2: No scaling concerns (object storage)
+**`select-persona-image/`** — POST
+```
+Input:  { persona_id: string, image_index: number }
+Auth:   Required
+Flow:
+  1. Verify ownership
+  2. Set selected_image_url from generated_images[index]
+Output: { persona: Persona }
+```
+
+#### Video Generation
+
+**`generate-video/`** — POST
+```
+Input:  { product_id: string, persona_id: string, mode: 'easy' }
+Auth:   Required
+Flow:
+  1. Check credit balance >= 1
+  2. Debit 1 credit (reserve via ledger entry)
+  3. Create generation record (status: 'scripting')
+  4. Call OpenAI → generate Hook/Body/CTA script from product data + brand tone
+  5. Update generation (status: 'generating_image', script saved)
+  6. Call NanoBanana → composite image (persona + product)
+  7. Upload composite to composite-images bucket
+  8. Update generation (status: 'generating_video')
+  9. For each segment (hook, body, cta) x 4 variations:
+     - Call Kling 3.0 API → get job_id
+     - Store job_ids in external_job_ids
+  10. Return generation_id to frontend
+Output: { generation_id: string, status: 'generating_video' }
+Timeout: Steps 1-9 take ~30-45s total. Kling processing continues async.
+```
+
+**`video-status/`** — GET
+```
+Input:  ?generation_id=xxx
+Auth:   Required
+Flow:
+  1. Verify ownership
+  2. Load generation record
+  3. If status = 'generating_video':
+     a. Check each Kling job_id status via API
+     b. For completed segments: download video, upload to Storage
+     c. If all segments done for all 4 variations:
+        - Stitch segments (or return segments — MVP can skip stitching)
+        - Update generation (status: 'completed', videos array populated)
+  4. Return current status + completed videos (if any)
+Output: { status: string, progress: { completed: number, total: number }, videos: Video[] }
+Polling: Frontend calls every 5s until status = 'completed' or 'failed'
+```
+
+**`generation-history/`** — GET
+```
+Input:  ?page=1&limit=20
+Auth:   Required
+Flow:   Query generations for owner, ordered by created_at DESC
+Output: { generations: Generation[], total: number }
+```
+
+#### Billing
+
+**`stripe-checkout/`** — POST
+```
+Input:  { plan: 'starter' | 'growth' | 'scale' }
+Auth:   Required
+Flow:
+  1. Get or create Stripe customer
+  2. Create Checkout session with plan price_id
+  3. Return checkout URL
+Output: { url: string }
+```
+
+**`stripe-portal/`** — POST
+```
+Auth:   Required
+Flow:   Create Stripe billing portal session
+Output: { url: string }
+```
+
+**`stripe-webhook/`** — POST
+```
+Auth:   Stripe signature verification (no JWT)
+Flow:
+  1. Verify webhook signature
+  2. Check event_id in audit_logs (idempotency)
+  3. Handle events:
+     - checkout.session.completed → create/update subscription, set plan, add credits
+     - invoice.paid → renew credits for billing period
+     - customer.subscription.updated → update plan/status
+     - customer.subscription.deleted → set plan to 'free', clear credits
+  4. Log event in audit_logs
+Output: { received: true }
+```
+
+**`credit-balance/`** — GET
+```
+Auth:   Required
+Flow:   Read credit_balances for user
+Output: { remaining: number, plan: string }
+```
+
+#### Auth Helpers
+
+**`delete-account/`** — POST
+```
+Auth:   Required
+Flow:
+  1. Delete all user data (products, personas, generations, credits)
+  2. Delete Storage objects
+  3. Cancel Stripe subscription
+  4. Delete Supabase auth user
+Output: { success: true }
+```
+
+---
+
+## Frontend Architecture
+
+### Pages (App Router)
+
+```
+app/
+├── (marketing)/
+│   ├── page.tsx                    # Landing page: hero + URL input + pricing + FAQ
+│   ├── pricing/page.tsx            # Plan comparison + checkout CTA
+│   └── layout.tsx                  # Marketing layout (Navbar + Footer)
+│
+├── (app)/
+│   ├── layout.tsx                  # App layout (auth guard + sidebar)
+│   ├── dashboard/page.tsx          # Overview: credits, recent generations, video library
+│   ├── products/
+│   │   ├── page.tsx                # Product library
+│   │   └── [id]/page.tsx           # Product detail + edit
+│   ├── personas/
+│   │   ├── page.tsx                # Persona library
+│   │   ├── new/page.tsx            # Persona creator (character builder)
+│   │   └── [id]/page.tsx           # Persona detail
+│   ├── generate/
+│   │   ├── page.tsx                # Generation wizard: select product → persona → generate
+│   │   └── [id]/page.tsx           # Generation result: 4 videos side-by-side
+│   ├── settings/page.tsx           # Account settings
+│   └── billing/page.tsx            # Subscription management
+│
+├── login/page.tsx                  # Auth page (email + Google OAuth)
+├── signup/page.tsx                 # Registration page
+├── auth/callback/route.ts          # OAuth callback handler
+│
+└── layout.tsx                      # Root layout (providers, fonts, metadata)
+```
+
+### Key Components
+
+```
+components/
+├── ui/                             # shadcn/ui base components
+│   ├── button.tsx
+│   ├── card.tsx
+│   ├── dialog.tsx
+│   ├── input.tsx
+│   ├── select.tsx
+│   ├── slider.tsx
+│   ├── badge.tsx
+│   ├── skeleton.tsx
+│   ├── toast.tsx
+│   └── ...
+│
+├── layout/
+│   ├── navbar.tsx                  # Top nav (marketing)
+│   ├── sidebar.tsx                 # App sidebar (dashboard nav)
+│   ├── footer.tsx                  # Marketing footer
+│   └── auth-guard.tsx              # Redirect to login if unauthenticated
+│
+├── landing/
+│   ├── hero-section.tsx            # Hero + URL input CTA
+│   ├── how-it-works.tsx            # 3-step explainer
+│   ├── pricing-section.tsx         # Plan cards
+│   ├── faq-section.tsx             # Accordion FAQ
+│   └── demo-video.tsx              # Product demo
+│
+├── products/
+│   ├── product-card.tsx            # Product display card
+│   ├── product-grid.tsx            # Grid of product cards
+│   ├── scrape-form.tsx             # URL input + scrape trigger
+│   ├── scrape-results.tsx          # Scraped products with edit/confirm
+│   └── manual-upload.tsx           # Manual product upload form
+│
+├── personas/
+│   ├── character-builder.tsx       # Main persona creator (9 attributes)
+│   ├── attribute-selector.tsx      # Individual attribute control (slider/picker/grid)
+│   ├── persona-preview.tsx         # Live preview of selected attributes
+│   ├── persona-image-picker.tsx    # 4 generated images — select one
+│   └── persona-card.tsx            # Persona display card
+│
+├── generate/
+│   ├── generation-wizard.tsx       # Step-by-step: product → persona → generate
+│   ├── script-preview.tsx          # Hook/Body/CTA script display
+│   ├── generation-progress.tsx     # Progress bar with status polling
+│   ├── video-grid.tsx              # 4 videos side-by-side comparison
+│   ├── video-player.tsx            # Individual video player with download
+│   └── paywall-modal.tsx           # Plan selection modal at generation step
+│
+├── dashboard/
+│   ├── credit-badge.tsx            # Credit balance display
+│   ├── generation-history.tsx      # Recent generations list
+│   └── stats-cards.tsx             # Quick stats (videos generated, credits used)
+│
+└── billing/
+    ├── plan-card.tsx               # Individual plan display
+    ├── plan-comparison.tsx         # Feature comparison table
+    └── billing-portal-button.tsx   # Redirect to Stripe portal
+```
+
+### Client Libraries
+
+```
+lib/
+├── supabase.ts                     # Supabase browser client (createBrowserClient)
+├── supabase-server.ts              # Supabase server client (createServerClient for SSR)
+├── api.ts                          # Edge Function call wrappers (scrape, generate, etc.)
+├── hooks/
+│   ├── use-user.ts                 # Auth state hook
+│   ├── use-credits.ts              # Credit balance hook
+│   ├── use-generation-status.ts    # Polling hook for video generation progress
+│   └── use-products.ts             # Products CRUD hook
+├── types.ts                        # Shared TypeScript types (Product, Persona, Generation, etc.)
+├── constants.ts                    # Plan limits, attribute options, pricing
+└── utils.ts                        # cn() helper, formatters
+```
 
 ---
 
 ## Implementation Patterns & Consistency Rules
 
-### Naming Patterns
+### Edge Function Pattern
 
-**Database Naming Conventions:**
-- Tables: `snake_case`, plural (`users`, `generations`, `credit_transactions`)
-- Columns: `snake_case` (`created_at`, `user_id`, `brand_name`)
-- Foreign keys: `{referenced_table_singular}_id` (`user_id`, `brand_id`, `persona_id`)
-- Indexes: `idx_{table}_{columns}` (`idx_users_clerk_id`, `idx_generations_user_id_status`)
-- Enums: `snake_case` values (`pending`, `processing`, `completed`, `failed`)
-
-**API Naming Conventions:**
-- Endpoints: `/api/{resource}` plural, lowercase (`/api/products`, `/api/generations`)
-- Route params: `[id]` (Next.js convention)
-- Query params: `camelCase` (`?brandId=xxx&status=pending`)
-- Headers: Standard HTTP headers only, no custom `X-` headers at MVP
-
-**Code Naming Conventions:**
-- Files: `kebab-case.ts` for utilities, `PascalCase.tsx` for React components
-- Functions: `camelCase` (`getProducts`, `triggerGeneration`)
-- React components: `PascalCase` (`PersonaBuilder`, `VideoReviewGrid`)
-- Types/Interfaces: `PascalCase` with no prefix (`User`, `Generation`, not `IUser`)
-- Constants: `UPPER_SNAKE_CASE` (`MAX_SEGMENTS`, `DEFAULT_HOOK_DURATION`)
-- Zod schemas: `camelCase` + `Schema` suffix (`createGenerationSchema`, `updatePersonaSchema`)
-- Inngest functions: `kebab-case` event names (`app/generation.requested`, `app/scrape.completed`)
-
-### Structure Patterns
-
-**Project Organization:**
-- Feature-first organization inside `src/` for the Next.js app
-- Co-located tests: `*.test.ts` next to source files
-- Shared utilities in `src/lib/`
-- Zod schemas in `src/schemas/` (shared between frontend and API routes)
-
-**File Structure Patterns:**
-- One component per file
-- Index files (`index.ts`) only for barrel exports of feature modules
-- Environment variables accessed only through `src/lib/env.ts` (validated with Zod at startup)
-
-### Format Patterns
-
-**API Response Formats:**
+Every Edge Function follows this exact structure:
 
 ```typescript
-// Standard response wrapper
-type ApiResponse<T> = {
-  data: T;
-  error: null;
-} | {
-  data: null;
-  error: { code: string; message: string; field?: string };
-};
+import { getCorsHeaders } from "../_shared/cors.ts";
+import { requireUserId } from "../_shared/auth.ts";
+import { json } from "../_shared/response.ts";
+import { getAdminClient } from "../_shared/supabase.ts";
 
-// Paginated response
-type PaginatedResponse<T> = {
-  data: { items: T[]; total: number; page: number; pageSize: number };
-  error: null;
-};
+Deno.serve(async (req: Request) => {
+  const cors = getCorsHeaders(req);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+
+  try {
+    const userId = await requireUserId(req);
+    const sb = getAdminClient();
+
+    // ... business logic ...
+
+    return json({ data }, cors);
+  } catch (e: any) {
+    if (e.message === "Unauthorized") return json({ detail: "Authentication required" }, cors, 401);
+    if (e.message === "Forbidden") return json({ detail: "Access denied" }, cors, 403);
+    if (e.message === "Rate limited") return json({ detail: "Too many requests" }, cors, 429);
+    console.error(e);
+    return json({ detail: "Internal error" }, cors, 500);
+  }
+});
 ```
 
-**Date/Time Formats:**
-- Database: `timestamptz` (PostgreSQL)
-- API JSON: ISO 8601 strings (`2026-02-26T18:00:00.000Z`)
-- Frontend display: `date-fns` for formatting
-
-**ID Formats:**
-- Database primary keys: UUID v4
-- External references: Stored as `text` (Clerk IDs, Stripe IDs, etc.)
-
-### Communication Patterns
-
-**Inngest Event Naming:**
-
-```
-app/{domain}.{action}
-```
-
-Examples:
-- `app/scrape.requested`
-- `app/persona.generation.requested`
-- `app/segment.batch.requested` — Generate a batch of segments (e.g., 3 hooks + 3 bodies + 3 CTAs)
-- `app/segment.generation.requested` — Generate a single segment
-- `app/segment.completed` — Single segment finished (Kling callback)
-- `app/combo.assembly.requested` — User wants to preview/download a combo
-- `app/combo.assembly.completed` — FFmpeg stitch done
-
-**Event Payload Structure:**
+### API Call Pattern (Frontend)
 
 ```typescript
-// Segment batch request
-{
-  name: "app/segment.batch.requested",
-  data: {
-    batchId: string;
-    userId: string;
-    personaId: string;
-    productId: string;
-    segments: {
-      type: "hook" | "body" | "cta";
-      count: number;        // e.g., 3 hooks
-      duration: number;     // seconds per segment
-    }[];
-  }
-}
+// lib/api.ts
+const EDGE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL + "/functions/v1";
 
-// Combo assembly request (on-demand)
-{
-  name: "app/combo.assembly.requested",
-  data: {
-    comboId: string;
-    userId: string;
-    hookSegmentId: string;
-    bodySegmentId: string;
-    ctaSegmentId: string;
+async function callEdge<T>(fn: string, options: { method?: string; body?: any; token: string }): Promise<T> {
+  const res = await fetch(`${EDGE_URL}/${fn}`, {
+    method: options.method || "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${options.token}`,
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Unknown error" }));
+    throw new Error(err.detail || `Edge function error: ${res.status}`);
   }
+
+  return res.json();
 }
 ```
 
-**State Updates:**
-- Zustand stores: Immutable updates via Immer middleware
-- React Query: Optimistic updates for CRUD, invalidation for generation status
-- Database status: Updated by Inngest steps via Supabase client
+### Naming Conventions
 
-### Process Patterns
+| Context | Convention | Example |
+|---------|-----------|---------|
+| DB tables | snake_case plural | `credit_balances` |
+| DB columns | snake_case | `owner_id`, `created_at` |
+| Edge Functions | kebab-case | `generate-video/`, `stripe-webhook/` |
+| Frontend pages | kebab-case dirs | `app/(app)/dashboard/` |
+| Components | PascalCase files | `PersonaCard.tsx` |
+| Hooks | camelCase with `use` prefix | `useCredits.ts` |
+| Types | PascalCase | `Generation`, `PersonaAttributes` |
+| API wrappers | camelCase verbs | `scrapeProduct()`, `generateVideo()` |
 
-**Error Handling:**
-- API routes: Try/catch with consistent `ApiResponse` format
-- Inngest steps: Built-in retry (max 3 attempts per step, exponential backoff)
-- Frontend: React Error Boundaries for component errors, React Query `onError` for API errors
-- User-facing errors: Friendly messages, never expose stack traces or internal codes
+### Error Handling
 
-**Loading State Patterns:**
-- React Query handles loading/error/success states for all server data
-- Skeleton components for initial page loads
-- Progress indicators for generation pipeline (poll generation status endpoint)
-- Toast notifications for background task completions
+- **Edge Functions:** Always return JSON with `detail` field on error. Log to `console.error` for server-side. Never expose stack traces.
+- **Frontend:** `try/catch` on all API calls. Show toast on error. Never swallow errors silently.
+- **Stripe webhook:** Log + acknowledge (200) even on processing errors to prevent retry storms. Track failures in `audit_logs`.
 
-**Credit Management Pattern (Segment-Based):**
+### Response Format
 
+All Edge Functions return:
+
+```typescript
+// Success
+{ "data": { ... } }
+
+// Error
+{ "detail": "Human-readable error message" }
 ```
-1 credit = 1 segment (hook, body, or CTA)
-Combo assembly (FFmpeg stitch) = free (no credit cost, just compute)
-
-1. User configures batch: e.g., 3 hooks + 3 bodies + 3 CTAs = 9 segments
-2. API route checks credit balance >= 9 (SELECT with FOR UPDATE)
-3. If sufficient: Decrement 9 credits atomically, create batch + segment records
-4. Send Inngest event 'app/segment.batch.requested'
-5. Inngest fans out: generates 9 segments in parallel (or batched)
-6. Per segment: If Kling fails after 3 retries → refund 1 credit
-7. Combo assembly: User picks 1 hook + 1 body + 1 CTA in mixer UI
-8. FFmpeg stitches on-demand → no credit cost
-9. Overage: If credits exhausted mid-batch, charge overage per segment via Stripe usage record
-```
-
-### Enforcement Guidelines
-
-**All AI Agents MUST:**
-- Use the Zod schemas in `src/schemas/` for all data validation — never inline validation
-- Use the `ApiResponse<T>` wrapper for all API route responses — never return raw data
-- Use Inngest step functions for all async pipeline work — never use `setTimeout` or manual queues
-- Store all generated files in R2 via the storage utility in `src/lib/storage.ts` — never write to local filesystem
-- Check credit balance before any generation — never generate without credit verification
-- Use `src/lib/env.ts` for all environment variable access — never use `process.env` directly
 
 ---
 
-## Project Structure & Boundaries
-
-### Complete Project Directory Structure
+## Project Directory Structure
 
 ```
-aiugc/
-├── .github/
-│   └── workflows/
-│       ├── ci.yml                          # Lint, type-check, test
-│       └── deploy-worker.yml               # Railway worker deploy
-├── .env.local                              # Local dev environment
-├── .env.example                            # Template for env vars
-├── .gitignore
-├── bunfig.toml                             # Bun configuration
-├── package.json
-├── tsconfig.json
-├── next.config.ts
-├── tailwind.config.ts
-├── components.json                         # shadcn/ui config
-├── middleware.ts                            # Clerk auth middleware
+ugcfarmai/
+├── frontend/
+│   ├── src/
+│   │   ├── app/                    # Next.js App Router pages
+│   │   ├── components/             # React components (ui/, layout/, landing/, etc.)
+│   │   ├── lib/                    # Utilities, API client, hooks, types
+│   │   └── styles/
+│   │       └── globals.css         # Tailwind base + custom styles
+│   ├── public/                     # Static assets (logo, OG images)
+│   ├── next.config.js
+│   ├── tailwind.config.ts
+│   ├── tsconfig.json
+│   ├── package.json
+│   └── .env.local                  # NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
 │
 ├── supabase/
-│   ├── config.toml                         # Supabase local config
-│   ├── seed.sql                            # Dev seed data
-│   └── migrations/
-│       ├── 001_create_users.sql
-│       ├── 002_create_brands.sql
-│       ├── 003_create_products.sql
-│       ├── 004_create_personas.sql
-│       ├── 005_create_generations.sql
-│       ├── 006_create_videos.sql
-│       ├── 007_create_subscriptions.sql
-│       ├── 008_create_credit_transactions.sql
-│       └── 009_create_rls_policies.sql
+│   ├── migrations/
+│   │   ├── 001_initial_schema.sql  # Tables, RLS, triggers, indexes
+│   │   ├── 002_storage_buckets.sql # Bucket creation + policies
+│   │   └── ...
+│   ├── functions/
+│   │   ├── _shared/
+│   │   │   ├── cors.ts
+│   │   │   ├── auth.ts
+│   │   │   ├── response.ts
+│   │   │   ├── supabase.ts
+│   │   │   ├── credits.ts
+│   │   │   ├── ssrf.ts
+│   │   │   └── rate-limit.ts
+│   │   ├── scrape-product/index.ts
+│   │   ├── confirm-products/index.ts
+│   │   ├── upload-product/index.ts
+│   │   ├── generate-persona/index.ts
+│   │   ├── select-persona-image/index.ts
+│   │   ├── generate-video/index.ts
+│   │   ├── video-status/index.ts
+│   │   ├── generation-history/index.ts
+│   │   ├── stripe-checkout/index.ts
+│   │   ├── stripe-portal/index.ts
+│   │   ├── stripe-webhook/index.ts
+│   │   ├── credit-balance/index.ts
+│   │   └── delete-account/index.ts
+│   └── config.toml
 │
-├── src/
-│   ├── app/
-│   │   ├── globals.css
-│   │   ├── layout.tsx                      # Root layout (Clerk provider)
-│   │   │
-│   │   ├── (marketing)/
-│   │   │   ├── layout.tsx                  # Marketing layout (header/footer)
-│   │   │   ├── page.tsx                    # Landing page
-│   │   │   └── pricing/
-│   │   │       └── page.tsx                # Pricing page
-│   │   │
-│   │   ├── (auth)/
-│   │   │   ├── sign-in/[[...sign-in]]/
-│   │   │   │   └── page.tsx
-│   │   │   └── sign-up/[[...sign-up]]/
-│   │   │       └── page.tsx
-│   │   │
-│   │   ├── (dashboard)/
-│   │   │   ├── layout.tsx                  # Dashboard layout (sidebar, header)
-│   │   │   ├── dashboard/
-│   │   │   │   └── page.tsx                # Dashboard home (video library)
-│   │   │   ├── brands/
-│   │   │   │   ├── page.tsx                # Brand list
-│   │   │   │   └── [brandId]/
-│   │   │   │       ├── page.tsx            # Brand detail + products
-│   │   │   │       └── products/
-│   │   │   │           └── [productId]/
-│   │   │   │               └── page.tsx    # Product detail
-│   │   │   ├── personas/
-│   │   │   │   ├── page.tsx                # Persona list
-│   │   │   │   ├── new/
-│   │   │   │   │   └── page.tsx            # Persona builder
-│   │   │   │   └── [personaId]/
-│   │   │   │       └── page.tsx            # Persona detail/edit
-│   │   │   ├── generate/
-│   │   │   │   ├── page.tsx                # Generation wizard (select product + persona)
-│   │   │   │   └── [generationId]/
-│   │   │   │       └── page.tsx            # Generation progress + video review
-│   │   │   └── settings/
-│   │   │       ├── page.tsx                # Account settings
-│   │   │       └── billing/
-│   │   │           └── page.tsx            # Subscription management
-│   │   │
-│   │   ├── api/
-│   │   │   ├── scrape/
-│   │   │   │   └── route.ts                # POST: Trigger website scraping
-│   │   │   ├── brands/
-│   │   │   │   ├── route.ts                # GET (list), POST (create)
-│   │   │   │   └── [brandId]/
-│   │   │   │       └── route.ts            # GET, PATCH, DELETE
-│   │   │   ├── products/
-│   │   │   │   ├── route.ts                # GET (list by brand)
-│   │   │   │   └── [productId]/
-│   │   │   │       └── route.ts            # GET, PATCH, DELETE
-│   │   │   ├── personas/
-│   │   │   │   ├── route.ts                # GET (list), POST (create)
-│   │   │   │   ├── generate/
-│   │   │   │   │   └── route.ts            # POST: Generate persona images
-│   │   │   │   └── [personaId]/
-│   │   │   │       └── route.ts            # GET, PATCH, DELETE
-│   │   │   ├── generations/
-│   │   │   │   ├── route.ts                # GET (list), POST (create + trigger)
-│   │   │   │   └── [generationId]/
-│   │   │   │       └── route.ts            # GET (status + videos)
-│   │   │   ├── billing/
-│   │   │   │   ├── checkout/
-│   │   │   │   │   └── route.ts            # POST: Create Stripe checkout session
-│   │   │   │   └── portal/
-│   │   │   │       └── route.ts            # POST: Create Stripe portal session
-│   │   │   └── webhooks/
-│   │   │       ├── clerk/
-│   │   │       │   └── route.ts            # POST: Clerk user sync
-│   │   │       ├── stripe/
-│   │   │       │   └── route.ts            # POST: Stripe subscription events
-│   │   │       └── inngest/
-│   │   │           └── route.ts            # POST: Inngest function endpoint
-│   │   │
-│   │   └── onboarding/
-│   │       └── page.tsx                    # Post-scrape onboarding flow
-│   │
-│   ├── components/
-│   │   ├── ui/                             # shadcn/ui components
-│   │   │   ├── button.tsx
-│   │   │   ├── card.tsx
-│   │   │   ├── dialog.tsx
-│   │   │   ├── input.tsx
-│   │   │   ├── select.tsx
-│   │   │   ├── slider.tsx
-│   │   │   ├── skeleton.tsx
-│   │   │   ├── toast.tsx
-│   │   │   └── ...
-│   │   ├── layout/
-│   │   │   ├── MarketingHeader.tsx
-│   │   │   ├── MarketingFooter.tsx
-│   │   │   ├── DashboardSidebar.tsx
-│   │   │   └── DashboardHeader.tsx
-│   │   ├── landing/
-│   │   │   ├── HeroSection.tsx
-│   │   │   ├── UrlInputCta.tsx
-│   │   │   ├── FeatureShowcase.tsx
-│   │   │   ├── PricingTeaser.tsx
-│   │   │   ├── TestimonialSection.tsx
-│   │   │   └── FaqSection.tsx
-│   │   ├── persona-builder/
-│   │   │   ├── PersonaBuilder.tsx          # Main builder component
-│   │   │   ├── AttributeSelector.tsx       # Generic attribute picker
-│   │   │   ├── SkinToneGradient.tsx        # Gradient color picker
-│   │   │   ├── HairStylePicker.tsx
-│   │   │   ├── ClothingStylePicker.tsx
-│   │   │   ├── AccessoryPicker.tsx
-│   │   │   ├── PersonaPreview.tsx          # Live preview panel
-│   │   │   └── PersonaImageGrid.tsx        # 4-variant selection grid
-│   │   ├── generation/
-│   │   │   ├── GenerationWizard.tsx        # Multi-step segment generation flow
-│   │   │   ├── ProductSelector.tsx
-│   │   │   ├── PersonaSelector.tsx
-│   │   │   ├── SegmentTypeSelector.tsx     # Choose how many hooks/bodies/CTAs
-│   │   │   ├── ScriptPreview.tsx           # AI-generated script display per segment
-│   │   │   └── GenerationProgress.tsx      # Pipeline progress tracker
-│   │   ├── mixer/
-│   │   │   ├── VideoMixer.tsx              # Drag-and-drop segment combiner
-│   │   │   ├── SegmentColumn.tsx           # Column of hook/body/cta segments
-│   │   │   ├── SegmentCard.tsx             # Individual segment preview card
-│   │   │   ├── ComboPreview.tsx            # Preview assembled combo (FFmpeg on-demand)
-│   │   │   └── ComboExportButton.tsx       # Download assembled MP4
-│   │   ├── video/
-│   │   │   ├── VideoPlayer.tsx             # Custom video player
-│   │   │   ├── SegmentPlayer.tsx           # Short segment preview player
-│   │   │   └── VideoLibrary.tsx            # Grid of segments + assembled combos
-│   │   ├── billing/
-│   │   │   ├── PricingCards.tsx            # Plan selection cards
-│   │   │   ├── CreditBalance.tsx           # Current credit display
-│   │   │   └── PaywallModal.tsx            # Paywall trigger modal
-│   │   └── brand/
-│   │       ├── BrandCard.tsx
-│   │       ├── ProductCard.tsx
-│   │       └── ProductImportReview.tsx     # Scraped data review/edit
-│   │
-│   ├── lib/
-│   │   ├── env.ts                          # Zod-validated environment variables
-│   │   ├── supabase/
-│   │   │   ├── client.ts                   # Browser Supabase client
-│   │   │   ├── server.ts                   # Server-side Supabase client
-│   │   │   └── admin.ts                    # Service role client (webhooks)
-│   │   ├── clerk.ts                        # Clerk helpers
-│   │   ├── stripe.ts                       # Stripe client + helpers
-│   │   ├── inngest.ts                      # Inngest client initialization
-│   │   ├── storage.ts                      # R2 upload/download/signed URL helpers
-│   │   ├── openrouter.ts                   # OpenRouter client + model selection
-│   │   └── utils.ts                        # General utilities (cn, formatters)
-│   │
-│   ├── schemas/
-│   │   ├── brand.ts                        # Brand Zod schemas
-│   │   ├── product.ts                      # Product Zod schemas
-│   │   ├── persona.ts                      # Persona attribute + creation schemas
-│   │   ├── generation.ts                   # Generation request/response schemas
-│   │   ├── billing.ts                      # Billing/subscription schemas
-│   │   └── scrape.ts                       # Scrape request/response schemas
-│   │
-│   ├── hooks/
-│   │   ├── use-brands.ts                   # React Query hooks for brands
-│   │   ├── use-products.ts                 # React Query hooks for products
-│   │   ├── use-personas.ts                 # React Query hooks for personas
-│   │   ├── use-generations.ts              # React Query hooks for generations
-│   │   ├── use-credits.ts                  # Credit balance hook
-│   │   └── use-generation-progress.ts      # Polling hook for generation status
-│   │
-│   ├── stores/
-│   │   ├── persona-builder.ts              # Zustand store for builder state
-│   │   └── generation-wizard.ts            # Zustand store for wizard state
-│   │
-│   ├── inngest/
-│   │   ├── client.ts                       # Inngest client config
-│   │   ├── functions/
-│   │   │   ├── scrape-website.ts           # Website scraping pipeline
-│   │   │   ├── generate-persona-images.ts  # NanoBanana persona image generation
-│   │   │   ├── generate-segment-batch.ts   # Generate N segments (hook/body/cta batch)
-│   │   │   ├── generate-single-segment.ts  # Generate 1 segment (script → POV → Kling)
-│   │   │   ├── assemble-combo.ts           # FFmpeg stitch on-demand (hook+body+cta)
-│   │   │   └── send-completion-email.ts    # Email notification
-│   │   └── index.ts                        # Export all functions for registration
-│   │
-│   └── types/
-│       ├── database.ts                     # Supabase generated types
-│       └── api.ts                          # ApiResponse type + helpers
+├── _bmad/                          # BMAD framework (planning)
+├── _bmad-output/                   # Planning artifacts (PRD, architecture)
 │
-├── worker/                                 # Separate Hono service (Railway)
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── Dockerfile                          # Bun + FFmpeg + Playwright
-│   ├── src/
-│   │   ├── index.ts                        # Hono app entry point
-│   │   ├── routes/
-│   │   │   ├── scrape.ts                   # Scraping endpoints
-│   │   │   ├── image-generate.ts           # NanoBanana proxy
-│   │   │   ├── video-generate.ts           # Kling 3.0 proxy
-│   │   │   ├── video-assemble.ts           # FFmpeg stitching
-│   │   │   └── health.ts                   # Health check
-│   │   ├── services/
-│   │   │   ├── scraper/
-│   │   │   │   ├── shopify.ts              # Shopify Storefront API client
-│   │   │   │   └── generic.ts              # Playwright generic scraper
-│   │   │   ├── nanobanana.ts               # NanoBanana API client
-│   │   │   ├── kling/
-│   │   │   │   ├── client.ts               # Kling API client (auth, base HTTP)
-│   │   │   │   ├── image-to-video.ts       # POST /v1/videos/image2video
-│   │   │   │   ├── text-to-video.ts        # POST /v1/videos/text2video
-│   │   │   │   ├── elements.ts             # Element CRUD (persona consistency)
-│   │   │   │   ├── query.ts                # GET task status polling/webhook
-│   │   │   │   └── types.ts                # Kling API types (models, params, responses)
-│   │   │   ├── openrouter.ts               # OpenRouter API client
-│   │   │   └── ffmpeg.ts                   # FFmpeg wrapper (Expert Mode only)
-│   │   ├── lib/
-│   │   │   ├── env.ts                      # Worker environment validation
-│   │   │   ├── storage.ts                  # R2 client for worker
-│   │   │   └── supabase.ts                 # Supabase client for status updates
-│   │   └── types/
-│   │       └── index.ts                    # Worker-specific types
-│   └── tests/
-│       ├── scraper.test.ts
-│       ├── nanobanana.test.ts
-│       └── ffmpeg.test.ts
-│
-├── public/
-│   ├── og-image.png                        # Open Graph image
-│   └── favicon.ico
-│
-└── tests/
-    ├── setup.ts                            # Test setup (mocks, env)
-    └── e2e/
-        ├── landing.spec.ts
-        ├── onboarding.spec.ts
-        ├── persona-builder.spec.ts
-        └── generation.spec.ts
+├── .env                            # Local dev: Supabase keys, Stripe test keys
+├── .gitignore
+└── README.md
 ```
 
-### Architectural Boundaries
+---
 
-**API Boundaries:**
-- Public API: `/api/scrape` (rate-limited, no auth required for initial scrape)
-- Authenticated API: All other `/api/*` routes require Clerk session
-- Webhook API: `/api/webhooks/*` verified by respective service signatures
-- Worker API: `worker/src/routes/*` called only by Inngest (verified by Inngest signing key)
+## External API Integration Contracts
 
-**Component Boundaries:**
-- Marketing pages: No access to dashboard state or authenticated APIs
-- Dashboard: Requires Clerk session, accesses only user-scoped data
-- Persona Builder: Self-contained component with local Zustand store, communicates via React Query mutations
-- Generation Pipeline: Event-driven, no direct coupling between steps
+### OpenAI (Script Generation)
 
-**Data Boundaries:**
-- All database access through Supabase client (never raw SQL in app code)
-- RLS enforces user data isolation — no user can access another user's data
-- Worker service has service-role access (needed for cross-user operations like batch processing)
-- R2 access: Signed URLs for reads (time-limited), direct upload for writes (worker only)
+```typescript
+// Used in: generate-video/ Edge Function
+// Model: gpt-4o
+// Purpose: Generate Hook/Body/CTA ad script
 
-### Requirements to Structure Mapping
-
-| Epic | Primary Location |
-|---|---|
-| E1: Landing Page | `src/app/(marketing)/`, `src/components/landing/` |
-| E2: Website Scraper | `src/app/api/scrape/`, `worker/src/services/scraper/`, `src/inngest/functions/scrape-website.ts` |
-| E3: Auth & User Mgmt | `src/app/(auth)/`, `middleware.ts`, `src/app/api/webhooks/clerk/` |
-| E4: Persona Creator | `src/app/(dashboard)/personas/`, `src/components/persona-builder/`, `src/stores/persona-builder.ts` |
-| E5: NanoBanana Integration | `worker/src/services/nanobanana.ts`, `src/inngest/functions/generate-persona-images.ts` |
-| E6: AI Script Generator | `worker/src/services/openrouter.ts`, `src/inngest/functions/generate-script.ts` |
-| E7: Kling Video Pipeline | `worker/src/services/kling.ts`, `src/inngest/functions/generate-video.ts` |
-| E8: Video Assembly | `worker/src/services/ffmpeg.ts`, `worker/src/routes/video-assemble.ts` |
-| E9: Paywall & Billing | `src/components/billing/`, `src/app/api/billing/`, `src/app/api/webhooks/stripe/` |
-| E10: Dashboard & Library | `src/app/(dashboard)/dashboard/`, `src/components/video/` |
-
-### External Integration Points
-
-| Service | Integration Method | Key File |
-|---|---|---|
-| Clerk | SDK + webhooks | `src/lib/clerk.ts`, `src/app/api/webhooks/clerk/route.ts` |
-| Supabase | Client SDK | `src/lib/supabase/` |
-| Stripe | SDK + webhooks | `src/lib/stripe.ts`, `src/app/api/webhooks/stripe/route.ts` |
-| Inngest | SDK + event-driven | `src/lib/inngest.ts`, `src/inngest/` |
-| NanoBanana | REST API | `worker/src/services/nanobanana.ts` |
-| Kling 3.0 | REST API | `worker/src/services/kling.ts` |
-| OpenRouter | REST API | `worker/src/services/openrouter.ts` |
-| Cloudflare R2 | S3-compatible SDK | `src/lib/storage.ts`, `worker/src/lib/storage.ts` |
-
-### Data Flow: Modular Segment Generation Pipeline
-
-#### Step 1: Segment Batch Generation
-
-User selects a product + persona, chooses how many hooks/bodies/CTAs to generate.
-
-```
-User configures batch: 3 hooks + 3 bodies + 3 CTAs
-    │
-    ▼
-POST /api/segments/batch
-    ├── Validate: total segments (9) <= credit balance
-    ├── Decrement 9 credits atomically (SELECT FOR UPDATE + UPDATE)
-    ├── Create segment_batch record + 9 segment records (status: 'pending')
-    └── inngest.send('app/segment.batch.requested')
-         │
-         ▼
-    Inngest: generate-segment-batch (fan-out)
-         │
-         ├── step.run('generate-pov-image') [once per batch]
-         │   └── Worker: NanoBanana → POV composite (persona + product)
-         │   └── Upload to R2, store URL in batch record
-         │
-         ├── For each segment in batch (9x, parallelized):
-         │   │
-         │   ├── step.run('generate-script-{segmentId}')
-         │   │   └── Worker: OpenRouter → script for this segment type
-         │   │   └── Hook: attention-grabbing opener, 3-5s
-         │   │   └── Body: product benefits + social proof, 5-10s
-         │   │   └── CTA: urgency-driven close, 3-5s
-         │   │   └── Each with slight prompt variation for diversity
-         │   │
-         │   ├── step.run('create-kling-task-{segmentId}')
-         │   │   └── Worker: POST /v1/videos/image2video
-         │   │       ├── model_name: "kling-v2-6"  (cost-optimized)
-         │   │       ├── image: POV image URL
-         │   │       ├── prompt: segment script text
-         │   │       ├── mode: "std" (720p)
-         │   │       ├── duration: "5" (hook/cta) or "10" (body)
-         │   │       ├── aspect_ratio: "9:16" (vertical for social)
-         │   │       └── callback_url: worker webhook endpoint
-         │   │
-         │   ├── step.waitForEvent('app/segment.completed', { segmentId })
-         │   │   └── Kling calls callback_url on succeed/failed
-         │   │   └── Inngest resumes (no polling)
-         │   │
-         │   └── step.run('download-and-store-{segmentId}')
-         │       └── Download video from Kling URL (expires in 30 days!)
-         │       └── Upload to R2 (permanent storage)
-         │       └── Update segment record: status='completed', video_url=R2 URL
-         │
-         └── step.run('notify-batch-complete')
-             └── Update batch status: 'completed'
-             └── Send email/push notification
-                  │
-                  ▼
-         User sees 3 hooks + 3 bodies + 3 CTAs in mixer UI
+const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${OPENAI_API_KEY}`,
+  },
+  body: JSON.stringify({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "system",
+        content: "You are a UGC ad scriptwriter. Write short-form video ad scripts in Hook/Body/CTA structure."
+      },
+      {
+        role: "user",
+        content: `Product: ${product.name}\nDescription: ${product.description}\nBrand tone: ${brand_summary.tone}\nTarget: ${brand_summary.demographic}\nSelling points: ${brand_summary.selling_points.join(', ')}`
+      }
+    ],
+    response_format: { type: "json_object" }
+  }),
+});
+// Expected output: { hook: { text, duration_seconds }, body: { text, duration_seconds }, cta: { text, duration_seconds } }
 ```
 
-#### Step 2: On-Demand Combo Assembly (FFmpeg)
+### NanoBanana (Persona Image Generation)
 
-User mixes and matches segments in the mixer UI. Assembly happens on-demand.
+```typescript
+// Used in: generate-persona/, generate-video/ (composite image)
+// Purpose: Generate 4 persona images from attribute prompt
 
-```
-User selects: Hook #2 + Body #1 + CTA #3
-    │
-    ▼
-POST /api/combos
-    ├── Create video_combo record
-    └── inngest.send('app/combo.assembly.requested')
-         │
-         ▼
-    Inngest: assemble-combo
-         │
-         ├── step.run('fetch-segments')
-         │   └── Download 3 segment videos from R2 to worker temp storage
-         │
-         ├── step.run('ffmpeg-stitch')
-         │   └── FFmpeg: concat with crossfade transitions (0.5s)
-         │   └── Output: single MP4, 9:16 aspect ratio
-         │
-         ├── step.run('upload-combo')
-         │   └── Upload assembled video to R2
-         │   └── Update combo record: status='completed', video_url=R2 URL
-         │
-         └── Return combo URL to frontend (via React Query invalidation)
-              │
-              ▼
-         User previews assembled video, downloads as MP4
+const prompt = buildPersonaPrompt(attributes);
+// prompt example: "UGC-style portrait photo, female, 25-30 years old, light skin, brown wavy hair, green eyes, athletic build, casual streetwear, gold earrings, looking at camera, natural lighting"
+
+const response = await fetch("https://api.nanobanana.com/v1/generate", {
+  method: "POST",
+  headers: { Authorization: `Bearer ${NANOBANANA_API_KEY}` },
+  body: JSON.stringify({
+    prompt,
+    num_images: 4,
+    style: "photorealistic",
+    aspect_ratio: "9:16" // vertical for UGC
+  }),
+});
+// Expected output: { images: [{ url: string }] }
 ```
 
-**Key insight:** Assembly is FREE (no Kling API cost, just FFmpeg compute on Railway).
-Users get 27 combinations from 9 segment credits. The value multiplier is the product differentiator.
+### Kling 3.0 (Video Generation)
 
-#### Kling Element Integration (Persona Consistency)
+```typescript
+// Used in: generate-video/ (fire job), video-status/ (poll result)
+// Purpose: Generate video segment from script + persona image
 
-For improved persona consistency across multiple generations:
+// Step 1: Submit job
+const submitResponse = await fetch("https://api.kling.ai/v1/videos/generate", {
+  method: "POST",
+  headers: { Authorization: `Bearer ${KLING_API_KEY}` },
+  body: JSON.stringify({
+    image_url: compositeImageUrl,
+    script: segmentText,
+    duration: segmentDuration,
+    aspect_ratio: "9:16",
+    mode: "standard" // or "professional" for Scale tier
+  }),
+});
+// Expected output: { job_id: string, status: "processing" }
 
+// Step 2: Poll status
+const statusResponse = await fetch(`https://api.kling.ai/v1/videos/${jobId}`, {
+  headers: { Authorization: `Bearer ${KLING_API_KEY}` },
+});
+// Expected output: { job_id, status: "processing" | "completed" | "failed", video_url?: string }
 ```
-First generation for a persona:
-    ├── Create Kling Element from NanoBanana persona image
-    │   POST /v1/general/advanced-custom-elements
-    │   ├── reference_type: "image_refer"
-    │   ├── element_image_list: { frontal_image: persona_url }
-    │   └── Store element_id in personas table
-    │
-Subsequent generations:
-    ├── Reference element_id in video generation
-    │   element_list: [{ element_id: stored_id }]
-    └── Better persona consistency than raw image reference
+
+### Stripe
+
+```typescript
+// Used in: stripe-checkout/, stripe-webhook/, stripe-portal/
+// Standard Stripe Node SDK patterns — same as ZeriFlow implementation
+
+// Price IDs (env vars)
+// STRIPE_PRICE_STARTER_MONTHLY
+// STRIPE_PRICE_GROWTH_MONTHLY
+// STRIPE_PRICE_SCALE_MONTHLY
 ```
 
-#### Cost Model (V2.6 std / 720p — Default)
+---
 
-| Segment Type | Duration | Kling Cost | Per 3 Segments |
-|---|---|---|---|
-| Hook | 5s | $0.21 | $0.63 |
-| Body | 10s | $0.42 | $1.26 |
-| CTA | 5s | $0.21 | $0.63 |
-| **Batch (3H + 3B + 3C)** | **—** | **$2.52** | **27 combos** |
-| Combo assembly (FFmpeg) | — | **$0.00** | Free |
+## Environment Variables
 
-**Cost per combinable video: $0.093**
+### Frontend (.env.local)
+```
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+```
 
-#### V2.6 vs V3 Comparison
+### Supabase Edge Functions (Secrets)
+```
+OPENAI_API_KEY=sk-...
+NANOBANANA_API_KEY=nb-...
+KLING_API_KEY=kl-...
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_STARTER_MONTHLY=price_...
+STRIPE_PRICE_GROWTH_MONTHLY=price_...
+STRIPE_PRICE_SCALE_MONTHLY=price_...
+```
 
-| | V2.6 std | V3 std | Savings |
-|---|---|---|---|
-| Per second | $0.042/s | $0.084/s | **50% cheaper** |
-| 9-segment batch | $2.52 | $5.04 | **50% cheaper** |
-| Quality | Good (720p) | Better (720p) | V3 slightly better at same resolution |
+---
 
-**Decision: V2.6 std for MVP.** Quality is sufficient for UGC-style social ads at 720p. Can upgrade to V3 later as a premium feature or when enterprise pricing is negotiated.
+## Security Architecture
 
-#### Revised Pricing Tiers
+### Authentication
+- Supabase Auth handles all auth flows (email/password + Google OAuth)
+- JWT tokens issued by Supabase, verified in every Edge Function via `requireUserId()`
+- Refresh tokens rotated automatically by Supabase client
 
-| Plan | Price | Segment Credits | Typical Usage | COGS | Gross Margin |
-|---|---|---|---|---|---|
-| **Starter** | $29/mo | 27 | 3 batches (3H+3B+3C) = 81 combos | $7.56 | **74%** |
-| **Growth** | $79/mo | 90 | 10 batches = 270 combos | $25.20 | **68%** |
-| **Scale** | $199/mo | 270 | 30 batches = 810 combos | $75.60 | **62%** |
+### Authorization
+- RLS on all tables — users can only access their own data
+- Subscription tier limits enforced in Edge Functions (persona slots, generation quota)
+- Admin role check for future admin endpoints
 
-Overage: $0.50/segment (Starter), $0.40/segment (Growth), $0.30/segment (Scale)
-Free trial: 3 free segment credits (1 hook + 1 body + 1 CTA = 1 combo)
+### Data Protection
+- Supabase encrypts at rest (AES-256) and in transit (TLS 1.3)
+- Signed URLs for all Storage access (1h expiry)
+- No secrets in frontend code — only `SUPABASE_URL` and `ANON_KEY` are public
+
+### Input Validation
+- URL validation + SSRF protection on scraping endpoint
+- Request body validation in every Edge Function
+- File upload size limits (product images: 5MB, no executable types)
+
+### Rate Limiting
+- Scraping: 10/hr unauthenticated, 60/hr authenticated (NFR11)
+- Generation: enforced by credit system (no credits = no generation)
+- Stripe webhook: signature verification + idempotency via audit_logs
+
+### Abuse Prevention
+- Credit system inherently rate-limits generation
+- Free trial: 1 credit (4 videos) — prevents bulk abuse
+- Unconfirmed scrape data purged after 24h (DR2)
 
 ---
 
 ## Architecture Validation Results
 
-### Coherence Validation
-
-- **Decision Compatibility:** All chosen technologies are proven to work together (Next.js + Clerk + Supabase + Stripe is a well-documented stack). Inngest natively integrates with Next.js and Vercel.
-- **Pattern Consistency:** All naming, format, and communication patterns are consistent across frontend and worker service.
-- **Structure Alignment:** Project structure maps directly to PRD epics and features.
-
 ### Requirements Coverage
 
-- **All 12 PRD epics mapped** to specific directories and files
-- **All MVP features covered:** Landing page, scraping, auth, persona builder, Easy Mode generation, 4-variant output, Starter + Growth tiers, Stripe checkout, MP4 download
-- **NFRs addressed:** Concurrent jobs (Inngest), uptime (Vercel + Railway), graceful degradation (Inngest step retries), encryption (Supabase + R2), rate limiting (middleware)
+| FR Range | Domain | Covered By |
+|----------|--------|-----------|
+| FR1–FR6 | Product Import & Scraping | `scrape-product/`, `confirm-products/`, `upload-product/`, `products` table |
+| FR7–FR10 | Auth & User Management | Supabase Auth, `profiles` table, `settings/` page |
+| FR11–FR17 | Persona Creation | `generate-persona/`, `select-persona-image/`, `personas` table, character builder UI |
+| FR18–FR26 | Video Generation (Easy Mode) | `generate-video/`, `video-status/`, `generations` table, generation wizard UI |
+| FR27–FR30 | Expert Mode (Phase 2) | Deferred — `mode` field in generations, UI not in MVP |
+| FR31–FR36 | Paywall & Billing | `stripe-checkout/`, `stripe-webhook/`, `credit_balances`, `credit_ledger`, paywall modal |
+| FR37–FR38 | Dashboard & Video Library | `generation-history/`, dashboard page, video library UI |
 
-### Implementation Readiness
+### NFR Coverage
 
-- **Decision Completeness:** All critical and important decisions made. No blockers.
-- **Structure Completeness:** Every file and directory specified. AI agents can begin implementation immediately.
-- **Pattern Completeness:** All naming, format, and process patterns defined to prevent agent conflicts.
-
-### Gap Analysis
-
-**Known gaps (non-blocking for MVP):**
-- Email notification service not specified (Resend recommended when needed)
-- Video cleanup/retention policy not defined (define post-launch based on storage costs)
-- Monitoring alerting thresholds not specified (configure after baseline metrics)
-- Kling API authentication (JWT generation) details need to be confirmed during developer onboarding
-- NanoBanana API pricing at scale not confirmed — factor into COGS model
-- Evaluate V3 as premium tier upgrade once enterprise pricing is negotiated
+| NFR | Requirement | How Met |
+|-----|------------|---------|
+| NFR1 | Scraping < 15s | Single Edge Function fetch + parse |
+| NFR2 | Persona images < 30s | NanoBanana API call within Edge Function timeout |
+| NFR3 | Video segment < 3 min | Kling async — not blocked by Edge Function timeout |
+| NFR4 | Total generation < 10 min | Parallel segment generation via multiple Kling jobs |
+| NFR5 | 50 concurrent jobs | Each job is independent Kling API calls — no shared resources |
+| NFR6 | 99.5% uptime | Supabase SLA + Vercel SLA |
+| NFR7 | Retry on AI failure | Edge Function retries (3x exponential backoff) on Kling/NanoBanana failures |
+| NFR9–10 | Encryption at rest + in transit | Supabase default (AES-256 + TLS 1.3) |
+| NFR11 | Rate limiting | `rate-limit.ts` shared helper |
+| NFR12 | Token expiry | Supabase Auth default token lifecycle |
+| NFR13 | No card data stored | Stripe handles all payment data |
+| NFR15 | CDN for videos | Supabase Storage CDN + signed URLs |
+| NFR16 | DB performance | Indexed queries, RLS optimized |
 
 ### Architecture Readiness Assessment
 
 - **Overall Status:** READY FOR IMPLEMENTATION
 - **Confidence Level:** High
-- **Key Strengths:** Event-driven pipeline with per-step retry, clean separation between web app and worker, cost-efficient storage with R2
-- **Areas for Future Enhancement:** Real-time progress via Supabase Realtime or SSE, multi-region workers, video CDN optimization
-
----
-
-**End of Architecture Document**
+- **Key Strengths:**
+  - Simple 2-service architecture (Vercel + Supabase)
+  - All external APIs are fire-and-forget HTTP calls
+  - Credit system provides natural rate limiting
+  - RLS provides data isolation without custom middleware
+- **Known Gaps (acceptable for MVP):**
+  - Video stitching (crossfade between segments) may need a simple ffmpeg step — evaluate during implementation
+  - Email notifications on generation completion (NFR8) — defer to Phase 2
+  - Expert Mode (FR27–30) — deferred by design
