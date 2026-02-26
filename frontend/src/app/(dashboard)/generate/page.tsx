@@ -26,9 +26,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -43,21 +41,18 @@ const mockProducts = [
   {
     id: "prod-1",
     name: "Vitamin C Serum",
-    brand: "GlowSkin Cosmetics",
     price: "$29.99",
     image: null as string | null,
   },
   {
     id: "prod-2",
     name: "Hyaluronic Acid Moisturizer",
-    brand: "GlowSkin Cosmetics",
     price: "$34.99",
     image: null as string | null,
   },
   {
     id: "prod-3",
     name: "Protein Shake Mix",
-    brand: "FitFuel Nutrition",
     price: "$49.99",
     image: null as string | null,
   },
@@ -83,16 +78,14 @@ const mockPersonas = [
 ];
 
 const mockSubscription = {
-  tier: "growth",
+  plan: "growth",
   creditsRemaining: 18,
-  creditsTotal: 27,
 };
 
 const steps = [
   { number: 1, label: "Product" },
   { number: 2, label: "Persona" },
-  { number: 3, label: "Configure" },
-  { number: 4, label: "Review" },
+  { number: 3, label: "Review" },
 ];
 
 export default function GeneratePage() {
@@ -101,17 +94,13 @@ export default function GeneratePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
 
-  const hasSubscription = mockSubscription.tier !== "none";
-  const totalSegments = store.hookCount + store.bodyCount + store.ctaCount;
-  const totalCombinations =
-    store.hookCount * store.bodyCount * store.ctaCount;
-  const creditCost = totalSegments;
+  const hasSubscription = mockSubscription.plan !== "none";
 
   const selectedProduct = mockProducts.find((p) => p.id === store.productId);
   const selectedPersona = mockPersonas.find((p) => p.id === store.personaId);
 
   function handleNext() {
-    if (store.step < 4) {
+    if (store.step < 3) {
       store.setStep(store.step + 1);
     }
   }
@@ -130,8 +119,6 @@ export default function GeneratePage() {
         return !!store.personaId;
       case 3:
         return true;
-      case 4:
-        return true;
       default:
         return false;
     }
@@ -144,11 +131,11 @@ export default function GeneratePage() {
     }
 
     setIsSubmitting(true);
-    // Simulate creating a segment batch
+    // Would call useCreateGeneration mutation
     setTimeout(() => {
-      const mockBatchId = "batch-new-1";
+      const mockGenerationId = "gen-new-1";
       store.reset();
-      router.push(`/dashboard/generate/${mockBatchId}`);
+      router.push(`/dashboard/generate/${mockGenerationId}`);
     }, 1500);
   }
 
@@ -160,7 +147,7 @@ export default function GeneratePage() {
           Generate UGC Video
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Create AI-powered video ads in 4 simple steps.
+          Create AI-powered video ads in 3 simple steps.
         </p>
       </div>
 
@@ -252,9 +239,6 @@ export default function GeneratePage() {
                         <h3 className="font-medium text-foreground">
                           {product.name}
                         </h3>
-                        <p className="text-xs text-muted-foreground">
-                          {product.brand}
-                        </p>
                         <p className="mt-1 text-sm font-semibold text-foreground">
                           {product.price}
                         </p>
@@ -328,119 +312,8 @@ export default function GeneratePage() {
           </div>
         )}
 
-        {/* Step 3: Configure Segments */}
+        {/* Step 3: Review & Generate */}
         {store.step === 3 && (
-          <div className="flex flex-col gap-6">
-            <h2 className="text-lg font-semibold text-foreground">
-              Configure Segments
-            </h2>
-
-            <div className="mx-auto w-full max-w-lg space-y-8">
-              {/* Hooks */}
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium text-foreground">
-                    Hooks
-                  </Label>
-                  <Badge variant="secondary" className="text-xs">
-                    {store.hookCount}
-                  </Badge>
-                </div>
-                <Slider
-                  value={[store.hookCount]}
-                  onValueChange={([v]) => store.setHookCount(v)}
-                  min={1}
-                  max={5}
-                  step={1}
-                  className="[&>[data-slot=slider-range]]:bg-violet-500 [&>[data-slot=slider-thumb]]:border-violet-500"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Opening hooks to grab attention
-                </p>
-              </div>
-
-              {/* Bodies */}
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium text-foreground">
-                    Bodies
-                  </Label>
-                  <Badge variant="secondary" className="text-xs">
-                    {store.bodyCount}
-                  </Badge>
-                </div>
-                <Slider
-                  value={[store.bodyCount]}
-                  onValueChange={([v]) => store.setBodyCount(v)}
-                  min={1}
-                  max={5}
-                  step={1}
-                  className="[&>[data-slot=slider-range]]:bg-violet-500 [&>[data-slot=slider-thumb]]:border-violet-500"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Main content segments showcasing the product
-                </p>
-              </div>
-
-              {/* CTAs */}
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium text-foreground">
-                    CTAs
-                  </Label>
-                  <Badge variant="secondary" className="text-xs">
-                    {store.ctaCount}
-                  </Badge>
-                </div>
-                <Slider
-                  value={[store.ctaCount]}
-                  onValueChange={([v]) => store.setCtaCount(v)}
-                  min={1}
-                  max={5}
-                  step={1}
-                  className="[&>[data-slot=slider-range]]:bg-violet-500 [&>[data-slot=slider-thumb]]:border-violet-500"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Closing call-to-action segments
-                </p>
-              </div>
-
-              <Separator />
-
-              {/* Summary */}
-              <Card className="border-violet-500/20 bg-violet-500/5">
-                <CardContent className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      Total segments
-                    </span>
-                    <span className="font-semibold text-foreground">
-                      {totalSegments}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      Possible combinations
-                    </span>
-                    <span className="font-semibold text-foreground">
-                      {totalCombinations}
-                    </span>
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Credit cost</span>
-                    <span className="font-bold text-violet-400">
-                      {creditCost} credits
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Review & Generate */}
-        {store.step === 4 && (
           <div className="flex flex-col gap-6">
             <h2 className="text-lg font-semibold text-foreground">
               Review & Generate
@@ -477,47 +350,28 @@ export default function GeneratePage() {
 
                   <Separator />
 
-                  {/* Segment Counts */}
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <div>
-                      <p className="text-2xl font-bold text-foreground">
-                        {store.hookCount}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Hooks</p>
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-foreground">
-                        {store.bodyCount}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Bodies</p>
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-foreground">
-                        {store.ctaCount}
-                      </p>
-                      <p className="text-xs text-muted-foreground">CTAs</p>
-                    </div>
+                  {/* Mode */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Mode</span>
+                    <Badge variant="secondary" className="capitalize">
+                      {store.mode}
+                    </Badge>
                   </div>
 
-                  <Separator />
-
-                  {/* Credits */}
+                  {/* Generation Info */}
                   <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
                     <div>
                       <p className="text-sm font-medium text-foreground">
-                        Credit Cost
+                        What you will get
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {totalSegments} segments = {totalCombinations} possible
-                        combos
+                        AI script + 4 video variations
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-bold text-violet-400">
-                        {creditCost}
-                      </p>
+                      <p className="text-lg font-bold text-violet-400">1</p>
                       <p className="text-xs text-muted-foreground">
-                        of {mockSubscription.creditsRemaining} remaining
+                        credit cost
                       </p>
                     </div>
                   </div>
@@ -539,7 +393,7 @@ export default function GeneratePage() {
           Back
         </Button>
 
-        {store.step < 4 ? (
+        {store.step < 3 ? (
           <Button
             onClick={handleNext}
             disabled={!canProceed()}
@@ -563,7 +417,7 @@ export default function GeneratePage() {
             ) : (
               <>
                 <Zap className="size-4" />
-                Generate Segments
+                Generate Video
               </>
             )}
           </Button>
@@ -576,8 +430,8 @@ export default function GeneratePage() {
           <DialogHeader>
             <DialogTitle>Subscription Required</DialogTitle>
             <DialogDescription>
-              You need an active subscription to generate UGC video segments.
-              Choose a plan to get started.
+              You need an active subscription to generate UGC videos. Choose a
+              plan to get started.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3 py-4">
@@ -585,17 +439,17 @@ export default function GeneratePage() {
               {
                 name: "Starter",
                 price: "$29/mo",
-                credits: "27 segments",
+                credits: "27 credits",
               },
               {
                 name: "Growth",
                 price: "$79/mo",
-                credits: "100 segments",
+                credits: "90 credits",
               },
               {
                 name: "Scale",
-                price: "$199/mo",
-                credits: "300 segments",
+                price: "$149/mo",
+                credits: "300 credits",
               },
             ].map((plan) => (
               <div
@@ -615,7 +469,10 @@ export default function GeneratePage() {
             ))}
           </div>
           <DialogFooter>
-            <Button asChild className="w-full bg-violet-600 hover:bg-violet-700">
+            <Button
+              asChild
+              className="w-full bg-violet-600 hover:bg-violet-700"
+            >
               <Link href="/pricing">View Plans</Link>
             </Button>
           </DialogFooter>

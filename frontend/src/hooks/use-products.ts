@@ -1,19 +1,22 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
+import { callEdge } from "@/lib/api";
 import type { Product } from "@/types/database";
-import type { ApiResponse } from "@/types/api";
 import type { CreateProductInput, UpdateProductInput } from "@/schemas/product";
 
-export function useProducts(brandId?: string) {
+export function useProducts() {
   return useQuery<Product[]>({
-    queryKey: ["products", { brandId }],
+    queryKey: ["products"],
     queryFn: async () => {
-      const params = brandId ? `?brandId=${brandId}` : "";
-      const res = await fetch(`/api/products${params}`);
-      const json: ApiResponse<Product[]> = await res.json();
-      if (json.error) throw new Error(json.error.message);
-      return json.data;
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data;
     },
   });
 }
@@ -22,10 +25,14 @@ export function useProduct(id: string) {
   return useQuery<Product>({
     queryKey: ["products", id],
     queryFn: async () => {
-      const res = await fetch(`/api/products/${id}`);
-      const json: ApiResponse<Product> = await res.json();
-      if (json.error) throw new Error(json.error.message);
-      return json.data;
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (error) throw new Error(error.message);
+      return data;
     },
     enabled: !!id,
   });
@@ -35,23 +42,16 @@ export function useCreateProduct() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: CreateProductInput) => {
-      const res = await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      const json: ApiResponse<Product> = await res.json();
-      if (json.error) throw new Error(json.error.message);
-      return json.data;
+      const supabase = createClient();
+      const { data: product, error } = await supabase
+        .from("products")
+        .insert(data)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return product as Product;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      if (data) {
-        queryClient.invalidateQueries({
-          queryKey: ["products", { brandId: data.brand_id }],
-        });
-      }
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
   });
 }
 
@@ -59,14 +59,15 @@ export function useUpdateProduct(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: UpdateProductInput) => {
-      const res = await fetch(`/api/products/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      const json: ApiResponse<Product> = await res.json();
-      if (json.error) throw new Error(json.error.message);
-      return json.data;
+      const supabase = createClient();
+      const { data: product, error } = await supabase
+        .from("products")
+        .update(data)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return product as Product;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -79,13 +80,30 @@ export function useDeleteProduct(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
-      const json: ApiResponse<{ success: boolean }> = await res.json();
-      if (json.error) throw new Error(json.error.message);
-      return json.data;
+      const supabase = createClient();
+      const { error } = await supabase.from("products").delete().eq("id", id);
+      if (error) throw new Error(error.message);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
+  });
+}
+
+export function useScrapeProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { url: string }) => {
+      return callEdge<Product>("scrape-product", { body: data });
     },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
+  });
+}
+
+export function useConfirmProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { product_id: string }) => {
+      return callEdge<Product>("confirm-products", { body: data });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
   });
 }

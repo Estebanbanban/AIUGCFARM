@@ -2,16 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
-  Store,
+  Package,
   Users,
   Sparkles,
   Settings,
   Menu,
+  LogOut,
 } from "lucide-react";
-import { UserButton } from "@clerk/nextjs";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -26,7 +27,7 @@ import {
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Brands", href: "/dashboard/brands", icon: Store },
+  { label: "Products", href: "/dashboard/products", icon: Package },
   { label: "Personas", href: "/dashboard/personas", icon: Users },
   { label: "Generate", href: "/dashboard/generate", icon: Sparkles },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
@@ -39,9 +40,17 @@ function SidebarContent({
   pathname: string;
   onNavigate?: () => void;
 }) {
+  const router = useRouter();
   const creditsRemaining = 18;
   const creditsTotal = 27;
   const creditPercent = Math.round((creditsRemaining / creditsTotal) * 100);
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -89,7 +98,7 @@ function SidebarContent({
 
       <Separator />
 
-      {/* Bottom section: credits + user */}
+      {/* Bottom section: credits + sign out */}
       <div className="flex flex-col gap-3 p-4">
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between text-xs">
@@ -103,19 +112,15 @@ function SidebarContent({
             className="h-1.5 bg-muted [&>[data-slot=progress-indicator]]:bg-violet-500"
           />
         </div>
-        <div className="flex items-center gap-3">
-          <UserButton
-            afterSignOutUrl="/"
-            appearance={{
-              elements: {
-                avatarBox: "size-8",
-              },
-            }}
-          />
-          <span className="truncate text-sm text-muted-foreground">
-            My Account
-          </span>
-        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="justify-start gap-2 text-muted-foreground hover:text-foreground"
+          onClick={handleSignOut}
+        >
+          <LogOut className="size-4" />
+          Sign out
+        </Button>
       </div>
     </div>
   );

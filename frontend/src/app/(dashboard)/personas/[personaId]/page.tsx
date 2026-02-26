@@ -4,14 +4,20 @@ export const dynamic = "force-dynamic";
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, User, Pencil, Sparkles, Clock, Video } from "lucide-react";
+import {
+  ArrowLeft,
+  User,
+  Pencil,
+  Sparkles,
+  Clock,
+  Video,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -19,32 +25,34 @@ import { Separator } from "@/components/ui/separator";
 const mockPersona = {
   id: "persona-1",
   name: "Sophie",
-  gender: "Female",
-  age_range: "25-35",
-  skin_tone: "#F1C27D",
-  hair_color: "Dark Brown",
-  hair_style: "Medium Straight",
-  eye_color: "Brown",
-  body_type: "Average",
-  clothing_style: "Casual",
-  accessories: ["Earrings", "Watch"],
+  attributes: {
+    gender: "Female",
+    age: "25-35",
+    skin_tone: "#F1C27D",
+    hair_color: "Dark Brown",
+    hair_style: "Medium Straight",
+    eye_color: "Brown",
+    body_type: "Average",
+    clothing_style: "Casual",
+    accessories: ["Earrings", "Watch"],
+  },
   selected_image_url: null as string | null,
   created_at: "Feb 10, 2026",
 };
 
 const mockGenerations = [
   {
-    id: "batch-1",
+    id: "gen-1",
     productName: "Vitamin C Serum",
     date: "Feb 24, 2026",
-    segmentsTotal: 9,
+    videoCount: 4,
     status: "completed",
   },
   {
-    id: "batch-2",
+    id: "gen-2",
     productName: "Running Shoes X1",
     date: "Feb 20, 2026",
-    segmentsTotal: 9,
+    videoCount: 4,
     status: "completed",
   },
 ];
@@ -54,13 +62,13 @@ export default function PersonaDetailPage() {
   const personaId = params.personaId as string;
 
   const attributes = [
-    { label: "Gender", value: mockPersona.gender },
-    { label: "Age Range", value: mockPersona.age_range },
-    { label: "Hair Color", value: mockPersona.hair_color },
-    { label: "Hair Style", value: mockPersona.hair_style },
-    { label: "Eye Color", value: mockPersona.eye_color },
-    { label: "Body Type", value: mockPersona.body_type },
-    { label: "Clothing Style", value: mockPersona.clothing_style },
+    { label: "Gender", value: mockPersona.attributes.gender },
+    { label: "Age Range", value: mockPersona.attributes.age },
+    { label: "Hair Color", value: mockPersona.attributes.hair_color },
+    { label: "Hair Style", value: mockPersona.attributes.hair_style },
+    { label: "Eye Color", value: mockPersona.attributes.eye_color },
+    { label: "Body Type", value: mockPersona.attributes.body_type },
+    { label: "Clothing Style", value: mockPersona.attributes.clothing_style },
   ];
 
   return (
@@ -114,7 +122,9 @@ export default function PersonaDetailPage() {
               <span className="text-xs text-muted-foreground">Skin Tone</span>
               <div
                 className="size-5 rounded-full border"
-                style={{ backgroundColor: mockPersona.skin_tone }}
+                style={{
+                  backgroundColor: mockPersona.attributes.skin_tone,
+                }}
               />
             </div>
           </CardContent>
@@ -141,13 +151,13 @@ export default function PersonaDetailPage() {
                 ))}
               </div>
 
-              {mockPersona.accessories.length > 0 && (
+              {mockPersona.attributes.accessories.length > 0 && (
                 <div className="mt-4">
                   <span className="text-xs font-medium uppercase text-muted-foreground">
                     Accessories
                   </span>
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {mockPersona.accessories.map((acc) => (
+                    {mockPersona.attributes.accessories.map((acc) => (
                       <Badge key={acc} variant="outline" className="text-xs">
                         {acc}
                       </Badge>
@@ -185,7 +195,7 @@ export default function PersonaDetailPage() {
                               {gen.productName}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {gen.segmentsTotal} segments
+                              {gen.videoCount} videos
                             </p>
                           </div>
                         </div>

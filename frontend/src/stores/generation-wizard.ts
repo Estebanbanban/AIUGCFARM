@@ -5,27 +5,20 @@ interface GenerationWizardState {
   step: number;
   productId: string | null;
   personaId: string | null;
-  hookCount: number;
-  bodyCount: number;
-  ctaCount: number;
+  mode: "easy" | "expert";
   setStep: (step: number) => void;
   setProductId: (id: string) => void;
   setPersonaId: (id: string) => void;
-  setHookCount: (count: number) => void;
-  setBodyCount: (count: number) => void;
-  setCtaCount: (count: number) => void;
-  totalSegments: () => number;
+  setMode: (mode: "easy" | "expert") => void;
   reset: () => void;
 }
 
 export const useGenerationWizardStore = create<GenerationWizardState>()(
-  immer((set, get) => ({
+  immer((set) => ({
     step: 1,
     productId: null,
     personaId: null,
-    hookCount: 3,
-    bodyCount: 3,
-    ctaCount: 3,
+    mode: "easy",
     setStep: (step) =>
       set((state) => {
         state.step = step;
@@ -38,27 +31,16 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
       set((state) => {
         state.personaId = id;
       }),
-    setHookCount: (count) =>
+    setMode: (mode) =>
       set((state) => {
-        state.hookCount = count;
+        state.mode = mode;
       }),
-    setBodyCount: (count) =>
-      set((state) => {
-        state.bodyCount = count;
-      }),
-    setCtaCount: (count) =>
-      set((state) => {
-        state.ctaCount = count;
-      }),
-    totalSegments: () => get().hookCount + get().bodyCount + get().ctaCount,
     reset: () =>
       set(() => ({
         step: 1,
         productId: null,
         personaId: null,
-        hookCount: 3,
-        bodyCount: 3,
-        ctaCount: 3,
+        mode: "easy" as const,
       })),
   }))
 );

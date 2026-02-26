@@ -9,14 +9,14 @@ export const metadata: Metadata = {
 };
 
 const comparisonRows = [
-  { feature: "Segment credits/month", starter: "27", growth: "90" },
-  { feature: "AI personas", starter: "1", growth: "3" },
-  { feature: "Brand profiles", starter: "1", growth: "3" },
-  { feature: "Easy Mode", starter: true, growth: true },
-  { feature: "Expert Mode", starter: false, growth: true },
-  { feature: "Custom scripts", starter: false, growth: true },
-  { feature: "Export resolution", starter: "720p", growth: "1080p" },
-  { feature: "Priority queue", starter: false, growth: false },
+  { feature: "Credits/month", starter: "27", growth: "90", scale: "300" },
+  { feature: "AI personas", starter: "1", growth: "3", scale: "10" },
+  { feature: "Products", starter: "1", growth: "3", scale: "10" },
+  { feature: "Easy Mode", starter: true, growth: true, scale: true },
+  { feature: "Expert Mode", starter: false, growth: true, scale: true },
+  { feature: "Custom scripts", starter: false, growth: true, scale: true },
+  { feature: "Export resolution", starter: "720p", growth: "1080p", scale: "1080p" },
+  { feature: "Priority support", starter: false, growth: false, scale: true },
 ];
 
 function CellValue({ value }: { value: string | boolean }) {
@@ -36,7 +36,7 @@ export default function PricingPage() {
 
       {/* Comparison table */}
       <section className="pb-20 md:pb-32">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6">
           <h3 className="mb-8 text-center text-xl font-semibold text-white">
             Feature Comparison
           </h3>
@@ -54,6 +54,9 @@ export default function PricingPage() {
                   <th className="px-6 py-4 text-center text-sm font-medium text-violet-400">
                     Growth
                   </th>
+                  <th className="px-6 py-4 text-center text-sm font-medium text-zinc-400">
+                    Scale
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -70,6 +73,9 @@ export default function PricingPage() {
                     </td>
                     <td className="px-6 py-4 text-center">
                       <CellValue value={row.growth} />
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <CellValue value={row.scale} />
                     </td>
                   </tr>
                 ))}

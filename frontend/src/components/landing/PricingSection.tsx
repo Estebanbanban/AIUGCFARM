@@ -11,9 +11,9 @@ const plans = [
     period: "/month",
     popular: false,
     features: [
-      "27 segment credits/month",
+      "27 credits/month",
       "1 AI persona",
-      "1 brand profile",
+      "1 product",
       "Easy Mode generation",
       "720p export",
     ],
@@ -24,12 +24,27 @@ const plans = [
     period: "/month",
     popular: true,
     features: [
-      "90 segment credits/month",
+      "90 credits/month",
       "3 AI personas",
-      "3 brand profiles",
+      "3 products",
       "Easy + Expert Mode",
       "1080p export",
       "Custom script editing",
+    ],
+  },
+  {
+    name: "Scale",
+    price: "$149",
+    period: "/month",
+    popular: false,
+    features: [
+      "300 credits/month",
+      "10 AI personas",
+      "10 products",
+      "Easy + Expert Mode",
+      "1080p export",
+      "Custom script editing",
+      "Priority support",
     ],
   },
 ];
@@ -37,7 +52,7 @@ const plans = [
 export function PricingSection() {
   return (
     <section id="pricing" className="relative py-20 md:py-32">
-      <div className="mx-auto max-w-5xl px-4 sm:px-6">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
         {/* Section header */}
         <div className="text-center">
           <p className="text-sm font-medium uppercase tracking-widest text-violet-400">
@@ -52,7 +67,7 @@ export function PricingSection() {
         </div>
 
         {/* Pricing cards */}
-        <div className="mt-16 grid gap-8 md:grid-cols-2">
+        <div className="mt-16 grid gap-8 md:grid-cols-3">
           {plans.map((plan) => (
             <div
               key={plan.name}
@@ -113,7 +128,7 @@ export function PricingSection() {
 
         {/* Bottom note */}
         <p className="mt-10 text-center text-sm text-zinc-500">
-          All plans include: Free trial (3 segments) &bull; No watermarks &bull;
+          All plans include: Free trial (3 credits) &bull; No watermarks &bull;
           MP4 download
         </p>
       </div>

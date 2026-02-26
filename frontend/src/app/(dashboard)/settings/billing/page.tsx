@@ -33,72 +33,67 @@ import {
 import { formatDate } from "@/lib/utils";
 
 const mockSubscription = {
-  tier: "growth",
-  tierLabel: "Growth",
+  plan: "growth" as const,
+  planLabel: "Growth",
   price: "$79/mo",
   status: "active" as const,
   currentPeriodEnd: "2026-03-15T00:00:00Z",
-  creditsUsed: 18,
-  creditsTotal: 27,
+  creditsRemaining: 72,
+  creditsTotal: 90,
   cancelAtPeriodEnd: false,
 };
 
-const mockTransactions = [
+const mockLedger = [
   {
-    id: "txn-1",
+    id: "entry-1",
     date: "2026-02-24",
-    type: "generation_debit" as const,
-    description: "Vitamin C Serum batch (9 segments)",
-    amount: -9,
-    balanceAfter: 18,
+    reason: "generation" as const,
+    description: "Vitamin C Serum video generation",
+    amount: -1,
   },
   {
-    id: "txn-2",
+    id: "entry-2",
     date: "2026-02-22",
-    type: "generation_debit" as const,
-    description: "Protein Shake batch (9 segments)",
-    amount: -9,
-    balanceAfter: 27,
+    reason: "generation" as const,
+    description: "Protein Shake video generation",
+    amount: -1,
   },
   {
-    id: "txn-3",
+    id: "entry-3",
     date: "2026-02-20",
-    type: "refund_credit" as const,
-    description: "Refund for failed segment",
+    reason: "refund" as const,
+    description: "Refund for failed generation",
     amount: 1,
-    balanceAfter: 36,
   },
   {
-    id: "txn-4",
+    id: "entry-4",
     date: "2026-02-15",
-    type: "subscription_grant" as const,
+    reason: "subscription_renewal" as const,
     description: "Growth plan monthly credits",
-    amount: 27,
-    balanceAfter: 35,
+    amount: 90,
   },
   {
-    id: "txn-5",
+    id: "entry-5",
     date: "2026-02-14",
-    type: "generation_debit" as const,
-    description: "Running Shoes batch (8 segments)",
-    amount: -8,
-    balanceAfter: 8,
+    reason: "generation" as const,
+    description: "Running Shoes video generation",
+    amount: -1,
   },
 ];
 
-const transactionTypeLabels: Record<string, { label: string; color: string }> =
-  {
-    generation_debit: { label: "Generation", color: "text-red-400" },
-    subscription_grant: { label: "Credit Grant", color: "text-emerald-400" },
-    refund_credit: { label: "Refund", color: "text-blue-400" },
-    overage_debit: { label: "Overage", color: "text-amber-400" },
-  };
+const reasonLabels: Record<string, { label: string; color: string }> = {
+  generation: { label: "Generation", color: "text-red-400" },
+  subscription_renewal: { label: "Credit Grant", color: "text-emerald-400" },
+  refund: { label: "Refund", color: "text-blue-400" },
+  bonus: { label: "Bonus", color: "text-violet-400" },
+  free_trial: { label: "Free Trial", color: "text-amber-400" },
+};
 
 const statusColors: Record<string, string> = {
   active: "bg-emerald-500/10 text-emerald-400",
   past_due: "bg-amber-500/10 text-amber-400",
   canceled: "bg-red-500/10 text-red-400",
-  trialing: "bg-blue-500/10 text-blue-400",
+  incomplete: "bg-zinc-500/10 text-zinc-400",
 };
 
 export default function BillingPage() {
@@ -106,10 +101,10 @@ export default function BillingPage() {
   const [isManaging, setIsManaging] = useState(false);
 
   const creditPercent = Math.round(
-    (mockSubscription.creditsUsed / mockSubscription.creditsTotal) * 100
+    ((mockSubscription.creditsTotal - mockSubscription.creditsRemaining) /
+      mockSubscription.creditsTotal) *
+      100
   );
-  const creditsRemaining =
-    mockSubscription.creditsTotal - mockSubscription.creditsUsed;
 
   function handleManageBilling() {
     setIsManaging(true);
@@ -160,7 +155,7 @@ export default function BillingPage() {
               </div>
               <div>
                 <p className="text-lg font-bold text-foreground">
-                  {mockSubscription.tierLabel}
+                  {mockSubscription.planLabel}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {mockSubscription.price}
@@ -200,8 +195,8 @@ export default function BillingPage() {
         <CardHeader>
           <CardTitle className="text-foreground">Credit Usage</CardTitle>
           <CardDescription>
-            {creditsRemaining} of {mockSubscription.creditsTotal} credits
-            remaining this month
+            {mockSubscription.creditsRemaining} of{" "}
+            {mockSubscription.creditsTotal} credits remaining this month
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -211,7 +206,9 @@ export default function BillingPage() {
           />
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
-              {mockSubscription.creditsUsed} used
+              {mockSubscription.creditsTotal -
+                mockSubscription.creditsRemaining}{" "}
+              used
             </span>
             <span className="font-medium text-foreground">
               {creditPercent}%
@@ -242,7 +239,7 @@ export default function BillingPage() {
 
       <Separator />
 
-      {/* Transaction History */}
+      {/* Credit History */}
       <div className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold text-foreground">
           Credit History
@@ -266,41 +263,32 @@ export default function BillingPage() {
                     <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">
                       Amount
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">
-                      Balance
-                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {mockTransactions.map((txn) => {
-                    const typeConfig = transactionTypeLabels[txn.type];
+                  {mockLedger.map((entry) => {
+                    const config = reasonLabels[entry.reason];
                     return (
                       <tr
-                        key={txn.id}
+                        key={entry.id}
                         className="border-b border-border last:border-0"
                       >
                         <td className="px-4 py-3 text-sm text-muted-foreground">
-                          {formatDate(txn.date)}
+                          {formatDate(entry.date)}
                         </td>
                         <td className="px-4 py-3">
-                          <Badge
-                            variant="secondary"
-                            className="text-xs"
-                          >
-                            {typeConfig.label}
+                          <Badge variant="secondary" className="text-xs">
+                            {config.label}
                           </Badge>
                         </td>
                         <td className="px-4 py-3 text-sm text-foreground">
-                          {txn.description}
+                          {entry.description}
                         </td>
                         <td
-                          className={`px-4 py-3 text-right text-sm font-medium ${typeConfig.color}`}
+                          className={`px-4 py-3 text-right text-sm font-medium ${config.color}`}
                         >
-                          {txn.amount > 0 ? "+" : ""}
-                          {txn.amount}
-                        </td>
-                        <td className="px-4 py-3 text-right text-sm text-foreground">
-                          {txn.balanceAfter}
+                          {entry.amount > 0 ? "+" : ""}
+                          {entry.amount}
                         </td>
                       </tr>
                     );
@@ -318,8 +306,8 @@ export default function BillingPage() {
           <DialogHeader>
             <DialogTitle>Cancel Subscription?</DialogTitle>
             <DialogDescription>
-              Are you sure you want to cancel your {mockSubscription.tierLabel}{" "}
-              plan? You will retain access until{" "}
+              Are you sure you want to cancel your{" "}
+              {mockSubscription.planLabel} plan? You will retain access until{" "}
               {formatDate(mockSubscription.currentPeriodEnd)}, but unused
               credits will not carry over.
             </DialogDescription>

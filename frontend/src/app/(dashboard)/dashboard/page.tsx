@@ -2,15 +2,16 @@
 
 export const dynamic = "force-dynamic";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useUser } from "@clerk/nextjs";
+import { createClient } from "@/lib/supabase/client";
 import {
   Video,
   CreditCard,
   Users,
   Sparkles,
   UserPlus,
-  Store,
+  Package,
   ArrowRight,
   Clock,
 } from "lucide-react";
@@ -25,6 +26,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import type { GenerationStatus } from "@/types/database";
 
 const mockStats = {
   videosGenerated: 12,
@@ -35,44 +37,61 @@ const mockStats = {
 
 const mockRecentGenerations = [
   {
-    id: "batch-1",
+    id: "gen-1",
     productName: "Vitamin C Serum",
     personaName: "Sophie",
     date: "Feb 24, 2026",
-    status: "completed" as const,
-    segmentsCompleted: 9,
-    segmentsTotal: 9,
+    status: "completed" as GenerationStatus,
+    videoCount: 4,
   },
   {
-    id: "batch-2",
+    id: "gen-2",
     productName: "Protein Shake",
     personaName: "Marcus",
     date: "Feb 22, 2026",
-    status: "completed" as const,
-    segmentsCompleted: 9,
-    segmentsTotal: 9,
+    status: "completed" as GenerationStatus,
+    videoCount: 4,
   },
   {
-    id: "batch-3",
+    id: "gen-3",
     productName: "Running Shoes X1",
     personaName: "Sophie",
     date: "Feb 20, 2026",
-    status: "generating" as const,
-    segmentsCompleted: 5,
-    segmentsTotal: 9,
+    status: "generating_video" as GenerationStatus,
+    videoCount: 2,
   },
 ];
 
 const statusColors: Record<string, string> = {
   completed: "bg-emerald-500/10 text-emerald-400",
-  generating: "bg-amber-500/10 text-amber-400",
+  generating_video: "bg-amber-500/10 text-amber-400",
+  generating_image: "bg-amber-500/10 text-amber-400",
+  scripting: "bg-amber-500/10 text-amber-400",
+  stitching: "bg-amber-500/10 text-amber-400",
   failed: "bg-red-500/10 text-red-400",
   pending: "bg-zinc-500/10 text-zinc-400",
 };
 
+function statusLabel(status: GenerationStatus): string {
+  if (status === "completed" || status === "failed" || status === "pending")
+    return status;
+  return "In Progress";
+}
+
 export default function DashboardPage() {
-  const { user } = useUser();
-  const firstName = user?.firstName || "there";
+  const [firstName, setFirstName] = useState("there");
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.user_metadata?.full_name) {
+        setFirstName(user.user_metadata.full_name.split(" ")[0]);
+      } else if (user?.email) {
+        setFirstName(user.email.split("@")[0]);
+      }
+    });
+  }, []);
+
   const hasGenerations = mockRecentGenerations.length > 0;
 
   return (
@@ -157,8 +176,8 @@ export default function DashboardPage() {
           </Link>
         </Button>
         <Button asChild variant="outline">
-          <Link href="/dashboard/brands/new">
-            <Store className="size-4" />
+          <Link href="/dashboard/products">
+            <Package className="size-4" />
             Import Products
           </Link>
         </Button>
@@ -201,9 +220,7 @@ export default function DashboardPage() {
                           statusColors[gen.status]
                         )}
                       >
-                        {gen.status === "generating"
-                          ? "In Progress"
-                          : gen.status}
+                        {statusLabel(gen.status)}
                       </Badge>
                     </div>
                     <CardDescription className="text-xs">
@@ -216,9 +233,7 @@ export default function DashboardPage() {
                         <Clock className="size-3" />
                         {gen.date}
                       </div>
-                      <span>
-                        {gen.segmentsCompleted}/{gen.segmentsTotal} segments
-                      </span>
+                      <span>{gen.videoCount} videos</span>
                     </div>
                   </CardContent>
                 </Card>

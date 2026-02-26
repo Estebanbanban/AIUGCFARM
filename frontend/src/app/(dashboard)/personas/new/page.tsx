@@ -53,6 +53,9 @@ const bodyTypeLabels: Record<string, string> = {
   plus_size: "Plus Size",
 };
 
+// The persona-builder store keeps flat fields for the UI,
+// which get assembled into the attributes JSONB on save.
+
 export default function NewPersonaPage() {
   const router = useRouter();
   const store = usePersonaBuilderStore();
