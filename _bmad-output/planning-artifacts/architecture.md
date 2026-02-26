@@ -145,12 +145,20 @@ bunx create-next-app@latest aiugc --typescript --tailwind --eslint --app --src-d
 | `users` | Synced from Clerk via webhook, stores subscription state |
 | `brands` | Brand profiles created from scraped data |
 | `products` | Imported product data per brand |
-| `personas` | AI persona configurations + selected reference image URL |
-| `generations` | Video generation jobs (status, credits used, metadata) |
-| `generation_segments` | Individual segments per generation (hook/body/cta) |
-| `videos` | Final assembled video outputs (4 per generation) |
-| `subscriptions` | Stripe subscription state, credit balance |
-| `credit_transactions` | Credit usage ledger (audit trail) |
+| `personas` | AI persona configurations + selected reference image URL + Kling element_id |
+| `segments` | Individual generated segments (type: hook/body/cta, status, video_url, script_text, duration) |
+| `segment_batches` | Groups of segments generated together (links to product, persona, credits used) |
+| `video_combos` | User-assembled combinations of segments (hook_segment_id + body_segment_id + cta_segment_id) |
+| `subscriptions` | Stripe subscription state, segment credit balance |
+| `credit_transactions` | Segment credit usage ledger (audit trail) |
+
+**Modular Video Model:**
+The core product model is segment-based, not video-based:
+- Users generate **segments** (hooks, bodies, CTAs) independently
+- Each segment is a standalone 3-10s video clip stored in R2
+- Users **combine** segments into full videos via the mixer UI (N hooks × N bodies × N CTAs)
+- FFmpeg stitches selected segments on-demand when user previews or downloads a combo
+- 1 credit = 1 segment generation. A batch of 3H + 3B + 3C = 9 credits = 27 possible combos
 
 **Data Validation:** Zod schemas shared between frontend and backend. Single source of truth for all data shapes.
 
@@ -278,11 +286,11 @@ bunx create-next-app@latest aiugc --typescript --tailwind --eslint --app --src-d
 │  Inngest (Cloud)             │
 │  ├── scrape-website          │  Step function
 │  ├── generate-persona-images │  Step function
-│  ├── generate-video          │  Step function (fan-out)
-│  │   ├── step: generate-hook-segment
-│  │   ├── step: generate-body-segment
-│  │   ├── step: generate-cta-segment
-│  │   └── step: assemble-video
+│  ├── generate-segments        │  Step function (fan-out per segment)
+│  │   ├── step: generate-script (per segment type)
+│  │   ├── step: generate-pov-image
+│  │   └── step: generate-kling-video (per segment)
+│  ├── assemble-combo           │  On-demand FFmpeg stitch
 │  └── send-completion-email   │  Step function
 └──────────┬──────────────────┘
            │ Executes on
@@ -428,22 +436,40 @@ app/{domain}.{action}
 Examples:
 - `app/scrape.requested`
 - `app/persona.generation.requested`
-- `app/video.generation.requested`
-- `app/video.segment.completed`
-- `app/video.assembly.completed`
+- `app/segment.batch.requested` — Generate a batch of segments (e.g., 3 hooks + 3 bodies + 3 CTAs)
+- `app/segment.generation.requested` — Generate a single segment
+- `app/segment.completed` — Single segment finished (Kling callback)
+- `app/combo.assembly.requested` — User wants to preview/download a combo
+- `app/combo.assembly.completed` — FFmpeg stitch done
 
 **Event Payload Structure:**
 
 ```typescript
+// Segment batch request
 {
-  name: "app/video.generation.requested",
+  name: "app/segment.batch.requested",
   data: {
-    generationId: string;
+    batchId: string;
     userId: string;
     personaId: string;
     productId: string;
-    mode: "easy" | "expert";
-    script?: { hook: string; body: string; cta: string };
+    segments: {
+      type: "hook" | "body" | "cta";
+      count: number;        // e.g., 3 hooks
+      duration: number;     // seconds per segment
+    }[];
+  }
+}
+
+// Combo assembly request (on-demand)
+{
+  name: "app/combo.assembly.requested",
+  data: {
+    comboId: string;
+    userId: string;
+    hookSegmentId: string;
+    bodySegmentId: string;
+    ctaSegmentId: string;
   }
 }
 ```
@@ -467,15 +493,21 @@ Examples:
 - Progress indicators for generation pipeline (poll generation status endpoint)
 - Toast notifications for background task completions
 
-**Credit Management Pattern:**
+**Credit Management Pattern (Segment-Based):**
 
 ```
-1. User triggers generation
-2. API route checks credit balance (SELECT with FOR UPDATE)
-3. If sufficient: Decrement credits atomically, create generation record
-4. Send Inngest event to start pipeline
-5. If pipeline fails completely: Refund credit via credit_transactions ledger
-6. If overage: Calculate overage amount, create Stripe usage record
+1 credit = 1 segment (hook, body, or CTA)
+Combo assembly (FFmpeg stitch) = free (no credit cost, just compute)
+
+1. User configures batch: e.g., 3 hooks + 3 bodies + 3 CTAs = 9 segments
+2. API route checks credit balance >= 9 (SELECT with FOR UPDATE)
+3. If sufficient: Decrement 9 credits atomically, create batch + segment records
+4. Send Inngest event 'app/segment.batch.requested'
+5. Inngest fans out: generates 9 segments in parallel (or batched)
+6. Per segment: If Kling fails after 3 retries → refund 1 credit
+7. Combo assembly: User picks 1 hook + 1 body + 1 CTA in mixer UI
+8. FFmpeg stitches on-demand → no credit cost
+9. Overage: If credits exhausted mid-batch, charge overage per segment via Stripe usage record
 ```
 
 ### Enforcement Guidelines
@@ -638,16 +670,22 @@ aiugc/
 │   │   │   ├── PersonaPreview.tsx          # Live preview panel
 │   │   │   └── PersonaImageGrid.tsx        # 4-variant selection grid
 │   │   ├── generation/
-│   │   │   ├── GenerationWizard.tsx        # Multi-step generation flow
+│   │   │   ├── GenerationWizard.tsx        # Multi-step segment generation flow
 │   │   │   ├── ProductSelector.tsx
 │   │   │   ├── PersonaSelector.tsx
-│   │   │   ├── ScriptPreview.tsx           # AI-generated script display
-│   │   │   ├── GenerationProgress.tsx      # Pipeline progress tracker
-│   │   │   └── VideoReviewGrid.tsx         # 4-variant video review
+│   │   │   ├── SegmentTypeSelector.tsx     # Choose how many hooks/bodies/CTAs
+│   │   │   ├── ScriptPreview.tsx           # AI-generated script display per segment
+│   │   │   └── GenerationProgress.tsx      # Pipeline progress tracker
+│   │   ├── mixer/
+│   │   │   ├── VideoMixer.tsx              # Drag-and-drop segment combiner
+│   │   │   ├── SegmentColumn.tsx           # Column of hook/body/cta segments
+│   │   │   ├── SegmentCard.tsx             # Individual segment preview card
+│   │   │   ├── ComboPreview.tsx            # Preview assembled combo (FFmpeg on-demand)
+│   │   │   └── ComboExportButton.tsx       # Download assembled MP4
 │   │   ├── video/
 │   │   │   ├── VideoPlayer.tsx             # Custom video player
-│   │   │   ├── VideoCard.tsx               # Video thumbnail card
-│   │   │   └── VideoLibrary.tsx            # Grid of generated videos
+│   │   │   ├── SegmentPlayer.tsx           # Short segment preview player
+│   │   │   └── VideoLibrary.tsx            # Grid of segments + assembled combos
 │   │   ├── billing/
 │   │   │   ├── PricingCards.tsx            # Plan selection cards
 │   │   │   ├── CreditBalance.tsx           # Current credit display
@@ -694,9 +732,10 @@ aiugc/
 │   │   ├── client.ts                       # Inngest client config
 │   │   ├── functions/
 │   │   │   ├── scrape-website.ts           # Website scraping pipeline
-│   │   │   ├── generate-persona-images.ts  # NanoBanana image generation
-│   │   │   ├── generate-video.ts           # Full video generation pipeline
-│   │   │   ├── generate-script.ts          # OpenRouter script generation
+│   │   │   ├── generate-persona-images.ts  # NanoBanana persona image generation
+│   │   │   ├── generate-segment-batch.ts   # Generate N segments (hook/body/cta batch)
+│   │   │   ├── generate-single-segment.ts  # Generate 1 segment (script → POV → Kling)
+│   │   │   ├── assemble-combo.ts           # FFmpeg stitch on-demand (hook+body+cta)
 │   │   │   └── send-completion-email.ts    # Email notification
 │   │   └── index.ts                        # Export all functions for registration
 │   │
@@ -802,87 +841,106 @@ aiugc/
 | OpenRouter | REST API | `worker/src/services/openrouter.ts` |
 | Cloudflare R2 | S3-compatible SDK | `src/lib/storage.ts`, `worker/src/lib/storage.ts` |
 
-### Data Flow: Video Generation Pipeline
+### Data Flow: Modular Segment Generation Pipeline
 
-#### Easy Mode (Multi-Shot — Recommended)
+#### Step 1: Segment Batch Generation
 
-Uses Kling V3's native multi-shot feature to generate Hook/Body/CTA in a single API call.
+User selects a product + persona, chooses how many hooks/bodies/CTAs to generate.
 
 ```
-User clicks "Generate"
+User configures batch: 3 hooks + 3 bodies + 3 CTAs
     │
     ▼
-POST /api/generations
-    ├── Verify credit balance (Supabase, SELECT FOR UPDATE)
-    ├── Decrement credits (Supabase, atomic UPDATE)
-    ├── Create generation record (status: 'pending')
-    └── inngest.send('app/video.generation.requested')
+POST /api/segments/batch
+    ├── Validate: total segments (9) <= credit balance
+    ├── Decrement 9 credits atomically (SELECT FOR UPDATE + UPDATE)
+    ├── Create segment_batch record + 9 segment records (status: 'pending')
+    └── inngest.send('app/segment.batch.requested')
          │
          ▼
-    Inngest: generate-video function
+    Inngest: generate-segment-batch (fan-out)
          │
-         ├── step.run('generate-script')
-         │   └── Worker: OpenRouter → script (hook/body/cta with durations)
-         │   └── Update generation record with script
+         ├── step.run('generate-pov-image') [once per batch]
+         │   └── Worker: NanoBanana → POV composite (persona + product)
+         │   └── Upload to R2, store URL in batch record
          │
-         ├── step.run('generate-pov-image')
-         │   └── Worker: NanoBanana → POV composite image (persona + product)
-         │   └── Upload to R2
+         ├── For each segment in batch (9x, parallelized):
+         │   │
+         │   ├── step.run('generate-script-{segmentId}')
+         │   │   └── Worker: OpenRouter → script for this segment type
+         │   │   └── Hook: attention-grabbing opener, 3-5s
+         │   │   └── Body: product benefits + social proof, 5-10s
+         │   │   └── CTA: urgency-driven close, 3-5s
+         │   │   └── Each with slight prompt variation for diversity
+         │   │
+         │   ├── step.run('create-kling-task-{segmentId}')
+         │   │   └── Worker: POST /v1/videos/image2video
+         │   │       ├── model_name: "kling-v2-6"  (cost-optimized)
+         │   │       ├── image: POV image URL
+         │   │       ├── prompt: segment script text
+         │   │       ├── mode: "std" (720p)
+         │   │       ├── duration: "5" (hook/cta) or "10" (body)
+         │   │       ├── aspect_ratio: "9:16" (vertical for social)
+         │   │       └── callback_url: worker webhook endpoint
+         │   │
+         │   ├── step.waitForEvent('app/segment.completed', { segmentId })
+         │   │   └── Kling calls callback_url on succeed/failed
+         │   │   └── Inngest resumes (no polling)
+         │   │
+         │   └── step.run('download-and-store-{segmentId}')
+         │       └── Download video from Kling URL (expires in 30 days!)
+         │       └── Upload to R2 (permanent storage)
+         │       └── Update segment record: status='completed', video_url=R2 URL
          │
-         ├── step.run('create-kling-tasks') (x4 variants in parallel)
-         │   └── Worker: POST /v1/videos/image2video
-         │       ├── model_name: "kling-v3"
-         │       ├── image: POV image URL from R2
-         │       ├── multi_shot: true
-         │       ├── shot_type: "customize"
-         │       ├── multi_prompt: [
-         │       │   { index: 1, prompt: hook_prompt, duration: "5" },
-         │       │   { index: 2, prompt: body_prompt, duration: "10" },
-         │       │   { index: 3, prompt: cta_prompt, duration: "5" }
-         │       │ ]
-         │       ├── mode: "pro" (1080p) or "std" (720p per tier)
-         │       ├── duration: "15" (total, adjustable)
-         │       ├── aspect_ratio: "9:16" (vertical for social)
-         │       └── callback_url: worker webhook endpoint
-         │
-         ├── step.waitForEvent('kling-task-completed') (x4 variants)
-         │   └── Kling calls our callback_url on succeed/failed
-         │   └── Inngest resumes on webhook event (no polling needed)
-         │
-         ├── step.run('download-and-store') (x4 variants)
-         │   └── Download video from Kling URL (expires after 30 days)
-         │   └── Upload to Cloudflare R2
-         │   └── Create video records in Supabase
-         │
-         └── step.run('notify-user')
-             └── Update generation status: 'completed'
-             └── Send email notification
+         └── step.run('notify-batch-complete')
+             └── Update batch status: 'completed'
+             └── Send email/push notification
                   │
                   ▼
-         User reviews 4 videos in dashboard
+         User sees 3 hooks + 3 bodies + 3 CTAs in mixer UI
 ```
 
-**Key insight:** Kling V3 multi-shot eliminates FFmpeg stitching for Easy Mode.
-Each variant is a single 15-20s video with Hook/Body/CTA as native storyboard shots.
+#### Step 2: On-Demand Combo Assembly (FFmpeg)
 
-#### Expert Mode (Segmented + FFmpeg — Future)
-
-For Expert Mode (post-MVP), where users customize individual segments:
+User mixes and matches segments in the mixer UI. Assembly happens on-demand.
 
 ```
-Same as above, except:
-    ├── Generate 3 separate Kling tasks per variant (hook, body, cta)
-    ├── Wait for all 3 to complete
-    ├── FFmpeg stitch on worker with crossfade transitions
-    └── Upload assembled video to R2
+User selects: Hook #2 + Body #1 + CTA #3
+    │
+    ▼
+POST /api/combos
+    ├── Create video_combo record
+    └── inngest.send('app/combo.assembly.requested')
+         │
+         ▼
+    Inngest: assemble-combo
+         │
+         ├── step.run('fetch-segments')
+         │   └── Download 3 segment videos from R2 to worker temp storage
+         │
+         ├── step.run('ffmpeg-stitch')
+         │   └── FFmpeg: concat with crossfade transitions (0.5s)
+         │   └── Output: single MP4, 9:16 aspect ratio
+         │
+         ├── step.run('upload-combo')
+         │   └── Upload assembled video to R2
+         │   └── Update combo record: status='completed', video_url=R2 URL
+         │
+         └── Return combo URL to frontend (via React Query invalidation)
+              │
+              ▼
+         User previews assembled video, downloads as MP4
 ```
+
+**Key insight:** Assembly is FREE (no Kling API cost, just FFmpeg compute on Railway).
+Users get 27 combinations from 9 segment credits. The value multiplier is the product differentiator.
 
 #### Kling Element Integration (Persona Consistency)
 
 For improved persona consistency across multiple generations:
 
 ```
-First generation:
+First generation for a persona:
     ├── Create Kling Element from NanoBanana persona image
     │   POST /v1/general/advanced-custom-elements
     │   ├── reference_type: "image_refer"
@@ -895,18 +953,38 @@ Subsequent generations:
     └── Better persona consistency than raw image reference
 ```
 
-#### Cost Model
+#### Cost Model (V2.6 std / 720p — Default)
 
-| Mode | Duration | Per Variant | Per Generation (x4) |
+| Segment Type | Duration | Kling Cost | Per 3 Segments |
 |---|---|---|---|
-| Std (720p), no audio | 15s | $1.26 | $5.04 |
-| Pro (1080p), no audio | 15s | $1.68 | $6.72 |
-| Pro (1080p), with audio | 15s | $2.52 | $10.08 |
+| Hook | 5s | $0.21 | $0.63 |
+| Body | 10s | $0.42 | $1.26 |
+| CTA | 5s | $0.21 | $0.63 |
+| **Batch (3H + 3B + 3C)** | **—** | **$2.52** | **27 combos** |
+| Combo assembly (FFmpeg) | — | **$0.00** | Free |
 
-At $15/mo Starter (10 generations): COGS = $50-67 → **needs volume pricing negotiation**
-At $59/mo Growth (50 generations): COGS = $252-336 → **negative margin without enterprise rates**
+**Cost per combinable video: $0.093**
 
-**Action item:** Negotiate enterprise/volume pricing with Kling before launch. Current unit economics require ~60-70% discount to be viable at Growth tier.
+#### V2.6 vs V3 Comparison
+
+| | V2.6 std | V3 std | Savings |
+|---|---|---|---|
+| Per second | $0.042/s | $0.084/s | **50% cheaper** |
+| 9-segment batch | $2.52 | $5.04 | **50% cheaper** |
+| Quality | Good (720p) | Better (720p) | V3 slightly better at same resolution |
+
+**Decision: V2.6 std for MVP.** Quality is sufficient for UGC-style social ads at 720p. Can upgrade to V3 later as a premium feature or when enterprise pricing is negotiated.
+
+#### Revised Pricing Tiers
+
+| Plan | Price | Segment Credits | Typical Usage | COGS | Gross Margin |
+|---|---|---|---|---|---|
+| **Starter** | $29/mo | 27 | 3 batches (3H+3B+3C) = 81 combos | $7.56 | **74%** |
+| **Growth** | $79/mo | 90 | 10 batches = 270 combos | $25.20 | **68%** |
+| **Scale** | $199/mo | 270 | 30 batches = 810 combos | $75.60 | **62%** |
+
+Overage: $0.50/segment (Starter), $0.40/segment (Growth), $0.30/segment (Scale)
+Free trial: 3 free segment credits (1 hook + 1 body + 1 CTA = 1 combo)
 
 ---
 
@@ -936,8 +1014,9 @@ At $59/mo Growth (50 generations): COGS = $252-336 → **negative margin without
 - Email notification service not specified (Resend recommended when needed)
 - Video cleanup/retention policy not defined (define post-launch based on storage costs)
 - Monitoring alerting thresholds not specified (configure after baseline metrics)
-- **CRITICAL: Unit economics** — At retail Kling pricing, COGS exceeds revenue at Growth tier. Must negotiate enterprise volume pricing (target ~60-70% discount) before launch. Consider std mode (720p) as default for Starter tier to reduce costs.
 - Kling API authentication (JWT generation) details need to be confirmed during developer onboarding
+- NanoBanana API pricing at scale not confirmed — factor into COGS model
+- Evaluate V3 as premium tier upgrade once enterprise pricing is negotiated
 
 ### Architecture Readiness Assessment
 
