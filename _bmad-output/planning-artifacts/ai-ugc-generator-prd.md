@@ -1,333 +1,430 @@
-# PRODUCT REQUIREMENTS DOCUMENT
+---
+workflowType: 'prd'
+workflow: 'edit'
+classification:
+  domain: 'e-commerce'
+  projectType: 'saas_b2b'
+  complexity: 'medium'
+inputDocuments:
+  - 'ai-ugc-generator-prd-v1-draft.md'
+stepsCompleted:
+  - 'step-e-01-discovery'
+  - 'step-e-01b-legacy-conversion'
+  - 'step-e-02-review'
+  - 'step-e-03-edit'
+lastEdited: '2026-02-26'
+editHistory:
+  - date: '2026-02-26'
+    changes: 'Full restructure from legacy format to BMAD standard. Extracted 38 FRs from narrative. Created SMART success criteria. Converted UI flow to user journeys. Added domain requirements, innovation analysis, project-type requirements. Removed tech stack and epic breakdown sections (relocated to Architecture and Epics docs). Tightened all NFRs with measurement methods.'
+---
 
-## AI UGC Generator
+# Product Requirements Document — AI UGC Generator
 
-**Generate Automated AI UGC for Your Business**
-
-**Propelled By**
-Author: Axel Ronsin
-Version: 1.0 — Draft
-February 2026
+**Author:** Axel Ronsin
+**Date:** February 2026
+**Version:** 2.0 — BMAD Standard
 
 ---
 
-## Table of Contents
+## Executive Summary
 
-1. Executive Summary
-2. Problem Statement
-3. Target Audience
-4. Product Overview & User Flow
-5. Paywall & Monetization
-6. Feature Map
-7. Non-Functional Requirements
-8. Technical Stack (Recommended)
-9. Risks & Mitigations
-10. Success Metrics (KPIs)
-11. MVP Scope
-12. Epic Breakdown
-13. Open Questions
+**Vision:** AI UGC Generator eliminates the cost, speed, and consistency bottleneck of UGC-style video ad production for e-commerce brands.
 
----
+**Product:** A micro-SaaS platform where users paste their store URL, auto-import product data, build a custom AI persona via a Sims-like character creator, and generate short-form UGC video ads (Hook / Body / CTA structure) in minutes — not days.
 
-## 1. Executive Summary
+**Differentiator:** Unlike generic AI video tools, AI UGC Generator combines three capabilities no competitor unifies: automated store-data scraping (zero manual input), persistent AI persona creation (consistent brand spokesperson across all videos), and UGC-optimized segmented video generation (Hook/Body/CTA structure tuned for paid social).
 
-AI UGC Generator is a micro-SaaS platform that enables e-commerce businesses to produce realistic AI-generated User Generated Content (UGC) videos at scale. Users paste their store URL, the platform scrapes product data, and they build a custom AI persona using a Sims-like character creator. The platform then generates short-form video ads featuring that persona promoting their products, complete with hooks, body copy, and calls-to-action.
-
-The product targets Shopify, WooCommerce, and general e-commerce store owners who need high-volume UGC-style video ads but lack the budget or logistics for real creators.
-
-## 2. Problem Statement
-
-E-commerce brands increasingly rely on UGC-style video ads for social platforms (TikTok, Instagram Reels, YouTube Shorts). However, sourcing real UGC creators is expensive ($150–$500+ per video), slow (days to weeks turnaround), and inconsistent in quality. Brands that need volume—10, 20, 50+ variations per product—face a major bottleneck.
-
-AI UGC Generator solves this by letting users create a consistent AI persona and generate unlimited video variations in minutes, not days.
-
-## 3. Target Audience
-
-- Shopify / WooCommerce store owners running paid social ads
-- DTC (Direct-to-Consumer) brands scaling ad creative
+**Target Users:**
+- Shopify/WooCommerce store owners running paid social ads
+- DTC brands scaling ad creative volume
 - E-commerce agencies managing multiple client accounts
 - Dropshippers needing fast, cheap video ads for product testing
 
-## 4. Product Overview & User Flow
+**Business Model:** Credit-based SaaS subscription. 1 credit = 1 generation = 4 video outputs. Three tiers: Starter ($15/mo, 10 credits), Growth ($59/mo, 50 credits), Scale ($249/mo, 250 credits). Paywall triggers after persona creation to maximize sunk-cost conversion.
 
-### 4.1 Landing Page
+**Problem:** UGC creators cost $150–$500+ per video, take days-to-weeks, and deliver inconsistent quality. Brands needing 10–50+ variations per product face a production bottleneck that directly limits ad spend scaling.
 
-The landing page serves as both the marketing page and the entry point into the product funnel.
+---
 
-Key elements:
-- Hero tagline: "Generate Automated AI UGC for Your Business"
-- Prominent URL input field (CTA): "Paste your store URL to get started"
-- Social proof section (testimonials, video examples, brand logos)
-- Feature breakdown section with before/after comparisons
-- Pricing teaser section
-- FAQ section
+## Success Criteria
 
-### 4.2 Website Scraping & Product Import
+All criteria measured from public launch date. Baselines are zero (greenfield product).
 
-Once the user submits their store URL, the platform scrapes product data automatically.
+| ID | Criterion | Target (Month 3) | Target (Month 6) | Measurement Method |
+|---|---|---|---|---|
+| SC1 | Landing page visitors who initiate a store scrape | 40% | 50% | Analytics: URL submit events / unique landing page sessions |
+| SC2 | Users who scrape → complete signup | 25% | 35% | Analytics: signup completion events / scrape initiation events |
+| SC3 | Signed-up users who convert to paid plan | 8% | 12% | Stripe: paying customers / total registered accounts |
+| SC4 | Monthly Recurring Revenue | $5,000 | $25,000 | Stripe MRR dashboard |
+| SC5 | Monthly churn rate | < 15% | < 10% | Stripe: churned subscriptions / active subscriptions at period start |
+| SC6 | Average video generations per active user per month | 8 | 15 | Database: total generations / active users in period |
+| SC7 | Net Promoter Score | 30+ | 45+ | In-app NPS survey triggered after 5th generation |
 
-Scraped data per product:
-- Product name
-- Product images (primary + variants)
-- Product description
-- Price
-- Product category / tags
+**Traceability:** SC1-SC2 validate the value-first funnel (UJ1). SC3-SC5 validate monetization (UJ3). SC6 validates core product utility (UJ2). SC7 validates overall satisfaction.
 
-The system generates an AI-powered brand summary: tone of voice, target demographic, key selling points. Users can review, edit, and confirm the imported data before proceeding.
+---
 
-**Fallback: Manual upload**
-If scraping fails or the user has no website, they can manually upload product images, name, and description.
+## Product Scope
 
-### 4.3 Authentication Gate
+### Phase 1: MVP (v1.0)
 
-After the scraping step, users are prompted to create an account or log in before proceeding to persona creation. This is a soft gate—they've already seen value (their products scraped), so conversion intent is higher.
+Core value loop: Scrape → Persona → Generate → Download.
 
-Auth methods:
-- Email + password
-- Google OAuth
-- Shopify OAuth (for native Shopify store integration)
+- Landing page with URL input CTA and marketing content
+- Website scraping: Shopify stores (primary), generic HTML fallback, manual upload fallback
+- Authentication: Email + password, Google OAuth
+- AI-powered brand summary generation from scraped data
+- Persona creation: visual character builder with 9 configurable attributes (gender, skin tone, age, hair color, hair style, eye color, body type, clothing style, accessories)
+- AI persona image generation: 4 variants per request, user selects preferred
+- Easy Mode video generation: AI writes Hook/Body/CTA script from product data and brand tone
+- Segmented video pipeline: generates Hook, Body, CTA segments independently, stitches into final output
+- 4 video variations per generation with prompt diversity
+- Side-by-side video review and MP4 download
+- Paywall at generation step with Stripe checkout
+- Starter ($15/mo, 10 credits) and Growth ($59/mo, 50 credits) tiers
+- User dashboard with generation history and video library
 
-### 4.4 Persona Creation (Sims-like Character Builder)
+### Phase 2: Growth (v1.1–v1.3)
 
-Users build their AI spokesperson using a visual character selector inspired by The Sims character creator.
+Power user features and expanded reach.
 
-Configurable attributes:
+- Expert Mode: custom script editing per segment (Hook/Body/CTA), pacing control, background selection
+- Scale tier ($249/mo, 250 credits) with priority queue and API access
+- Shopify native app integration (OAuth + embedded admin)
+- Team/agency features: multi-seat accounts, shared personas, brand profiles
+- Video analytics: view counts, click-through tracking per video
 
-| Attribute | Options |
-|---|---|
-| Gender | Male, Female, Non-binary |
-| Ethnicity / Skin tone | Gradient selector (light to dark) |
-| Age range | 18–25, 25–35, 35–45, 45–55, 55+ |
-| Hair color | Black, Brown, Blonde, Red, Gray, Custom |
-| Hair style | Short, Medium, Long, Curly, Straight, Braided, Bald |
-| Eye color | Brown, Blue, Green, Hazel, Gray |
-| Body type | Slim, Average, Athletic, Curvy, Plus-size |
-| Clothing style | Casual, Professional, Streetwear, Athleisure, Glam |
-| Accessories | Glasses, Earrings, Necklace, Hat, None |
+### Phase 3: Vision (v2.0+)
 
-AI generation flow:
-1. User configures attributes via the visual selector.
-2. System generates an optimized text prompt based on selections.
-3. Prompt is sent to NanoBanana API → generates 4 persona images.
-4. User reviews the 4 options, selects their preferred persona.
-5. Selected image is stored as the reference image for all future video generations.
-6. User can iterate: adjust attributes and regenerate if unsatisfied.
+Platform expansion and ecosystem.
 
-### 4.5 Video Generation
+- Direct publishing to TikTok, Meta, YouTube Shorts
+- A/B testing framework: auto-generate variations, track performance, suggest winners
+- Multi-language script generation (10+ languages)
+- Marketplace: community-created persona templates
+- White-label offering for agencies
 
-Once the persona is locked and a product is selected, the user enters the video generation flow. Two modes are available:
+---
 
-#### 4.5.1 Easy Mode (One-Click Generation)
+## User Journeys
 
-Designed for speed. The user selects a product and hits "Generate"—everything else is automated.
+### UJ1: First-Time Store Owner — Discovery to First Scrape
 
-AI-generated script structure:
-- **Hook (3–10 seconds):** Attention-grabbing opener based on UGC best practices. Examples: "Stop scrolling if you have [problem]", "I just found the best [product category] ever"
-- **Body (10–20 seconds):** Product benefits, social proof, feature highlights
-- **CTA (3–5 seconds):** "Link in bio", "Use code X for Y% off", urgency-driven close
+**Persona:** Sarah, Shopify store owner running TikTok ads. Spends $2K/mo on ad creative. Needs 20+ video variations per product launch.
 
-The AI writes the full script segmented into Hook / Body / CTA, each tuned to the product's scraped description and the brand's tone of voice.
+**Goal:** Discover the platform and see immediate value with zero commitment.
 
-#### 4.5.2 Expert Mode (Custom Script)
+**Journey:**
 
-For power users who want full creative control over the output.
-
-Customization options:
-- Edit or rewrite the Hook script
-- Edit or rewrite the Body script
-- Edit or rewrite the CTA script
-- Mix and match: use AI-generated hook with custom body, etc.
-- Adjust pacing / duration per segment
-- Select background setting / environment
-
-### 4.6 AI Video Pipeline (Technical)
-
-This section details the backend pipeline that produces the final video output.
-
-**Step 1 — POV Image Generation**
-Using the stored persona reference image and the product image (scraped or uploaded), call NanoBanana API to generate a POV-style (iPhone selfie) composite image of the persona holding/using the product.
-
-**Step 2 — Segmented Video Generation**
-The POV image and script are fed into Kling 3.0 (AI video model). Videos are generated in segments to avoid lip-sync degradation:
-- Hook segment: 3–10 seconds
-- Body segment: 10–20 seconds (can be split into 2 sub-segments if > 10s)
-- CTA segment: 3–5 seconds
-
-Each segment is generated independently to keep lip sync quality high (AI lip sync degrades noticeably after ~10 seconds of continuous generation).
-
-**Step 3 — Assembly & Output**
-Segments are stitched together server-side using FFmpeg or similar. Transitions between segments are smooth (crossfade or jump cut). The system generates 4 complete video variations per request, each with slight prompt variations for diversity.
-
-**Step 4 — Review & Download**
-User reviews 4 generated videos side-by-side. They can download any or all of the 4 videos. This multi-generation approach mitigates the risk of AI artifacts (misspelled words, bad lip sync, unnatural movements).
-
-## 5. Paywall & Monetization
-
-The paywall triggers at the moment the user hits "Generate Video" after selecting a product and configuring their persona. At this point, the user has already invested time in the product (scraped data, created persona), maximizing conversion intent.
-
-### 5.1 Pricing Tiers
-
-| Plan | Price / month | Included Credits | Target User |
+| Step | Action | System Response | Pain Point Addressed |
 |---|---|---|---|
-| Starter | $15/mo | 10 video generations (40 outputs) | Testers, small sellers, side hustlers |
-| Growth | $59/mo | 50 video generations (200 outputs) | Active DTC brands, regular advertisers |
-| Scale | $249/mo | 250 video generations (1000 outputs) | Agencies, high-volume brands, teams |
+| 1 | Lands on homepage from ad/search | Sees hero tagline + URL input field | No signup wall — instant engagement |
+| 2 | Pastes Shopify store URL | Scraping begins, progress indicator shown | Zero manual data entry |
+| 3 | Views scraped products | Product cards with images, names, prices, descriptions displayed. AI brand summary generated (tone, demographic, selling points) | Immediate "wow" moment — data already organized |
+| 4 | Edits/confirms product data | Inline editing, confirm button | User retains control over accuracy |
 
-Additional notes:
-- 1 credit = 1 generation = 4 video outputs
-- Unused credits do not roll over
-- Overage: $2 per additional credit on Starter, $1.50 on Growth, $1.00 on Scale
-- Annual billing: 20% discount
-- Free trial: 1 free generation (4 outputs) to demonstrate value before paywall
+**Success:** User sees their products organized with AI-generated brand insights before creating an account. Conversion intent established through demonstrated value.
 
-### 5.2 Conversion Flow
+### UJ2: Authenticated User — Persona Creation to Video Generation
 
-1. User pastes URL → products scraped (no auth required)
-2. User signs up / logs in (soft gate)
-3. User creates persona (free, builds investment)
-4. User selects product + mode → hits Generate
-5. Paywall appears: "Choose a plan to generate your first AI UGC video"
-6. User selects plan → Stripe checkout
-7. Video generation begins → 4 outputs delivered
+**Persona:** Sarah (continued). Has signed up. Wants to create her first AI spokesperson and generate a video ad.
 
-## 6. Feature Map
+**Goal:** Build a custom AI persona and generate a professional UGC video ad for a specific product.
+
+**Journey:**
+
+| Step | Action | System Response | Pain Point Addressed |
+|---|---|---|---|
+| 1 | Prompted to sign up / log in | Auth gate with Email, Google OAuth options | Soft gate after value demonstrated |
+| 2 | Opens persona creator | Visual character builder with 9 attribute sliders/selectors | No design skills needed |
+| 3 | Configures persona attributes | Real-time preview updates as attributes change | WYSIWYG control |
+| 4 | Submits persona for generation | 4 AI-generated persona images returned in < 30s | Fast iteration, multiple options |
+| 5 | Selects preferred persona (or regenerates) | Selected image stored as persistent reference | Consistent brand spokesperson |
+| 6 | Selects a product from library | Product data and brand tone pre-loaded | No re-entry of product info |
+| 7 | Chooses Easy Mode, hits Generate | AI writes Hook/Body/CTA script. Video pipeline produces 4 variations | One-click from product to finished video |
+| 8 | Reviews 4 videos side-by-side | Video player grid with download buttons per video | Multiple options mitigate AI quality variance |
+| 9 | Downloads preferred video(s) as MP4 | Direct download, no watermark on paid plans | Ready for ad platform upload |
+
+**Success:** User goes from persona creation to downloadable video ad in under 15 minutes.
+
+### UJ3: Free User — Paywall Conversion
+
+**Persona:** Sarah (continued). Has created persona and selected a product. Hits Generate for the first time.
+
+**Goal:** Convert from free exploration to paid subscriber.
+
+**Journey:**
+
+| Step | Action | System Response | Pain Point Addressed |
+|---|---|---|---|
+| 1 | Hits "Generate Video" | Paywall modal appears: "Choose a plan to generate your first AI UGC video" | Triggered after maximum sunk-cost investment |
+| 2 | Reviews plan options | Starter and Growth tiers with feature comparison | Clear value-per-dollar |
+| 3 | Selects plan | Stripe checkout overlay | Trusted payment processing |
+| 4 | Completes payment | Immediate redirect to generation in progress | No delay between payment and value delivery |
+| 5 | Receives 4 video outputs | Videos ready for review and download | Instant ROI justification |
+
+**Success:** Free trial (1 generation = 4 outputs) available for users who need proof before committing. Paywall placement maximizes conversion by triggering after persona investment.
+
+### UJ4: Returning User — Bulk Generation Workflow
+
+**Persona:** Marcus, agency owner managing 5 e-commerce clients. Growth plan subscriber.
+
+**Goal:** Generate video ads for multiple products across multiple brand profiles efficiently.
+
+**Journey:**
+
+| Step | Action | System Response | Pain Point Addressed |
+|---|---|---|---|
+| 1 | Logs in, views dashboard | Generation history, video library, credit balance displayed | Quick status overview |
+| 2 | Switches to client brand profile | Products and personas for that brand loaded | Multi-brand management |
+| 3 | Selects product, selects existing persona | Pre-configured — no rebuild needed | Persona persistence saves time |
+| 4 | Generates video (Easy Mode) | 4 variations delivered | Consistent quality across clients |
+| 5 | Repeats for 3 more products | Batch workflow — select product, generate, download, next | Volume production in minutes |
+
+**Success:** Marcus generates 16 videos (4 products x 4 variations) in under 40 minutes.
+
+---
+
+## Domain Requirements
+
+**Domain Classification:** E-commerce SaaS with payment processing and web scraping.
+
+### DR1: Payment Processing Compliance
+- All payment processing delegated to PCI DSS Level 1 compliant processor (Stripe)
+- No credit card data stored, transmitted, or processed by application servers
+- Subscription management handled entirely via Stripe Billing API
+
+### DR2: Data Privacy — Scraping
+- Scraped product data (names, images, descriptions, prices) stored only for authenticated users who confirm the import
+- Unconfirmed scrape data purged within 24 hours
+- Scraping respects robots.txt directives
+- Users must confirm they have rights to scraped store data (ToS agreement)
+- GDPR compliance: EU users can request full data deletion within 30 days
+- CCPA compliance: California users can opt out of data sale (no data is sold)
+
+### DR3: AI-Generated Content Regulations
+- Terms of Service: users accept full responsibility for AI-generated content usage
+- No real-person likeness replication — persona builder creates synthetic faces only
+- Watermark applied on free-tier outputs
+- Generated content metadata includes AI-generation disclosure tag
+
+### DR4: Data Encryption
+- All user data encrypted at rest (AES-256)
+- All data in transit encrypted (TLS 1.3)
+- API keys and secrets stored in environment variables, never in source code
+- Uploaded product images stored in access-controlled cloud storage with signed URLs
+
+---
+
+## Innovation Analysis
+
+### Competitive Landscape
+
+| Competitor | Approach | Limitation AI UGC Generator Addresses |
+|---|---|---|
+| Real UGC creators (Billo, Insense) | Human creators film custom videos | $150–$500/video, days turnaround, inconsistent quality |
+| Arcads | AI avatar video generation | No store scraping, no persistent persona builder, limited customization |
+| Creatify | AI ad generation from URLs | Generates ad creatives, not UGC-style persona videos. No character builder |
+| Synthesia | AI spokesperson videos | Corporate talking-head style, not UGC aesthetic. No e-commerce integration |
+| Generic AI video (Runway, Pika) | General-purpose AI video | No UGC optimization, no script structure, no e-commerce workflow |
+
+### Key Differentiators
+1. **Zero-input product import** — paste URL, get structured product data + AI brand summary
+2. **Persistent AI persona** — build once, generate consistently across all products
+3. **UGC-optimized output** — Hook/Body/CTA structure designed for paid social conversion
+4. **Segmented generation** — avoids lip-sync degradation that plagues longer AI videos
+5. **4-variant output** — every generation produces 4 variations to hedge against AI artifacts
+
+---
+
+## Project-Type Requirements
+
+**Project Type:** SaaS Web Application (B2B/B2C hybrid)
+
+### PT1: Multi-Tenancy
+- Each user account isolated with own products, personas, and generated videos
+- Brand profiles enable multiple stores per account (Growth: 3, Scale: unlimited)
+- Team seats share brand profile access with role-based permissions (Scale: 5 seats)
+
+### PT2: Subscription Lifecycle
+- Free exploration (scraping + persona creation) without payment
+- Paywall at generation step
+- Plan upgrade/downgrade via self-service billing portal
+- Credit balance tracking with overage billing
+- Annual billing option with 20% discount
+- Cancellation with access through end of billing period
+
+### PT3: Browser Compatibility
+- Chrome, Firefox, Safari, Edge — latest 2 major versions
+- Responsive design: desktop-first, functional on tablet
+- Mobile: view-only for dashboard and video library (generation is desktop-optimized)
+
+### PT4: Async Job Processing
+- Video generation runs asynchronously (up to 10 minutes per generation)
+- Real-time progress indicator via WebSocket or polling
+- Email notification on generation completion
+- Job queue with priority lanes per subscription tier (Scale = high priority)
+- Failed jobs auto-retry up to 3 times before notifying user
+
+---
+
+## Functional Requirements
+
+### Product Import & Scraping
+
+| ID | Requirement | Traces To |
+|---|---|---|
+| FR1 | Users can submit a store URL to initiate automatic product data scraping | UJ1.2 |
+| FR2 | Scraper extracts product name, images (primary + variants), description, price, and category/tags per product | UJ1.3 |
+| FR3 | System generates an AI-powered brand summary (tone of voice, target demographic, key selling points) from scraped product data | UJ1.3 |
+| FR4 | Users can review, inline-edit, and confirm imported product data before proceeding | UJ1.4 |
+| FR5 | Users can manually upload product images, name, and description when scraping fails or no website exists | UJ1 (fallback) |
+| FR6 | Scraping supports Shopify stores as primary target with generic HTML fallback for other platforms | UJ1.2 |
+
+### Authentication & User Management
+
+| ID | Requirement | Traces To |
+|---|---|---|
+| FR7 | Users can create an account using email + password | UJ2.1 |
+| FR8 | Users can authenticate via Google OAuth | UJ2.1 |
+| FR9 | Authentication gate appears after product scraping (soft gate — value demonstrated first) | UJ1→UJ2 transition |
+| FR10 | Users can view and manage their account settings, subscription, and billing | UJ4.1 |
+
+### Persona Creation
+
+| ID | Requirement | Traces To |
+|---|---|---|
+| FR11 | Users can build an AI persona using a visual character builder with 9 configurable attributes: gender, skin tone, age range, hair color, hair style, eye color, body type, clothing style, accessories | UJ2.2, UJ2.3 |
+| FR12 | Each attribute provides predefined options selectable via visual controls (sliders, gradient pickers, option grids) | UJ2.3 |
+| FR13 | System generates 4 AI persona images from configured attributes | UJ2.4 |
+| FR14 | Users can select their preferred persona image from the 4 generated options | UJ2.4 |
+| FR15 | Selected persona image persists as reference for all future video generations | UJ2.5, UJ4.3 |
+| FR16 | Users can regenerate persona images by adjusting attributes and resubmitting | UJ2.4 (iteration) |
+| FR17 | Persona slots limited by subscription tier: Starter = 1, Growth = 3, Scale = 10 | PT1, Scope |
+
+### Video Generation — Easy Mode
+
+| ID | Requirement | Traces To |
+|---|---|---|
+| FR18 | Users can select a product from their library and initiate one-click video generation (Easy Mode) | UJ2.6, UJ2.7 |
+| FR19 | System generates an AI-written script segmented into Hook (3–10s), Body (10–20s), and CTA (3–5s) tuned to the product's scraped description and brand tone | UJ2.7 |
+| FR20 | System generates a composite POV-style image of the persona holding/using the selected product | UJ2.7 |
+| FR21 | System generates video segments independently (Hook, Body, CTA) to maintain lip-sync quality (each segment < 10 seconds) | UJ2.7 |
+| FR22 | Body segments exceeding 10 seconds are split into 2 sub-segments for generation | UJ2.7 |
+| FR23 | System stitches video segments into a complete output with smooth transitions (crossfade or jump cut) | UJ2.7 |
+| FR24 | Each generation produces 4 complete video variations with slight prompt diversity | UJ2.8 |
+| FR25 | Users can review 4 generated videos side-by-side in a comparison view | UJ2.8 |
+| FR26 | Users can download any or all generated videos as MP4 files | UJ2.9 |
+
+### Video Generation — Expert Mode (Phase 2)
+
+| ID | Requirement | Traces To |
+|---|---|---|
+| FR27 | Users can edit or rewrite individual script segments (Hook, Body, CTA) before generation | Scope Phase 2 |
+| FR28 | Users can mix AI-generated and custom-written segments (e.g., AI hook + custom body) | Scope Phase 2 |
+| FR29 | Users can adjust pacing/duration per segment | Scope Phase 2 |
+| FR30 | Users can select background setting/environment for video generation | Scope Phase 2 |
+
+### Paywall & Billing
+
+| ID | Requirement | Traces To |
+|---|---|---|
+| FR31 | Paywall triggers when user initiates first video generation without an active subscription | UJ3.1 |
+| FR32 | Paywall displays plan comparison with Starter and Growth tiers (MVP), Scale tier (Phase 2) | UJ3.2 |
+| FR33 | Users complete subscription purchase via Stripe checkout | UJ3.3 |
+| FR34 | 1 free generation (4 video outputs) available before paywall enforces payment | UJ3 (free trial) |
+| FR35 | Credit balance decrements by 1 per generation, displayed in dashboard | UJ4.1 |
+| FR36 | Overage charges apply when credits exhausted: $2/credit (Starter), $1.50 (Growth), $1 (Scale) | PT2 |
+
+### Dashboard & Video Library
+
+| ID | Requirement | Traces To |
+|---|---|---|
+| FR37 | Users can view generation history with timestamps, product names, and video thumbnails | UJ4.1 |
+| FR38 | Users can re-download previously generated videos from their library | UJ4.1 |
+
+---
+
+## Non-Functional Requirements
+
+### Performance
+
+| ID | Requirement | Measurement |
+|---|---|---|
+| NFR1 | Website scraping completes in < 15 seconds for stores with up to 50 products | Server-side timer from URL submit to product data response, measured at p95 |
+| NFR2 | Persona image generation returns 4 images in < 30 seconds | Server-side timer from generation request to image delivery, measured at p95 |
+| NFR3 | Video segment generation completes in < 3 minutes per segment | Job queue timer per segment, measured at p95 |
+| NFR4 | Total video generation (all segments + stitching) completes in < 10 minutes | End-to-end job timer from generation initiation to 4 outputs ready, measured at p95 |
+| NFR5 | System supports at least 50 concurrent video generation jobs without degradation | Load testing with 50 simultaneous generation requests, all completing within NFR4 targets |
+
+### Reliability
+
+| ID | Requirement | Measurement |
+|---|---|---|
+| NFR6 | 99.5% uptime for web application (excluding scheduled maintenance windows announced 24h in advance) | Uptime monitoring service (e.g., BetterUptime), measured monthly |
+| NFR7 | AI provider outages (image/video generation APIs) handled via job queuing with automatic retry (3 attempts, exponential backoff) | Job queue metrics: retry count, success-after-retry rate |
+| NFR8 | Users receive email notification when video generation completes or fails | Email delivery tracking: sent within 60 seconds of job completion |
+
+### Security
+
+| ID | Requirement | Measurement |
+|---|---|---|
+| NFR9 | All user data encrypted at rest using AES-256 | Database encryption configuration audit, quarterly |
+| NFR10 | All data in transit encrypted via TLS 1.3 | SSL Labs scan: A+ rating, quarterly |
+| NFR11 | API rate limiting: max 10 scrape requests per IP per hour for unauthenticated users, max 60 per hour for authenticated users | Rate limiter metrics: blocked request count, false positive rate |
+| NFR12 | Authentication tokens expire after 24 hours of inactivity, refresh tokens after 30 days | Token expiry audit via automated test suite |
+| NFR13 | No payment card data stored or processed by application — all payment handling via Stripe | PCI DSS self-assessment questionnaire (SAQ-A), annually |
+
+### Scalability
+
+| ID | Requirement | Measurement |
+|---|---|---|
+| NFR14 | Video generation pipeline scales horizontally to handle 10x load growth without architecture changes | Load test: 500 concurrent jobs complete within 2x NFR4 targets |
+| NFR15 | Generated video assets served via CDN with < 200ms first-byte time globally | CDN analytics: TTFB at p95 across major regions (NA, EU, APAC) |
+| NFR16 | Database handles 10,000 registered users with < 100ms query response time for dashboard operations | Database query monitoring at p95, measured weekly |
+
+---
+
+## Risks & Mitigations
+
+| Risk | Likelihood | Impact | Mitigation |
+|---|---|---|---|
+| AI lip-sync quality inconsistent across segments | High | High | Segment videos at < 10s each (FR21-FR22). Generate 4 variants (FR24). Allow regeneration (FR16) |
+| AI image/video provider API downtime or breaking changes | Medium | High | Abstract API layer behind internal interface. Queue + retry on failure (NFR7). Maintain fallback provider evaluation |
+| AI provider API rate limits constrain generation volume | Medium | Medium | Job queue with priority lanes (PT4). Negotiate enterprise rates. Monitor usage against limits |
+| Store scraping blocked by anti-bot measures | Medium | Low | Manual upload fallback (FR5). Shopify API integration in Phase 2. Respect robots.txt (DR2) |
+| Low conversion at paywall step | Medium | High | Free trial: 1 generation (FR34). Maximize investment before gate (UJ3). A/B test pricing in Phase 2 |
+| Copyright/likeness legal challenges | Low | High | ToS: user responsible for usage (DR3). No real-person replication. Watermark on free tier. Legal review pending (OQ4) |
+
+---
+
+## Open Questions
+
+| # | Question | Owner | Status |
+|---|---|---|---|
+| OQ1 | Pricing validation: competitor benchmarking needed to confirm $15/$59/$249 tiers | Axel | Open |
+| OQ2 | AI image provider (NanoBanana) pricing at scale — enterprise deal negotiation | Axel | Open |
+| OQ3 | AI video provider (Kling 3.0) API availability and rate limits for commercial use | Axel | Open |
+| OQ4 | Legal review: AI-generated likeness, Terms of Service, usage rights | TBD | Open |
+| OQ5 | Scraping legality per-region: GDPR, CCPA considerations for automated data collection | TBD | Open |
+| OQ6 | Free tier/freemium: should a limited free-forever plan exist alongside free trial? | Axel | Open |
+| OQ7 | Multi-language script generation priority for Phase 2 | Axel | Open |
+
+---
+
+## Appendix: Feature Map by Tier
+
+Retained from original PRD for reference. Tier features are reflected in FRs and Scope above.
 
 | Feature | Starter | Growth | Scale |
 |---|---|---|---|
 | Video generations / month | 10 | 50 | 250 |
 | Persona slots | 1 | 3 | 10 |
-| Easy Mode | ✓ | ✓ | ✓ |
-| Expert Mode | ✗ | ✓ | ✓ |
-| Custom script editing | ✗ | ✓ | ✓ |
-| Priority generation queue | ✗ | ✗ | ✓ |
-| API access | ✗ | ✗ | ✓ |
+| Easy Mode | Yes | Yes | Yes |
+| Expert Mode | No | Yes | Yes |
+| Custom script editing | No | Yes | Yes |
+| Priority generation queue | No | No | Yes |
+| API access | No | No | Yes |
 | Team seats | 1 | 1 | 5 |
 | Brand profiles | 1 | 3 | Unlimited |
 | Export resolution | 720p | 1080p | 1080p |
-
-## 7. Non-Functional Requirements
-
-### 7.1 Performance
-- Website scraping: < 15 seconds for up to 50 products
-- Persona generation: < 30 seconds for 4 images
-- Video generation: < 3 minutes per segment, < 10 minutes total per generation
-- Concurrent generations: support at least 50 simultaneous jobs
-
-### 7.2 Reliability
-- 99.5% uptime SLA
-- Graceful degradation if NanoBanana or Kling APIs are down (queue + retry)
-- Job status tracking with email notification on completion
-
-### 7.3 Security
-- SOC 2 compliance target
-- All scraped data encrypted at rest
-- Stripe for payment processing (PCI DSS compliant)
-- Rate limiting on scraping to avoid abuse
-
-### 7.4 Scalability
-- Serverless video pipeline (AWS Lambda / GCP Cloud Run)
-- Job queue with priority lanes per tier
-- CDN delivery for generated video assets
-
-## 8. Technical Stack (Recommended)
-
-| Layer | Technology |
-|---|---|
-| Frontend | Next.js + Tailwind CSS (landing + app) |
-| Auth | Clerk or NextAuth (Google + email + Shopify OAuth) |
-| Backend API | Next.js API routes or Node.js microservices |
-| Database | PostgreSQL (Supabase or PlanetScale) |
-| Job Queue | BullMQ (Redis) or Inngest |
-| Scraping | Puppeteer / Playwright (headless Chromium) |
-| AI Image Generation | NanoBanana API |
-| AI Video Generation | Kling 3.0 API |
-| AI Script Writing | Claude API (Anthropic) or GPT-4 |
-| Video Stitching | FFmpeg (server-side) |
-| Payments | Stripe Billing (subscriptions + metered) |
-| Hosting | Vercel (frontend) + AWS/GCP (video pipeline) |
-| Storage | AWS S3 / Cloudflare R2 + CDN |
-
-## 9. Risks & Mitigations
-
-| Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|
-| AI lip-sync quality inconsistent | High | High | Segment videos at < 10s; generate 4 variants; allow re-generation |
-| NanoBanana API downtime/changes | Medium | High | Abstract API layer; maintain fallback provider (e.g., Flux, Midjourney) |
-| Kling 3.0 API rate limits | Medium | Medium | Queue system with retries; priority lanes; negotiate enterprise rates |
-| Scraping blocked by stores | Medium | Low | Manual upload fallback; Shopify API integration for native stores |
-| Low conversion at paywall | Medium | High | Free trial (1 gen); maximize sunk cost before gate; A/B test pricing |
-| Copyright / likeness issues | Low | High | ToS: user responsible for usage; no real person replication; watermark on free tier |
-
-## 10. Success Metrics (KPIs)
-
-| Metric | Target (Month 3) | Target (Month 6) |
-|---|---|---|
-| Landing page → Scrape conversion | 40% | 50% |
-| Scrape → Signup conversion | 25% | 35% |
-| Signup → Paid conversion | 8% | 12% |
-| Monthly Recurring Revenue (MRR) | $5K | $25K |
-| Churn rate (monthly) | < 15% | < 10% |
-| Average videos generated / user / month | 8 | 15 |
-| NPS score | 30+ | 45+ |
-
-## 11. MVP Scope
-
-For the initial launch (v1.0), the following features are in scope:
-
-### In scope (MVP):
-- Landing page with URL input CTA
-- Website scraping (Shopify-first, generic fallback)
-- Email + Google OAuth signup
-- Persona creation (full Sims-like builder)
-- Easy Mode video generation only
-- 4-variant output per generation
-- Starter + Growth pricing tiers
-- Stripe checkout integration
-- Download as MP4
-
-### Out of scope (v1.1+):
-- Expert Mode (custom script editing)
-- Scale tier + API access
-- Shopify native app integration
-- Team/agency features (multi-seat, shared personas)
-- Video analytics / performance tracking
-- Direct publishing to TikTok / Meta / YouTube
-- A/B testing framework for ad creative
-- Multi-language script generation
-
-## 12. Epic Breakdown
-
-Below is a high-level epic breakdown for backlog planning. User stories will be derived from each epic in the next phase.
-
-| Epic # | Epic Name | Priority | Est. Effort |
-|---|---|---|---|
-| E1 | Landing Page & Marketing Site | P0 | 1 sprint |
-| E2 | Website Scraper & Product Import | P0 | 2 sprints |
-| E3 | Authentication & User Management | P0 | 1 sprint |
-| E4 | Persona Creator (Sims-like UI) | P0 | 2 sprints |
-| E5 | NanoBanana Integration (Persona Images) | P0 | 1 sprint |
-| E6 | AI Script Generator (Easy Mode) | P0 | 1 sprint |
-| E7 | Kling 3.0 Integration (Video Pipeline) | P0 | 2 sprints |
-| E8 | Video Assembly & Delivery (FFmpeg) | P0 | 1 sprint |
-| E9 | Paywall & Stripe Billing | P0 | 1 sprint |
-| E10 | User Dashboard & Video Library | P1 | 1 sprint |
-| E11 | Expert Mode (Custom Scripts) | P1 | 1 sprint |
-| E12 | Scale Tier & API | P2 | 2 sprints |
-
-Estimated MVP timeline: 8–10 sprints (~4–5 months) with a team of 2–3 engineers + 1 designer.
-
-## 13. Open Questions
-
-| # | Question | Owner | Status |
-|---|---|---|---|
-| 1 | Final pricing validation: need market research / competitor benchmarking | Axel | Open |
-| 2 | NanoBanana API pricing at scale — negotiate enterprise deal? | Axel | Open |
-| 3 | Kling 3.0 API availability & rate limits for commercial use | Axel | Open |
-| 4 | Legal review: AI-generated likeness, ToS, usage rights | TBD | Open |
-| 5 | Scraping legality per-region (GDPR, CCPA considerations) | TBD | Open |
-| 6 | Free tier / freemium: offer limited free forever plan? | Axel | Open |
-| 7 | Multi-language support priority for v1.1? | Axel | Open |
-
----
-
-**End of Document — PRD v1.0**
