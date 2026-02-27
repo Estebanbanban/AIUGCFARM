@@ -53,14 +53,17 @@ async function generateKlingToken(): Promise<string> {
 
 /**
  * Submit a video generation job to Kling AI.
- * Uses kling-v2-6 std (720p) for cost efficiency per architecture decision AD-KLING-01.
  * image2video endpoint infers aspect ratio from the input image — no aspect_ratio param.
+ *
+ * @param model_name - "kling-v2-6" (standard, $0.042/s) or "kling-v3" (hd, $0.084/s).
+ *                     Defaults to "kling-v2-6".
  */
 export async function submitKlingJob(params: {
   image_url: string;
   script: string;
   duration: number;
   mode?: string;
+  model_name?: string;
 }): Promise<KlingSubmitResult> {
   const token = await generateKlingToken();
 
@@ -71,7 +74,7 @@ export async function submitKlingJob(params: {
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
-      model_name: "kling-v2-6",
+      model_name: params.model_name || "kling-v2-6",
       image: params.image_url,
       prompt: params.script,
       duration: String(params.duration),

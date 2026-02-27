@@ -14,6 +14,7 @@ interface GenerationInput {
   product_id: string;
   persona_id: string;
   mode: "single" | "triple";
+  quality: "standard" | "hd";
 }
 
 export interface GenerationWithRelations extends Generation {
