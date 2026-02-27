@@ -228,6 +228,65 @@ function optionImageDataUri(key: string) {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
+function optionHumanPhotoUri(key: string) {
+  const genderMap: Record<string, string> = {
+    male: "https://randomuser.me/api/portraits/men/32.jpg",
+    female: "https://randomuser.me/api/portraits/women/44.jpg",
+    non_binary: "https://randomuser.me/api/portraits/women/65.jpg",
+  };
+
+  const hairStyleMap: Record<string, string> = {
+    "Short Straight": "https://randomuser.me/api/portraits/men/11.jpg",
+    "Short Curly": "https://randomuser.me/api/portraits/men/28.jpg",
+    "Medium Straight": "https://randomuser.me/api/portraits/women/12.jpg",
+    "Medium Wavy": "https://randomuser.me/api/portraits/women/33.jpg",
+    "Long Straight": "https://randomuser.me/api/portraits/women/24.jpg",
+    "Long Curly": "https://randomuser.me/api/portraits/women/52.jpg",
+    "Buzz Cut": "https://randomuser.me/api/portraits/men/47.jpg",
+    Bob: "https://randomuser.me/api/portraits/women/36.jpg",
+    Ponytail: "https://randomuser.me/api/portraits/women/57.jpg",
+    Braids: "https://randomuser.me/api/portraits/women/68.jpg",
+    Afro: "https://randomuser.me/api/portraits/men/73.jpg",
+    Bald: "https://randomuser.me/api/portraits/men/86.jpg",
+  };
+
+  const bodyTypeMap: Record<string, string> = {
+    slim: "https://randomuser.me/api/portraits/women/70.jpg",
+    average: "https://randomuser.me/api/portraits/men/54.jpg",
+    athletic: "https://randomuser.me/api/portraits/men/63.jpg",
+    curvy: "https://randomuser.me/api/portraits/women/61.jpg",
+    plus_size: "https://randomuser.me/api/portraits/women/79.jpg",
+  };
+
+  const clothingMap: Record<string, string> = {
+    Casual: "https://randomuser.me/api/portraits/women/29.jpg",
+    "Business Casual": "https://randomuser.me/api/portraits/men/22.jpg",
+    Streetwear: "https://randomuser.me/api/portraits/men/45.jpg",
+    Sporty: "https://randomuser.me/api/portraits/women/19.jpg",
+    Elegant: "https://randomuser.me/api/portraits/women/39.jpg",
+    Bohemian: "https://randomuser.me/api/portraits/women/26.jpg",
+    Minimalist: "https://randomuser.me/api/portraits/men/35.jpg",
+  };
+
+  const accessoryMap: Record<string, string> = {
+    None: "https://randomuser.me/api/portraits/women/41.jpg",
+    Glasses: "https://randomuser.me/api/portraits/men/76.jpg",
+    Sunglasses: "https://randomuser.me/api/portraits/women/75.jpg",
+    Earrings: "https://randomuser.me/api/portraits/women/27.jpg",
+    Necklace: "https://randomuser.me/api/portraits/women/31.jpg",
+    Watch: "https://randomuser.me/api/portraits/men/82.jpg",
+    Hat: "https://randomuser.me/api/portraits/men/69.jpg",
+    Scarf: "https://randomuser.me/api/portraits/women/83.jpg",
+  };
+
+  if (key.startsWith("gender-")) return genderMap[key.slice(7)] ?? optionImageDataUri(key);
+  if (key.startsWith("hair-style-")) return hairStyleMap[key.slice(11)] ?? optionImageDataUri(key);
+  if (key.startsWith("body-type-")) return bodyTypeMap[key.slice(10)] ?? optionImageDataUri(key);
+  if (key.startsWith("clothing-")) return clothingMap[key.slice(9)] ?? optionImageDataUri(key);
+  if (key.startsWith("accessory-")) return accessoryMap[key.slice(10)] ?? optionImageDataUri(key);
+  return optionImageDataUri(key);
+}
+
 const hairPlaceholderStyle: Record<string, React.CSSProperties> = {
   Black:       { background: "linear-gradient(135deg,#18181b 0%,#09090b 100%)" },
   "Dark Brown":  { background: "linear-gradient(135deg,#3b1f0a 0%,#1c0f05 100%)" },
@@ -266,19 +325,19 @@ const accessoriesPlaceholderStyle: Record<string, React.CSSProperties> =
   Object.fromEntries(accessoryOptions.map((value) => [value, neutralCardStyle(`accessory-${value}`)]));
 
 const genderImageSrc: Record<string, string> =
-  Object.fromEntries(personaGenders.map((value) => [value, optionImageDataUri(`gender-${value}`)]));
+  Object.fromEntries(personaGenders.map((value) => [value, optionHumanPhotoUri(`gender-${value}`)]));
 
 const hairStyleImageSrc: Record<string, string> =
-  Object.fromEntries(hairStyles.map((value) => [value, optionImageDataUri(`hair-style-${value}`)]));
+  Object.fromEntries(hairStyles.map((value) => [value, optionHumanPhotoUri(`hair-style-${value}`)]));
 
 const bodyTypeImageSrc: Record<string, string> =
-  Object.fromEntries(personaBodyTypes.map((value) => [value, optionImageDataUri(`body-type-${value}`)]));
+  Object.fromEntries(personaBodyTypes.map((value) => [value, optionHumanPhotoUri(`body-type-${value}`)]));
 
 const clothingImageSrc: Record<string, string> =
-  Object.fromEntries(clothingStyles.map((value) => [value, optionImageDataUri(`clothing-${value}`)]));
+  Object.fromEntries(clothingStyles.map((value) => [value, optionHumanPhotoUri(`clothing-${value}`)]));
 
 const accessoriesImageSrc: Record<string, string> =
-  Object.fromEntries(accessoryOptions.map((value) => [value, optionImageDataUri(`accessory-${value}`)]));
+  Object.fromEntries(accessoryOptions.map((value) => [value, optionHumanPhotoUri(`accessory-${value}`)]));
 
 // ── Shared sub-components ───────────────────────────────────────────────────
 
