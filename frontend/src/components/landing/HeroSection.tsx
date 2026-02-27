@@ -5,7 +5,7 @@ import { UrlInputCta } from "./UrlInputCta";
 
 export function HeroSection() {
   return (
-    <section className="relative overflow-hidden bg-black pt-24 pb-16 md:pt-28 md:pb-24">
+    <section className="relative overflow-hidden bg-black pt-44 pb-28 md:pt-52 md:pb-36">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_22%,rgba(249,115,22,0.24),transparent_52%)]" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(255,255,255,0.06),transparent_60%)]" />
 
@@ -23,30 +23,11 @@ export function HeroSection() {
             </span>
           </motion.h1>
 
-          <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.2, ease: [0.25, 0.4, 0.25, 1] }}
-            className="mx-auto mt-8 max-w-3xl text-lg text-white/85 md:text-xl"
-          >
-            Import your product page, generate multiple ad angles, and launch creatives
-            ready for TikTok, Reels, and Shorts.
-          </motion.p>
-
-          <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, delay: 0.35, ease: [0.25, 0.4, 0.25, 1] }}
-            className="mt-3 text-[#b8b8b8]"
-          >
-            Hook, Body, CTA. Faster testing. Better winners.
-          </motion.p>
-
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.5, ease: [0.25, 0.4, 0.25, 1] }}
-            className="mt-9"
+            className="mt-10"
           >
             <UrlInputCta />
           </motion.div>
