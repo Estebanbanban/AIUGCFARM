@@ -15,7 +15,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useGenerationHistory } from "@/hooks/use-generations";
 import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
 import type { GenerationStatus } from "@/types/database";
+import { calculateGenerationCost } from "@/lib/generation-cost";
 
 /** Renders an image from either an external URL or a Supabase storage path. */
 function ResolvedImage({ path, alt, className }: { path: string; alt: string; className?: string }) {
@@ -146,7 +147,10 @@ export default function HistoryPage() {
       {!isLoading && generations.length > 0 && (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {generations.map((gen) => (
+            {generations.map((gen) => {
+              const cost = calculateGenerationCost(gen.videos, gen.video_quality);
+              const showCost = gen.status === "completed" && cost.totalBilledSeconds > 0;
+              return (
               <Link
                 key={gen.id}
                 href={`/generate/${gen.id}`}
@@ -200,6 +204,11 @@ export default function HistoryPage() {
                       <Badge variant="outline" className="text-xs capitalize">
                         {gen.mode} mode
                       </Badge>
+                      {showCost && (
+                        <Badge variant="outline" className="text-xs">
+                          {cost.modelName}
+                        </Badge>
+                      )}
                       {gen.status === "completed" && gen.videos && (
                         <span className="text-xs text-muted-foreground">
                           {(gen.videos.hooks?.length ?? 0) +
@@ -209,6 +218,16 @@ export default function HistoryPage() {
                         </span>
                       )}
                     </div>
+
+                    {showCost && (
+                      <p className="text-xs text-muted-foreground">
+                        Cost:{" "}
+                        <span className="font-medium text-foreground">
+                          {formatCurrency(cost.totalCostUsd)}
+                        </span>{" "}
+                        ({cost.totalBilledSeconds}s billed)
+                      </p>
+                    )}
 
                     {/* Failed: show error + retry */}
                     {gen.status === "failed" && (
@@ -235,7 +254,8 @@ export default function HistoryPage() {
                   </CardContent>
                 </Card>
               </Link>
-            ))}
+              );
+            })}
           </div>
 
           {/* Pagination */}

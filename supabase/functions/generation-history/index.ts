@@ -38,6 +38,7 @@ Deno.serve(async (req: Request) => {
         product_id,
         persona_id,
         mode,
+        video_quality,
         status,
         script,
         composite_image_url,

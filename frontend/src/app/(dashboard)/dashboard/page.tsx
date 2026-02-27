@@ -15,8 +15,9 @@ import {
   ArrowRight,
   Clock,
   Loader2,
+  DollarSign,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatDate, formatCurrency } from "@/lib/utils";
 import { PLANS } from "@/lib/stripe";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +28,6 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { formatDate } from "@/lib/utils";
 import { useCredits } from "@/hooks/use-credits";
 import { useProfile } from "@/hooks/use-profile";
 import {
@@ -36,6 +36,7 @@ import {
 } from "@/hooks/use-generations";
 import { usePersonas } from "@/hooks/use-personas";
 import type { GenerationStatus } from "@/types/database";
+import { calculateGenerationCost } from "@/lib/generation-cost";
 
 const statusColors: Record<GenerationStatus, string> = {
   pending: "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
@@ -242,32 +243,42 @@ export default function DashboardPage() {
           </div>
         ) : hasGenerations ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {recentGenerations.map((gen) => (
-              <Link key={gen.id} href={`/generate/${gen.id}`} className="group">
-                <Card className="h-full border-border bg-card transition-colors hover:border-primary/40">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="line-clamp-1 text-sm font-medium">
-                        {gen.products?.name ?? `Generation ${gen.id.slice(0, 8)}`}
-                      </CardTitle>
-                      <Badge
-                        variant="secondary"
-                        className={cn(
-                          "shrink-0 text-xs capitalize",
-                          statusColors[gen.status] ?? statusColors.pending
-                        )}
-                      >
-                        {statusLabel(gen.status)}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Clock className="size-3" />
-                      {formatDate(gen.created_at)}
-                    </div>
-                  </CardHeader>
-                </Card>
-              </Link>
-            ))}
+            {recentGenerations.map((gen) => {
+              const cost = calculateGenerationCost(gen.videos, gen.video_quality);
+              const showCost = gen.status === "completed" && cost.totalBilledSeconds > 0;
+              return (
+                <Link key={gen.id} href={`/generate/${gen.id}`} className="group">
+                  <Card className="h-full border-border bg-card transition-colors hover:border-primary/40">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <CardTitle className="line-clamp-1 text-sm font-medium">
+                          {gen.products?.name ?? `Generation ${gen.id.slice(0, 8)}`}
+                        </CardTitle>
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            "shrink-0 text-xs capitalize",
+                            statusColors[gen.status] ?? statusColors.pending
+                          )}
+                        >
+                          {statusLabel(gen.status)}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Clock className="size-3" />
+                        {formatDate(gen.created_at)}
+                      </div>
+                      {showCost && (
+                        <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <DollarSign className="size-3" />
+                          {formatCurrency(cost.totalCostUsd)} · {cost.modelName}
+                        </div>
+                      )}
+                    </CardHeader>
+                  </Card>
+                </Link>
+              );
+            })}
           </div>
         ) : (
           <Card className="border-border bg-card">
