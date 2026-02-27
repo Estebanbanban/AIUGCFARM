@@ -46,6 +46,8 @@ export async function callEdge<T>(
   const makeRequest = (accessToken: string) =>
     fetch(`${EDGE_URL}/${fn}`, {
       method: options.method || "POST",
+      mode: "cors",
+      credentials: "omit",
       headers: {
         "Content-Type": "application/json",
         apikey: supabaseAnonKey,
@@ -86,6 +88,8 @@ export async function callEdgePublic<T>(
 
   const res = await fetch(`${EDGE_URL}/${fn}`, {
     method: options.method || "POST",
+    mode: "cors",
+    credentials: "omit",
     headers,
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
@@ -117,6 +121,8 @@ export async function callEdgeMultipart<T>(
 
   const res = await fetch(`${EDGE_URL}/${fn}`, {
     method: "POST",
+    mode: "cors",
+    credentials: "omit",
     headers: {
       apikey: supabaseAnonKey,
       Authorization: `Bearer ${session.access_token}`,
