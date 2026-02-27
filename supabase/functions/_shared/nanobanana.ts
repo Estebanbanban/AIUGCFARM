@@ -39,7 +39,7 @@ async function generateSingleImage(prompt: string): Promise<GeneratedImage> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { responseModalities: ["IMAGE"] },
+      generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
     }),
   });
 
@@ -121,7 +121,10 @@ export async function generateCompositeFromImages(
           { inlineData: { mimeType: productMime, data: productB64 } },
         ],
       }],
-      generationConfig: { responseModalities: ["IMAGE"], aspectRatio },
+      generationConfig: {
+        responseModalities: ["TEXT", "IMAGE"],
+        imageConfig: { aspectRatio },
+      },
     }),
   });
 
