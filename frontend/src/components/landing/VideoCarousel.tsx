@@ -14,8 +14,8 @@ const products = [
   { name: "Smart Watch", price: "$199", color: "from-zinc-900 to-zinc-800" },
 ];
 
-// Arc: center phones sit highest (0px down), edges dip down (36px)
-const arcOffsets = [36, 20, 8, 0, 0, 8, 20, 36];
+// All phones at the same height
+const arcOffsets = [0, 0, 0, 0, 0, 0, 0, 0];
 
 function PhoneCard({
   product,
