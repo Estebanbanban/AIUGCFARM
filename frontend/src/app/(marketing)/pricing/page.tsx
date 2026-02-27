@@ -9,7 +9,9 @@ export const metadata: Metadata = {
 };
 
 const comparisonRows = [
-  { feature: "Credits/month", starter: "27", growth: "90", scale: "300" },
+  { feature: "Credits/month", starter: "30 ($30 value)", growth: "100 ($100 value)", scale: "250 ($250 value)" },
+  { feature: "Standard videos/mo", starter: "6", growth: "20", scale: "50" },
+  { feature: "HD videos/mo", starter: "3", growth: "10", scale: "25" },
   { feature: "AI personas", starter: "1", growth: "3", scale: "10" },
   { feature: "Products", starter: "1", growth: "3", scale: "10" },
   { feature: "Easy Mode", starter: true, growth: true, scale: true },

@@ -33,15 +33,17 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
-import { PLANS, type PlanTier } from "@/lib/stripe";
+import { PLANS, CREDIT_PACKS, type PlanTier, type CreditPackKey } from "@/lib/stripe";
 import { useCredits } from "@/hooks/use-credits";
 import { useProfile } from "@/hooks/use-profile";
 import { useSubscription, useCreditLedger } from "@/hooks/use-billing";
-import { useBillingPortal, useCheckout } from "@/hooks/use-checkout";
+import { useBillingPortal, useCheckout, useBuyCredits } from "@/hooks/use-checkout";
 
 const reasonLabels: Record<string, { label: string; color: string }> = {
   generation: { label: "Generation", color: "text-red-400" },
   subscription_renewal: { label: "Credit Grant", color: "text-emerald-400" },
+  subscription_purchase: { label: "Credit Grant", color: "text-emerald-400" },
+  credit_pack_purchase: { label: "Pack Purchase", color: "text-emerald-400" },
   refund: { label: "Refund", color: "text-primary" },
   bonus: { label: "Bonus", color: "text-primary" },
   free_trial: { label: "Free Trial", color: "text-amber-400" },
@@ -63,9 +65,17 @@ export default function BillingPage() {
   const { data: ledger, isLoading: ledgerLoading } = useCreditLedger();
   const billingPortal = useBillingPortal();
   const checkout = useCheckout();
+  const buyCredits = useBuyCredits();
 
   function handleSwitchPlan(planKey: PlanTier) {
     checkout.mutate(planKey, {
+      onSuccess: (url) => { window.location.href = url; },
+      onError: (err) => toast.error(err.message || "Failed to start checkout"),
+    });
+  }
+
+  function handleBuyPack(pack: CreditPackKey) {
+    buyCredits.mutate(pack, {
       onSuccess: (url) => { window.location.href = url; },
       onError: (err) => toast.error(err.message || "Failed to start checkout"),
     });
@@ -228,6 +238,44 @@ export default function BillingPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Credit Packs */}
+      <div className="flex flex-col gap-4">
+        <div>
+          <h2 className="text-lg font-semibold">Buy Credits</h2>
+          <p className="text-sm text-muted-foreground">One-time top-up, no commitment required.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {(Object.entries(CREDIT_PACKS) as [CreditPackKey, typeof CREDIT_PACKS[CreditPackKey]][]).map(([key, pack]) => (
+            <Card key={key}>
+              <CardContent className="flex flex-col gap-3 p-5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold">{pack.name}</h3>
+                    {"badge" in pack && pack.badge && (
+                      <Badge variant="secondary" className="text-xs">{pack.badge}</Badge>
+                    )}
+                  </div>
+                  <p className="mt-1 text-2xl font-bold">${pack.price}</p>
+                  <p className="text-xs text-muted-foreground">${pack.pricePerCredit}/credit</p>
+                </div>
+                <p className="text-sm text-muted-foreground">{pack.credits} credits · {pack.description}</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-auto"
+                  onClick={() => handleBuyPack(key)}
+                  disabled={buyCredits.isPending}
+                >
+                  {buyCredits.isPending ? <Loader2 className="size-4 animate-spin" /> : "Buy Now"}
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      <Separator />
 
       {/* Plan Comparison */}
       <div className="flex flex-col gap-4">

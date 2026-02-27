@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { callEdge } from "@/lib/api";
-import type { PlanTier } from "@/lib/stripe";
+import type { PlanTier, CreditPackKey } from "@/lib/stripe";
 
 interface CheckoutResponse {
   data: { url: string };
@@ -21,6 +21,18 @@ export function useCheckout() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["credits"] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
+    },
+  });
+}
+
+/** One-time credit pack purchase. Redirects to Stripe Checkout. */
+export function useBuyCredits() {
+  return useMutation({
+    mutationFn: async (pack: CreditPackKey) => {
+      const res = await callEdge<CheckoutResponse>("stripe-checkout", {
+        body: { pack },
+      });
+      return res.data.url;
     },
   });
 }

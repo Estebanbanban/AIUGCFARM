@@ -2,53 +2,73 @@
  * Plan definitions for UI display.
  * Stripe checkout is handled server-side via the stripe-checkout Edge Function.
  * No Stripe SDK or secret key needed on the frontend.
+ *
+ * Pricing model: 1 credit = $1
+ * Kling v2.6 (standard): $1/second → 5s = 5cr, 10s = 10cr
+ * Kling v3 (hd):         $2/second → 5s = 10cr, 10s = 20cr
  */
+
+// ── Per-generation credit costs ─────────────────────────────────────────────
+
+/** Standard single (v2.6): 1 hook + 1 body + 1 CTA */
+export const CREDITS_PER_SINGLE = 5;
+/** Standard triple (v2.6): 3 hooks + 3 bodies + 3 CTAs */
+export const CREDITS_PER_BATCH = 15;
+/** HD single (v3): 1 hook + 1 body + 1 CTA */
+export const CREDITS_PER_SINGLE_HD = 10;
+/** HD triple (v3): 3 hooks + 3 bodies + 3 CTAs */
+export const CREDITS_PER_BATCH_HD = 30;
+
+// ── Subscription plans ───────────────────────────────────────────────────────
+
 export const PLANS = {
   starter: {
     name: "Starter",
-    price: 29,
-    credits: 27,
+    price: 25,
+    credits: 30,
     personas: 1,
     brands: 1,
     resolution: "720p",
     features: [
-      "27 segment credits/month (3 batches)",
+      "30 credits/month ($30 value)",
+      "6 standard videos or 3 HD videos",
       "1 AI persona",
       "1 brand profile",
-      "Easy Mode generation",
-      "720p export",
+      "AI-Written Scripts",
+      "720p MP4 export",
     ],
   },
   growth: {
     name: "Growth",
-    price: 79,
-    credits: 90,
+    price: 80,
+    credits: 100,
     personas: 3,
     brands: 3,
-    resolution: "720p",
+    resolution: "1080p",
     features: [
-      "90 segment credits/month (10 batches)",
+      "100 credits/month ($100 value)",
+      "20 standard videos or 10 HD videos",
       "3 AI personas",
       "3 brand profiles",
-      "Easy + Expert Mode",
-      "720p export",
-      "Custom script editing",
+      "AI-Written Scripts + Custom Script Editor",
+      "1080p MP4 export",
+      "Priority generation",
     ],
   },
   scale: {
     name: "Scale",
-    price: 199,
-    credits: 270,
+    price: 180,
+    credits: 250,
     personas: 10,
     brands: 10,
     resolution: "1080p",
     features: [
-      "270 segment credits/month",
+      "250 credits/month ($250 value)",
+      "50 standard videos or 25 HD videos",
       "10 AI personas",
       "10 brand profiles",
-      "Easy + Expert Mode",
-      "1080p export",
-      "Custom script editing",
+      "AI-Written Scripts + Custom Script Editor",
+      "1080p MP4 export",
       "Priority support",
     ],
   },
@@ -56,11 +76,33 @@ export const PLANS = {
 
 export type PlanTier = keyof typeof PLANS;
 
-/** Cost per single generation (1 hook + 1 body + 1 CTA), kling-v2-6 std */
-export const CREDITS_PER_SINGLE = 3;
-/** Cost per triple generation (3 hooks + 3 bodies + 3 CTAs), kling-v2-6 std */
-export const CREDITS_PER_BATCH = 9;
-/** Cost per single generation, kling-v3 std (2× v2-6) */
-export const CREDITS_PER_SINGLE_HD = 6;
-/** Cost per triple generation, kling-v3 std (2× v2-6) */
-export const CREDITS_PER_BATCH_HD = 18;
+// ── One-time credit packs ─────────────────────────────────────────────────────
+
+// Packs are priced at a higher per-credit rate than subscriptions to incentivize subscribing.
+// Subscription rate: $0.83/cr (Starter). Pack rates: $1.20 → $1.10 → $0.95/cr.
+export const CREDIT_PACKS = {
+  pack_10: {
+    name: "Starter Pack",
+    credits: 10,
+    price: 12,
+    pricePerCredit: 1.2,
+    description: "2 standard videos or 1 HD video",
+  },
+  pack_30: {
+    name: "Creator Pack",
+    credits: 30,
+    price: 33,
+    pricePerCredit: 1.1,
+    description: "6 standard videos or 3 HD videos",
+  },
+  pack_100: {
+    name: "Pro Pack",
+    credits: 100,
+    price: 95,
+    pricePerCredit: 0.95,
+    description: "20 standard videos or 10 HD videos",
+    badge: "Best value",
+  },
+} as const;
+
+export type CreditPackKey = keyof typeof CREDIT_PACKS;

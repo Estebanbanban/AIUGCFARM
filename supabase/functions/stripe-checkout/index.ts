@@ -12,7 +12,7 @@ const stripe = new Stripe(STRIPE_SECRET_KEY, {
   httpClient: Stripe.createFetchHttpClient(),
 });
 
-/** Map plan names to Stripe Price IDs (configure in env or Stripe dashboard). */
+/** Subscription plan → Stripe recurring Price ID */
 const PLAN_PRICE_IDS: Record<string, string | undefined> = {
   starter: Deno.env.get("STRIPE_PRICE_STARTER"),
   growth: Deno.env.get("STRIPE_PRICE_GROWTH"),
@@ -20,9 +20,22 @@ const PLAN_PRICE_IDS: Record<string, string | undefined> = {
 };
 
 const PLAN_NAMES: Record<string, string> = {
-  starter: "Starter ($29/mo)",
-  growth: "Growth ($79/mo)",
-  scale: "Scale ($199/mo)",
+  starter: "Starter ($25/mo)",
+  growth: "Growth ($80/mo)",
+  scale: "Scale ($180/mo)",
+};
+
+/** Credit pack → Stripe one-time Price ID */
+const PACK_PRICE_IDS: Record<string, string | undefined> = {
+  pack_10: Deno.env.get("STRIPE_PRICE_PACK_10"),
+  pack_30: Deno.env.get("STRIPE_PRICE_PACK_30"),
+  pack_100: Deno.env.get("STRIPE_PRICE_PACK_100"),
+};
+
+const PACK_NAMES: Record<string, string> = {
+  pack_10: "10 Credits — Starter Pack ($10)",
+  pack_30: "30 Credits — Creator Pack ($28)",
+  pack_100: "100 Credits — Pro Pack ($85)",
 };
 
 Deno.serve(async (req: Request) => {
@@ -37,24 +50,11 @@ Deno.serve(async (req: Request) => {
     const userId = await requireUserId(req);
     const sb = getAdminClient();
 
-    const { plan } = await req.json();
+    const body = await req.json();
+    const { plan, pack } = body;
 
-    if (!plan || !PLAN_PRICE_IDS[plan]) {
-      return json(
-        { detail: `Invalid plan. Choose: ${Object.keys(PLAN_PRICE_IDS).join(", ")}` },
-        cors,
-        400,
-      );
-    }
-
-    const priceId = PLAN_PRICE_IDS[plan];
-    if (!priceId) {
-      console.error(`Stripe price ID not configured for plan: ${plan}`);
-      return json(
-        { detail: "Checkout is not available right now. Please try again later." },
-        cors,
-        503,
-      );
+    if (!plan && !pack) {
+      return json({ detail: "Provide either 'plan' or 'pack'" }, cors, 400);
     }
 
     // Get user profile for email
@@ -68,9 +68,8 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "Profile not found" }, cors, 404);
     }
 
-    // Check for existing Stripe customer
+    // Get or create Stripe customer
     let stripeCustomerId: string | null = null;
-
     const { data: existingSub } = await sb
       .from("subscriptions")
       .select("stripe_customer_id")
@@ -81,7 +80,6 @@ Deno.serve(async (req: Request) => {
     if (existingSub?.stripe_customer_id) {
       stripeCustomerId = existingSub.stripe_customer_id;
     } else {
-      // Create Stripe customer
       const customer = await stripe.customers.create({
         email: profile.email,
         metadata: { supabase_user_id: userId },
@@ -89,23 +87,52 @@ Deno.serve(async (req: Request) => {
       stripeCustomerId = customer.id;
     }
 
-    // Create Checkout Session
+    // ── Credit pack (one-time payment) ────────────────────────────────────────
+    if (pack) {
+      const priceId = PACK_PRICE_IDS[pack];
+      if (!priceId) {
+        console.error(`Stripe price ID not configured for pack: ${pack}`);
+        return json(
+          { detail: "This credit pack is not available right now." },
+          cors,
+          503,
+        );
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        customer: stripeCustomerId,
+        mode: "payment",
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${FRONTEND_URL}/dashboard?checkout=success&pack=${pack}`,
+        cancel_url: `${FRONTEND_URL}/settings/billing?checkout=canceled`,
+        metadata: {
+          supabase_user_id: userId,
+          pack,
+        },
+      });
+
+      return json({ data: { url: session.url } }, cors);
+    }
+
+    // ── Subscription ──────────────────────────────────────────────────────────
+    const priceId = PLAN_PRICE_IDS[plan];
+    if (!priceId) {
+      console.error(`Stripe price ID not configured for plan: ${plan}`);
+      return json(
+        { detail: "Checkout is not available right now. Please try again later." },
+        cors,
+        503,
+      );
+    }
+
     const session = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
       mode: "subscription",
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
+      line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${FRONTEND_URL}/dashboard?checkout=success&plan=${plan}`,
       cancel_url: `${FRONTEND_URL}/pricing?checkout=canceled`,
       subscription_data: {
-        metadata: {
-          supabase_user_id: userId,
-          plan,
-        },
+        metadata: { supabase_user_id: userId, plan },
       },
       metadata: {
         supabase_user_id: userId,

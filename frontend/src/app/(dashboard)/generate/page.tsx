@@ -26,11 +26,13 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   PLANS,
+  CREDIT_PACKS,
   CREDITS_PER_SINGLE,
   CREDITS_PER_BATCH,
   CREDITS_PER_SINGLE_HD,
   CREDITS_PER_BATCH_HD,
   type PlanTier,
+  type CreditPackKey,
 } from "@/lib/stripe";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,7 +66,7 @@ import {
   useEditCompositeImage,
   useGenerateCompositeImages,
 } from "@/hooks/use-generations";
-import { useCheckout } from "@/hooks/use-checkout";
+import { useCheckout, useBuyCredits } from "@/hooks/use-checkout";
 import { ManualUploadForm } from "@/components/products/ManualUploadForm";
 import { ScrapeResults } from "@/components/products/ScrapeResults";
 import { PersonaBuilderInline } from "@/components/personas/PersonaBuilderInline";
@@ -209,6 +211,7 @@ export default function GeneratePage() {
   const editComposite = useEditCompositeImage();
   const deletePersona = useDeletePersona(personaToDelete?.id ?? "");
   const checkout = useCheckout();
+  const buyCredits = useBuyCredits();
 
   const confirmedProducts = products?.filter((p) => p.confirmed) ?? [];
   const activePersonas = personas ?? [];
@@ -501,12 +504,15 @@ export default function GeneratePage() {
 
   async function handleCheckout(plan: PlanTier) {
     checkout.mutate(plan, {
-      onSuccess: (url) => {
-        window.location.href = url;
-      },
-      onError: (err) => {
-        toast.error(err.message || "Failed to start checkout");
-      },
+      onSuccess: (url) => { window.location.href = url; },
+      onError: (err) => { toast.error(err.message || "Failed to start checkout"); },
+    });
+  }
+
+  async function handleBuyPack(pack: CreditPackKey) {
+    buyCredits.mutate(pack, {
+      onSuccess: (url) => { window.location.href = url; },
+      onError: (err) => { toast.error(err.message || "Failed to start checkout"); },
     });
   }
 
@@ -1399,65 +1405,99 @@ export default function GeneratePage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {creditsRemaining > 0
-                ? "Not Enough Credits"
-                : "Subscription Required"}
+              {creditsRemaining > 0 ? "Not Enough Credits" : "You're Out of Credits"}
             </DialogTitle>
             <DialogDescription>
               {creditsRemaining > 0
-                ? `You need ${creditCost} credits but have ${creditsRemaining}. Upgrade your plan for more credits.`
-                : "Choose a plan to start generating UGC videos."}
+                ? `You need ${creditCost} credits but only have ${creditsRemaining}.`
+                : "Buy a one-time pack or subscribe for the best per-credit rate."}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col gap-3 py-4">
-            {(
-              Object.entries(PLANS) as [
-                PlanTier,
-                (typeof PLANS)[PlanTier],
-              ][]
-            ).map(([key, plan]) => (
-              <div
-                key={key}
-                className={cn(
-                  "flex items-center justify-between rounded-lg border px-4 py-3",
-                  key === "growth"
-                    ? "border-primary/50 bg-primary/5"
-                    : "border-border",
-                )}
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium">{plan.name}</p>
-                    {key === "growth" && (
-                      <Badge
-                        variant="secondary"
-                        className="bg-primary/10 text-xs text-primary"
-                      >
-                        Popular
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {plan.credits} credits/month
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold">${plan.price}/mo</span>
-                  <Button
-                    size="sm"
-                    variant={key === "growth" ? "default" : "outline"}
-                    onClick={() => handleCheckout(key)}
-                    disabled={checkout.isPending}
+
+          <div className="flex flex-col gap-5 py-2">
+            {/* Credit packs */}
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                One-time — no commitment
+              </p>
+              <div className="flex flex-col gap-2">
+                {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between rounded-lg border border-border px-4 py-3"
                   >
-                    {checkout.isPending ? (
-                      <Loader2 className="size-3 animate-spin" />
-                    ) : (
-                      "Subscribe"
-                    )}
-                  </Button>
-                </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">{pack.name}</p>
+                        {"badge" in pack && pack.badge && (
+                          <Badge variant="secondary" className="text-xs">
+                            {pack.badge}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {pack.credits} credits · {pack.description}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold">${pack.price}</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleBuyPack(key)}
+                        disabled={buyCredits.isPending}
+                      >
+                        {buyCredits.isPending ? <Loader2 className="size-3 animate-spin" /> : "Buy"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex-1 border-t border-border" />
+              <span className="text-xs text-muted-foreground">or subscribe for best value</span>
+              <div className="flex-1 border-t border-border" />
+            </div>
+
+            {/* Subscription plans */}
+            <div className="flex flex-col gap-2">
+              {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => (
+                <div
+                  key={key}
+                  className={cn(
+                    "flex items-center justify-between rounded-lg border px-4 py-3",
+                    key === "growth" ? "border-primary/50 bg-primary/5" : "border-border",
+                  )}
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">{plan.name}</p>
+                      {key === "growth" && (
+                        <Badge variant="secondary" className="bg-primary/10 text-xs text-primary">
+                          Popular
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {plan.credits} credits/mo · ${(plan.price / plan.credits).toFixed(2)}/cr
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold">${plan.price}/mo</span>
+                    <Button
+                      size="sm"
+                      variant={key === "growth" ? "default" : "outline"}
+                      onClick={() => handleCheckout(key)}
+                      disabled={checkout.isPending}
+                    >
+                      {checkout.isPending ? <Loader2 className="size-3 animate-spin" /> : "Subscribe"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

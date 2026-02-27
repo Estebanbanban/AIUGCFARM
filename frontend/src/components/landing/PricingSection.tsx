@@ -8,18 +8,19 @@ import { ScaleIn, FadeInUp } from "@/lib/motion";
 const plans = [
   {
     name: "Starter",
-    monthlyPrice: 29,
-    annualPrice: 23,
-    annualSavings: 72,
+    monthlyPrice: 25,
+    annualPrice: 20,
+    annualSavings: 60,
     description: "Perfect for testing and launching your first UGC campaigns.",
-    perVideo: "$0.36/video",
+    perVideo: "$4.17/video",
+    credits: 30,
     features: [
-      "Up to 81 unique video ads/mo",
+      "30 credits/month ($30 value)",
+      "6 standard or 3 HD videos",
       "1 AI persona",
       "1 brand profile",
       "AI-Written Scripts",
       "720p MP4 export",
-      "Free trial (3 segments)",
     ],
     cta: "Start Free — No Card Required",
     href: "/signup",
@@ -28,18 +29,19 @@ const plans = [
   },
   {
     name: "Growth",
-    monthlyPrice: 79,
-    annualPrice: 63,
+    monthlyPrice: 80,
+    annualPrice: 64,
     annualSavings: 192,
     description: "For brands scaling their ad creative output seriously.",
-    perVideo: "$0.29/video",
+    perVideo: "$4/video",
+    credits: 100,
     features: [
-      "Up to 270 unique video ads/mo",
+      "100 credits/month ($100 value)",
+      "20 standard or 10 HD videos",
       "3 AI personas",
       "3 brand profiles",
       "AI-Written Scripts + Custom Script Editor",
       "1080p MP4 export",
-      "Custom scripts",
       "Priority generation",
     ],
     cta: "Start Scaling →",
@@ -48,22 +50,21 @@ const plans = [
     isAgency: false,
   },
   {
-    name: "Agency",
-    monthlyPrice: 199,
-    annualPrice: 159,
-    annualSavings: 480,
+    name: "Scale",
+    monthlyPrice: 180,
+    annualPrice: 144,
+    annualSavings: 432,
     description: "For agencies and large teams managing multiple brands.",
-    perVideo: "$0.25/video",
+    perVideo: "$3.60/video",
+    credits: 250,
     features: [
-      "Up to 810 unique video ads/mo",
+      "250 credits/month ($250 value)",
+      "50 standard or 25 HD videos",
       "10 AI personas",
-      "Unlimited brand profiles",
+      "10 brand profiles",
       "AI-Written Scripts + Custom Script Editor",
       "1080p MP4 export",
-      "Custom scripts",
-      "Priority generation queue",
-      "API access",
-      "5 team seats",
+      "Priority support",
     ],
     cta: "Go Unlimited →",
     href: "/signup",
@@ -194,7 +195,7 @@ export function PricingSection() {
 
         <FadeInUp delay={0.3}>
           <p className="text-center text-xs text-muted-foreground mt-8">
-            All plans include: Free trial (3 segments) · No watermarks · MP4 download · Cancel anytime
+            All plans include: 5 free trial credits · No watermarks · MP4 download · Cancel anytime
           </p>
           <p className="text-center text-xs text-primary mt-3">
             🔒 Beta pricing — lock in your rate forever. Prices increase at public launch.

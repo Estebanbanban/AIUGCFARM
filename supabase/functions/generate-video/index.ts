@@ -7,10 +7,10 @@ import { callOpenRouter } from "../_shared/openrouter.ts";
 import { withRetry } from "../_shared/retry.ts";
 import { submitKlingJob } from "../_shared/kling.ts";
 
-// Credits per segment set  -  HD (kling-v3) costs 2× standard (kling-v2-6)
+// 1 credit = $1. Kling v2.6 = $1/sec → 5cr/single. Kling v3 = $2/sec → 10cr/single.
 const COSTS = {
-  standard: { single: 3, batch: 9 },
-  hd:       { single: 6, batch: 18 },
+  standard: { single: 5, batch: 15 },
+  hd:       { single: 10, batch: 30 },
 } as const;
 
 // Kling model name per quality tier
