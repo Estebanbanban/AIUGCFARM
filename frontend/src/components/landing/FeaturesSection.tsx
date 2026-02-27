@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useRef, useState } from "react";
+import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
 import { FadeInUp, ScaleIn } from "@/lib/motion";
 
 /* ──────────────────────────────────────────
@@ -191,93 +191,133 @@ const mockups: Record<FeatureId, () => React.ReactElement> = {
 };
 
 function FeatureShowcase() {
-  const [active, setActive] = useState<FeatureId>("import");
-  const ActiveMockup = mockups[active];
+  const [activeIndex, setActiveIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Track scroll through the tall container → map to active feature
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "end end"],
+  });
+
+  useMotionValueEvent(scrollYProgress, "change", (v) => {
+    const idx = Math.min(features.length - 1, Math.floor(v * features.length));
+    setActiveIndex(idx);
+  });
+
+  const active = features[activeIndex];
+  const ActiveMockup = mockups[active.id];
 
   return (
-    <section className="bg-[#0A0A0A] py-24 px-4 sm:px-6">
-      <div className="max-w-6xl mx-auto">
-        <FadeInUp className="mb-16">
-          <p className="text-xs uppercase tracking-[0.15em] text-[#555] mb-3">Features</p>
-          <h2 className="text-[clamp(2rem,4vw,3rem)] font-semibold tracking-tight text-white">
-            Everything You Need to Ship UGC Ads
-          </h2>
-        </FadeInUp>
-
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-start">
-          {/* Left — Feature sidebar */}
-          <div className="lg:sticky lg:top-24 lg:self-start space-y-0">
-            {features.map((f) => {
-              const isActive = active === f.id;
-              return (
-                <div
-                  key={f.id}
-                  className="border-b border-[#1a1a1a] last:border-b-0"
-                >
-                  <button
-                    onClick={() => setActive(f.id)}
-                    className="w-full text-left py-5 group"
-                  >
-                    <div className="flex items-center gap-3">
-                      {isActive && (
-                        <motion.div
-                          layoutId="active-dot"
-                          className="w-1.5 h-1.5 rounded-full bg-primary shrink-0"
-                        />
-                      )}
-                      <h3
-                        className={`text-base transition-colors duration-200 ${
-                          isActive
-                            ? "text-white font-semibold"
-                            : "text-[#555] group-hover:text-[#888]"
-                        }`}
-                      >
-                        {f.title}
-                      </h3>
-                    </div>
-                  </button>
-                  <AnimatePresence>
-                    {isActive && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3, ease: "easeInOut" }}
-                        className="overflow-hidden"
-                      >
-                        <div className="pb-5 pl-[18px] space-y-2">
-                          <p className="text-sm text-[#888] leading-relaxed">
-                            {f.description}
-                          </p>
-                          <p className="text-xs text-primary cursor-pointer hover:underline">
-                            {f.learnMore}
-                          </p>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              );
-            })}
+    // Tall outer container: 100vh per feature so scroll drives transitions
+    <div
+      ref={containerRef}
+      className="relative bg-[#0A0A0A]"
+      style={{ height: `${features.length * 100}vh` }}
+    >
+      {/* Sticky panel — stays in view while user scrolls */}
+      <div className="sticky top-0 h-screen flex flex-col justify-center px-4 sm:px-6 overflow-hidden">
+        <div className="max-w-6xl mx-auto w-full">
+          {/* Section header */}
+          <div className="mb-10">
+            <p className="text-xs uppercase tracking-[0.15em] text-[#555] mb-3">Features</p>
+            <h2 className="text-[clamp(2rem,4vw,3rem)] font-semibold tracking-tight text-white">
+              Everything You Need to Ship UGC Ads
+            </h2>
           </div>
 
-          {/* Right — Mockup area */}
-          <div className="rounded-2xl bg-[#111] border border-[#222] p-6 min-h-[340px]">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={active}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3 }}
-              >
-                <ActiveMockup />
-              </motion.div>
-            </AnimatePresence>
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            {/* Left — sidebar with scroll progress indicator */}
+            <div>
+              {/* Thin scroll progress bar */}
+              <div className="flex gap-1.5 mb-6">
+                {features.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveIndex(i)}
+                    className="h-0.5 rounded-full flex-1 overflow-hidden bg-[#222] transition-colors"
+                    aria-label={`Go to feature ${i + 1}`}
+                  >
+                    <motion.div
+                      className="h-full bg-primary rounded-full"
+                      initial={{ width: "0%" }}
+                      animate={{ width: i < activeIndex ? "100%" : i === activeIndex ? "100%" : "0%" }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  </button>
+                ))}
+              </div>
+
+              {/* Feature list */}
+              <div>
+                {features.map((f, i) => {
+                  const isActive = i === activeIndex;
+                  return (
+                    <div key={f.id} className="border-b border-[#1a1a1a] last:border-b-0">
+                      <button
+                        onClick={() => setActiveIndex(i)}
+                        className="w-full text-left py-5 group"
+                      >
+                        <div className="flex items-center gap-3">
+                          {isActive && (
+                            <motion.div
+                              layoutId="active-dot"
+                              className="w-1.5 h-1.5 rounded-full bg-primary shrink-0"
+                            />
+                          )}
+                          <h3
+                            className={`text-base transition-colors duration-300 ${
+                              isActive
+                                ? "text-white font-semibold"
+                                : "text-[#555] group-hover:text-[#888]"
+                            }`}
+                          >
+                            {f.title}
+                          </h3>
+                        </div>
+                      </button>
+                      <AnimatePresence>
+                        {isActive && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3, ease: "easeInOut" }}
+                            className="overflow-hidden"
+                          >
+                            <div className="pb-5 pl-[18px] space-y-2">
+                              <p className="text-sm text-[#888] leading-relaxed">
+                                {f.description}
+                              </p>
+                              <p className="text-xs text-primary">{f.learnMore}</p>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Right — mockup cross-fades as activeIndex changes */}
+            <div className="rounded-2xl bg-[#111] border border-[#222] p-6 min-h-[340px]">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeIndex}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.35, ease: [0.25, 0.4, 0.25, 1] }}
+                >
+                  <ActiveMockup />
+                </motion.div>
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 
