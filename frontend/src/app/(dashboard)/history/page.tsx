@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Clock,
@@ -26,7 +26,20 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useGenerationHistory } from "@/hooks/use-generations";
+import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
 import type { GenerationStatus } from "@/types/database";
+
+/** Renders an image from either an external URL or a Supabase storage path. */
+function ResolvedImage({ path, alt, className }: { path: string; alt: string; className?: string }) {
+  const [src, setSrc] = useState<string | null>(isExternalUrl(path) ? path : null);
+  useEffect(() => {
+    if (!isExternalUrl(path)) {
+      getSignedImageUrl("product-images", path).then(setSrc);
+    }
+  }, [path]);
+  if (!src) return null;
+  return <img src={src} alt={alt} className={className} />;
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Status helpers                                                            */
@@ -145,8 +158,8 @@ export default function HistoryPage() {
                       {/* Product image thumbnail */}
                       <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
                         {gen.products?.images?.[0] ? (
-                          <img
-                            src={gen.products.images[0]}
+                          <ResolvedImage
+                            path={gen.products.images[0]}
                             alt={gen.products?.name ?? "Product"}
                             className="size-full rounded-lg object-cover"
                           />

@@ -25,7 +25,7 @@ async function generateKlingToken(): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
 
   const b64url = (obj: object) =>
-    btoa(JSON.stringify(obj))
+    btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(obj))))
       .replace(/=/g, "")
       .replace(/\+/g, "-")
       .replace(/\//g, "_");
