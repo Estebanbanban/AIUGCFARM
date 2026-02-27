@@ -1,12 +1,36 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { MDXRemote } from "next-mdx-remote/rsc";
+import remarkGfm from "remark-gfm";
+import rehypeSlug from "rehype-slug";
+import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import { getAllPosts, getPostBySlug, getRelatedPosts } from "@/lib/blog";
 import { absoluteUrl } from "@/lib/utils";
-import { ArticleClient } from "./article-client";
+import {
+  BlogHeader,
+  BlogContent,
+  BlogAuthor,
+  BlogRelated,
+  BlogNewsletter,
+  BlogCta,
+  BlogImage,
+  BlogQuote,
+  BlogComparison,
+  BlogMetrics,
+} from "@/components/blog";
+import { ArticleLayout } from "./article-layout";
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
+
+const mdxComponents = {
+  BlogCta,
+  BlogImage,
+  BlogQuote,
+  BlogComparison,
+  BlogMetrics,
+};
 
 export async function generateStaticParams() {
   const posts = getAllPosts();
@@ -46,7 +70,6 @@ export default async function BlogArticlePage({ params }: Props) {
 
   const related = getRelatedPosts(slug, 3);
 
-  // JSON-LD structured data
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Article",
@@ -95,7 +118,20 @@ export default async function BlogArticlePage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
       />
-      <ArticleClient post={post} relatedPosts={related} slug={slug} />
+      <ArticleLayout post={post} relatedPosts={related}>
+        <BlogContent>
+          <MDXRemote
+            source={post.content}
+            components={mdxComponents}
+            options={{
+              mdxOptions: {
+                remarkPlugins: [remarkGfm],
+                rehypePlugins: [rehypeSlug, rehypeAutolinkHeadings],
+              },
+            }}
+          />
+        </BlogContent>
+      </ArticleLayout>
     </>
   );
 }
