@@ -17,14 +17,14 @@ export function MarketingHeader() {
 
   return (
     <>
-      <header
-        className={`fixed top-0 w-full z-50 h-16 transition-all duration-300 ${
-          scrolled
-            ? "bg-black/80 backdrop-blur-xl border-b border-[#242424]"
-            : "bg-black/60 backdrop-blur-xl"
-        }`}
-      >
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-full flex items-center justify-between">
+      <header className="fixed left-0 right-0 top-3 z-50 px-3 sm:px-5">
+        <div
+          className={`mx-auto h-16 max-w-7xl rounded-full border px-5 sm:px-7 transition-all duration-300 ${
+            scrolled
+              ? "border-[#3a3a3a] bg-black/88 shadow-[0_8px_22px_rgba(0,0,0,0.35)] backdrop-blur-xl"
+              : "border-[#2a2a2a] bg-black/78 backdrop-blur-xl"
+          } flex items-center justify-between`}
+        >
           {/* Logo */}
           <Link href="/" className="text-lg font-bold text-white tracking-tight">
             CineRads
@@ -58,7 +58,7 @@ export function MarketingHeader() {
             </Link>
             <Link
               href="/signup"
-              className="bg-white text-black rounded-full px-4 py-2 text-sm font-medium hover:bg-white/90 transition-colors duration-200"
+              className="rounded-full border border-primary/90 px-4 py-2 text-sm font-medium text-primary transition-colors duration-200 hover:bg-primary hover:text-white"
             >
               Get Started
             </Link>

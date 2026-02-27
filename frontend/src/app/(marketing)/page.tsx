@@ -116,9 +116,9 @@ export default function LandingPage() {
       />
       <HeroSection />
       <VideoCarousel />
+      <MetricsBar />
       <HowItWorksSection />
       <FeaturesSection />
-      <MetricsBar />
       <PricingSection />
       <FaqSection />
       <FinalCtaSection />
