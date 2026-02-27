@@ -24,6 +24,7 @@ import {
   SheetContent,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -52,8 +53,10 @@ function SidebarContent({
   const { data: profile } = useProfile();
   const creditsRemaining = credits?.remaining ?? 0;
   const plan = profile?.plan ?? "free";
-  const creditsTotal = plan !== "free" ? (PLANS[plan as keyof typeof PLANS]?.credits ?? 0) : 9;
-  const creditPercent = creditsTotal > 0 ? Math.round((creditsRemaining / creditsTotal) * 100) : 0;
+  const creditsTotal =
+    plan !== "free" ? (PLANS[plan as keyof typeof PLANS]?.credits ?? 0) : 9;
+  const creditPercent =
+    creditsTotal > 0 ? Math.round((creditsRemaining / creditsTotal) * 100) : 0;
   const userEmail = profile?.email ?? "";
 
   async function handleSignOut() {
@@ -64,19 +67,17 @@ function SidebarContent({
   }
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Logo */}
+    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center px-6">
         <Link
           href="/dashboard"
-          className="text-xl font-bold tracking-tight text-white"
+          className="text-xl font-semibold tracking-tight text-foreground"
           onClick={onNavigate}
         >
           CineRads
         </Link>
       </div>
 
-      {/* Navigation */}
       <nav className="flex flex-1 flex-col gap-1 px-3 py-4">
         {navItems.map((item) => {
           const isActive =
@@ -89,10 +90,10 @@ function SidebarContent({
               href={item.href}
               onClick={onNavigate}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-[hsl(0,0%,12%)] hover:text-foreground"
+                  ? "border-border bg-sidebar-accent text-foreground"
+                  : "border-transparent text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground"
               )}
             >
               <item.icon className="size-4 shrink-0" />
@@ -102,9 +103,8 @@ function SidebarContent({
         })}
       </nav>
 
-      {/* Bottom: credits + user */}
-      <div className="flex flex-col gap-3 border-t border-border px-4 py-4">
-        <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3 border-t border-sidebar-border px-4 py-4">
+        <div className="rounded-lg border border-sidebar-border bg-card p-3">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Credits</span>
             <span className="font-mono font-medium text-foreground">
@@ -113,16 +113,16 @@ function SidebarContent({
           </div>
           <Progress
             value={creditPercent}
-            className="h-1.5 bg-muted [&>[data-slot=progress-indicator]]:bg-primary"
+            className="mt-2 h-1.5 bg-muted [&>[data-slot=progress-indicator]]:bg-primary"
           />
         </div>
-        <div className="flex items-center justify-between">
-          <span className="truncate text-xs text-muted-foreground">
-            {userEmail}
-          </span>
+
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
           <button
             onClick={handleSignOut}
             className="text-muted-foreground transition-colors hover:text-foreground"
+            aria-label="Sign out"
           >
             <LogOut className="size-4" />
           </button>
@@ -146,30 +146,19 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      {/* Desktop Sidebar */}
-      <aside className="hidden w-64 shrink-0 border-r border-border bg-[hsl(0,0%,7%)] lg:flex lg:flex-col">
+      <aside className="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar lg:flex lg:flex-col">
         <SidebarContent pathname={pathname} />
       </aside>
 
-      {/* Mobile Sidebar */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent
-          side="left"
-          className="w-64 bg-[hsl(0,0%,7%)] p-0"
-          showCloseButton={false}
-        >
+        <SheetContent side="left" className="w-64 bg-sidebar p-0" showCloseButton={false}>
           <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <SidebarContent
-            pathname={pathname}
-            onNavigate={() => setMobileOpen(false)}
-          />
+          <SidebarContent pathname={pathname} onNavigate={() => setMobileOpen(false)} />
         </SheetContent>
       </Sheet>
 
-      {/* Main Content */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Header */}
-        <header className="flex h-16 items-center justify-between border-b border-border px-4 md:px-6">
+      <div className="flex flex-1 flex-col overflow-hidden bg-background-secondary">
+        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-border bg-background/90 px-4 backdrop-blur md:px-6">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -180,23 +169,22 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               <Menu className="size-5" />
               <span className="sr-only">Open menu</span>
             </Button>
-            <h1 className="text-xl font-semibold text-foreground">
-              {pageTitle}
-            </h1>
+            <h1 className="text-xl font-semibold text-foreground">{pageTitle}</h1>
           </div>
-          <Button asChild size="sm">
-            <Link href="/generate">
-              <Plus className="size-4" />
-              New Generation
-            </Link>
-          </Button>
+
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button asChild size="sm">
+              <Link href="/generate">
+                <Plus className="size-4" />
+                New Generation
+              </Link>
+            </Button>
+          </div>
         </header>
 
-        {/* Page Content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-7xl p-6 md:p-8">
-            {children}
-          </div>
+          <div className="mx-auto w-full max-w-7xl p-6 md:p-8">{children}</div>
         </main>
       </div>
     </div>
