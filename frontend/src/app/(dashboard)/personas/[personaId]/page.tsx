@@ -2,7 +2,8 @@
 
 export const dynamic = "force-dynamic";
 
-import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -11,7 +12,9 @@ import {
   Sparkles,
   Clock,
   Video,
+  Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,55 +24,173 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
+import {
+  usePersona,
+  useDeletePersona,
+  usePersonaGenerations,
+  resolvePersonaImageUrl,
+} from "@/hooks/use-personas";
+import type { PersonaAttributes } from "@/types/database";
 
-const mockPersona = {
-  id: "persona-1",
-  name: "Sophie",
-  attributes: {
-    gender: "Female",
-    age: "25-35",
-    skin_tone: "#F1C27D",
-    hair_color: "Dark Brown",
-    hair_style: "Medium Straight",
-    eye_color: "Brown",
-    body_type: "Average",
-    clothing_style: "Casual",
-    accessories: ["Earrings", "Watch"],
-  },
-  selected_image_url: null as string | null,
-  created_at: "Feb 10, 2026",
-};
+/** Resolve a single persona image URL (handles storage paths). */
+function useResolvedImage(url: string | null | undefined) {
+  const [resolved, setResolved] = useState<string | null>(null);
 
-const mockGenerations = [
-  {
-    id: "gen-1",
-    productName: "Vitamin C Serum",
-    date: "Feb 24, 2026",
-    videoCount: 4,
-    status: "completed",
-  },
-  {
-    id: "gen-2",
-    productName: "Running Shoes X1",
-    date: "Feb 20, 2026",
-    videoCount: 4,
-    status: "completed",
-  },
-];
+  useEffect(() => {
+    let cancelled = false;
+    resolvePersonaImageUrl(url ?? null).then((r) => {
+      if (!cancelled) setResolved(r);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+
+  return resolved;
+}
+
+function formatDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function buildAttributeList(attrs: PersonaAttributes) {
+  return [
+    { label: "Gender", value: attrs.gender },
+    { label: "Age Range", value: attrs.age },
+    { label: "Hair Color", value: attrs.hair_color },
+    { label: "Hair Style", value: attrs.hair_style },
+    { label: "Eye Color", value: attrs.eye_color },
+    { label: "Body Type", value: attrs.body_type },
+    { label: "Clothing Style", value: attrs.clothing_style },
+  ].filter((a) => a.value);
+}
+
+function DetailSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Header skeleton */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Skeleton className="size-9 rounded-md" />
+          <Skeleton className="h-7 w-40" />
+        </div>
+        <Skeleton className="h-9 w-40 rounded-md" />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+        {/* Image card skeleton */}
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4">
+            <Skeleton className="size-48 rounded-xl" />
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-4 w-32" />
+          </CardContent>
+        </Card>
+
+        {/* Details skeleton */}
+        <div className="flex flex-col gap-6">
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-5 w-24" />
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-8 w-28 rounded-full" />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function PersonaDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const personaId = params.personaId as string;
 
-  const attributes = [
-    { label: "Gender", value: mockPersona.attributes.gender },
-    { label: "Age Range", value: mockPersona.attributes.age },
-    { label: "Hair Color", value: mockPersona.attributes.hair_color },
-    { label: "Hair Style", value: mockPersona.attributes.hair_style },
-    { label: "Eye Color", value: mockPersona.attributes.eye_color },
-    { label: "Body Type", value: mockPersona.attributes.body_type },
-    { label: "Clothing Style", value: mockPersona.attributes.clothing_style },
-  ];
+  const {
+    data: persona,
+    isLoading: personaLoading,
+    error: personaError,
+  } = usePersona(personaId);
+
+  const { data: generations, isLoading: generationsLoading } =
+    usePersonaGenerations(personaId);
+
+  const deleteMutation = useDeletePersona(personaId);
+  const resolvedImage = useResolvedImage(persona?.selected_image_url);
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  function handleDelete() {
+    deleteMutation.mutate(undefined, {
+      onSuccess: () => {
+        toast.success("Persona deleted successfully");
+        setDeleteDialogOpen(false);
+        router.push("/dashboard/personas");
+      },
+      onError: (err) => {
+        toast.error(err.message || "Failed to delete persona");
+      },
+    });
+  }
+
+  // Loading state
+  if (personaLoading) {
+    return <DetailSkeleton />;
+  }
+
+  // 404 / Error state
+  if (personaError || !persona) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center gap-3">
+          <Button asChild variant="ghost" size="icon">
+            <Link href="/dashboard/personas">
+              <ArrowLeft className="size-4" />
+            </Link>
+          </Button>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Persona not found
+          </h1>
+        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 py-12">
+            <User className="size-10 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              This persona does not exist or has been deleted.
+            </p>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/personas">Back to Personas</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const attrs = persona.attributes;
+  const attributes = buildAttributeList(attrs);
+  const accessories = attrs.accessories ?? [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -82,15 +203,51 @@ export default function PersonaDetailPage() {
             </Link>
           </Button>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            {mockPersona.name}
+            {persona.name}
           </h1>
         </div>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/dashboard/personas/new">
-            <Pencil className="size-4" />
-            Edit & Regenerate
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Delete button with confirmation dialog */}
+          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                <Trash2 className="size-4" />
+                Delete
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete persona</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to delete &quot;{persona.name}&quot;? This
+                  persona will no longer appear in your library, but existing
+                  generations will not be affected.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant="outline" disabled={deleteMutation.isPending}>
+                    Cancel
+                  </Button>
+                </DialogClose>
+                <Button
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? "Deleting..." : "Delete Persona"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Button asChild variant="outline" size="sm">
+            <Link href="/dashboard/personas/new">
+              <Pencil className="size-4" />
+              Edit &amp; Regenerate
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
@@ -98,10 +255,10 @@ export default function PersonaDetailPage() {
         <Card>
           <CardContent className="flex flex-col items-center gap-4">
             <div className="flex size-48 items-center justify-center rounded-xl bg-muted">
-              {mockPersona.selected_image_url ? (
+              {resolvedImage ? (
                 <img
-                  src={mockPersona.selected_image_url}
-                  alt={mockPersona.name}
+                  src={resolvedImage}
+                  alt={persona.name}
                   className="size-full rounded-xl object-cover"
                 />
               ) : (
@@ -110,23 +267,23 @@ export default function PersonaDetailPage() {
             </div>
             <div className="text-center">
               <h2 className="text-lg font-semibold text-foreground">
-                {mockPersona.name}
+                {persona.name}
               </h2>
               <p className="text-sm text-muted-foreground">
-                Created {mockPersona.created_at}
+                Created {formatDate(persona.created_at)}
               </p>
             </div>
 
             {/* Skin Tone */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Skin Tone</span>
-              <div
-                className="size-5 rounded-full border"
-                style={{
-                  backgroundColor: mockPersona.attributes.skin_tone,
-                }}
-              />
-            </div>
+            {attrs.skin_tone && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Skin Tone</span>
+                <div
+                  className="size-5 rounded-full border"
+                  style={{ backgroundColor: attrs.skin_tone }}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -151,13 +308,13 @@ export default function PersonaDetailPage() {
                 ))}
               </div>
 
-              {mockPersona.attributes.accessories.length > 0 && (
+              {accessories.length > 0 && (
                 <div className="mt-4">
                   <span className="text-xs font-medium uppercase text-muted-foreground">
                     Accessories
                   </span>
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {mockPersona.attributes.accessories.map((acc) => (
+                    {accessories.map((acc) => (
                       <Badge key={acc} variant="outline" className="text-xs">
                         {acc}
                       </Badge>
@@ -176,9 +333,28 @@ export default function PersonaDetailPage() {
               Generations using this persona
             </h3>
 
-            {mockGenerations.length > 0 ? (
+            {generationsLoading && (
               <div className="flex flex-col gap-3">
-                {mockGenerations.map((gen) => (
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <Card key={i}>
+                    <CardContent className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="size-9 rounded-lg" />
+                        <div className="flex flex-col gap-1">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-3 w-20" />
+                        </div>
+                      </div>
+                      <Skeleton className="h-3 w-24" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {!generationsLoading && generations && generations.length > 0 && (
+              <div className="flex flex-col gap-3">
+                {generations.map((gen) => (
                   <Link
                     key={gen.id}
                     href={`/dashboard/generate/${gen.id}`}
@@ -192,42 +368,45 @@ export default function PersonaDetailPage() {
                           </div>
                           <div>
                             <p className="text-sm font-medium text-foreground">
-                              {gen.productName}
+                              {gen.products?.name ?? "Unknown Product"}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {gen.videoCount} videos
+                              {gen.videos?.length ?? 0} video{(gen.videos?.length ?? 0) !== 1 ? "s" : ""}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Clock className="size-3" />
-                          {gen.date}
+                          {formatDate(gen.created_at)}
                         </div>
                       </CardContent>
                     </Card>
                   </Link>
                 ))}
               </div>
-            ) : (
-              <Card>
-                <CardContent className="flex flex-col items-center gap-3 py-8">
-                  <Sparkles className="size-6 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    No generations yet with this persona.
-                  </p>
-                  <Button
-                    asChild
-                    size="sm"
-                    className="bg-violet-600 hover:bg-violet-700"
-                  >
-                    <Link href="/dashboard/generate">
-                      <Sparkles className="size-4" />
-                      Generate Video
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
             )}
+
+            {!generationsLoading &&
+              (!generations || generations.length === 0) && (
+                <Card>
+                  <CardContent className="flex flex-col items-center gap-3 py-8">
+                    <Sparkles className="size-6 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      No generations yet with this persona.
+                    </p>
+                    <Button
+                      asChild
+                      size="sm"
+                      className="bg-violet-600 hover:bg-violet-700"
+                    >
+                      <Link href="/dashboard/generate">
+                        <Sparkles className="size-4" />
+                        Generate Video
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
           </div>
         </div>
       </div>

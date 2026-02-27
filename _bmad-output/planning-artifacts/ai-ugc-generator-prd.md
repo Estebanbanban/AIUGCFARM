@@ -40,7 +40,7 @@ editHistory:
 - E-commerce agencies managing multiple client accounts
 - Dropshippers needing fast, cheap video ads for product testing
 
-**Business Model:** Credit-based SaaS subscription. 1 credit = 1 generation = 4 video outputs. Three tiers: Starter ($15/mo, 10 credits), Growth ($59/mo, 50 credits), Scale ($249/mo, 250 credits). Paywall triggers after persona creation to maximize sunk-cost conversion.
+**Business Model:** Credit-based SaaS subscription. 1 credit = 1 video segment. Users generate hook, body, and CTA segments independently and combine them for exponential video variations (e.g., 3 hooks × 3 bodies × 3 CTAs = 27 unique videos from 9 credits). Two MVP tiers: Starter ($29/mo, 27 segment credits) and Growth ($79/mo, 90 segment credits). Paywall triggers after persona creation to maximize sunk-cost conversion.
 
 **Problem:** UGC creators cost $150–$500+ per video, take days-to-weeks, and deliver inconsistent quality. Brands needing 10–50+ variations per product face a production bottleneck that directly limits ad spend scaling.
 
@@ -77,11 +77,13 @@ Core value loop: Scrape → Persona → Generate → Download.
 - Persona creation: visual character builder with 9 configurable attributes (gender, skin tone, age, hair color, hair style, eye color, body type, clothing style, accessories)
 - AI persona image generation: 4 variants per request, user selects preferred
 - Easy Mode video generation: AI writes Hook/Body/CTA script from product data and brand tone
-- Segmented video pipeline: generates Hook, Body, CTA segments independently, stitches into final output
-- 4 video variations per generation with prompt diversity
-- Side-by-side video review and MP4 download
+- Segmented video pipeline: generates Hook, Body, CTA segments independently via Kling V2.6 (std, 720p)
+- 3 variants per segment type per generation (9 total segments) with prompt diversity
+- Modular video assembly: users combine any hook + body + CTA into custom videos (N×N×N combinations)
+- On-demand FFmpeg stitching of segment combinations at no additional credit cost
+- Segment review by type + combination builder + assembled video preview and MP4 download
 - Paywall at generation step with Stripe checkout
-- Starter ($15/mo, 10 credits) and Growth ($59/mo, 50 credits) tiers
+- Starter ($29/mo, 27 segment credits) and Growth ($79/mo, 90 segment credits) tiers
 - User dashboard with generation history and video library
 
 ### Phase 2: Growth (v1.1–v1.3)
@@ -89,7 +91,7 @@ Core value loop: Scrape → Persona → Generate → Download.
 Power user features and expanded reach.
 
 - Expert Mode: custom script editing per segment (Hook/Body/CTA), pacing control, background selection
-- Scale tier ($249/mo, 250 credits) with priority queue and API access
+- Scale tier ($199/mo, 270 segment credits) with priority queue and API access
 - Shopify native app integration (OAuth + embedded admin)
 - Team/agency features: multi-seat accounts, shared personas, brand profiles
 - Video analytics: view counts, click-through tracking per video
@@ -141,11 +143,11 @@ Platform expansion and ecosystem.
 | 4 | Submits persona for generation | 4 AI-generated persona images returned in < 30s | Fast iteration, multiple options |
 | 5 | Selects preferred persona (or regenerates) | Selected image stored as persistent reference | Consistent brand spokesperson |
 | 6 | Selects a product from library | Product data and brand tone pre-loaded | No re-entry of product info |
-| 7 | Chooses Easy Mode, hits Generate | AI writes Hook/Body/CTA script. Video pipeline produces 4 variations | One-click from product to finished video |
-| 8 | Reviews 4 videos side-by-side | Video player grid with download buttons per video | Multiple options mitigate AI quality variance |
-| 9 | Downloads preferred video(s) as MP4 | Direct download, no watermark on paid plans | Ready for ad platform upload |
+| 7 | Chooses Easy Mode, hits Generate | AI writes multiple Hook/Body/CTA script variants. Video pipeline generates segments independently | One-click from product to modular video segments |
+| 8 | Reviews generated segments, combines favorites | Segment picker by type (hooks, bodies, CTAs) + combination builder. Assembled videos preview in player | Mix-and-match segments for exponential combinations |
+| 9 | Downloads assembled video(s) as MP4 | Direct download, no watermark on paid plans | Ready for ad platform upload |
 
-**Success:** User goes from persona creation to downloadable video ad in under 15 minutes.
+**Success:** User goes from persona creation to downloadable video ad in under 15 minutes. Gets 27 possible video combinations from a single batch generation.
 
 ### UJ3: Free User — Paywall Conversion
 
@@ -161,9 +163,9 @@ Platform expansion and ecosystem.
 | 2 | Reviews plan options | Starter and Growth tiers with feature comparison | Clear value-per-dollar |
 | 3 | Selects plan | Stripe checkout overlay | Trusted payment processing |
 | 4 | Completes payment | Immediate redirect to generation in progress | No delay between payment and value delivery |
-| 5 | Receives 4 video outputs | Videos ready for review and download | Instant ROI justification |
+| 5 | Receives video segments | Segments ready for combination, preview, and download | Instant ROI justification |
 
-**Success:** Free trial (1 generation = 4 outputs) available for users who need proof before committing. Paywall placement maximizes conversion by triggering after persona investment.
+**Success:** Free trial (9 segment credits = 1 full batch of 3 hooks + 3 bodies + 3 CTAs = 27 possible combinations) available for users who need proof before committing. Paywall placement maximizes conversion by triggering after persona investment.
 
 ### UJ4: Returning User — Bulk Generation Workflow
 
@@ -179,9 +181,9 @@ Platform expansion and ecosystem.
 | 2 | Switches to client brand profile | Products and personas for that brand loaded | Multi-brand management |
 | 3 | Selects product, selects existing persona | Pre-configured — no rebuild needed | Persona persistence saves time |
 | 4 | Generates video (Easy Mode) | 4 variations delivered | Consistent quality across clients |
-| 5 | Repeats for 3 more products | Batch workflow — select product, generate, download, next | Volume production in minutes |
+| 5 | Repeats for 3 more products | Batch workflow — select product, generate segments, combine, download | Volume production in minutes |
 
-**Success:** Marcus generates 16 videos (4 products x 4 variations) in under 40 minutes.
+**Success:** Marcus generates segments for 4 products and assembles 100+ unique video combinations in under 40 minutes.
 
 ---
 
@@ -233,7 +235,7 @@ Platform expansion and ecosystem.
 2. **Persistent AI persona** — build once, generate consistently across all products
 3. **UGC-optimized output** — Hook/Body/CTA structure designed for paid social conversion
 4. **Segmented generation** — avoids lip-sync degradation that plagues longer AI videos
-5. **4-variant output** — every generation produces 4 variations to hedge against AI artifacts
+5. **Modular segment combinations** — 3 variants per segment type (hook/body/CTA) yield 27 unique video combinations per batch, giving advertisers exponential creative variety from minimal generation cost
 
 ---
 
@@ -307,13 +309,13 @@ Platform expansion and ecosystem.
 | ID | Requirement | Traces To |
 |---|---|---|
 | FR18 | Users can select a product from their library and initiate one-click video generation (Easy Mode) | UJ2.6, UJ2.7 |
-| FR19 | System generates an AI-written script segmented into Hook (3–10s), Body (10–20s), and CTA (3–5s) tuned to the product's scraped description and brand tone | UJ2.7 |
+| FR19 | System generates multiple AI-written script variants per segment type: 3 Hook variants (3–5s each), 3 Body variants (5–10s each), and 3 CTA variants (3–5s each), tuned to the product's scraped description and brand tone | UJ2.7 |
 | FR20 | System generates a composite POV-style image of the persona holding/using the selected product | UJ2.7 |
 | FR21 | System generates video segments independently (Hook, Body, CTA) to maintain lip-sync quality (each segment < 10 seconds) | UJ2.7 |
 | FR22 | Body segments exceeding 10 seconds are split into 2 sub-segments for generation | UJ2.7 |
-| FR23 | System stitches video segments into a complete output with smooth transitions (crossfade or jump cut) | UJ2.7 |
-| FR24 | Each generation produces 4 complete video variations with slight prompt diversity | UJ2.8 |
-| FR25 | Users can review 4 generated videos side-by-side in a comparison view | UJ2.8 |
+| FR23 | System assembles user-selected segment combinations (any hook + any body + any CTA) into complete videos via on-demand FFmpeg stitching with smooth transitions (crossfade or jump cut) | UJ2.7 |
+| FR24 | Each Easy Mode generation produces 3 variants per segment type (3 hooks + 3 bodies + 3 CTAs = 9 segments), each with slight prompt diversity. Combinatorially yields 27 unique video outputs | UJ2.8 |
+| FR25 | Users can review generated segments by type (hooks, bodies, CTAs), select favorites, combine them into custom videos, and preview assembled combinations | UJ2.8 |
 | FR26 | Users can download any or all generated videos as MP4 files | UJ2.9 |
 
 ### Video Generation — Expert Mode (Phase 2)
@@ -332,9 +334,9 @@ Platform expansion and ecosystem.
 | FR31 | Paywall triggers when user initiates first video generation without an active subscription | UJ3.1 |
 | FR32 | Paywall displays plan comparison with Starter and Growth tiers (MVP), Scale tier (Phase 2) | UJ3.2 |
 | FR33 | Users complete subscription purchase via Stripe checkout | UJ3.3 |
-| FR34 | 1 free generation (4 video outputs) available before paywall enforces payment | UJ3 (free trial) |
-| FR35 | Credit balance decrements by 1 per generation, displayed in dashboard | UJ4.1 |
-| FR36 | Overage charges apply when credits exhausted: $2/credit (Starter), $1.50 (Growth), $1 (Scale) | PT2 |
+| FR34 | 9 free segment credits (1 full batch: 3 hooks + 3 bodies + 3 CTAs = 27 possible video combinations) available before paywall enforces payment | UJ3 (free trial) |
+| FR35 | Credit balance decrements by 1 per segment generated, displayed in dashboard | UJ4.1 |
+| FR36 | Overage charges apply when segment credits exhausted: $1.50/credit (Starter), $1.00/credit (Growth), $0.75/credit (Scale) | PT2 |
 
 ### Dashboard & Video Library
 
@@ -402,7 +404,7 @@ Platform expansion and ecosystem.
 
 | # | Question | Owner | Status |
 |---|---|---|---|
-| OQ1 | Pricing validation: competitor benchmarking needed to confirm $15/$59/$249 tiers | Axel | Open |
+| OQ1 | Pricing validation: segment-based model ($29/$79/$199) confirmed based on Kling V2.6 COGS analysis (62-80% margin). Monitor competitor pricing for adjustments | Axel | Resolved |
 | OQ2 | AI image provider (NanoBanana) pricing at scale — enterprise deal negotiation | Axel | Open |
 | OQ3 | AI video provider (Kling 3.0) API availability and rate limits for commercial use | Axel | Open |
 | OQ4 | Legal review: AI-generated likeness, Terms of Service, usage rights | TBD | Open |
@@ -418,7 +420,11 @@ Retained from original PRD for reference. Tier features are reflected in FRs and
 
 | Feature | Starter | Growth | Scale |
 |---|---|---|---|
-| Video generations / month | 10 | 50 | 250 |
+| Monthly price | $29/mo | $79/mo | $199/mo |
+| Segment credits / month | 27 | 90 | 270 |
+| Full batches (3H+3B+3C) | 3 | 10 | 30 |
+| Max video combinations | 81 | 270 | 810 |
+| Overage rate (per credit) | $1.50 | $1.00 | $0.75 |
 | Persona slots | 1 | 3 | 10 |
 | Easy Mode | Yes | Yes | Yes |
 | Expert Mode | No | Yes | Yes |
@@ -427,4 +433,5 @@ Retained from original PRD for reference. Tier features are reflected in FRs and
 | API access | No | No | Yes |
 | Team seats | 1 | 1 | 5 |
 | Brand profiles | 1 | 3 | Unlimited |
-| Export resolution | 720p | 1080p | 1080p |
+| Export resolution | 720p | 720p | 720p |
+| Video model | Kling V2.6 std | Kling V2.6 std | Kling V2.6 std |

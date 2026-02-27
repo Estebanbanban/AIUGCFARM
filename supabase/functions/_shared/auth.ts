@@ -21,3 +21,11 @@ export async function requireUserId(req: Request): Promise<string> {
   if (error || !user) throw new Error("Unauthorized");
   return user.id;
 }
+
+export async function optionalUserId(req: Request): Promise<string | null> {
+  try {
+    return await requireUserId(req);
+  } catch {
+    return null;
+  }
+}

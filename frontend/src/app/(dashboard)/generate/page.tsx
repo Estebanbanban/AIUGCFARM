@@ -16,7 +16,9 @@ import {
   User,
   Zap,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { PLANS, CREDITS_PER_BATCH, type PlanTier } from "@/lib/stripe";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -36,51 +38,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
-
-const mockProducts = [
-  {
-    id: "prod-1",
-    name: "Vitamin C Serum",
-    price: "$29.99",
-    image: null as string | null,
-  },
-  {
-    id: "prod-2",
-    name: "Hyaluronic Acid Moisturizer",
-    price: "$34.99",
-    image: null as string | null,
-  },
-  {
-    id: "prod-3",
-    name: "Protein Shake Mix",
-    price: "$49.99",
-    image: null as string | null,
-  },
-];
-
-const mockPersonas = [
-  {
-    id: "persona-1",
-    name: "Sophie",
-    gender: "Female",
-    age: "25-35",
-    style: "Casual",
-    image: null as string | null,
-  },
-  {
-    id: "persona-2",
-    name: "Marcus",
-    gender: "Male",
-    age: "25-35",
-    style: "Sporty",
-    image: null as string | null,
-  },
-];
-
-const mockSubscription = {
-  plan: "growth",
-  creditsRemaining: 18,
-};
+import { useProducts } from "@/hooks/use-products";
+import { usePersonas } from "@/hooks/use-personas";
+import { useCredits } from "@/hooks/use-credits";
+import { useCreateGeneration } from "@/hooks/use-generations";
+import { useCheckout } from "@/hooks/use-checkout";
 
 const steps = [
   { number: 1, label: "Product" },
@@ -91,24 +53,29 @@ const steps = [
 export default function GeneratePage() {
   const router = useRouter();
   const store = useGenerationWizardStore();
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
 
-  const hasSubscription = mockSubscription.plan !== "none";
+  const { data: products, isLoading: productsLoading } = useProducts();
+  const { data: personas, isLoading: personasLoading } = usePersonas();
+  const { data: credits, isLoading: creditsLoading } = useCredits();
+  const createGeneration = useCreateGeneration();
+  const checkout = useCheckout();
 
-  const selectedProduct = mockProducts.find((p) => p.id === store.productId);
-  const selectedPersona = mockPersonas.find((p) => p.id === store.personaId);
+  const confirmedProducts = products?.filter((p) => p.confirmed) ?? [];
+  const activePersonas = personas ?? [];
+
+  const selectedProduct = confirmedProducts.find((p) => p.id === store.productId);
+  const selectedPersona = activePersonas.find((p) => p.id === store.personaId);
+
+  const creditsRemaining = credits?.remaining ?? 0;
+  const hasEnoughCredits = creditsRemaining >= CREDITS_PER_BATCH;
 
   function handleNext() {
-    if (store.step < 3) {
-      store.setStep(store.step + 1);
-    }
+    if (store.step < 3) store.setStep(store.step + 1);
   }
 
   function handleBack() {
-    if (store.step > 1) {
-      store.setStep(store.step - 1);
-    }
+    if (store.step > 1) store.setStep(store.step - 1);
   }
 
   function canProceed() {
@@ -125,18 +92,41 @@ export default function GeneratePage() {
   }
 
   async function handleGenerate() {
-    if (!hasSubscription) {
+    if (!hasEnoughCredits) {
       setShowPaywall(true);
       return;
     }
 
-    setIsSubmitting(true);
-    // Would call useCreateGeneration mutation
-    setTimeout(() => {
-      const mockGenerationId = "gen-new-1";
-      store.reset();
-      router.push(`/dashboard/generate/${mockGenerationId}`);
-    }, 1500);
+    if (!store.productId || !store.personaId) return;
+
+    createGeneration.mutate(
+      {
+        product_id: store.productId,
+        persona_id: store.personaId,
+        mode: store.mode as "easy" | "expert",
+      },
+      {
+        onSuccess: (generation) => {
+          store.reset();
+          router.push(`/dashboard/generate/${generation.id}`);
+          toast.success("Generation started!");
+        },
+        onError: (err) => {
+          toast.error(err.message || "Failed to start generation");
+        },
+      }
+    );
+  }
+
+  async function handleCheckout(plan: PlanTier) {
+    checkout.mutate(plan, {
+      onSuccess: (url) => {
+        window.location.href = url;
+      },
+      onError: (err) => {
+        toast.error(err.message || "Failed to start checkout");
+      },
+    });
   }
 
   return (
@@ -148,6 +138,11 @@ export default function GeneratePage() {
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Create AI-powered video ads in 3 simple steps.
+          {!creditsLoading && (
+            <span className="ml-2 font-medium text-foreground">
+              {creditsRemaining} credits remaining
+            </span>
+          )}
         </p>
       </div>
 
@@ -208,52 +203,80 @@ export default function GeneratePage() {
             <h2 className="text-lg font-semibold text-foreground">
               Select a Product
             </h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {mockProducts.map((product) => (
-                <button
-                  key={product.id}
-                  onClick={() => store.setProductId(product.id)}
-                  className="text-left"
-                >
-                  <Card
-                    className={cn(
-                      "h-full transition-all",
-                      store.productId === product.id
-                        ? "border-violet-500 ring-1 ring-violet-500/30"
-                        : "hover:border-muted-foreground/30"
-                    )}
+            {productsLoading ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {[1, 2, 3].map((i) => (
+                  <Card key={i} className="h-48 animate-pulse bg-muted" />
+                ))}
+              </div>
+            ) : confirmedProducts.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center gap-4 py-12">
+                  <Package className="size-10 text-muted-foreground" />
+                  <div className="text-center">
+                    <h3 className="font-semibold text-foreground">
+                      No products yet
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Import products from your store first.
+                    </p>
+                  </div>
+                  <Button asChild variant="outline">
+                    <Link href="/dashboard/products">Import Products</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {confirmedProducts.map((product) => (
+                  <button
+                    key={product.id}
+                    onClick={() => store.setProductId(product.id)}
+                    className="text-left"
                   >
-                    <CardContent className="flex flex-col gap-3">
-                      <div className="flex aspect-video items-center justify-center rounded-lg bg-muted">
-                        {product.image ? (
-                          <img
-                            src={product.image}
-                            alt={product.name}
-                            className="size-full rounded-lg object-cover"
-                          />
-                        ) : (
-                          <ImageIcon className="size-8 text-muted-foreground" />
-                        )}
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-foreground">
-                          {product.name}
-                        </h3>
-                        <p className="mt-1 text-sm font-semibold text-foreground">
-                          {product.price}
-                        </p>
-                      </div>
-                      {store.productId === product.id && (
-                        <div className="flex items-center gap-1.5 text-xs text-violet-400">
-                          <Check className="size-3.5" />
-                          Selected
-                        </div>
+                    <Card
+                      className={cn(
+                        "h-full transition-all",
+                        store.productId === product.id
+                          ? "border-violet-500 ring-1 ring-violet-500/30"
+                          : "hover:border-muted-foreground/30"
                       )}
-                    </CardContent>
-                  </Card>
-                </button>
-              ))}
-            </div>
+                    >
+                      <CardContent className="flex flex-col gap-3">
+                        <div className="flex aspect-video items-center justify-center rounded-lg bg-muted">
+                          {product.images?.[0] ? (
+                            <img
+                              src={product.images[0]}
+                              alt={product.name}
+                              className="size-full rounded-lg object-cover"
+                            />
+                          ) : (
+                            <ImageIcon className="size-8 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-foreground">
+                            {product.name}
+                          </h3>
+                          {product.price && (
+                            <p className="mt-1 text-sm font-semibold text-foreground">
+                              {product.currency === "USD" ? "$" : product.currency}
+                              {product.price}
+                            </p>
+                          )}
+                        </div>
+                        {store.productId === product.id && (
+                          <div className="flex items-center gap-1.5 text-xs text-violet-400">
+                            <Check className="size-3.5" />
+                            Selected
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -263,52 +286,77 @@ export default function GeneratePage() {
             <h2 className="text-lg font-semibold text-foreground">
               Select a Persona
             </h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {mockPersonas.map((persona) => (
-                <button
-                  key={persona.id}
-                  onClick={() => store.setPersonaId(persona.id)}
-                  className="text-left"
-                >
-                  <Card
-                    className={cn(
-                      "h-full transition-all",
-                      store.personaId === persona.id
-                        ? "border-violet-500 ring-1 ring-violet-500/30"
-                        : "hover:border-muted-foreground/30"
-                    )}
+            {personasLoading ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {[1, 2].map((i) => (
+                  <Card key={i} className="h-48 animate-pulse bg-muted" />
+                ))}
+              </div>
+            ) : activePersonas.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center gap-4 py-12">
+                  <User className="size-10 text-muted-foreground" />
+                  <div className="text-center">
+                    <h3 className="font-semibold text-foreground">
+                      No personas yet
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Create an AI persona first.
+                    </p>
+                  </div>
+                  <Button asChild variant="outline">
+                    <Link href="/dashboard/personas/new">Create Persona</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {activePersonas.map((persona) => (
+                  <button
+                    key={persona.id}
+                    onClick={() => store.setPersonaId(persona.id)}
+                    className="text-left"
                   >
-                    <CardContent className="flex flex-col items-center gap-3 py-6">
-                      <div className="flex size-20 items-center justify-center rounded-full bg-muted">
-                        {persona.image ? (
-                          <img
-                            src={persona.image}
-                            alt={persona.name}
-                            className="size-full rounded-full object-cover"
-                          />
-                        ) : (
-                          <User className="size-8 text-muted-foreground" />
-                        )}
-                      </div>
-                      <div className="text-center">
-                        <h3 className="font-medium text-foreground">
-                          {persona.name}
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                          {persona.gender} / {persona.age} / {persona.style}
-                        </p>
-                      </div>
-                      {store.personaId === persona.id && (
-                        <div className="flex items-center gap-1.5 text-xs text-violet-400">
-                          <Check className="size-3.5" />
-                          Selected
-                        </div>
+                    <Card
+                      className={cn(
+                        "h-full transition-all",
+                        store.personaId === persona.id
+                          ? "border-violet-500 ring-1 ring-violet-500/30"
+                          : "hover:border-muted-foreground/30"
                       )}
-                    </CardContent>
-                  </Card>
-                </button>
-              ))}
-            </div>
+                    >
+                      <CardContent className="flex flex-col items-center gap-3 py-6">
+                        <div className="flex size-20 items-center justify-center rounded-full bg-muted">
+                          {persona.selected_image_url ? (
+                            <img
+                              src={persona.selected_image_url}
+                              alt={persona.name}
+                              className="size-full rounded-full object-cover"
+                            />
+                          ) : (
+                            <User className="size-8 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="text-center">
+                          <h3 className="font-medium text-foreground">
+                            {persona.name}
+                          </h3>
+                          <p className="text-xs text-muted-foreground">
+                            {persona.attributes.gender} / {persona.attributes.age} / {persona.attributes.clothing_style}
+                          </p>
+                        </div>
+                        {store.personaId === persona.id && (
+                          <div className="flex items-center gap-1.5 text-xs text-violet-400">
+                            <Check className="size-3.5" />
+                            Selected
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -365,16 +413,25 @@ export default function GeneratePage() {
                         What you will get
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        AI script + 4 video variations
+                        3 Hook + 3 Body + 3 CTA segments = 27 combinations
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-bold text-violet-400">1</p>
+                      <p className="text-lg font-bold text-violet-400">
+                        {CREDITS_PER_BATCH}
+                      </p>
                       <p className="text-xs text-muted-foreground">
-                        credit cost
+                        credits cost
                       </p>
                     </div>
                   </div>
+
+                  {!hasEnoughCredits && !creditsLoading && (
+                    <div className="rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
+                      You need {CREDITS_PER_BATCH} credits but have{" "}
+                      {creditsRemaining}. Subscribe or upgrade to continue.
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -405,11 +462,11 @@ export default function GeneratePage() {
         ) : (
           <Button
             onClick={handleGenerate}
-            disabled={isSubmitting}
+            disabled={createGeneration.isPending}
             className="bg-violet-600 hover:bg-violet-700"
             size="lg"
           >
-            {isSubmitting ? (
+            {createGeneration.isPending ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
                 Generating...
@@ -426,56 +483,73 @@ export default function GeneratePage() {
 
       {/* Paywall Dialog */}
       <Dialog open={showPaywall} onOpenChange={setShowPaywall}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Subscription Required</DialogTitle>
+            <DialogTitle>
+              {creditsRemaining > 0
+                ? "Not Enough Credits"
+                : "Subscription Required"}
+            </DialogTitle>
             <DialogDescription>
-              You need an active subscription to generate UGC videos. Choose a
-              plan to get started.
+              {creditsRemaining > 0
+                ? `You need ${CREDITS_PER_BATCH} credits but have ${creditsRemaining}. Upgrade your plan for more credits.`
+                : "Choose a plan to start generating UGC videos."}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3 py-4">
-            {[
-              {
-                name: "Starter",
-                price: "$29/mo",
-                credits: "27 credits",
-              },
-              {
-                name: "Growth",
-                price: "$79/mo",
-                credits: "90 credits",
-              },
-              {
-                name: "Scale",
-                price: "$149/mo",
-                credits: "300 credits",
-              },
-            ].map((plan) => (
-              <div
-                key={plan.name}
-                className="flex items-center justify-between rounded-lg border border-border px-4 py-3"
-              >
-                <div>
-                  <p className="font-medium text-foreground">{plan.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {plan.credits}/month
-                  </p>
+            {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(
+              ([key, plan]) => (
+                <div
+                  key={key}
+                  className={cn(
+                    "flex items-center justify-between rounded-lg border px-4 py-3",
+                    key === "growth"
+                      ? "border-violet-500/50 bg-violet-500/5"
+                      : "border-border"
+                  )}
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-foreground">{plan.name}</p>
+                      {key === "growth" && (
+                        <Badge
+                          variant="secondary"
+                          className="bg-violet-500/10 text-violet-400 text-xs"
+                        >
+                          Popular
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {plan.credits} credits/month
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-foreground">
+                      ${plan.price}/mo
+                    </span>
+                    <Button
+                      size="sm"
+                      variant={key === "growth" ? "default" : "outline"}
+                      className={
+                        key === "growth"
+                          ? "bg-violet-600 hover:bg-violet-700"
+                          : ""
+                      }
+                      onClick={() => handleCheckout(key)}
+                      disabled={checkout.isPending}
+                    >
+                      {checkout.isPending ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        "Subscribe"
+                      )}
+                    </Button>
+                  </div>
                 </div>
-                <span className="font-semibold text-foreground">
-                  {plan.price}
-                </span>
-              </div>
-            ))}
+              )
+            )}
           </div>
-          <DialogFooter>
-            <Button
-              asChild
-              className="w-full bg-violet-600 hover:bg-violet-700"
-            >
-              <Link href="/pricing">View Plans</Link>
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -1,11 +1,10 @@
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { requireUserId } from "../_shared/auth.ts";
+import { optionalUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
 import { validateUrl } from "../_shared/ssrf.ts";
 import { rateLimit } from "../_shared/rate-limit.ts";
-
-const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!;
+import { callOpenRouter } from "../_shared/openrouter.ts";
 
 interface ProductData {
   name: string;
@@ -17,58 +16,201 @@ interface ProductData {
   source: "shopify" | "generic";
 }
 
-/** Try to extract product data from Shopify's /products.json endpoint. */
+interface BrandSummary {
+  tone: string;
+  demographic: string;
+  selling_points: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Shopify scraper — paginate with limit=30, cap at 50 total products
+// ---------------------------------------------------------------------------
+
 async function tryShopify(origin: string): Promise<ProductData[] | null> {
+  const MAX_TOTAL = 50;
+  const PER_PAGE = 30;
+  const allProducts: ProductData[] = [];
+
   try {
-    const res = await fetch(`${origin}/products.json?limit=10`, {
-      headers: { "User-Agent": "UGCFarmAI/1.0" },
-    });
-    if (!res.ok) return null;
+    let page = 1;
+    while (allProducts.length < MAX_TOTAL) {
+      const res = await fetch(
+        `${origin}/products.json?limit=${PER_PAGE}&page=${page}`,
+        { headers: { "User-Agent": "UGCFarmAI/1.0" } },
+      );
+      if (!res.ok) return page === 1 ? null : allProducts;
 
-    const body = await res.json();
-    if (!body.products || !Array.isArray(body.products)) return null;
+      const body = await res.json();
+      if (
+        !body.products ||
+        !Array.isArray(body.products) ||
+        body.products.length === 0
+      ) {
+        break;
+      }
 
-    return body.products.map(
-      (p: Record<string, unknown>) => ({
-        name: p.title as string,
-        description: (p.body_html as string) ?? "",
-        price: p.variants
-          ? parseFloat(
-              ((p.variants as Record<string, unknown>[])[0]?.price as string) ??
-                "0",
-            )
-          : null,
-        currency: "USD",
-        images: ((p.images as Record<string, string>[]) ?? []).map(
-          (i) => i.src,
-        ),
-        category: (p.product_type as string) || null,
-        source: "shopify" as const,
-      }),
-    );
+      for (const p of body.products) {
+        if (allProducts.length >= MAX_TOTAL) break;
+        allProducts.push({
+          name: p.title as string,
+          description: (p.body_html as string) ?? "",
+          price: p.variants
+            ? parseFloat(
+                ((p.variants as Record<string, unknown>[])[0]
+                  ?.price as string) ?? "0",
+              )
+            : null,
+          currency: "USD",
+          images: ((p.images as Record<string, string>[]) ?? []).map(
+            (i) => i.src,
+          ),
+          category: (p.product_type as string) || null,
+          source: "shopify" as const,
+        });
+      }
+
+      // If we got fewer than PER_PAGE, there are no more pages
+      if (body.products.length < PER_PAGE) break;
+      page++;
+    }
+
+    return allProducts.length > 0 ? allProducts : null;
   } catch {
     return null;
   }
 }
 
-/** Scrape a generic page via HTML and use regex heuristics for product data. */
-async function scrapeGeneric(url: string): Promise<ProductData> {
+// ---------------------------------------------------------------------------
+// robots.txt checker
+// ---------------------------------------------------------------------------
+
+async function isAllowedByRobots(
+  origin: string,
+  path: string,
+): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(`${origin}/robots.txt`, {
+      signal: controller.signal,
+    });
+    if (!res.ok) return true;
+    const text = await res.text();
+    const lines = text.split("\n");
+    let inDefaultAgent = false;
+    for (const line of lines) {
+      const trimmed = line.trim().toLowerCase();
+      if (trimmed.startsWith("user-agent:")) {
+        inDefaultAgent = trimmed.includes("*");
+      }
+      if (inDefaultAgent && trimmed.startsWith("disallow:")) {
+        const disallowed = trimmed.replace("disallow:", "").trim();
+        if (
+          disallowed &&
+          (disallowed === "/" || path.startsWith(disallowed))
+        ) {
+          return false;
+        }
+      }
+    }
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// JSON-LD parser for generic pages
+// ---------------------------------------------------------------------------
+
+function parseJsonLd(html: string): ProductData[] {
+  const products: ProductData[] = [];
+  const regex =
+    /<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi;
+  let match;
+  while ((match = regex.exec(html)) !== null) {
+    try {
+      const data = JSON.parse(match[1]);
+      const items = Array.isArray(data) ? data : [data];
+      for (const item of items) {
+        if (
+          item["@type"] === "Product" ||
+          item["@type"] === "ProductGroup"
+        ) {
+          products.push({
+            name: item.name || "Unknown Product",
+            description: String(item.description || "").replace(
+              /<[^>]*>/g,
+              "",
+            ),
+            price: item.offers?.price
+              ? parseFloat(item.offers.price)
+              : item.offers?.lowPrice
+                ? parseFloat(item.offers.lowPrice)
+                : null,
+            currency: item.offers?.priceCurrency || "USD",
+            images: Array.isArray(item.image)
+              ? item.image
+              : item.image
+                ? [item.image]
+                : [],
+            category: item.category || null,
+            source: "generic" as const,
+          });
+        }
+      }
+    } catch {
+      /* skip invalid JSON-LD */
+    }
+  }
+  return products;
+}
+
+// ---------------------------------------------------------------------------
+// Generic scraper — JSON-LD first, OG tags fallback
+// ---------------------------------------------------------------------------
+
+async function scrapeGeneric(
+  url: string,
+  origin: string,
+): Promise<{ products: ProductData[]; blocked_by_robots: boolean }> {
+  const parsedUrl = new URL(url);
+
+  // Check robots.txt before fetching
+  const allowed = await isAllowedByRobots(origin, parsedUrl.pathname);
+  if (!allowed) {
+    return { products: [], blocked_by_robots: true };
+  }
+
   const res = await fetch(url, {
     headers: { "User-Agent": "UGCFarmAI/1.0" },
     redirect: "follow",
   });
   if (!res.ok) throw new Error(`Failed to fetch URL: ${res.status}`);
 
+  // Validate Content-Type is HTML
+  const ct = res.headers.get("content-type") ?? "";
+  if (!ct.includes("text/html")) {
+    throw new Error(
+      `Unsupported Content-Type: ${ct}. Expected text/html.`,
+    );
+  }
+
   const html = await res.text();
 
-  // Extract title
+  // Try JSON-LD first
+  const jsonLdProducts = parseJsonLd(html);
+  if (jsonLdProducts.length > 0) {
+    return { products: jsonLdProducts, blocked_by_robots: false };
+  }
+
+  // Fallback: OG tags / meta tags
   const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
   const ogTitleMatch = html.match(
     /<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i,
   );
   const name = ogTitleMatch?.[1] || titleMatch?.[1] || "Unknown Product";
 
-  // Extract description
   const ogDescMatch = html.match(
     /<meta[^>]+property="og:description"[^>]+content="([^"]+)"/i,
   );
@@ -77,70 +219,90 @@ async function scrapeGeneric(url: string): Promise<ProductData> {
   );
   const description = ogDescMatch?.[1] || metaDescMatch?.[1] || "";
 
-  // Extract images (og:image + product images)
   const images: string[] = [];
   const ogImageMatch = html.match(
     /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i,
   );
   if (ogImageMatch) images.push(ogImageMatch[1]);
 
-  // Attempt to extract price
   const priceMatch = html.match(
-    /(?:price|amount)[^>]*>[\s$£€]*(\d+[.,]\d{2})/i,
+    /(?:price|amount)[^>]*>[\s$\u00a3\u20ac]*(\d+[.,]\d{2})/i,
   );
 
   return {
-    name: name.trim(),
-    description: description.trim(),
-    price: priceMatch ? parseFloat(priceMatch[1].replace(",", ".")) : null,
-    currency: "USD",
-    images,
-    category: null,
-    source: "generic",
+    products: [
+      {
+        name: name.trim(),
+        description: description.trim(),
+        price: priceMatch
+          ? parseFloat(priceMatch[1].replace(",", "."))
+          : null,
+        currency: "USD",
+        images,
+        category: null,
+        source: "generic",
+      },
+    ],
+    blocked_by_robots: false,
   };
 }
 
-/** Call OpenAI to generate a brand summary from product data. */
+// ---------------------------------------------------------------------------
+// Brand summary generation via OpenRouter
+// ---------------------------------------------------------------------------
+
 async function generateBrandSummary(
-  product: ProductData,
-): Promise<Record<string, string>> {
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      response_format: { type: "json_object" },
-      messages: [
+  products: ProductData[],
+): Promise<BrandSummary | null> {
+  try {
+    // Build product summary from ALL products, truncating descriptions
+    const productSummaries = products
+      .map((p, i) => {
+        const desc =
+          p.description.length > 200
+            ? p.description.slice(0, 200) + "..."
+            : p.description;
+        return `Product ${i + 1}: ${p.name}\nDescription: ${desc}\nPrice: ${p.price ?? "unknown"} ${p.currency}\nCategory: ${p.category ?? "unknown"}`;
+      })
+      .join("\n\n");
+
+    const content = await callOpenRouter(
+      [
         {
           role: "system",
           content:
-            'You are a brand analyst. Given product data, return a JSON object with keys: "tone" (brand voice tone), "target_audience" (who this product is for), "key_selling_points" (array of 3-5 bullet points), "brand_personality" (1-2 sentence summary).',
+            'You are a brand analyst. Given product data, return a JSON object with exactly these keys: "tone" (brand voice tone, 1-2 words), "demographic" (who this product is for, 1 sentence), "selling_points" (array of 3-5 bullet point strings). Return ONLY valid JSON, no markdown.',
         },
         {
           role: "user",
-          content: `Product name: ${product.name}\nDescription: ${product.description}\nPrice: ${product.price ?? "unknown"} ${product.currency}\nCategory: ${product.category ?? "unknown"}`,
+          content: productSummaries,
         },
       ],
-      max_tokens: 500,
-    }),
-  });
+      { maxTokens: 500, timeoutMs: 10000 },
+    );
 
-  if (!res.ok) {
-    const err = await res.text();
-    console.error("OpenAI brand summary error:", err);
-    return { error: "Brand summary generation failed" };
-  }
+    const parsed = JSON.parse(content);
 
-  const body = await res.json();
-  try {
-    return JSON.parse(body.choices[0].message.content);
-  } catch {
-    return { raw: body.choices[0].message.content };
+    // Validate expected shape
+    if (
+      typeof parsed.tone !== "string" ||
+      typeof parsed.demographic !== "string" ||
+      !Array.isArray(parsed.selling_points)
+    ) {
+      console.error("Brand summary has unexpected shape:", parsed);
+      return null;
+    }
+
+    return parsed as BrandSummary;
+  } catch (e) {
+    console.error("Brand summary generation failed:", e);
+    return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Main handler
+// ---------------------------------------------------------------------------
 
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req);
@@ -152,17 +314,17 @@ Deno.serve(async (req: Request) => {
     }
 
     // Auth is optional for scraping, but affects rate limits and saving
-    let userId: string | null = null;
-    try {
-      userId = await requireUserId(req);
-    } catch {
-      // unauthenticated — allowed but rate-limited more aggressively
-    }
+    const userId = await optionalUserId(req);
 
-    const rateLimitKey = userId ?? (req.headers.get("x-forwarded-for") || "anon");
+    const rateLimitKey =
+      userId ?? req.headers.get("x-forwarded-for") || "anon";
     const limit = userId ? 60 : 10;
     if (!rateLimit(rateLimitKey, limit)) {
-      return json({ detail: "Rate limit exceeded. Try again later." }, cors, 429);
+      return json(
+        { detail: "Rate limit exceeded. Try again later." },
+        cors,
+        429,
+      );
     }
 
     const { url, save } = await req.json();
@@ -170,26 +332,46 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "url is required" }, cors, 400);
     }
 
-    const parsed = validateUrl(url);
+    const parsed = await validateUrl(url);
     const origin = parsed.origin;
 
-    // Try Shopify first
-    let products: ProductData[] | null = await tryShopify(origin);
+    let products: ProductData[] = [];
     let source: "shopify" | "generic" = "shopify";
+    let platform: "shopify" | "generic" = "shopify";
+    let blockedByRobots = false;
+    let fallbackAvailable = false;
 
-    if (!products || products.length === 0) {
+    // Try Shopify first
+    const shopifyProducts = await tryShopify(origin);
+
+    if (shopifyProducts && shopifyProducts.length > 0) {
+      products = shopifyProducts;
+      source = "shopify";
+      platform = "shopify";
+    } else {
       // Fall back to generic scraping
-      const single = await scrapeGeneric(url);
-      products = [single];
       source = "generic";
+      platform = "generic";
+      fallbackAvailable = true;
+      const result = await scrapeGeneric(url, origin);
+      products = result.products;
+      blockedByRobots = result.blocked_by_robots;
     }
 
-    // Generate brand summary for the first product
-    const brandSummary = await generateBrandSummary(products[0]);
+    // Generate brand summary from ALL products (graceful degradation)
+    let brandSummary: BrandSummary | null = null;
+    let brandSummaryError: string | null = null;
+
+    if (products.length > 0) {
+      brandSummary = await generateBrandSummary(products);
+      if (!brandSummary) {
+        brandSummaryError = "Brand summary generation failed or timed out";
+      }
+    }
 
     // Save to DB if authenticated and requested
     let savedIds: string[] = [];
-    if (userId && save !== false) {
+    if (userId && save !== false && products.length > 0) {
       const sb = getAdminClient();
       const rows = products.map((p) => ({
         owner_id: userId,
@@ -222,6 +404,11 @@ Deno.serve(async (req: Request) => {
             id: savedIds[i] ?? null,
           })),
           source,
+          platform,
+          brand_summary: brandSummary,
+          brand_summary_error: brandSummaryError,
+          blocked_by_robots: blockedByRobots,
+          fallback_available: fallbackAvailable,
           saved: savedIds.length > 0,
         },
       },
@@ -237,7 +424,8 @@ Deno.serve(async (req: Request) => {
       msg.includes("Malformed") ||
       msg.includes("private") ||
       msg.includes("loopback") ||
-      msg.includes("internal")
+      msg.includes("internal") ||
+      msg.includes("Content-Type")
     ) {
       return json({ detail: msg }, cors, 400);
     }

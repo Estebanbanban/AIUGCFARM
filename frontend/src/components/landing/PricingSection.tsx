@@ -11,11 +11,12 @@ const plans = [
     period: "/month",
     popular: false,
     features: [
-      "27 credits/month",
+      "27 segment credits/month",
+      "3 batch generations",
       "1 AI persona",
-      "1 product",
       "Easy Mode generation",
       "720p export",
+      "MP4 download",
     ],
   },
   {
@@ -24,26 +25,12 @@ const plans = [
     period: "/month",
     popular: true,
     features: [
-      "90 credits/month",
+      "90 segment credits/month",
+      "10 batch generations",
       "3 AI personas",
-      "3 products",
-      "Easy + Expert Mode",
-      "1080p export",
-      "Custom script editing",
-    ],
-  },
-  {
-    name: "Scale",
-    price: "$149",
-    period: "/month",
-    popular: false,
-    features: [
-      "300 credits/month",
-      "10 AI personas",
-      "10 products",
-      "Easy + Expert Mode",
-      "1080p export",
-      "Custom script editing",
+      "Easy Mode generation",
+      "720p export",
+      "MP4 download",
       "Priority support",
     ],
   },
@@ -67,14 +54,14 @@ export function PricingSection() {
         </div>
 
         {/* Pricing cards */}
-        <div className="mt-16 grid gap-8 md:grid-cols-3">
+        <div className="mt-16 grid gap-8 md:grid-cols-2">
           {plans.map((plan) => (
             <div
               key={plan.name}
               className={cn(
                 "relative flex flex-col rounded-2xl border p-8 transition-all",
                 plan.popular
-                  ? "border-violet-500/40 bg-zinc-900/60 shadow-lg shadow-violet-500/5 md:scale-105"
+                  ? "border-violet-500/40 bg-zinc-900/60 shadow-lg shadow-violet-500/5"
                   : "border-white/5 bg-zinc-900/30"
               )}
             >
@@ -128,7 +115,7 @@ export function PricingSection() {
 
         {/* Bottom note */}
         <p className="mt-10 text-center text-sm text-zinc-500">
-          All plans include: Free trial (3 credits) &bull; No watermarks &bull;
+          All plans include: 9 free segment credits &bull; No watermarks on paid &bull;
           MP4 download
         </p>
       </div>

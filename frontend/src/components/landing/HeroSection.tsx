@@ -1,6 +1,11 @@
 import { UrlInputCta } from "./UrlInputCta";
+import type { ScrapeResponseData } from "@/types/api";
 
-export function HeroSection() {
+interface HeroSectionProps {
+  onScrapeComplete?: (data: ScrapeResponseData) => void;
+}
+
+export function HeroSection({ onScrapeComplete }: HeroSectionProps) {
   return (
     <section className="relative overflow-hidden pt-32 pb-20 md:pt-40 md:pb-32">
       {/* Gradient glow */}
@@ -32,7 +37,7 @@ export function HeroSection() {
 
         {/* CTA */}
         <div className="mx-auto mt-10 max-w-xl">
-          <UrlInputCta />
+          <UrlInputCta onScrapeComplete={onScrapeComplete} />
         </div>
 
         {/* Social proof */}

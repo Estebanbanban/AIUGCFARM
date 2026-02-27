@@ -180,12 +180,12 @@ BEGIN
     COALESCE(NEW.raw_user_meta_data ->> 'avatar_url', '')
   );
 
-  -- Seed 1 free credit
+  -- Seed 9 free segment credits (1 full batch = 27 video combinations)
   INSERT INTO credit_balances (owner_id, remaining)
-  VALUES (NEW.id, 1);
+  VALUES (NEW.id, 9);
 
   INSERT INTO credit_ledger (owner_id, amount, reason)
-  VALUES (NEW.id, 1, 'free_trial');
+  VALUES (NEW.id, 9, 'free_trial');
 
   RETURN NEW;
 END;

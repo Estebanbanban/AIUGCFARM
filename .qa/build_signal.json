@@ -1,0 +1,12 @@
+{
+  "status": "idle",
+  "epic": null,
+  "story": null,
+  "story_title": null,
+  "port": 3000,
+  "base_url": "http://localhost:3000",
+  "routes_to_test": [],
+  "frs_to_verify": [],
+  "build_notes": "",
+  "timestamp": null
+}

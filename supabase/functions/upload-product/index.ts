@@ -3,6 +3,10 @@ import { requireUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
 
+const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_IMAGE_COUNT = 5;
+
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -37,9 +41,42 @@ Deno.serve(async (req: Request) => {
     const currency = (formData.get("currency") as string) ?? "USD";
     const category = (formData.get("category") as string) ?? null;
 
-    // Upload images to product-images bucket
-    const imageUrls: string[] = [];
+    // Collect and validate image files
     const imageFiles = formData.getAll("images");
+
+    if (imageFiles.length > MAX_IMAGE_COUNT) {
+      return json(
+        { detail: `Maximum ${MAX_IMAGE_COUNT} images allowed` },
+        cors,
+        400,
+      );
+    }
+
+    // Validate all files before uploading any
+    for (const file of imageFiles) {
+      if (!(file instanceof File)) continue;
+      if (!ALLOWED_TYPES.has(file.type)) {
+        return json(
+          {
+            detail: `Invalid file type: ${file.type}. Allowed: image/jpeg, image/png, image/webp`,
+          },
+          cors,
+          400,
+        );
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        return json(
+          {
+            detail: `File "${file.name}" exceeds maximum size of 5MB`,
+          },
+          cors,
+          400,
+        );
+      }
+    }
+
+    // Upload images to product-images bucket, storing paths (not public URLs)
+    const imagePaths: string[] = [];
 
     for (let i = 0; i < imageFiles.length; i++) {
       const file = imageFiles[i];
@@ -60,13 +97,10 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      const {
-        data: { publicUrl },
-      } = sb.storage.from("product-images").getPublicUrl(storagePath);
-      imageUrls.push(publicUrl);
+      imagePaths.push(storagePath);
     }
 
-    // Create product record
+    // Create product record with storage paths (not public URLs)
     const { data: product, error: insertErr } = await sb
       .from("products")
       .insert({
@@ -76,7 +110,7 @@ Deno.serve(async (req: Request) => {
         price,
         currency,
         category,
-        images: imageUrls,
+        images: imagePaths,
         source: "manual",
         confirmed: true,
       })

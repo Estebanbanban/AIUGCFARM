@@ -14,6 +14,7 @@ export function useProducts() {
       const { data, error } = await supabase
         .from("products")
         .select("*")
+        .eq("confirmed", true)
         .order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
       return data;
