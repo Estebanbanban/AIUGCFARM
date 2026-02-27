@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -19,6 +20,7 @@ import {
   LinkIcon,
   Upload,
   Plus,
+  Pencil,
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -636,51 +638,67 @@ export default function GeneratePage() {
               /* Product grid */
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {confirmedProducts.map((product) => (
-                  <button
-                    key={product.id}
-                    onClick={() => store.setProductId(product.id)}
-                    className="text-left"
-                  >
-                    <Card
-                      className={cn(
-                        "h-full transition-all",
-                        store.productId === product.id
-                          ? "border-primary ring-1 ring-primary/30"
-                          : "hover:border-muted-foreground/30",
-                      )}
+                  <div key={product.id} className="relative">
+                    <button
+                      onClick={() => store.setProductId(product.id)}
+                      className="w-full text-left"
                     >
-                      <CardContent className="flex flex-col gap-3 p-5">
-                        <div className="flex aspect-video items-center justify-center rounded-lg bg-muted">
-                          {productImageMap[product.id] ? (
-                            <img
-                              src={productImageMap[product.id]!}
-                              alt={product.name}
-                              className="size-full rounded-lg object-cover"
-                            />
-                          ) : (
-                            <ImageIcon className="size-8 text-muted-foreground" />
-                          )}
-                        </div>
-                        <div>
-                          <h3 className="font-medium">{product.name}</h3>
-                          {product.price && (
-                            <p className="mt-1 font-mono text-sm font-semibold">
-                              {product.currency === "USD"
-                                ? "$"
-                                : product.currency}
-                              {product.price}
-                            </p>
-                          )}
-                        </div>
-                        {store.productId === product.id && (
-                          <div className="flex items-center gap-1.5 text-xs text-primary">
-                            <Check className="size-3.5" />
-                            Selected
-                          </div>
+                      <Card
+                        className={cn(
+                          "h-full transition-all",
+                          store.productId === product.id
+                            ? "border-primary ring-1 ring-primary/30"
+                            : "hover:border-muted-foreground/30",
                         )}
-                      </CardContent>
-                    </Card>
-                  </button>
+                      >
+                        <CardContent className="flex flex-col gap-3 p-5">
+                          <div className="flex aspect-video items-center justify-center rounded-lg bg-muted">
+                            {productImageMap[product.id] ? (
+                              <img
+                                src={productImageMap[product.id]!}
+                                alt={product.name}
+                                className="size-full rounded-lg object-cover"
+                              />
+                            ) : (
+                              <ImageIcon className="size-8 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="font-medium">{product.name}</h3>
+                            {product.price && (
+                              <p className="mt-1 font-mono text-sm font-semibold">
+                                {product.currency === "USD"
+                                  ? "$"
+                                  : product.currency}
+                                {product.price}
+                              </p>
+                            )}
+                          </div>
+                          {store.productId === product.id && (
+                            <div className="flex items-center gap-1.5 text-xs text-primary">
+                              <Check className="size-3.5" />
+                              Selected
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </button>
+                    <Button
+                      asChild
+                      size="icon"
+                      variant="secondary"
+                      className="absolute right-3 top-3 size-8 rounded-full"
+                    >
+                      <Link
+                        href={`/products/${product.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={`Edit ${product.name}`}
+                        title="Edit product details and images"
+                      >
+                        <Pencil className="size-3.5" />
+                      </Link>
+                    </Button>
+                  </div>
                 ))}
               </div>
             ) : null}

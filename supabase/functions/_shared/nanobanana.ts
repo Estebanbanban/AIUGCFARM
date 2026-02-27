@@ -27,6 +27,14 @@ export interface GeneratedImage {
   mimeType: string; // e.g. "image/png"
 }
 
+export interface ProductReferenceContext {
+  name?: string;
+  description?: string;
+  category?: string;
+  price?: number;
+  currency?: string;
+}
+
 function endpoint(): string {
   if (!GEMINI_API_KEY) throw new Error("NANOBANANA_API_KEY (Gemini API key) is not configured");
   return `${GEMINI_BASE}/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
@@ -75,32 +83,46 @@ export async function generateImagesFromPrompt(
 
 /**
  * Generate a composite image (persona + product) for video generation.
- * Downloads both source images, sends to Gemini as multimodal input.
+ * Downloads persona + product reference images, sends to Gemini as multimodal input.
  * Returns raw image buffer.
  */
 export async function generateCompositeFromImages(
   personImageUrl: string,
-  productImageUrl: string,
+  productImageUrls: string[],
+  productContext?: ProductReferenceContext,
   scenePrompt?: string,
   aspectRatio: "9:16" | "16:9" = "9:16",
 ): Promise<GeneratedImage> {
-  const [personRes, productRes] = await Promise.all([
+  if (!Array.isArray(productImageUrls) || productImageUrls.length === 0) {
+    throw new Error("At least one product reference image is required");
+  }
+
+  const [personRes, ...productResponses] = await Promise.all([
     fetch(personImageUrl),
-    fetch(productImageUrl),
+    ...productImageUrls.map((url) => fetch(url)),
   ]);
-
   if (!personRes.ok) throw new Error(`Failed to download persona image: ${personRes.status}`);
-  if (!productRes.ok) throw new Error(`Failed to download product image: ${productRes.status}`);
+  for (let i = 0; i < productResponses.length; i++) {
+    if (!productResponses[i].ok) {
+      throw new Error(
+        `Failed to download product image ${i + 1}: ${productResponses[i].status}`,
+      );
+    }
+  }
 
-  const [personBuf, productBuf] = await Promise.all([
+  const [personBuf, ...productBuffers] = await Promise.all([
     personRes.arrayBuffer(),
-    productRes.arrayBuffer(),
+    ...productResponses.map((res) => res.arrayBuffer()),
   ]);
 
   const personB64 = uint8ArrayToBase64(new Uint8Array(personBuf));
-  const productB64 = uint8ArrayToBase64(new Uint8Array(productBuf));
   const personMime = personRes.headers.get("content-type") || "image/jpeg";
-  const productMime = productRes.headers.get("content-type") || "image/jpeg";
+  const productInlineParts = productBuffers.map((buf, idx) => ({
+    inlineData: {
+      mimeType: productResponses[idx].headers.get("content-type") || "image/jpeg",
+      data: uint8ArrayToBase64(new Uint8Array(buf)),
+    },
+  }));
 
   const formatHint = aspectRatio === "9:16"
     ? "Vertical 9:16 portrait format for mobile/phone screen."
@@ -108,10 +130,22 @@ export async function generateCompositeFromImages(
 
   // CRITICAL FRAMING RULE: head-and-shoulders POV selfie ONLY — no waist, legs, or feet.
   const framingRule = "IMPORTANT: Tight upper-body frame — show ONLY the person's head, neck, shoulders, and upper chest. NO waist, legs, or feet. The bottom edge of the image must cut off at the chest/collarbone level. This is a close-up phone selfie, not a full-body photo.";
+  const productContextPrompt = [
+    productContext?.name ? `Product name: ${productContext.name}.` : "",
+    productContext?.description ? `Product description: ${productContext.description}.` : "",
+    productContext?.category ? `Category: ${productContext.category}.` : "",
+    typeof productContext?.price === "number"
+      ? `Price: ${productContext.currency ?? "USD"} ${productContext.price}.`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const multiImageInstruction =
+    "Use all provided product reference images to preserve exact product packaging, color, materials, shape, logo placement, and label details.";
 
   const compositePrompt = scenePrompt
-    ? `${framingRule} ${scenePrompt} The person is filming themselves POV-style (arm extended, front-camera angle, slight wide-angle distortion), naturally holding and showcasing the product which is clearly visible in frame. iPhone selfie aesthetic, talking-to-camera energy. ${formatHint}`
-    : `${framingRule} UGC phone selfie: extreme close-up POV, front-camera angle, arm extended at selfie distance, slight wide-angle distortion. The person looks directly into the lens while naturally holding the product near their upper chest — the product is clearly visible in frame. Natural window lighting, authentic imperfections, talking-to-camera energy. ${formatHint}`;
+    ? `${framingRule} ${multiImageInstruction} ${productContextPrompt} ${scenePrompt} The person is filming themselves POV-style (arm extended, front-camera angle, slight wide-angle distortion), naturally holding and showcasing the product which is clearly visible in frame. iPhone selfie aesthetic, talking-to-camera energy. ${formatHint}`
+    : `${framingRule} ${multiImageInstruction} ${productContextPrompt} UGC phone selfie: extreme close-up POV, front-camera angle, arm extended at selfie distance, slight wide-angle distortion. The person looks directly into the lens while naturally holding the product near their upper chest — the product is clearly visible in frame. Natural window lighting, authentic imperfections, talking-to-camera energy. ${formatHint}`;
 
   const res = await fetch(endpoint(), {
     method: "POST",
@@ -121,7 +155,7 @@ export async function generateCompositeFromImages(
         parts: [
           { text: compositePrompt },
           { inlineData: { mimeType: personMime, data: personB64 } },
-          { inlineData: { mimeType: productMime, data: productB64 } },
+          ...productInlineParts,
         ],
       }],
       generationConfig: {

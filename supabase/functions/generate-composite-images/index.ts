@@ -6,6 +6,7 @@ import { withRetry } from "../_shared/retry.ts";
 import { generateCompositeFromImages } from "../_shared/nanobanana.ts";
 
 const COMPOSITE_COUNT = 4;
+const MAX_PRODUCT_REFERENCE_IMAGES = 4;
 
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req);
@@ -64,20 +65,29 @@ Deno.serve(async (req: Request) => {
     }
     const personaSignedUrl = personaSignedUrlData.signedUrl;
 
-    // Product image URL
-    const productImageUrl = (product.images as string[])?.[0] ?? "";
-    if (!productImageUrl) throw new Error("Product has no images available");
+    // Product image URLs (multiple references improve output fidelity).
+    const productImagePaths = ((product.images as string[]) ?? [])
+      .filter((img) => typeof img === "string" && img.trim().length > 0)
+      .slice(0, MAX_PRODUCT_REFERENCE_IMAGES);
+    if (productImagePaths.length === 0) {
+      throw new Error("Product has no images available");
+    }
 
-    let resolvedProductImageUrl = productImageUrl;
-    if (!productImageUrl.startsWith("http")) {
-      const { data: prodSignedUrlData, error: prodSignedUrlErr } = await sb
+    const resolvedProductImageUrls: string[] = [];
+    for (const imagePath of productImagePaths) {
+      if (imagePath.startsWith("http")) {
+        resolvedProductImageUrls.push(imagePath);
+        continue;
+      }
+
+      const { data: signedData, error: signErr } = await sb
         .storage
         .from("product-images")
-        .createSignedUrl(productImageUrl, 600);
-      if (prodSignedUrlErr || !prodSignedUrlData?.signedUrl) {
-        throw new Error(`Failed to sign product image URL: ${prodSignedUrlErr?.message}`);
+        .createSignedUrl(imagePath, 600);
+      if (signErr || !signedData?.signedUrl) {
+        throw new Error(`Failed to sign product image URL: ${signErr?.message}`);
       }
-      resolvedProductImageUrl = prodSignedUrlData.signedUrl;
+      resolvedProductImageUrls.push(signedData.signedUrl);
     }
 
     // Scene prompt from persona attributes (for context)
@@ -92,7 +102,16 @@ Deno.serve(async (req: Request) => {
           withRetry(
             () => generateCompositeFromImages(
               personaSignedUrl,
-              resolvedProductImageUrl,
+              resolvedProductImageUrls,
+              {
+                name: typeof product.name === "string" ? product.name : undefined,
+                description: typeof product.description === "string"
+                  ? product.description
+                  : undefined,
+                category: typeof product.category === "string" ? product.category : undefined,
+                price: typeof product.price === "number" ? product.price : undefined,
+                currency: typeof product.currency === "string" ? product.currency : undefined,
+              },
               scenePrompt,
               format as "9:16" | "16:9",
             ),
