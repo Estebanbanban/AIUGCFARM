@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import Script from "next/script";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
-import Script from "next/script";
+import { PostHogProvider } from "@/components/providers/posthog-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -59,18 +60,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           data-domain="www.cinerads.com"
           strategy="afterInteractive"
         />
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-          storageKey="cinerads-theme"
-        >
-          <QueryProvider>
-            {children}
-            <Toaster />
-          </QueryProvider>
-        </ThemeProvider>
+        <PostHogProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+            storageKey="cinerads-theme"
+          >
+            <QueryProvider>
+              {children}
+              <Toaster />
+            </QueryProvider>
+          </ThemeProvider>
+        </PostHogProvider>
       </body>
     </html>
   );
