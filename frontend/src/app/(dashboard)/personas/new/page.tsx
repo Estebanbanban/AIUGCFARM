@@ -308,14 +308,14 @@ function optionHumanPhotoUri(key: string) {
   };
 
   const accessoryMap: Record<string, string> = {
-    None: u("DmJrwQzOVK4"),
-    Glasses: u("62rTkfxLTDg"),
-    Sunglasses: u("egqZNnzjXng"),
-    Earrings: u("wQ3iEJaHgXM"),
-    Necklace: u("12N9XSSuygc"),
-    Watch: u("QQ_nm-OFlBs"),
-    Hat: u("iRRUQkR3MKM"),
-    Scarf: u("gmCVcF3bBSs"),
+    None: u("photo-1612690119274-8819a81c13a2"),
+    Glasses: u("photo-1591843336309-cbf414ad7978"),
+    Sunglasses: u("photo-1608539733292-190446b22b83"),
+    Earrings: u("photo-1649675094138-2436328c27f0"),
+    Necklace: u("photo-1718312267215-58bbba315a15"),
+    Watch: u("photo-1694598152256-a346298ae0b5"),
+    Hat: u("photo-1751003801817-638f03892c1e"),
+    Scarf: u("photo-1672798379137-f872e2631e0b"),
   };
 
   if (key.startsWith("gender-")) return genderMap[key.slice(7)] ?? optionImageDataUri(key);
