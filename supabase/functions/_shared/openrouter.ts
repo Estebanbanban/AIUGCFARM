@@ -1,5 +1,5 @@
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
-const OPENROUTER_MODEL = "openai/gpt-4o";
+const OPENROUTER_MODEL = "openai/gpt-oss-120b";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 interface ChatMessage {
