@@ -7,8 +7,10 @@ import type { Generation } from "@/types/database";
 import type {
   CompositeImagesResponse,
   CreateGenerationResponse,
+  EditCompositeImageResponse,
   GenerationProgressResponse,
   GenerationHistoryResponse,
+  RegenerateSegmentResponse,
 } from "@/types/api";
 
 interface GenerationInput {
@@ -17,6 +19,14 @@ interface GenerationInput {
   mode: "single" | "triple";
   quality: "standard" | "hd";
   composite_image_path: string;
+  cta_style?:
+    | "auto"
+    | "product_name_drop"
+    | "link_in_bio"
+    | "link_in_comments"
+    | "comment_keyword"
+    | "check_description";
+  cta_comment_keyword?: string;
 }
 
 export interface GenerationWithRelations extends Generation {
@@ -72,6 +82,22 @@ export function useGenerateCompositeImages() {
   });
 }
 
+/** Edit one selected composite preview image using text instructions. */
+export function useEditCompositeImage() {
+  return useMutation({
+    mutationFn: async (input: {
+      composite_image_path: string;
+      edit_prompt: string;
+      format: "9:16" | "16:9";
+    }) => {
+      const res = await callEdge<EditCompositeImageResponse>("edit-composite-image", {
+        body: input,
+      });
+      return res.data;
+    },
+  });
+}
+
 /** Create a new generation (calls generate-video Edge Function). */
 export function useCreateGeneration() {
   const queryClient = useQueryClient();
@@ -89,6 +115,30 @@ export function useCreateGeneration() {
     onError: () => {
       // Refresh credits even on error — debit may have been attempted then refunded
       queryClient.invalidateQueries({ queryKey: ["credits"] });
+    },
+  });
+}
+
+/** Regenerate a single segment (hook/body/cta variation) for 1 credit. */
+export function useRegenerateSegment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      generation_id: string;
+      segment_type: "hook" | "body" | "cta";
+      variation: number;
+    }) => {
+      const res = await callEdge<RegenerateSegmentResponse>("regenerate-segment", {
+        body: input,
+      });
+      return res.data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["credits"] });
+      queryClient.invalidateQueries({
+        queryKey: ["generation-progress", variables.generation_id],
+      });
+      queryClient.invalidateQueries({ queryKey: ["generations"] });
     },
   });
 }

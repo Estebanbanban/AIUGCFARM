@@ -149,3 +149,70 @@ export async function generateCompositeFromImages(
   const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
   return { data: binary, mimeType };
 }
+
+/**
+ * Edit an existing composite image using natural-language instructions.
+ * Uses the reference image as inline input so identity/product framing is preserved.
+ */
+export async function editCompositeFromReference(
+  referenceImageUrl: string,
+  editPrompt: string,
+  aspectRatio: "9:16" | "16:9" = "9:16",
+): Promise<GeneratedImage> {
+  const refRes = await fetch(referenceImageUrl);
+  if (!refRes.ok) {
+    throw new Error(`Failed to download reference image: ${refRes.status}`);
+  }
+
+  const refBuf = await refRes.arrayBuffer();
+  const refB64 = uint8ArrayToBase64(new Uint8Array(refBuf));
+  const refMime = refRes.headers.get("content-type") || "image/jpeg";
+
+  const formatHint = aspectRatio === "9:16"
+    ? "Keep vertical 9:16 portrait format."
+    : "Keep horizontal 16:9 landscape format.";
+
+  const prompt = [
+    "Edit this UGC selfie ad image according to the user's instruction.",
+    "Preserve the same person identity and product unless explicitly changed.",
+    "Maintain photorealistic iPhone selfie style with natural lighting and details.",
+    "Do not add text overlays, logos, captions, or watermarks.",
+    `User instruction: ${editPrompt}`,
+    formatHint,
+  ].join(" ");
+
+  const res = await fetch(endpoint(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType: refMime, data: refB64 } },
+        ],
+      }],
+      generationConfig: {
+        responseModalities: ["TEXT", "IMAGE"],
+        imageConfig: { aspectRatio },
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Gemini image edit failed (${res.status}): ${err.slice(0, 300)}`);
+  }
+
+  const data = await res.json();
+  const parts: { text?: string; inlineData?: { mimeType: string; data: string } }[] =
+    data.candidates?.[0]?.content?.parts ?? [];
+
+  const imagePart = parts.find((p) => p.inlineData);
+  if (!imagePart?.inlineData) {
+    throw new Error(`Gemini returned no edited image. Response: ${JSON.stringify(data).slice(0, 300)}`);
+  }
+
+  const { mimeType, data: b64 } = imagePart.inlineData;
+  const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  return { data: binary, mimeType };
+}

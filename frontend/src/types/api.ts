@@ -65,6 +65,23 @@ export interface CompositeImagesResponse {
   };
 }
 
+/** Response from edit-composite-image Edge Function */
+export interface EditCompositeImageResponse {
+  data: {
+    image: { path: string; signed_url: string };
+  };
+}
+
+/** Response from regenerate-segment Edge Function */
+export interface RegenerateSegmentResponse {
+  data: {
+    generation_id: string;
+    status: GenerationStatus;
+    job_key: string;
+    credits_charged: number;
+  };
+}
+
 /** Response from generate-video Edge Function */
 export interface CreateGenerationResponse {
   data: {
@@ -94,6 +111,7 @@ export interface GenerationHistoryItem {
   product_id: string;
   persona_id: string;
   mode: string;
+  video_quality: Generation["video_quality"];
   status: GenerationStatus;
   script: GenerationScript | null;
   composite_image_url: string | null;

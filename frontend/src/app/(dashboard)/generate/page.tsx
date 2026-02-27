@@ -19,6 +19,7 @@ import {
   LinkIcon,
   Upload,
   Plus,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -51,7 +53,11 @@ import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
 import { usePersonas, resolvePersonaImageUrl } from "@/hooks/use-personas";
 import type { Persona, Product, BrandSummary } from "@/types/database";
 import { useCredits } from "@/hooks/use-credits";
-import { useCreateGeneration, useGenerateCompositeImages } from "@/hooks/use-generations";
+import {
+  useCreateGeneration,
+  useEditCompositeImage,
+  useGenerateCompositeImages,
+} from "@/hooks/use-generations";
 import { useCheckout } from "@/hooks/use-checkout";
 import { ManualUploadForm } from "@/components/products/ManualUploadForm";
 import { ScrapeResults } from "@/components/products/ScrapeResults";
@@ -63,6 +69,39 @@ const steps = [
   { number: 3, label: "Preview" },
   { number: 4, label: "Generate" },
 ];
+
+const CTA_STYLE_OPTIONS = [
+  {
+    key: "auto",
+    label: "Auto",
+    description: "Mixes CTA styles for variety.",
+  },
+  {
+    key: "product_name_drop",
+    label: "Name Drop",
+    description: "Mentions the product name directly.",
+  },
+  {
+    key: "link_in_bio",
+    label: "Link in Bio",
+    description: "Directs viewers to your bio link.",
+  },
+  {
+    key: "link_in_comments",
+    label: "Link in Comments",
+    description: "Directs viewers to a comment link.",
+  },
+  {
+    key: "comment_keyword",
+    label: "Comment Keyword",
+    description: "Asks for a keyword, ideal for ManyChat automation.",
+  },
+  {
+    key: "check_description",
+    label: "Check Description",
+    description: "Sends viewers to the post description/caption.",
+  },
+] as const;
 
 function useResolvedProductImages(
   products: { id: string; images: string[] }[] | undefined,
@@ -147,6 +186,7 @@ export default function GeneratePage() {
     Array<{ path: string; signed_url: string }>
   >([]);
   const [selectedCompositeIdx, setSelectedCompositeIdx] = useState<number | null>(null);
+  const [previewEditPrompt, setPreviewEditPrompt] = useState("");
 
   const { data: products, isLoading: productsLoading } = useProducts();
   const productImageMap = useResolvedProductImages(products);
@@ -156,6 +196,7 @@ export default function GeneratePage() {
   const { data: credits, isLoading: creditsLoading } = useCredits();
   const createGeneration = useCreateGeneration();
   const generateComposites = useGenerateCompositeImages();
+  const editComposite = useEditCompositeImage();
   const checkout = useCheckout();
 
   const confirmedProducts = products?.filter((p) => p.confirmed) ?? [];
@@ -177,6 +218,10 @@ export default function GeneratePage() {
         ? CREDITS_PER_SINGLE
         : CREDITS_PER_BATCH;
   const hasEnoughCredits = isUnlimitedCredits || creditsRemaining >= creditCost;
+  const requiresCommentKeyword = store.ctaStyle === "comment_keyword";
+  const commentKeyword = store.ctaCommentKeyword
+    .trim()
+    .replace(/[^a-zA-Z0-9 _-]/g, "");
 
   // Derived view states, no effects needed
   const showAddProductForm =
@@ -307,6 +352,7 @@ export default function GeneratePage() {
     setCompositeImages([]);
     setSelectedCompositeIdx(null);
     store.setCompositeImagePath(null);
+    setPreviewEditPrompt("");
   }
 
   async function handleGenerateComposites() {
@@ -314,6 +360,7 @@ export default function GeneratePage() {
     setCompositeImages([]);
     setSelectedCompositeIdx(null);
     store.setCompositeImagePath(null);
+    setPreviewEditPrompt("");
 
     generateComposites.mutate(
       { product_id: store.productId, persona_id: store.personaId, format: store.format },
@@ -333,11 +380,40 @@ export default function GeneratePage() {
     store.setCompositeImagePath(compositeImages[idx].path);
   }
 
+  function handleApplyPreviewEdit() {
+    const trimmedPrompt = previewEditPrompt.trim();
+    if (!store.compositeImagePath || !trimmedPrompt) return;
+
+    editComposite.mutate(
+      {
+        composite_image_path: store.compositeImagePath,
+        edit_prompt: trimmedPrompt,
+        format: store.format,
+      },
+      {
+        onSuccess: (result) => {
+          setCompositeImages((prev) => [result.image, ...prev]);
+          setSelectedCompositeIdx(0);
+          store.setCompositeImagePath(result.image.path);
+          setPreviewEditPrompt("");
+          toast.success("Preview image updated");
+        },
+        onError: (err) => {
+          toast.error(err.message || "Failed to edit preview image");
+        },
+      },
+    );
+  }
+
   // ── Generation ───────────────────────────────────────────────────────────
 
   async function handleGenerate() {
     if (!hasEnoughCredits) {
       setShowPaywall(true);
+      return;
+    }
+    if (requiresCommentKeyword && !commentKeyword) {
+      toast.error("Add a comment keyword for the CTA style.");
       return;
     }
     if (!store.productId || !store.personaId || !store.compositeImagePath) return;
@@ -349,6 +425,8 @@ export default function GeneratePage() {
         mode: store.mode,
         quality: store.quality,
         composite_image_path: store.compositeImagePath,
+        cta_style: store.ctaStyle,
+        cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
       },
       {
         onSuccess: (result) => {
@@ -823,6 +901,54 @@ export default function GeneratePage() {
                   Click an image to select it — this becomes the base for your video.
                 </p>
 
+                <div className="rounded-lg border border-border bg-muted/20 p-4">
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <Label htmlFor="preview-edit-prompt" className="text-sm font-medium">
+                        Quick edit (optional)
+                      </Label>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Ask for changes like outfit, background, lighting, or time of day.
+                      </p>
+                    </div>
+
+                    <Textarea
+                      id="preview-edit-prompt"
+                      value={previewEditPrompt}
+                      onChange={(e) => setPreviewEditPrompt(e.target.value)}
+                      placeholder="Example: Change the outfit to a black hoodie and make the background a cozy cafe at sunset."
+                      maxLength={500}
+                    />
+
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs text-muted-foreground">
+                        Uses the selected preview image as the reference.
+                      </p>
+                      <Button
+                        size="sm"
+                        onClick={handleApplyPreviewEdit}
+                        disabled={
+                          editComposite.isPending ||
+                          !store.compositeImagePath ||
+                          previewEditPrompt.trim().length === 0
+                        }
+                      >
+                        {editComposite.isPending ? (
+                          <>
+                            <Loader2 className="size-3.5 animate-spin" />
+                            Applying Edit...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="size-3.5" />
+                            Apply Edit
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Full-width image grid: 4-col for portrait (tall), 2-col for landscape (wide) */}
                 <div className={cn(
                   "grid gap-3",
@@ -1029,12 +1155,66 @@ export default function GeneratePage() {
                     </div>
                   </div>
 
+                  {/* CTA style selector */}
+                  <div>
+                    <p className="mb-2 text-sm text-muted-foreground">
+                      CTA style
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {CTA_STYLE_OPTIONS.map((option) => (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => store.setCtaStyle(option.key)}
+                          className={cn(
+                            "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
+                            store.ctaStyle === option.key
+                              ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                              : "border-border hover:border-muted-foreground/30",
+                          )}
+                        >
+                          <p className="text-sm font-semibold text-foreground">
+                            {option.label}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {option.description}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+
+                    {requiresCommentKeyword && (
+                      <div className="mt-3">
+                        <Label htmlFor="cta-comment-keyword" className="text-xs text-muted-foreground">
+                          Keyword viewers should comment
+                        </Label>
+                        <Input
+                          id="cta-comment-keyword"
+                          value={store.ctaCommentKeyword}
+                          onChange={(e) =>
+                            store.setCtaCommentKeyword(
+                              e.target.value.replace(/[^a-zA-Z0-9 _-]/g, ""),
+                            )}
+                          placeholder='e.g. "link" or "deal"'
+                          className="mt-1"
+                          maxLength={30}
+                        />
+                      </div>
+                    )}
+                  </div>
+
                   {/* Info */}
                   <div className="rounded-lg bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
                     {store.mode === "single"
                       ? "You'll get 1 complete video combination."
                       : "You'll get 27 possible combinations (3x3x3)."}
                   </div>
+
+                  {requiresCommentKeyword && !commentKeyword && (
+                    <div className="rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
+                      Add a comment keyword so we can write the CTA correctly.
+                    </div>
+                  )}
 
                   {!hasEnoughCredits && !creditsLoading && (
                     <div className="rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
@@ -1046,7 +1226,7 @@ export default function GeneratePage() {
                   {/* Generate button */}
                   <Button
                     onClick={handleGenerate}
-                    disabled={createGeneration.isPending}
+                    disabled={createGeneration.isPending || (requiresCommentKeyword && !commentKeyword)}
                     size="lg"
                     className="w-full"
                   >
