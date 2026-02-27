@@ -55,6 +55,72 @@ const bodyTypeLabels: Record<string, string> = {
   plus_size: "Plus Size",
 };
 
+function hashString(input: string) {
+  let hash = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = (hash << 5) - hash + input.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function neutralCardStyle(key: string): React.CSSProperties {
+  const palettes: Array<[string, string, string]> = [
+    ["#f5f5f4", "#e7e5e4", "#d6d3d1"],
+    ["#f8fafc", "#e2e8f0", "#cbd5e1"],
+    ["#f4f4f5", "#e4e4e7", "#d4d4d8"],
+    ["#f8fafc", "#e5e7eb", "#d1d5db"],
+    ["#f5f5f5", "#e7e5e4", "#d4d4d4"],
+    ["#fafaf9", "#e7e5e4", "#d6d3d1"],
+  ];
+
+  const idx = hashString(key) % palettes.length;
+  const [base, shade, accent] = palettes[idx];
+
+  return {
+    backgroundColor: base,
+    backgroundImage: [
+      `radial-gradient(circle at 18% 22%, ${accent}66 0%, transparent 34%)`,
+      `radial-gradient(circle at 80% 16%, ${shade}80 0%, transparent 30%)`,
+      `linear-gradient(165deg, ${base} 0%, ${shade} 62%, ${accent} 100%)`,
+    ].join(","),
+  };
+}
+
+function optionImageDataUri(key: string) {
+  const seed = hashString(key);
+  const palettes = [
+    ["#f8fafc", "#e2e8f0", "#cbd5e1"],
+    ["#fafaf9", "#e7e5e4", "#d6d3d1"],
+    ["#f5f5f4", "#e7e5e4", "#d4d4d4"],
+    ["#f4f4f5", "#e4e4e7", "#d4d4d8"],
+  ] as const;
+  const [bg1, bg2, bg3] = palettes[seed % palettes.length];
+  const wave = 240 + (seed % 60);
+  const eye = 188 + (seed % 18);
+
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${bg1}"/>
+      <stop offset="60%" stop-color="${bg2}"/>
+      <stop offset="100%" stop-color="${bg3}"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="1000" fill="url(#bg)"/>
+  <circle cx="400" cy="315" r="${wave}" fill="${bg2}" opacity="0.28"/>
+  <circle cx="400" cy="275" r="115" fill="#ffffff" opacity="0.8"/>
+  <rect x="245" y="420" width="310" height="380" rx="150" fill="#ffffff" opacity="0.82"/>
+  <circle cx="355" cy="${eye}" r="5.5" fill="#9ca3af"/>
+  <circle cx="445" cy="${eye}" r="5.5" fill="#9ca3af"/>
+  <rect x="356" y="232" width="88" height="6" rx="3" fill="#9ca3af" opacity="0.65"/>
+  <rect x="318" y="744" width="164" height="12" rx="6" fill="#9ca3af" opacity="0.4"/>
+</svg>`;
+
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 const hairPlaceholderStyle: Record<string, React.CSSProperties> = {
   Black:       { background: "linear-gradient(135deg,#18181b 0%,#09090b 100%)" },
   "Dark Brown":  { background: "linear-gradient(135deg,#3b1f0a 0%,#1c0f05 100%)" },
@@ -76,6 +142,36 @@ const eyePlaceholderStyle: Record<string, React.CSSProperties> = {
   Gray:  { background: "linear-gradient(135deg,#71717a 0%,#3f3f46 100%)" },
   Amber: { background: "linear-gradient(135deg,#f59e0b 0%,#b45309 100%)" },
 };
+
+const genderPlaceholderStyle: Record<string, React.CSSProperties> =
+  Object.fromEntries(personaGenders.map((value) => [value, neutralCardStyle(`gender-${value}`)]));
+
+const hairStylePlaceholderStyle: Record<string, React.CSSProperties> =
+  Object.fromEntries(hairStyles.map((value) => [value, neutralCardStyle(`hair-style-${value}`)]));
+
+const bodyTypePlaceholderStyle: Record<string, React.CSSProperties> =
+  Object.fromEntries(personaBodyTypes.map((value) => [value, neutralCardStyle(`body-type-${value}`)]));
+
+const clothingPlaceholderStyle: Record<string, React.CSSProperties> =
+  Object.fromEntries(clothingStyles.map((value) => [value, neutralCardStyle(`clothing-${value}`)]));
+
+const accessoriesPlaceholderStyle: Record<string, React.CSSProperties> =
+  Object.fromEntries(accessoryOptions.map((value) => [value, neutralCardStyle(`accessory-${value}`)]));
+
+const genderImageSrc: Record<string, string> =
+  Object.fromEntries(personaGenders.map((value) => [value, optionImageDataUri(`gender-${value}`)]));
+
+const hairStyleImageSrc: Record<string, string> =
+  Object.fromEntries(hairStyles.map((value) => [value, optionImageDataUri(`hair-style-${value}`)]));
+
+const bodyTypeImageSrc: Record<string, string> =
+  Object.fromEntries(personaBodyTypes.map((value) => [value, optionImageDataUri(`body-type-${value}`)]));
+
+const clothingImageSrc: Record<string, string> =
+  Object.fromEntries(clothingStyles.map((value) => [value, optionImageDataUri(`clothing-${value}`)]));
+
+const accessoriesImageSrc: Record<string, string> =
+  Object.fromEntries(accessoryOptions.map((value) => [value, optionImageDataUri(`accessory-${value}`)]));
 
 // ── Shared sub-components ───────────────────────────────────────────────────
 
@@ -122,12 +218,14 @@ function ImageCard({
   label,
   selected,
   onClick,
+  imageSrc,
   placeholderStyle,
   aspect = "aspect-[3/4]",
 }: {
   label: string;
   selected: boolean;
   onClick: () => void;
+  imageSrc?: string;
   placeholderStyle?: React.CSSProperties;
   aspect?: string;
 }) {
@@ -144,6 +242,14 @@ function ImageCard({
       )}
     >
       <div className="absolute inset-0 bg-muted" style={placeholderStyle} />
+      {imageSrc && (
+        <img
+          src={imageSrc}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      )}
       <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/70 to-transparent" />
       <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5">
         {selected && (
@@ -306,6 +412,8 @@ export default function NewPersonaPage() {
                     label={genderLabels[g]}
                     selected={store.gender === g}
                     onClick={() => store.setField("gender", g)}
+                    imageSrc={genderImageSrc[g]}
+                    placeholderStyle={genderPlaceholderStyle[g]}
                   />
                 ))}
               </div>
@@ -370,6 +478,8 @@ export default function NewPersonaPage() {
                     label={style}
                     selected={store.hairStyle === style}
                     onClick={() => store.setField("hairStyle", style)}
+                    imageSrc={hairStyleImageSrc[style]}
+                    placeholderStyle={hairStylePlaceholderStyle[style]}
                   />
                 ))}
               </div>
@@ -395,11 +505,14 @@ export default function NewPersonaPage() {
             <Section icon={<User className="size-4" />} label="Body Type" count={1}>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                 {personaBodyTypes.map((type) => (
-                  <TextCard
+                  <ImageCard
                     key={type}
                     label={bodyTypeLabels[type]}
                     selected={store.bodyType === type}
                     onClick={() => store.setField("bodyType", type)}
+                    imageSrc={bodyTypeImageSrc[type]}
+                    placeholderStyle={bodyTypePlaceholderStyle[type]}
+                    aspect="aspect-[4/5]"
                   />
                 ))}
               </div>
@@ -414,6 +527,8 @@ export default function NewPersonaPage() {
                     label={style}
                     selected={store.clothingStyle === style}
                     onClick={() => store.setField("clothingStyle", style)}
+                    imageSrc={clothingImageSrc[style]}
+                    placeholderStyle={clothingPlaceholderStyle[style]}
                   />
                 ))}
               </div>
@@ -426,24 +541,19 @@ export default function NewPersonaPage() {
               count={store.accessories.length}
             >
               <p className="mb-2 text-xs text-muted-foreground">Select up to 5</p>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {accessoryOptions.map((acc) => {
                   const isSelected = store.accessories.includes(acc);
                   return (
-                    <button
+                    <ImageCard
                       key={acc}
-                      type="button"
+                      label={acc}
+                      selected={isSelected}
                       onClick={() => store.toggleAccessory(acc)}
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
-                        isSelected
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
-                      )}
-                    >
-                      {isSelected && <Check className="mr-1 inline size-3" strokeWidth={3} />}
-                      {acc}
-                    </button>
+                      imageSrc={accessoriesImageSrc[acc]}
+                      placeholderStyle={accessoriesPlaceholderStyle[acc]}
+                      aspect="aspect-square"
+                    />
                   );
                 })}
               </div>

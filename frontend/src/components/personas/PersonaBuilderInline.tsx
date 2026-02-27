@@ -84,6 +84,40 @@ function neutralCardStyle(key: string): React.CSSProperties {
   };
 }
 
+function optionImageDataUri(key: string) {
+  const seed = hashString(key);
+  const palettes = [
+    ['#f8fafc', '#e2e8f0', '#cbd5e1'],
+    ['#fafaf9', '#e7e5e4', '#d6d3d1'],
+    ['#f5f5f4', '#e7e5e4', '#d4d4d4'],
+    ['#f4f4f5', '#e4e4e7', '#d4d4d8'],
+  ] as const;
+  const [bg1, bg2, bg3] = palettes[seed % palettes.length];
+  const wave = 240 + (seed % 60);
+  const eye = 188 + (seed % 18);
+
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${bg1}"/>
+      <stop offset="60%" stop-color="${bg2}"/>
+      <stop offset="100%" stop-color="${bg3}"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="1000" fill="url(#bg)"/>
+  <circle cx="400" cy="315" r="${wave}" fill="${bg2}" opacity="0.28"/>
+  <circle cx="400" cy="275" r="115" fill="#ffffff" opacity="0.8"/>
+  <rect x="245" y="420" width="310" height="380" rx="150" fill="#ffffff" opacity="0.82"/>
+  <circle cx="355" cy="${eye}" r="5.5" fill="#9ca3af"/>
+  <circle cx="445" cy="${eye}" r="5.5" fill="#9ca3af"/>
+  <rect x="356" y="232" width="88" height="6" rx="3" fill="#9ca3af" opacity="0.65"/>
+  <rect x="318" y="744" width="164" height="12" rx="6" fill="#9ca3af" opacity="0.4"/>
+</svg>`;
+
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 // Color-tinted placeholder gradients for hair/eye options.
 // Swap the placeholder <div> for <Image fill .../> per option when photos are ready.
 const hairPlaceholderStyle: Record<string, React.CSSProperties> = {
@@ -122,6 +156,21 @@ const clothingPlaceholderStyle: Record<string, React.CSSProperties> =
 
 const accessoriesPlaceholderStyle: Record<string, React.CSSProperties> =
   Object.fromEntries(accessoryOptions.map((value) => [value, neutralCardStyle(`accessory-${value}`)]));
+
+const genderImageSrc: Record<string, string> =
+  Object.fromEntries(personaGenders.map((value) => [value, optionImageDataUri(`gender-${value}`)]));
+
+const hairStyleImageSrc: Record<string, string> =
+  Object.fromEntries(hairStyles.map((value) => [value, optionImageDataUri(`hair-style-${value}`)]));
+
+const bodyTypeImageSrc: Record<string, string> =
+  Object.fromEntries(personaBodyTypes.map((value) => [value, optionImageDataUri(`body-type-${value}`)]));
+
+const clothingImageSrc: Record<string, string> =
+  Object.fromEntries(clothingStyles.map((value) => [value, optionImageDataUri(`clothing-${value}`)]));
+
+const accessoriesImageSrc: Record<string, string> =
+  Object.fromEntries(accessoryOptions.map((value) => [value, optionImageDataUri(`accessory-${value}`)]));
 
 // ── Shared sub-components ───────────────────────────────────────────────────
 
@@ -169,12 +218,14 @@ function ImageCard({
   label,
   selected,
   onClick,
+  imageSrc,
   placeholderStyle,
   aspect = 'aspect-[3/4]',
 }: {
   label: string;
   selected: boolean;
   onClick: () => void;
+  imageSrc?: string;
   placeholderStyle?: React.CSSProperties;
   aspect?: string;
 }) {
@@ -190,11 +241,15 @@ function ImageCard({
           : 'ring-1 ring-border hover:ring-primary/40',
       )}
     >
-      {/* Placeholder, swap with <Image fill .../> per option when photo is ready */}
-      <div
-        className="absolute inset-0 bg-muted"
-        style={placeholderStyle}
-      />
+      <div className="absolute inset-0 bg-muted" style={placeholderStyle} />
+      {imageSrc && (
+        <img
+          src={imageSrc}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      )}
 
       {/* Bottom gradient for label legibility */}
       <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/70 to-transparent" />
@@ -351,6 +406,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     label={genderLabels[g]}
                     selected={store.gender === g}
                     onClick={() => store.setField('gender', g)}
+                    imageSrc={genderImageSrc[g]}
                     placeholderStyle={genderPlaceholderStyle[g]}
                   />
                 ))}
@@ -416,6 +472,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     label={style}
                     selected={store.hairStyle === style}
                     onClick={() => store.setField('hairStyle', style)}
+                    imageSrc={hairStyleImageSrc[style]}
                     placeholderStyle={hairStylePlaceholderStyle[style]}
                   />
                 ))}
@@ -447,6 +504,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     label={bodyTypeLabels[type]}
                     selected={store.bodyType === type}
                     onClick={() => store.setField('bodyType', type)}
+                    imageSrc={bodyTypeImageSrc[type]}
                     placeholderStyle={bodyTypePlaceholderStyle[type]}
                     aspect="aspect-[4/5]"
                   />
@@ -463,6 +521,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     label={style}
                     selected={store.clothingStyle === style}
                     onClick={() => store.setField('clothingStyle', style)}
+                    imageSrc={clothingImageSrc[style]}
                     placeholderStyle={clothingPlaceholderStyle[style]}
                   />
                 ))}
@@ -485,6 +544,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                       label={acc}
                       selected={isSelected}
                       onClick={() => store.toggleAccessory(acc)}
+                      imageSrc={accessoriesImageSrc[acc]}
                       placeholderStyle={accessoriesPlaceholderStyle[acc]}
                       aspect="aspect-square"
                     />
