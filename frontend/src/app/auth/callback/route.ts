@@ -16,6 +16,10 @@ export async function GET(request: Request) {
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`);
     }
+    // PKCE code exchange failed (code_verifier missing — e.g. link opened in
+    // a different browser than where signup was initiated). Fall through so
+    // the user can still sign in manually.
+    console.error("PKCE code exchange failed:", error?.message);
   }
 
   // OTP / token hash flow (email confirmation, magic link, recovery)
@@ -24,6 +28,15 @@ export async function GET(request: Request) {
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`);
     }
+    console.error("OTP verify failed:", error?.message);
+  }
+
+  // If this was a signup confirmation that failed PKCE (cross-browser link open),
+  // redirect to login with a helpful message rather than a generic error.
+  if (type === "signup" || searchParams.get("type") === "signup") {
+    return NextResponse.redirect(
+      `${origin}/login?message=Email+confirmed.+Please+sign+in.`
+    );
   }
 
   return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
