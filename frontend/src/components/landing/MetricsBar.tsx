@@ -1,36 +1,58 @@
 "use client";
 
-import { CountUp, FadeInUp } from "@/lib/motion";
+const logoNames = [
+  "zumper",
+  "kit.sch",
+  "drift",
+  "SCENTBIRD",
+  "BOMBAS",
+  "MaryRuth's",
+  "BIOMA",
+  "ELEVATE",
+  "BINANCE",
+  "Weee!",
+  "COMCAST",
+  "APPLOVIN",
+  "Alibaba.com",
+  "ByteDance",
+];
 
 const metrics = [
-  { value: 500, suffix: "+", label: "Brands", sub: "trust us" },
-  { value: 10000, suffix: "+", label: "Videos", sub: "generated" },
-  { value: 10, suffix: " min", label: "Per Video", sub: "avg. turnaround" },
-  { value: 27, suffix: "", label: "Combos", sub: "per batch" },
+  { value: "20M+", label: "Ads analyzed" },
+  { value: "10M+", label: "Ads created" },
+  { value: "$650M+", label: "Ad spend" },
 ];
 
 export function MetricsBar() {
   return (
-    <section className="bg-black py-20 border-y border-[#111]">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-0">
-          {metrics.map((m, i) => (
-            <FadeInUp key={m.label} delay={i * 0.1}>
+    <section className="bg-black pb-16 pt-8 md:pb-24 md:pt-10">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <p className="text-center text-[clamp(1.25rem,2.2vw,2rem)] font-medium tracking-tight text-white">
+          Trusted by growing ecommerce brands and performance teams
+        </p>
+
+        <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-5 md:mt-10 md:grid-cols-7 md:gap-y-7">
+          {logoNames.map((name) => (
+            <div key={name} className="text-center text-sm font-semibold tracking-wide text-[#888] md:text-base">
+              {name}
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-10 overflow-hidden rounded-3xl border border-[#1f1f1f] bg-[#0f0f0f] shadow-[0_14px_36px_rgba(0,0,0,0.3)] md:mt-14">
+          <div className="grid md:grid-cols-3">
+            {metrics.map((m, i) => (
               <div
-                className={`flex flex-col items-center py-6 ${
-                  i % 2 !== 0 ? "border-l border-[#1a1a1a]" : ""
-                } ${i >= 2 ? "border-t md:border-t-0 border-[#1a1a1a]" : ""} ${
-                  i > 0 ? "md:border-l" : ""
+                key={m.label}
+                className={`px-6 py-10 text-center md:px-8 md:py-12 ${
+                  i > 0 ? "border-t border-[#1f1f1f] md:border-l md:border-t-0" : ""
                 }`}
               >
-                <div className="text-5xl font-bold font-mono text-white tabular-nums">
-                  <CountUp target={m.value} suffix={m.suffix} />
-                </div>
-                <p className="text-sm font-medium text-white mt-1">{m.label}</p>
-                <p className="text-xs text-[#555] mt-0.5">{m.sub}</p>
+                <p className="text-5xl font-semibold tracking-tight text-primary md:text-6xl">{m.value}</p>
+                <p className="mt-3 text-[clamp(1rem,1.9vw,1.9rem)] text-[#cfcfcf]">{m.label}</p>
               </div>
-            </FadeInUp>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </section>
