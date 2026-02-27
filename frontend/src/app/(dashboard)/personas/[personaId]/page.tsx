@@ -177,7 +177,7 @@ export default function PersonaDetailPage() {
               <ArrowLeft className="size-4" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          <h1 className="text-2xl font-bold tracking-tight">
             Persona not found
           </h1>
         </div>
@@ -210,7 +210,7 @@ export default function PersonaDetailPage() {
               <ArrowLeft className="size-4" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          <h1 className="text-2xl font-bold tracking-tight">
             {persona.name}
           </h1>
         </div>
@@ -249,9 +249,9 @@ export default function PersonaDetailPage() {
             </DialogContent>
           </Dialog>
 
-          <Button variant="outline" size="sm" onClick={handleEditRegenerate}>
+          <Button variant="secondary" size="sm" onClick={handleEditRegenerate}>
             <Pencil className="size-4" />
-            Edit &amp; Regenerate
+            Edit & Regenerate
           </Button>
         </div>
       </div>
@@ -259,7 +259,7 @@ export default function PersonaDetailPage() {
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         {/* Persona Image */}
         <Card>
-          <CardContent className="flex flex-col items-center gap-4">
+          <CardContent className="flex flex-col items-center gap-4 p-6">
             <div className="flex size-48 items-center justify-center rounded-xl bg-muted">
               {resolvedImage ? (
                 <img
@@ -272,9 +272,7 @@ export default function PersonaDetailPage() {
               )}
             </div>
             <div className="text-center">
-              <h2 className="text-lg font-semibold text-foreground">
-                {persona.name}
-              </h2>
+              <h2 className="text-lg font-semibold">{persona.name}</h2>
               <p className="text-sm text-muted-foreground">
                 Created {formatDate(persona.created_at)}
               </p>
@@ -298,7 +296,7 @@ export default function PersonaDetailPage() {
           {/* Attributes */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-foreground">Attributes</CardTitle>
+              <CardTitle>Attributes</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
@@ -309,7 +307,7 @@ export default function PersonaDetailPage() {
                     className="gap-1.5 px-3 py-1.5 text-sm"
                   >
                     <span className="text-muted-foreground">{attr.label}:</span>
-                    <span className="text-foreground">{attr.value}</span>
+                    <span>{attr.value}</span>
                   </Badge>
                 ))}
               </div>
@@ -335,7 +333,7 @@ export default function PersonaDetailPage() {
 
           {/* Generations using this persona */}
           <div className="flex flex-col gap-4">
-            <h3 className="text-lg font-semibold text-foreground">
+            <h3 className="text-lg font-semibold">
               Generations using this persona
             </h3>
 
@@ -366,14 +364,14 @@ export default function PersonaDetailPage() {
                     href={`/generate/${gen.id}`}
                     className="group"
                   >
-                    <Card className="transition-colors hover:border-violet-500/30">
-                      <CardContent className="flex items-center justify-between">
+                    <Card className="transition-colors hover:border-primary/30">
+                      <CardContent className="flex items-center justify-between p-4">
                         <div className="flex items-center gap-3">
-                          <div className="flex size-9 items-center justify-center rounded-lg bg-violet-500/10">
-                            <Video className="size-4 text-violet-500" />
+                          <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
+                            <Video className="size-4 text-primary" />
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-foreground">
+                            <p className="text-sm font-medium">
                               {gen.products?.name ?? "Unknown Product"}
                             </p>
                             <p className="text-xs capitalize text-muted-foreground">
@@ -400,11 +398,7 @@ export default function PersonaDetailPage() {
                     <p className="text-sm text-muted-foreground">
                       No generations yet with this persona.
                     </p>
-                    <Button
-                      asChild
-                      size="sm"
-                      className="bg-violet-600 hover:bg-violet-700"
-                    >
+                    <Button asChild size="sm">
                       <Link href="/generate">
                         <Sparkles className="size-4" />
                         Generate Video

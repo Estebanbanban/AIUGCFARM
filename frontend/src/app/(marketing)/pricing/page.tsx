@@ -21,10 +21,10 @@ const comparisonRows = [
 
 function CellValue({ value }: { value: string | boolean }) {
   if (typeof value === "string") {
-    return <span className="text-sm text-zinc-300">{value}</span>;
+    return <span className="text-sm text-muted-foreground">{value}</span>;
   }
   if (value) {
-    return <Check className="mx-auto size-4 text-violet-400" />;
+    return <Check className="mx-auto size-4 text-primary" />;
   }
   return <X className="mx-auto size-4 text-zinc-600" />;
 }
@@ -37,35 +37,35 @@ export default function PricingPage() {
       {/* Comparison table */}
       <section className="pb-20 md:pb-32">
         <div className="mx-auto max-w-4xl px-4 sm:px-6">
-          <h3 className="mb-8 text-center text-xl font-semibold text-white">
+          <h3 className="mb-8 text-center text-xl font-semibold text-foreground">
             Feature Comparison
           </h3>
 
-          <div className="overflow-hidden rounded-xl border border-white/5">
+          <div className="overflow-hidden rounded-xl border border-border">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-white/5 bg-zinc-900/50">
-                  <th className="px-6 py-4 text-left text-sm font-medium text-zinc-400">
+                <tr className="border-b border-border bg-muted/50">
+                  <th className="px-6 py-4 text-left text-sm font-medium text-muted-foreground">
                     Feature
                   </th>
-                  <th className="px-6 py-4 text-center text-sm font-medium text-zinc-400">
+                  <th className="px-6 py-4 text-center text-sm font-medium text-muted-foreground">
                     Starter
                   </th>
-                  <th className="px-6 py-4 text-center text-sm font-medium text-violet-400">
+                  <th className="px-6 py-4 text-center text-sm font-medium text-primary">
                     Growth
                   </th>
-                  <th className="px-6 py-4 text-center text-sm font-medium text-zinc-400">
+                  <th className="px-6 py-4 text-center text-sm font-medium text-muted-foreground">
                     Scale
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-border">
                 {comparisonRows.map((row) => (
                   <tr
                     key={row.feature}
-                    className="transition-colors hover:bg-zinc-900/30"
+                    className="transition-colors hover:bg-muted/30"
                   >
-                    <td className="px-6 py-4 text-sm text-zinc-300">
+                    <td className="px-6 py-4 text-sm text-muted-foreground">
                       {row.feature}
                     </td>
                     <td className="px-6 py-4 text-center">

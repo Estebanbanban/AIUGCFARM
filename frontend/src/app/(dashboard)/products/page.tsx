@@ -68,7 +68,6 @@ export default function ProductsPage() {
 
     try {
       const result = await scrapeProduct.mutateAsync({ url: importUrl.trim() });
-      // Map scraped products to Product shape for ScrapeResults
       const scraped: Product[] = result.products
         .filter((p) => p.id != null)
         .map((p) => ({
@@ -130,9 +129,7 @@ export default function ProductsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Products
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight">Products</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {isLoading ? (
               <Skeleton className="inline-block h-4 w-32" />
@@ -141,13 +138,16 @@ export default function ProductsPage() {
             )}
           </p>
         </div>
-        <Button
-          className="bg-violet-600 hover:bg-violet-700"
-          onClick={() => setShowImportDialog(true)}
-        >
-          <Plus className="size-4" />
-          Import Product
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => setShowImportDialog(true)}>
+            <LinkIcon className="size-4" />
+            Import Product
+          </Button>
+          <Button>
+            <Plus className="size-4" />
+            Add Manually
+          </Button>
+        </div>
       </div>
 
       {/* Error state */}
@@ -192,23 +192,18 @@ export default function ProductsPage() {
       {!isLoading && !error && !hasProducts && (
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-12">
-            <div className="flex size-14 items-center justify-center rounded-full bg-violet-500/10">
-              <Package className="size-7 text-violet-500" />
+            <div className="flex size-14 items-center justify-center rounded-full bg-primary/10">
+              <Package className="size-7 text-primary" />
             </div>
             <div className="text-center">
-              <h3 className="font-semibold text-foreground">
-                No products yet
-              </h3>
+              <h3 className="font-semibold">No products yet</h3>
               <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                 Import products from your store or upload them manually to get
                 started with video generation.
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <Button
-                className="bg-violet-600 hover:bg-violet-700"
-                onClick={() => setShowImportDialog(true)}
-              >
+              <Button onClick={() => setShowImportDialog(true)}>
                 <LinkIcon className="size-4" />
                 Import from Store
               </Button>
@@ -288,7 +283,6 @@ export default function ProductsPage() {
                     <Button
                       onClick={handleScrape}
                       disabled={!importUrl.trim() || scrapeProduct.isPending}
-                      className="bg-violet-600 hover:bg-violet-700"
                     >
                       {scrapeProduct.isPending ? (
                         <>
@@ -317,10 +311,6 @@ export default function ProductsPage() {
   );
 }
 
-/**
- * Wrapper component that manages the delete mutation per product.
- * Needed because useDeleteProduct requires a product ID at hook call time.
- */
 function DeleteProductWrapper({ product }: { product: Product }) {
   const deleteProduct = useDeleteProduct(product.id);
 

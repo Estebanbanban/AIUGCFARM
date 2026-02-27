@@ -9,6 +9,7 @@ import {
   ArrowUpRight,
   CreditCard,
   Loader2,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
 import { PLANS } from "@/lib/stripe";
 import { useCredits } from "@/hooks/use-credits";
@@ -37,11 +39,35 @@ import { useProfile } from "@/hooks/use-profile";
 import { useSubscription, useCreditLedger } from "@/hooks/use-billing";
 import { useBillingPortal } from "@/hooks/use-checkout";
 
+const plans = [
+  {
+    name: "Starter",
+    price: "$29/mo",
+    credits: 27,
+    features: ["27 credits/month", "3 persona slots", "Basic support"],
+    current: false,
+  },
+  {
+    name: "Growth",
+    price: "$79/mo",
+    credits: 90,
+    features: ["90 credits/month", "10 persona slots", "Priority support"],
+    current: true,
+  },
+  {
+    name: "Scale",
+    price: "$149/mo",
+    credits: 300,
+    features: ["300 credits/month", "Unlimited personas", "Dedicated support"],
+    current: false,
+  },
+];
+
 const reasonLabels: Record<string, { label: string; color: string }> = {
   generation: { label: "Generation", color: "text-red-400" },
   subscription_renewal: { label: "Credit Grant", color: "text-emerald-400" },
-  refund: { label: "Refund", color: "text-blue-400" },
-  bonus: { label: "Bonus", color: "text-violet-400" },
+  refund: { label: "Refund", color: "text-primary" },
+  bonus: { label: "Bonus", color: "text-primary" },
   free_trial: { label: "Free Trial", color: "text-amber-400" },
 };
 
@@ -119,7 +145,7 @@ export default function BillingPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          <h1 className="text-2xl font-bold tracking-tight">
             Billing & Subscription
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
@@ -133,7 +159,7 @@ export default function BillingPage() {
         <CardHeader>
           <div className="flex items-start justify-between">
             <div>
-              <CardTitle className="text-foreground">Current Plan</CardTitle>
+              <CardTitle>Current Plan</CardTitle>
               <CardDescription>
                 {subscription?.current_period_end
                   ? `Next billing date: ${formatDate(subscription.current_period_end)}`
@@ -152,8 +178,8 @@ export default function BillingPage() {
         <CardContent className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex size-12 items-center justify-center rounded-xl bg-violet-500/10">
-                <CreditCard className="size-6 text-violet-500" />
+              <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10">
+                <CreditCard className="size-6 text-primary" />
               </div>
               <div>
                 <p className="text-lg font-bold text-foreground">
@@ -182,7 +208,7 @@ export default function BillingPage() {
                   )}
                 </Button>
               ) : (
-                <Button asChild size="sm" className="bg-violet-600 hover:bg-violet-700">
+                <Button asChild size="sm">
                   <Link href="/pricing">Choose a Plan</Link>
                 </Button>
               )}
@@ -194,7 +220,7 @@ export default function BillingPage() {
       {/* Credit Usage */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-foreground">Credit Usage</CardTitle>
+          <CardTitle>Credit Usage</CardTitle>
           <CardDescription>
             {creditsRemaining} of {creditsTotal} credits remaining this month
           </CardDescription>
@@ -202,7 +228,7 @@ export default function BillingPage() {
         <CardContent className="flex flex-col gap-3">
           <Progress
             value={creditPercent}
-            className="h-3 bg-muted [&>[data-slot=progress-indicator]]:bg-violet-500"
+            className="h-3 bg-muted [&>[data-slot=progress-indicator]]:bg-primary"
           />
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
@@ -212,6 +238,51 @@ export default function BillingPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Plan Comparison */}
+      <div className="flex flex-col gap-4">
+        <h2 className="text-lg font-semibold">Available Plans</h2>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {plans.map((p) => (
+            <Card
+              key={p.name}
+              className={cn(
+                p.current && "border-primary/50 ring-1 ring-primary/20"
+              )}
+            >
+              <CardContent className="flex flex-col gap-4 p-5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold">{p.name}</h3>
+                    {p.current && (
+                      <Badge variant="secondary" className="text-xs">
+                        Current
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="mt-1 text-2xl font-bold">{p.price}</p>
+                </div>
+                <ul className="flex flex-col gap-2">
+                  {p.features.map((feature) => (
+                    <li
+                      key={feature}
+                      className="flex items-center gap-2 text-sm text-muted-foreground"
+                    >
+                      <Check className="size-3.5 text-primary" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                {!p.current && (
+                  <Button variant="secondary" size="sm" className="mt-auto">
+                    Switch to {p.name}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
 
       {/* Cancel Subscription */}
       {subscription && subscription.status === "active" && (
@@ -239,9 +310,7 @@ export default function BillingPage() {
 
       {/* Credit History */}
       <div className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold text-foreground">
-          Credit History
-        </h2>
+        <h2 className="text-lg font-semibold">Credit History</h2>
 
         <Card>
           <CardContent className="p-0">
@@ -320,7 +389,7 @@ export default function BillingPage() {
           </DialogHeader>
           <DialogFooter>
             <Button
-              variant="outline"
+              variant="secondary"
               onClick={() => setShowCancelDialog(false)}
             >
               Keep Plan

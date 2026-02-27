@@ -80,9 +80,7 @@ export default function PersonasPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            AI Personas
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight">AI Personas</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {isLoading ? (
               <Skeleton className="inline-block h-4 w-32" />
@@ -92,18 +90,15 @@ export default function PersonasPage() {
           </p>
         </div>
         {atLimit ? (
-          <Button className="bg-violet-600 hover:bg-violet-700" disabled>
+          <Button disabled>
             <Plus className="size-4" />
-            Create New Persona
+            Create Persona
           </Button>
         ) : (
-          <Button
-            asChild
-            className="bg-violet-600 hover:bg-violet-700"
-          >
+          <Button asChild>
             <Link href="/personas/new">
               <Plus className="size-4" />
-              Create New Persona
+              Create Persona
             </Link>
           </Button>
         )}
@@ -142,8 +137,8 @@ export default function PersonasPage() {
                 href={`/personas/${persona.id}`}
                 className="group"
               >
-                <Card className="h-full transition-colors hover:border-violet-500/30">
-                  <CardContent className="flex flex-col items-center gap-4">
+                <Card className="h-full transition-colors hover:border-primary/30">
+                  <CardContent className="flex flex-col items-center gap-4 p-6">
                     {/* Avatar / Image */}
                     <div className="flex size-24 items-center justify-center rounded-full bg-muted">
                       {resolvedUrl ? (
@@ -159,7 +154,7 @@ export default function PersonasPage() {
 
                     {/* Name & Info */}
                     <div className="text-center">
-                      <h3 className="text-lg font-semibold text-foreground">
+                      <h3 className="text-lg font-semibold">
                         {persona.name}
                       </h3>
                       <p className="mt-0.5 text-sm text-muted-foreground">
@@ -197,19 +192,17 @@ export default function PersonasPage() {
       {!isLoading && !personasError && !hasPersonas && (
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-12">
-            <div className="flex size-14 items-center justify-center rounded-full bg-violet-500/10">
-              <Users className="size-7 text-violet-500" />
+            <div className="flex size-14 items-center justify-center rounded-full bg-primary/10">
+              <Users className="size-7 text-primary" />
             </div>
             <div className="text-center">
-              <h3 className="font-semibold text-foreground">
-                Create your first AI persona
-              </h3>
+              <h3 className="font-semibold">Create your first AI persona</h3>
               <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                 Build a custom AI avatar to star in your UGC video ads.
                 Customize appearance, style, and more.
               </p>
             </div>
-            <Button asChild className="bg-violet-600 hover:bg-violet-700">
+            <Button asChild>
               <Link href="/personas/new">
                 <Plus className="size-4" />
                 Create Persona
