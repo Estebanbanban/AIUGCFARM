@@ -11,8 +11,17 @@ const NANOBANANA_API_KEY = Deno.env.get("NANOBANANA_API_KEY")!;
 const NANOBANANA_BASE_URL =
   Deno.env.get("NANOBANANA_BASE_URL") || "https://api.nanobanana.com/v1";
 
-const SINGLE_COST = 3; // 1 hook + 1 body + 1 CTA
-const BATCH_COST = 9;  // 3 hooks + 3 bodies + 3 CTAs
+// Credits per segment set — HD (kling-v3) costs 2× standard (kling-v2-6)
+const COSTS = {
+  standard: { single: 3, batch: 9 },
+  hd:       { single: 6, batch: 18 },
+} as const;
+
+// Kling model name per quality tier
+const KLING_MODEL = {
+  standard: "kling-v2-6",
+  hd: "kling-v3",
+} as const;
 
 // ── Script types ──────────────────────────────────────────────────────
 
@@ -185,7 +194,7 @@ Deno.serve(async (req: Request) => {
 
     // ── 1. Validate input ──────────────────────────────────────────
 
-    const { product_id, persona_id, mode } = await req.json();
+    const { product_id, persona_id, mode, quality } = await req.json();
 
     if (!product_id) return json({ detail: "product_id is required" }, cors, 400);
     if (!persona_id) return json({ detail: "persona_id is required" }, cors, 400);
@@ -194,8 +203,17 @@ Deno.serve(async (req: Request) => {
     if (resolvedMode !== "single" && resolvedMode !== "triple") {
       return json({ detail: "mode must be 'single' or 'triple'" }, cors, 400);
     }
+
+    const resolvedQuality = quality || "standard";
+    if (resolvedQuality !== "standard" && resolvedQuality !== "hd") {
+      return json({ detail: "quality must be 'standard' or 'hd'" }, cors, 400);
+    }
+
     const variantCount = resolvedMode === "single" ? 1 : 3;
-    const creditCost = resolvedMode === "single" ? SINGLE_COST : BATCH_COST;
+    const creditCost = resolvedMode === "single"
+      ? COSTS[resolvedQuality as keyof typeof COSTS].single
+      : COSTS[resolvedQuality as keyof typeof COSTS].batch;
+    const klingModel = KLING_MODEL[resolvedQuality as keyof typeof KLING_MODEL];
 
     // ── 2. Verify product ownership (confirmed = true) ────────────
 
@@ -253,6 +271,7 @@ Deno.serve(async (req: Request) => {
         product_id,
         persona_id,
         mode: resolvedMode,
+        video_quality: resolvedQuality,
         status: "scripting",
         started_at: new Date().toISOString(),
       })
@@ -389,6 +408,7 @@ Deno.serve(async (req: Request) => {
               script: segment.text,
               duration: segment.duration_seconds,
               mode: "std",
+              model_name: klingModel,
             })
           ).then((result) => [jobKey, result.job_id] as [string, string]);
         })

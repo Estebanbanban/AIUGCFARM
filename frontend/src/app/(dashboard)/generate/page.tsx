@@ -18,7 +18,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { PLANS, CREDITS_PER_SINGLE, CREDITS_PER_BATCH, type PlanTier } from "@/lib/stripe";
+import {
+  PLANS,
+  CREDITS_PER_SINGLE,
+  CREDITS_PER_BATCH,
+  CREDITS_PER_SINGLE_HD,
+  CREDITS_PER_BATCH_HD,
+  type PlanTier,
+} from "@/lib/stripe";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -95,7 +102,9 @@ export default function GeneratePage() {
   const selectedPersona = activePersonas.find((p) => p.id === store.personaId);
 
   const creditsRemaining = credits?.remaining ?? 0;
-  const creditCost = store.mode === "single" ? CREDITS_PER_SINGLE : CREDITS_PER_BATCH;
+  const creditCost = store.quality === "hd"
+    ? (store.mode === "single" ? CREDITS_PER_SINGLE_HD : CREDITS_PER_BATCH_HD)
+    : (store.mode === "single" ? CREDITS_PER_SINGLE : CREDITS_PER_BATCH);
   const hasEnoughCredits = creditsRemaining >= creditCost;
 
   function handleNext() {
@@ -134,6 +143,7 @@ export default function GeneratePage() {
         product_id: store.productId,
         persona_id: store.personaId,
         mode: store.mode,
+        quality: store.quality,
       },
       {
         onSuccess: (result) => {
@@ -469,6 +479,44 @@ export default function GeneratePage() {
                         <p className="mt-1 text-xs text-muted-foreground">
                           3 hooks · 3 bodies · 3 CTAs
                         </p>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Quality toggle */}
+                  <div>
+                    <p className="mb-2 text-sm text-muted-foreground">
+                      Video quality
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => store.setQuality("standard")}
+                        className={cn(
+                          "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
+                          store.quality === "standard"
+                            ? "border-violet-500 bg-violet-500/5 ring-1 ring-violet-500/30"
+                            : "border-border hover:border-muted-foreground/30"
+                        )}
+                      >
+                        <p className="text-sm font-semibold text-foreground">Standard</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">720p · kling-v2-6</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => store.setQuality("hd")}
+                        className={cn(
+                          "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
+                          store.quality === "hd"
+                            ? "border-violet-500 bg-violet-500/5 ring-1 ring-violet-500/30"
+                            : "border-border hover:border-muted-foreground/30"
+                        )}
+                      >
+                        <div className="flex w-full items-center justify-between">
+                          <p className="text-sm font-semibold text-foreground">HD</p>
+                          <Badge variant="secondary" className="text-[10px]">2× credits</Badge>
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">720p · kling-v3</p>
                       </button>
                     </div>
                   </div>

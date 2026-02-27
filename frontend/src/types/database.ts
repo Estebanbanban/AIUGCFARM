@@ -139,6 +139,7 @@ export interface Generation {
   product_id: string;
   persona_id: string;
   mode: "single" | "triple";
+  video_quality: "standard" | "hd";
   status: GenerationStatus;
   script: GenerationScript | null;
   composite_image_url: string | null;
