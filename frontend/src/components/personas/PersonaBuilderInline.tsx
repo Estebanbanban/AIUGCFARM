@@ -52,6 +52,38 @@ const bodyTypeLabels: Record<string, string> = {
   plus_size: 'Plus Size',
 };
 
+function hashString(input: string) {
+  let hash = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = (hash << 5) - hash + input.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function neutralCardStyle(key: string): React.CSSProperties {
+  const palettes: Array<[string, string, string]> = [
+    ['#f5f5f4', '#e7e5e4', '#d6d3d1'],
+    ['#f8fafc', '#e2e8f0', '#cbd5e1'],
+    ['#f4f4f5', '#e4e4e7', '#d4d4d8'],
+    ['#f8fafc', '#e5e7eb', '#d1d5db'],
+    ['#f5f5f5', '#e7e5e4', '#d4d4d4'],
+    ['#fafaf9', '#e7e5e4', '#d6d3d1'],
+  ];
+
+  const idx = hashString(key) % palettes.length;
+  const [base, shade, accent] = palettes[idx];
+
+  return {
+    backgroundColor: base,
+    backgroundImage: [
+      `radial-gradient(circle at 18% 22%, ${accent}66 0%, transparent 34%)`,
+      `radial-gradient(circle at 80% 16%, ${shade}80 0%, transparent 30%)`,
+      `linear-gradient(165deg, ${base} 0%, ${shade} 62%, ${accent} 100%)`,
+    ].join(','),
+  };
+}
+
 // Color-tinted placeholder gradients for hair/eye options.
 // Swap the placeholder <div> for <Image fill .../> per option when photos are ready.
 const hairPlaceholderStyle: Record<string, React.CSSProperties> = {
@@ -75,6 +107,21 @@ const eyePlaceholderStyle: Record<string, React.CSSProperties> = {
   'Gray':  { background: 'linear-gradient(135deg,#71717a 0%,#3f3f46 100%)' },
   'Amber': { background: 'linear-gradient(135deg,#f59e0b 0%,#b45309 100%)' },
 };
+
+const genderPlaceholderStyle: Record<string, React.CSSProperties> =
+  Object.fromEntries(personaGenders.map((value) => [value, neutralCardStyle(`gender-${value}`)]));
+
+const hairStylePlaceholderStyle: Record<string, React.CSSProperties> =
+  Object.fromEntries(hairStyles.map((value) => [value, neutralCardStyle(`hair-style-${value}`)]));
+
+const bodyTypePlaceholderStyle: Record<string, React.CSSProperties> =
+  Object.fromEntries(personaBodyTypes.map((value) => [value, neutralCardStyle(`body-type-${value}`)]));
+
+const clothingPlaceholderStyle: Record<string, React.CSSProperties> =
+  Object.fromEntries(clothingStyles.map((value) => [value, neutralCardStyle(`clothing-${value}`)]));
+
+const accessoriesPlaceholderStyle: Record<string, React.CSSProperties> =
+  Object.fromEntries(accessoryOptions.map((value) => [value, neutralCardStyle(`accessory-${value}`)]));
 
 // ── Shared sub-components ───────────────────────────────────────────────────
 
@@ -304,6 +351,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     label={genderLabels[g]}
                     selected={store.gender === g}
                     onClick={() => store.setField('gender', g)}
+                    placeholderStyle={genderPlaceholderStyle[g]}
                   />
                 ))}
               </div>
@@ -368,6 +416,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     label={style}
                     selected={store.hairStyle === style}
                     onClick={() => store.setField('hairStyle', style)}
+                    placeholderStyle={hairStylePlaceholderStyle[style]}
                   />
                 ))}
               </div>
@@ -393,11 +442,13 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
             <Section icon={<User className="size-4" />} label="Body Type" count={1}>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                 {personaBodyTypes.map((type) => (
-                  <TextCard
+                  <ImageCard
                     key={type}
                     label={bodyTypeLabels[type]}
                     selected={store.bodyType === type}
                     onClick={() => store.setField('bodyType', type)}
+                    placeholderStyle={bodyTypePlaceholderStyle[type]}
+                    aspect="aspect-[4/5]"
                   />
                 ))}
               </div>
@@ -412,6 +463,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     label={style}
                     selected={store.clothingStyle === style}
                     onClick={() => store.setField('clothingStyle', style)}
+                    placeholderStyle={clothingPlaceholderStyle[style]}
                   />
                 ))}
               </div>
@@ -424,24 +476,18 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
               count={store.accessories.length}
             >
               <p className="mb-2 text-xs text-muted-foreground">Select up to 5</p>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {accessoryOptions.map((acc) => {
                   const isSelected = store.accessories.includes(acc);
                   return (
-                    <button
+                    <ImageCard
                       key={acc}
-                      type="button"
+                      label={acc}
+                      selected={isSelected}
                       onClick={() => store.toggleAccessory(acc)}
-                      className={cn(
-                        'rounded-full border px-3 py-1.5 text-xs font-medium transition-all',
-                        isSelected
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground',
-                      )}
-                    >
-                      {isSelected && <Check className="mr-1 inline size-3" strokeWidth={3} />}
-                      {acc}
-                    </button>
+                      placeholderStyle={accessoriesPlaceholderStyle[acc]}
+                      aspect="aspect-square"
+                    />
                   );
                 })}
               </div>
