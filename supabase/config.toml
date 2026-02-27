@@ -16,6 +16,9 @@ verify_jwt = false
 [functions.delete-account]
 verify_jwt = false
 
+[functions.edit-composite-image]
+verify_jwt = false
+
 [functions.generate-composite-images]
 verify_jwt = false
 
@@ -29,6 +32,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.persona-images]
+verify_jwt = false
+
+[functions.regenerate-segment]
 verify_jwt = false
 
 [functions.scrape-product]
