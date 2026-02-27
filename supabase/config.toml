@@ -1,0 +1,56 @@
+# Supabase project config
+# Project ref: nuodqvvgfwptnnlvmqbe
+
+[api]
+enabled = true
+
+# All functions bypass gateway JWT verification — each function
+# implements its own auth via requireUserId() or webhook signatures.
+# This prevents the Supabase gateway from incorrectly rejecting valid tokens.
+[functions.confirm-products]
+verify_jwt = false
+
+[functions.credit-balance]
+verify_jwt = false
+
+[functions.delete-account]
+verify_jwt = false
+
+[functions.generate-composite-images]
+verify_jwt = false
+
+[functions.generate-persona]
+verify_jwt = false
+
+[functions.generate-video]
+verify_jwt = false
+
+[functions.generation-history]
+verify_jwt = false
+
+[functions.persona-images]
+verify_jwt = false
+
+[functions.scrape-product]
+verify_jwt = false
+
+[functions.select-persona-image]
+verify_jwt = false
+
+[functions.send-email]
+verify_jwt = false
+
+[functions.stripe-checkout]
+verify_jwt = false
+
+[functions.stripe-portal]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.upload-product]
+verify_jwt = false
+
+[functions.video-status]
+verify_jwt = false
