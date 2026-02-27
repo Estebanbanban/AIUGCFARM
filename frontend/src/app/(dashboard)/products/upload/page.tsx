@@ -31,11 +31,11 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_FILES = 5;
 
 const CURRENCIES = [
-  { value: "USD", label: "USD - US Dollar" },
-  { value: "EUR", label: "EUR - Euro" },
-  { value: "GBP", label: "GBP - British Pound" },
-  { value: "CAD", label: "CAD - Canadian Dollar" },
-  { value: "AUD", label: "AUD - Australian Dollar" },
+  { value: "USD", label: "USD (US Dollar)" },
+  { value: "EUR", label: "EUR (Euro)" },
+  { value: "GBP", label: "GBP (British Pound)" },
+  { value: "CAD", label: "CAD (Canadian Dollar)" },
+  { value: "AUD", label: "AUD (Australian Dollar)" },
 ];
 
 async function uploadProduct(formData: FormData) {

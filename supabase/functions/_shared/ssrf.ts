@@ -53,7 +53,7 @@ export async function validateUrl(url: string): Promise<URL> {
   }
 
   if (!["http:", "https:"].includes(parsed.protocol)) {
-    throw new Error("Invalid URL scheme — only http and https are allowed");
+    throw new Error("Invalid URL scheme  -  only http and https are allowed");
   }
 
   const hostname = parsed.hostname.toLowerCase();
@@ -84,7 +84,7 @@ export async function validateUrl(url: string): Promise<URL> {
     throw new Error("URL targets an internal hostname");
   }
 
-  // DNS resolution check — catch rebinding attacks
+  // DNS resolution check  -  catch rebinding attacks
   await resolveAndValidate(hostname);
 
   return parsed;

@@ -419,7 +419,7 @@ export default function NewPersonaPage() {
               </div>
             </Section>
 
-            {/* Accessories — multi-select */}
+            {/* Accessories, multi-select */}
             <Section
               icon={<Watch className="size-4" />}
               label="Accessories"

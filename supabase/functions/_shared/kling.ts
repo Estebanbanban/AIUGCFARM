@@ -53,7 +53,7 @@ async function generateKlingToken(): Promise<string> {
 
 /**
  * Submit a video generation job to Kling AI.
- * image2video endpoint infers aspect ratio from the input image — no aspect_ratio param.
+ * image2video endpoint infers aspect ratio from the input image  -  no aspect_ratio param.
  *
  * @param model_name - "kling-v2-6" (standard, $0.042/s) or "kling-v3" (hd, $0.084/s).
  *                     Defaults to "kling-v2-6".

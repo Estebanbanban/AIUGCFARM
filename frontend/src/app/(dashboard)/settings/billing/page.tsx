@@ -146,7 +146,7 @@ export default function BillingPage() {
                 {subscription?.current_period_end
                   ? `Next billing date: ${formatDate(subscription.current_period_end)}`
                   : plan === "free"
-                    ? "Free plan — no billing"
+                    ? "Free plan, no billing"
                     : "No active subscription"}
               </CardDescription>
             </div>

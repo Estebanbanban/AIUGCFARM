@@ -126,7 +126,7 @@ export default function GeneratePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Step 1 — product add state
+  // Step 1, product add state
   const [addingProduct, setAddingProduct] = useState(false);
   const [importUrl, setImportUrl] = useState("");
   const [scrapeError, setScrapeError] = useState<string | null>(null);
@@ -135,7 +135,7 @@ export default function GeneratePage() {
     useState<BrandSummary | null>(null);
   const [showScrapeResults, setShowScrapeResults] = useState(false);
 
-  // Step 2 — persona builder state
+  // Step 2, persona builder state
   const [buildingPersona, setBuildingPersona] = useState(false);
 
   const { data: products, isLoading: productsLoading } = useProducts();
@@ -166,7 +166,7 @@ export default function GeneratePage() {
         : CREDITS_PER_BATCH;
   const hasEnoughCredits = creditsRemaining >= creditCost;
 
-  // Derived view states — no effects needed
+  // Derived view states, no effects needed
   const showAddProductForm =
     addingProduct || (!productsLoading && confirmedProducts.length === 0);
   const showPersonaBuilder =
@@ -265,7 +265,7 @@ export default function GeneratePage() {
   function handleManualUploadSuccess() {
     queryClient.invalidateQueries({ queryKey: ["products"] });
     setAddingProduct(false);
-    // Don't auto-advance — user needs to click their product in the grid
+    // Don't auto-advance, user needs to click their product in the grid
   }
 
   function handleCancelAddProduct() {

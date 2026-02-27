@@ -34,7 +34,7 @@ Generate the Executive Summary content using insights from classification (step 
 
 - ✅ You are a product-focused PM facilitator collaborating with an expert peer
 - ✅ We engage in collaborative dialogue, not command-response
-- ✅ Content is drafted collaboratively — present for review before saving
+- ✅ Content is drafted collaboratively  -  present for review before saving
 
 ### Step-Specific Rules:
 
@@ -75,10 +75,10 @@ Review all available context before drafting:
 ### 2. Draft Executive Summary Content
 
 Generate the Executive Summary section using the content structure below. Apply PRD quality standards:
-- High information density — every sentence carries weight
-- Zero fluff — no filler phrases or vague language
-- Precise and actionable — clear, specific statements
-- Dual-audience optimized — readable by humans, consumable by LLMs
+- High information density  -  every sentence carries weight
+- Zero fluff  -  no filler phrases or vague language
+- Precise and actionable  -  clear, specific statements
+- Dual-audience optimized  -  readable by humans, consumable by LLMs
 
 ### 3. Present Draft for Review
 
@@ -132,9 +132,9 @@ When user selects 'C', append the following content structure directly to the do
 ```
 
 Where:
-- `{vision_alignment_content}` — Product vision, target users, and the problem being solved. Dense, precise summary drawn from step 2b vision discovery.
-- `{product_differentiator_content}` — What makes this product unique, the core insight, and why users will choose it over alternatives. Drawn from step 2b differentiator discovery.
-- `{project_classification_content}` — Project type, domain, complexity level, and project context (greenfield/brownfield). Drawn from step 2 classification.
+- `{vision_alignment_content}`  -  Product vision, target users, and the problem being solved. Dense, precise summary drawn from step 2b vision discovery.
+- `{product_differentiator_content}`  -  What makes this product unique, the core insight, and why users will choose it over alternatives. Drawn from step 2b differentiator discovery.
+- `{project_classification_content}`  -  Project type, domain, complexity level, and project context (greenfield/brownfield). Drawn from step 2 classification.
 
 ## CRITICAL STEP COMPLETION NOTE
 
@@ -167,4 +167,4 @@ ONLY WHEN [C continue option] is selected and [content appended to document], wi
 ❌ **CRITICAL**: Proceeding with 'C' without fully reading and understanding the next step file
 ❌ **CRITICAL**: Making decisions without complete understanding of step requirements and protocols
 
-**Master Rule:** Generate high-quality Executive Summary content from discovered insights. Present for review, refine collaboratively, and only save when the user approves. This is the first substantive content in the PRD — it sets the quality bar for everything that follows.
+**Master Rule:** Generate high-quality Executive Summary content from discovered insights. Present for review, refine collaboratively, and only save when the user approves. This is the first substantive content in the PRD  -  it sets the quality bar for everything that follows.

@@ -67,21 +67,21 @@ So that **I can still auto-import products without manual entry**.
 
 ## Dev Notes
 
-- This story **modifies** `supabase/functions/scrape-product/index.ts` — do NOT create a new Edge Function
-- Deno does not include a full DOM parser. Use **regex-based extraction** for meta tags and script blocks. This is acceptable for MVP — JSON-LD is the most reliable source and regex handles `<script>` block extraction well
+- This story **modifies** `supabase/functions/scrape-product/index.ts`  -  do NOT create a new Edge Function
+- Deno does not include a full DOM parser. Use **regex-based extraction** for meta tags and script blocks. This is acceptable for MVP  -  JSON-LD is the most reliable source and regex handles `<script>` block extraction well
 - Consider importing `deno-dom` if regex becomes unmanageable, but avoid heavy dependencies
 - Keep parsing heuristics **simple** for MVP:
-  - JSON-LD is the gold standard — most modern e-commerce platforms emit it
+  - JSON-LD is the gold standard  -  most modern e-commerce platforms emit it
   - Open Graph is reliable for single-product pages
   - Microdata/itemprop is a last resort
-- The generic scraper will **never** be as accurate as Shopify JSON — that's expected. Manual upload (Story 1.7) catches what the scraper misses
-- robots.txt check should be **non-blocking** — if `/robots.txt` returns 404 or times out, proceed with scraping
+- The generic scraper will **never** be as accurate as Shopify JSON  -  that's expected. Manual upload (Story 1.7) catches what the scraper misses
+- robots.txt check should be **non-blocking**  -  if `/robots.txt` returns 404 or times out, proceed with scraping
 - Total time budget remains < 15s: ~1s robots.txt + ~3s HTML fetch + ~1s parsing = well within budget
 - HTML response size is already capped at 5MB by `validateUrl()` from Story 1.2
 
 ### References
 
-- [Source: architecture.md#Endpoints — scrape-product/ — generic HTML fallback]
-- [Source: PRD#FR6 — Shopify-first + generic fallback]
-- [Source: PRD#DR2 — robots.txt compliance]
-- [Source: PRD#NFR1 — < 15s scraping time]
+- [Source: architecture.md#Endpoints  -  scrape-product/  -  generic HTML fallback]
+- [Source: PRD#FR6  -  Shopify-first + generic fallback]
+- [Source: PRD#DR2  -  robots.txt compliance]
+- [Source: PRD#NFR1  -  < 15s scraping time]

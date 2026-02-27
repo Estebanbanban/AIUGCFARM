@@ -1,7 +1,7 @@
 # Kling AI 3.0 API Reference
 
 > Compiled from official Kling AI documentation (Feb 2026).
-> Generated videos/images are cleared after 30 days — must be downloaded to R2 immediately.
+> Generated videos/images are cleared after 30 days  -  must be downloaded to R2 immediately.
 
 ---
 
@@ -37,7 +37,7 @@
 
 ## Video Generation Endpoints
 
-### Image-to-Video — Create Task
+### Image-to-Video  -  Create Task
 
 **Our primary endpoint for UGC video generation (POV image → video segments)**
 
@@ -101,7 +101,7 @@ POST /v1/videos/image2video
 
 ---
 
-### Image-to-Video — Query Task
+### Image-to-Video  -  Query Task
 
 ```
 GET /v1/videos/image2video/{task_id}
@@ -141,7 +141,7 @@ Or query by custom ID: `GET /v1/videos/image2video/{external_task_id}`
 
 ---
 
-### Image-to-Video — Query Task List
+### Image-to-Video  -  Query Task List
 
 ```
 GET /v1/videos/image2video?pageNum=1&pageSize=30
@@ -149,7 +149,7 @@ GET /v1/videos/image2video?pageNum=1&pageSize=30
 
 ---
 
-### Text-to-Video — Create Task
+### Text-to-Video  -  Create Task
 
 ```
 POST /v1/videos/text2video
@@ -162,7 +162,7 @@ Same parameters as Image-to-Video EXCEPT:
 
 ---
 
-### Text-to-Video — Query Task
+### Text-to-Video  -  Query Task
 
 ```
 GET /v1/videos/text2video/{task_id}
@@ -172,7 +172,7 @@ Same response format as Image-to-Video query.
 
 ---
 
-### Omni-Video — Create Task (Unified Endpoint)
+### Omni-Video  -  Create Task (Unified Endpoint)
 
 ```
 POST /v1/videos/omni-video
@@ -201,7 +201,7 @@ POST /v1/videos/omni-video
 
 ## Image Generation Endpoints
 
-### Omni-Image — Create Task
+### Omni-Image  -  Create Task
 
 ```
 POST /v1/images/omni-image
@@ -221,7 +221,7 @@ POST /v1/images/omni-image
 | `callback_url` | string | Optional | null | Webhook URL |
 | `external_task_id` | string | Optional | null | Custom task ID |
 
-### Standard Image — Create Task
+### Standard Image  -  Create Task
 
 ```
 POST /v1/images/generations
@@ -279,8 +279,8 @@ Body: { "element_id": "string" }
 |---|---|
 | `submitted` | Task created, queued |
 | `processing` | Actively generating |
-| `succeed` | Complete — video URL available |
-| `failed` | Error — check `task_status_msg` |
+| `succeed` | Complete  -  video URL available |
+| `failed` | Error  -  check `task_status_msg` |
 
 ---
 
@@ -373,7 +373,7 @@ Server sends notification on task status changes (submitted → processing → s
 - V3 can be offered as a premium feature later
 
 **Why NOT multi-shot:**
-- Our product model is **modular segments** — users generate hooks, bodies, CTAs independently
+- Our product model is **modular segments**  -  users generate hooks, bodies, CTAs independently
 - Users mix and match segments to create N×N×N video combinations
 - Multi-shot would lock segments into a single video, destroying the combinatorial value
 - Individual segments allow per-segment retry on failure
@@ -387,7 +387,7 @@ Each segment is generated as an independent Kling image-to-video task:
 3. **CTA segments** (3-5s): Urgency-driven close
 
 Each uses the same POV image (persona + product) as the start frame.
-FFmpeg stitches user-selected combos on-demand (free — no Kling cost).
+FFmpeg stitches user-selected combos on-demand (free  -  no Kling cost).
 
 ### Element Library for Persona Consistency
 
@@ -398,7 +398,7 @@ Instead of passing the persona reference image every time, we can:
 
 ### Callback vs Polling
 
-Kling supports `callback_url` — use this with Inngest to avoid polling:
+Kling supports `callback_url`  -  use this with Inngest to avoid polling:
 1. Create Kling task with `callback_url` pointing to our worker
 2. Inngest `step.waitForEvent()` waits for webhook
 3. On callback, Inngest continues pipeline

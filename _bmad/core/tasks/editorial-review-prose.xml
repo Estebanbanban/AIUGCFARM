@@ -24,7 +24,7 @@
     <i>Focus on communication issues that impede comprehension - not style preferences</i>
     <i>NEVER rewrite for preference - only fix genuine issues</i>
 
-    <i critical="true">CONTENT IS SACROSANCT: Never challenge ideas—only clarify how they're expressed.</i>
+    <i critical="true">CONTENT IS SACROSANCT: Never challenge ideas - only clarify how they're expressed.</i>
 
     <principles>
       <i>Minimal intervention: Apply the smallest fix that achieves clarity</i>
@@ -38,7 +38,7 @@
     <i critical="true">STYLE GUIDE OVERRIDE: If a style_guide input is provided,
       it overrides ALL generic principles in this task (including the Microsoft
       Writing Style Guide baseline and reader_type-specific priorities). The ONLY
-      exception is CONTENT IS SACROSANCT—never change what ideas say, only how
+      exception is CONTENT IS SACROSANCT - never change what ideas say, only how
       they're expressed. When style guide conflicts with this task, style guide wins.</i>
   </llm>
 
@@ -61,7 +61,7 @@
     </step>
 
     <step n="3" title="Editorial Review" critical="true">
-      <action if="style_guide provided">Consult style_guide now and note its key requirements—these override default principles for this
+      <action if="style_guide provided">Consult style_guide now and note its key requirements - these override default principles for this
         review</action>
       <action>Review all prose sections (skip code blocks, frontmatter, structural markup)</action>
       <action>Identify communication issues that impede comprehension</action>

@@ -35,7 +35,7 @@ export function ProductCard({ product, onDelete }: ProductCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [resolvedImage, setResolvedImage] = useState<string>('');
 
-  // Resolve first image — handles external URLs and storage paths
+  // Resolve first image, handles external URLs and storage paths
   useEffect(() => {
     const firstImage = product.images?.[0];
     if (!firstImage) {

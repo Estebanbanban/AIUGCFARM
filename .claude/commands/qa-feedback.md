@@ -3,7 +3,7 @@ name: 'qa-feedback'
 description: 'Read QA feedback from Cowork visual testing and act on it. Use when Cowork has completed QA testing and written feedback. Usage: /qa-feedback'
 ---
 
-# QA Feedback — Process Cowork Visual QA Results
+# QA Feedback  -  Process Cowork Visual QA Results
 
 Read the `.qa/qa_feedback.json` file written by Cowork after visual QA testing, and take appropriate action.
 
@@ -14,7 +14,7 @@ Read the `.qa/qa_feedback.json` file written by Cowork after visual QA testing, 
    - If `status` is `idle` or `null`, inform user that no QA feedback is available yet
 
 2. **Analyze results:**
-   - Check `overall_pass` — if `true`, proceed to next story
+   - Check `overall_pass`  -  if `true`, proceed to next story
    - If `false`, review each issue in `issues` array
    - Group issues by severity: critical > major > minor > cosmetic
 
@@ -45,5 +45,5 @@ Read the `.qa/qa_feedback.json` file written by Cowork after visual QA testing, 
 
 ## Important
 - Always fix critical issues before moving on
-- The `ux_observations` field contains subjective feedback — consider but don't block on it
-- Screenshots in `.qa/screenshots/` provide visual evidence — reference them when debugging layout/rendering issues
+- The `ux_observations` field contains subjective feedback  -  consider but don't block on it
+- Screenshots in `.qa/screenshots/` provide visual evidence  -  reference them when debugging layout/rendering issues

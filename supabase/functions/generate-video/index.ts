@@ -8,7 +8,7 @@ import { withRetry } from "../_shared/retry.ts";
 import { submitKlingJob } from "../_shared/kling.ts";
 import { generateCompositeFromImages } from "../_shared/nanobanana.ts";
 
-// Credits per segment set — HD (kling-v3) costs 2× standard (kling-v2-6)
+// Credits per segment set  -  HD (kling-v3) costs 2× standard (kling-v2-6)
 const COSTS = {
   standard: { single: 3, batch: 9 },
   hd:       { single: 6, batch: 18 },
@@ -39,7 +39,7 @@ interface GeneratedScript {
 function buildSystemPrompt(count: number): string {
   const plural = count > 1 ? "s" : "";
   return `You are an expert UGC (User-Generated Content) ad scriptwriter for e-commerce brands.
-Write scripts in first-person, casual, authentic tone — as if a real person is speaking directly to camera.
+Write scripts in first-person, casual, authentic tone  -  as if a real person is speaking directly to camera.
 Write SPOKEN DIALOGUE ONLY. No stage directions, no camera notes.
 
 Generate:

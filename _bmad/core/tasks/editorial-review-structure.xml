@@ -41,13 +41,13 @@
       <i>One source of truth: If information appears identically twice, consolidate</i>
       <i>Scope discipline: Content that belongs in a different document should be cut or linked</i>
       <i>Propose, don't execute: Output recommendations-user decides what to accept</i>
-      <i critical="true">CONTENT IS SACROSANCT: Never challenge ideas—only optimize how they're organized.</i>
+      <i critical="true">CONTENT IS SACROSANCT: Never challenge ideas - only optimize how they're organized.</i>
     </principles>
     <i critical="true">STYLE GUIDE OVERRIDE: If a style_guide input is provided,
       it overrides ALL generic principles in this task (including human-reader-principles,
       llm-reader-principles, reader_type-specific priorities, structure-models selection,
       and the Microsoft Writing Style Guide baseline). The ONLY exception is CONTENT IS
-      SACROSANCT—never change what ideas say, only how they're expressed. When style
+      SACROSANCT - never change what ideas say, only how they're expressed. When style
       guide conflicts with this task, style guide wins.</i>
     <human-reader-principles>
       <i>These elements serve human comprehension and engagement-preserve unless clearly wasteful:</i>
@@ -130,7 +130,7 @@
       <action>Note reader_type and which principles apply (human-reader-principles or llm-reader-principles)</action>
     </step>
     <step n="3" title="Structural Analysis" critical="true">
-      <action if="style_guide provided">Consult style_guide now and note its key requirements—these override default principles for this
+      <action if="style_guide provided">Consult style_guide now and note its key requirements - these override default principles for this
         analysis</action>
       <action>Map the document structure: list each major section with its word count</action>
       <action>Evaluate structure against the selected model's primary rules

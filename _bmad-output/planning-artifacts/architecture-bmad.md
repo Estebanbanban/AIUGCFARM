@@ -46,25 +46,25 @@ completedAt: '2026-02-26'
 
 ### Scale & Complexity
 
-- **Domain:** Media/E-commerce (high complexity — async pipelines, external AI APIs, video processing)
+- **Domain:** Media/E-commerce (high complexity  -  async pipelines, external AI APIs, video processing)
 - **Project type:** Full-stack SaaS with heavy backend processing
 - **Primary bottleneck:** Video pipeline throughput and third-party API reliability
 - **Data volume:** Large binary assets (images, videos), moderate relational data (users, products, personas)
 
 ### Technical Constraints & Dependencies
 
-- NanoBanana API — persona image generation (external dependency, rate limits unknown)
-- Kling 3.0 API — video generation (external dependency, commercial rate limits TBD)
-- OpenRouter — LLM script generation (multi-model, single billing)
-- FFmpeg — must run on worker servers (not serverless-friendly without containers)
-- Shopify Storefront API — requires app registration for native stores
+- NanoBanana API  -  persona image generation (external dependency, rate limits unknown)
+- Kling 3.0 API  -  video generation (external dependency, commercial rate limits TBD)
+- OpenRouter  -  LLM script generation (multi-model, single billing)
+- FFmpeg  -  must run on worker servers (not serverless-friendly without containers)
+- Shopify Storefront API  -  requires app registration for native stores
 
 ### Cross-Cutting Concerns
 
 - **Job orchestration:** Every generation involves 4+ async steps across multiple APIs
 - **Credit management:** Must decrement credits atomically, handle overage billing
 - **File lifecycle:** Generated assets need cleanup policies (storage costs)
-- **Error recovery:** Each pipeline step can fail independently — need per-step retry
+- **Error recovery:** Each pipeline step can fail independently  -  need per-step retry
 
 ---
 
@@ -167,7 +167,7 @@ The core product model is segment-based, not video-based:
 **Caching Strategy:**
 - Product data: Cache scraped results in Supabase for 24h (avoid re-scraping)
 - Session data: Clerk handles session caching
-- No application-level Redis cache at MVP — Supabase connection pooling via Supavisor is sufficient
+- No application-level Redis cache at MVP  -  Supabase connection pooling via Supavisor is sufficient
 
 ---
 
@@ -202,16 +202,16 @@ The core product model is segment-based, not video-based:
 ### API & Communication Patterns
 
 **API Design: Next.js Route Handlers (REST)**
-- `/api/scrape` — Trigger website scraping
-- `/api/brands` — CRUD brand profiles
-- `/api/products` — CRUD products per brand
-- `/api/personas` — CRUD persona configurations
-- `/api/personas/generate` — Trigger NanoBanana image generation
-- `/api/generations` — Trigger video generation, list generations
-- `/api/generations/[id]` — Get generation status + video outputs
-- `/api/webhooks/clerk` — Clerk user sync
-- `/api/webhooks/stripe` — Stripe subscription events
-- `/api/webhooks/inngest` — Inngest function endpoint
+- `/api/scrape`  -  Trigger website scraping
+- `/api/brands`  -  CRUD brand profiles
+- `/api/products`  -  CRUD products per brand
+- `/api/personas`  -  CRUD persona configurations
+- `/api/personas/generate`  -  Trigger NanoBanana image generation
+- `/api/generations`  -  Trigger video generation, list generations
+- `/api/generations/[id]`  -  Get generation status + video outputs
+- `/api/webhooks/clerk`  -  Clerk user sync
+- `/api/webhooks/stripe`  -  Stripe subscription events
+- `/api/webhooks/inngest`  -  Inngest function endpoint
 
 **API Response Format:**
 
@@ -240,12 +240,12 @@ The core product model is segment-based, not video-based:
 ### Frontend Architecture
 
 **State Management:**
-- **Server state:** TanStack Query (React Query) — handles caching, refetching, optimistic updates for all API data
-- **Client state:** Zustand — minimal stores for UI state (persona builder selections, generation form state)
+- **Server state:** TanStack Query (React Query)  -  handles caching, refetching, optimistic updates for all API data
+- **Client state:** Zustand  -  minimal stores for UI state (persona builder selections, generation form state)
 - **URL state:** `nuqs` for search params (filters, pagination)
 
 **Component Architecture:**
-- **UI primitives:** shadcn/ui (based on Radix UI) — fully owned, customizable components
+- **UI primitives:** shadcn/ui (based on Radix UI)  -  fully owned, customizable components
 - **Feature components:** Co-located by feature domain (`/components/persona-builder/`, `/components/generation/`, etc.)
 - **Layout components:** App Router layouts for shared UI (sidebar, header)
 
@@ -436,11 +436,11 @@ app/{domain}.{action}
 Examples:
 - `app/scrape.requested`
 - `app/persona.generation.requested`
-- `app/segment.batch.requested` — Generate a batch of segments (e.g., 3 hooks + 3 bodies + 3 CTAs)
-- `app/segment.generation.requested` — Generate a single segment
-- `app/segment.completed` — Single segment finished (Kling callback)
-- `app/combo.assembly.requested` — User wants to preview/download a combo
-- `app/combo.assembly.completed` — FFmpeg stitch done
+- `app/segment.batch.requested`  -  Generate a batch of segments (e.g., 3 hooks + 3 bodies + 3 CTAs)
+- `app/segment.generation.requested`  -  Generate a single segment
+- `app/segment.completed`  -  Single segment finished (Kling callback)
+- `app/combo.assembly.requested`  -  User wants to preview/download a combo
+- `app/combo.assembly.completed`  -  FFmpeg stitch done
 
 **Event Payload Structure:**
 
@@ -513,12 +513,12 @@ Combo assembly (FFmpeg stitch) = free (no credit cost, just compute)
 ### Enforcement Guidelines
 
 **All AI Agents MUST:**
-- Use the Zod schemas in `src/schemas/` for all data validation — never inline validation
-- Use the `ApiResponse<T>` wrapper for all API route responses — never return raw data
-- Use Inngest step functions for all async pipeline work — never use `setTimeout` or manual queues
-- Store all generated files in R2 via the storage utility in `src/lib/storage.ts` — never write to local filesystem
-- Check credit balance before any generation — never generate without credit verification
-- Use `src/lib/env.ts` for all environment variable access — never use `process.env` directly
+- Use the Zod schemas in `src/schemas/` for all data validation  -  never inline validation
+- Use the `ApiResponse<T>` wrapper for all API route responses  -  never return raw data
+- Use Inngest step functions for all async pipeline work  -  never use `setTimeout` or manual queues
+- Store all generated files in R2 via the storage utility in `src/lib/storage.ts`  -  never write to local filesystem
+- Check credit balance before any generation  -  never generate without credit verification
+- Use `src/lib/env.ts` for all environment variable access  -  never use `process.env` directly
 
 ---
 
@@ -809,7 +809,7 @@ aiugc/
 
 **Data Boundaries:**
 - All database access through Supabase client (never raw SQL in app code)
-- RLS enforces user data isolation — no user can access another user's data
+- RLS enforces user data isolation  -  no user can access another user's data
 - Worker service has service-role access (needed for cross-user operations like batch processing)
 - R2 access: Signed URLs for reads (time-limited), direct upload for writes (worker only)
 
@@ -953,15 +953,15 @@ Subsequent generations:
     └── Better persona consistency than raw image reference
 ```
 
-#### Cost Model (V2.6 std / 720p — Default)
+#### Cost Model (V2.6 std / 720p  -  Default)
 
 | Segment Type | Duration | Kling Cost | Per 3 Segments |
 |---|---|---|---|
 | Hook | 5s | $0.21 | $0.63 |
 | Body | 10s | $0.42 | $1.26 |
 | CTA | 5s | $0.21 | $0.63 |
-| **Batch (3H + 3B + 3C)** | **—** | **$2.52** | **27 combos** |
-| Combo assembly (FFmpeg) | — | **$0.00** | Free |
+| **Batch (3H + 3B + 3C)** | ** - ** | **$2.52** | **27 combos** |
+| Combo assembly (FFmpeg) |  -  | **$0.00** | Free |
 
 **Cost per combinable video: $0.093**
 
@@ -1015,7 +1015,7 @@ Free trial: 3 free segment credits (1 hook + 1 body + 1 CTA = 1 combo)
 - Video cleanup/retention policy not defined (define post-launch based on storage costs)
 - Monitoring alerting thresholds not specified (configure after baseline metrics)
 - Kling API authentication (JWT generation) details need to be confirmed during developer onboarding
-- NanoBanana API pricing at scale not confirmed — factor into COGS model
+- NanoBanana API pricing at scale not confirmed  -  factor into COGS model
 - Evaluate V3 as premium tier upgrade once enterprise pricing is negotiated
 
 ### Architecture Readiness Assessment

@@ -252,5 +252,5 @@ CREATE POLICY "Users can view own subscriptions"
   ON subscriptions FOR SELECT
   USING (auth.uid() = owner_id);
 
--- audit_logs (service_role only — no user policies)
+-- audit_logs (service_role only  -  no user policies)
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;

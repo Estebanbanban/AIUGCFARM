@@ -8,15 +8,15 @@ depends_on: ['Epic 1 (products)', 'Epic 2 (auth)', 'Epic 3 (persona)']
 architecture_stack: 'Supabase Edge Functions (Deno), Supabase Auth, Supabase Storage, OpenAI GPT-4o, NanoBanana API'
 ---
 
-# Epic 5 — AI Script & POV Image Generation: User Stories
+# Epic 5  -  AI Script & POV Image Generation: User Stories
 
 ## Epic Overview
 
 Users select a product and persona, and the system generates:
-1. **AI-written script variants** — 3 hooks, 3 bodies, 3 CTAs (9 total) via OpenAI GPT-4o
-2. **POV composite image** — persona holding/using the selected product via NanoBanana API
+1. **AI-written script variants**  -  3 hooks, 3 bodies, 3 CTAs (9 total) via OpenAI GPT-4o
+2. **POV composite image**  -  persona holding/using the selected product via NanoBanana API
 
-This is the content preparation stage before video generation (Epic 6). It is independently testable — script quality and POV image compositing can be validated without the video pipeline.
+This is the content preparation stage before video generation (Epic 6). It is independently testable  -  script quality and POV image compositing can be validated without the video pipeline.
 
 ### Architecture Context (Supabase-centric)
 
@@ -24,13 +24,13 @@ This is the content preparation stage before video generation (Epic 6). It is in
 - **Backend:** Supabase Edge Functions (Deno runtime, ~60s timeout)
 - **Database:** Supabase PostgreSQL with RLS
 - **Storage:** Supabase Storage (private buckets, signed URLs)
-- **AI Script:** OpenAI API (GPT-4o) — structured JSON output
-- **AI Image:** NanoBanana API — persona + product composite
+- **AI Script:** OpenAI API (GPT-4o)  -  structured JSON output
+- **AI Image:** NanoBanana API  -  persona + product composite
 - **Credit Model:** 1 credit = 1 segment. A full batch = 9 segments = 9 credits.
 
 ---
 
-## Story 5.1: Generation Wizard — Product & Persona Selection UI
+## Story 5.1: Generation Wizard  -  Product & Persona Selection UI
 
 **As a** signed-in user with confirmed products and a selected persona,
 **I want to** select a product and persona from my library and initiate Easy Mode generation,
@@ -68,9 +68,9 @@ This is the content preparation stage before video generation (Epic 6). It is in
 ### Dependencies
 
 - Epic 1 (products table populated with confirmed products)
-- Epic 2 (Supabase Auth — user must be signed in)
+- Epic 2 (Supabase Auth  -  user must be signed in)
 - Epic 3 (personas table populated with selected persona images)
-- Epic 4 (credit_balances table — credit check)
+- Epic 4 (credit_balances table  -  credit check)
 
 ### Dev Notes
 
@@ -139,7 +139,7 @@ This is the content preparation stage before video generation (Epic 6). It is in
 ```
 You are an expert UGC (User-Generated Content) ad scriptwriter for e-commerce brands.
 
-Generate video ad scripts in a first-person, casual, authentic tone — as if a real person is speaking directly to camera about a product they genuinely love.
+Generate video ad scripts in a first-person, casual, authentic tone  -  as if a real person is speaking directly to camera about a product they genuinely love.
 
 For each script, write SPOKEN DIALOGUE ONLY. No stage directions, no camera notes, no scene descriptions. Just the words the person says.
 
@@ -167,9 +167,9 @@ Return valid JSON only.
 ### Dev Notes
 
 - Edge Function timeout is ~60s. OpenAI GPT-4o typically responds in 5-15s for structured output. Well within limits.
-- The `variant_label` field is metadata for the frontend — helps users understand the creative angle of each variant.
+- The `variant_label` field is metadata for the frontend  -  helps users understand the creative angle of each variant.
 - Consider caching the system prompt as a constant, not rebuilding each time.
-- The script generation can be called independently from the image generation — they have no dependency on each other.
+- The script generation can be called independently from the image generation  -  they have no dependency on each other.
 
 ---
 
@@ -211,10 +211,10 @@ Return valid JSON only.
 
 ```
 UGC-style POV photo taken on iPhone.
-Subject: {persona_description} — {gender}, {age_range} years old, {skin_tone} skin,
+Subject: {persona_description}  -  {gender}, {age_range} years old, {skin_tone} skin,
 {hair_color} {hair_style} hair, {eye_color} eyes, {body_type} build,
 wearing {clothing_style}, {accessories}.
-Action: Holding/using {product_name} — {product_description_short}.
+Action: Holding/using {product_name}  -  {product_description_short}.
 Setting: Casual home/lifestyle environment.
 Style: Natural lighting, slightly warm tones, authentic feel.
 Format: Vertical 9:16, close-up to mid-shot, subject looking at camera.
@@ -230,7 +230,7 @@ Format: Vertical 9:16, close-up to mid-shot, subject looking at camera.
 
 ### Dev Notes
 
-- NanoBanana API response time is typically 10-25s — within Edge Function timeout.
+- NanoBanana API response time is typically 10-25s  -  within Edge Function timeout.
 - The composite image is the starting frame for ALL video segments in this generation. It is generated once and reused across all 9 segments.
 - Store the permanent composite image URL (Supabase Storage path), not the signed URL. Signed URLs are regenerated on access.
 - If NanoBanana supports an image reference input (pass persona's selected image), use it for better persona consistency. If not, the text prompt must be detailed enough.
@@ -262,7 +262,7 @@ Format: Vertical 9:16, close-up to mid-shot, subject looking at camera.
    - Set generation status to `'failed'` with error message
    - Refund 9 credits via `credit_ledger` entry (`amount: +9, reason: 'refund'`)
    - Increment `credit_balances.remaining` by 9
-8. **Idempotency**: Include `external_task_id` check — if same product_id + persona_id generation is already in progress, return existing generation_id.
+8. **Idempotency**: Include `external_task_id` check  -  if same product_id + persona_id generation is already in progress, return existing generation_id.
 9. **Auth**: Require authenticated user via `requireUserId()`. Verify user owns the product and persona via RLS queries.
 10. **Audit log**: Log generation event in `audit_logs` table.
 
@@ -318,7 +318,7 @@ pending → scripting → content_ready → generating_video (Epic 6)
 ### Dev Notes
 
 - The Edge Function timeout is ~60s. OpenAI (5-15s) + NanoBanana (10-25s) in parallel = ~25s max. Well within limits.
-- The "fast return" in AC #6 is aspirational — since Edge Functions are request/response, the full pipeline runs before returning. If we need true async behavior, the frontend polls `video-status/` (Epic 6). For Epic 5, the response returns when scripts + composite are ready.
+- The "fast return" in AC #6 is aspirational  -  since Edge Functions are request/response, the full pipeline runs before returning. If we need true async behavior, the frontend polls `video-status/` (Epic 6). For Epic 5, the response returns when scripts + composite are ready.
 - Credit debit is optimistic (debit first, refund on failure). This prevents race conditions where two concurrent requests overdraw the balance.
 - The `status` column in `generations` needs to be updated to include `'scripting'`, `'content_ready'` states. Update the CHECK constraint:
   ```sql
@@ -341,7 +341,7 @@ pending → scripting → content_ready → generating_video (Epic 6)
 ### Acceptance Criteria
 
 1. **Progress page**: `app/(app)/generate/[id]/page.tsx` shows generation status with visual progress indicator.
-2. **Status polling**: Frontend polls `video-status/` Edge Function every 5 seconds. Displays current step: "Writing scripts...", "Generating POV image...", "Content ready — generating videos..." (Epic 6).
+2. **Status polling**: Frontend polls `video-status/` Edge Function every 5 seconds. Displays current step: "Writing scripts...", "Generating POV image...", "Content ready  -  generating videos..." (Epic 6).
 3. **Script preview**: Once status reaches `'content_ready'`, display scripts organized by type:
    - **Hooks tab**: 3 hook variants with text, duration badge, variant label
    - **Bodies tab**: 3 body variants
@@ -349,7 +349,7 @@ pending → scripting → content_ready → generating_video (Epic 6)
 4. **Composite image preview**: Display the POV composite image alongside scripts.
 5. **Duration visualization**: Each script variant shows estimated duration as a badge (e.g., "5s").
 6. **Progress steps**: Visual step indicator: Script Generation → Image Generation → Video Generation (grayed until Epic 6). Steps show checkmark when complete, spinner when in-progress.
-7. **Error state**: If generation fails, show error message with "Retry" button (creates new generation, re-debits credits — or uses refunded credits).
+7. **Error state**: If generation fails, show error message with "Retry" button (creates new generation, re-debits credits  -  or uses refunded credits).
 8. **Auto-advance**: When video generation completes (Epic 6), page auto-updates to show video results.
 
 ### Technical Tasks
@@ -366,7 +366,7 @@ pending → scripting → content_ready → generating_video (Epic 6)
 
 ### Dependencies
 
-- Story 5.4 (generation orchestration — provides the data to display)
+- Story 5.4 (generation orchestration  -  provides the data to display)
 - `video-status/` Edge Function must return script + composite image data when status >= `content_ready`
 
 ### Dev Notes
@@ -374,7 +374,7 @@ pending → scripting → content_ready → generating_video (Epic 6)
 - The polling hook should stop polling when status is `'completed'` or `'failed'`.
 - Script preview is read-only in MVP (Expert Mode editing is Phase 2, FR27-FR28).
 - The page serves dual purpose: first for Epic 5 content (scripts + image) progress, then for Epic 6 (video generation progress + results). Design the component to handle the full lifecycle.
-- Use Supabase's `supabase.from('generations').select('*').eq('id', id).single()` with RLS for direct reads instead of a custom Edge Function — more efficient for status checks that don't need external API polling.
+- Use Supabase's `supabase.from('generations').select('*').eq('id', id).single()` with RLS for direct reads instead of a custom Edge Function  -  more efficient for status checks that don't need external API polling.
 
 ---
 
@@ -389,13 +389,13 @@ Story 5.1 (Wizard UI) ───────────┘
 ```
 
 **Recommended execution order:**
-1. **Story 5.1** (Wizard UI) — can start immediately, frontend only
-2. **Story 5.2** (Script Generation) — can start in parallel with 5.1
-3. **Story 5.3** (Composite Image) — can start in parallel with 5.1 and 5.2
-4. **Story 5.4** (Orchestration) — depends on 5.2 + 5.3 logic being available
-5. **Story 5.5** (Progress + Preview UI) — depends on 5.4 for data
+1. **Story 5.1** (Wizard UI)  -  can start immediately, frontend only
+2. **Story 5.2** (Script Generation)  -  can start in parallel with 5.1
+3. **Story 5.3** (Composite Image)  -  can start in parallel with 5.1 and 5.2
+4. **Story 5.4** (Orchestration)  -  depends on 5.2 + 5.3 logic being available
+5. **Story 5.5** (Progress + Preview UI)  -  depends on 5.4 for data
 
-**Parallelization:** Stories 5.1, 5.2, and 5.3 can all be developed in parallel by different developers (or sequentially by one developer — UI first, then backend).
+**Parallelization:** Stories 5.1, 5.2, and 5.3 can all be developed in parallel by different developers (or sequentially by one developer  -  UI first, then backend).
 
 ---
 

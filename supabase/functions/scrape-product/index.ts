@@ -62,7 +62,7 @@ async function ensureProfileExists(userId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Shopify scraper — paginate with limit=30, cap at 50 total products
+// Shopify scraper  -  paginate with limit=30, cap at 50 total products
 // ---------------------------------------------------------------------------
 
 async function tryShopify(origin: string): Promise<ProductData[] | null> {
@@ -206,7 +206,7 @@ function parseJsonLd(html: string): ProductData[] {
 }
 
 // ---------------------------------------------------------------------------
-// Generic scraper — JSON-LD first, OG tags fallback
+// Generic scraper  -  JSON-LD first, OG tags fallback
 // ---------------------------------------------------------------------------
 
 async function scrapeGeneric(

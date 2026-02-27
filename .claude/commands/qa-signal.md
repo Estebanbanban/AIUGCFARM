@@ -3,7 +3,7 @@ name: 'qa-signal'
 description: 'Signal that a story is ready for visual QA testing by Cowork. Use after completing a story implementation to write the build signal file. Usage: /qa-signal'
 ---
 
-# QA Signal — Notify Cowork That Build Is Ready
+# QA Signal  -  Notify Cowork That Build Is Ready
 
 After completing a story implementation, run this command to write the `.qa/build_signal.json` file so the Cowork visual QA agent can test the build.
 
@@ -50,6 +50,6 @@ After completing a story implementation, run this command to write the `.qa/buil
    - List the routes Cowork should visit
 
 ## Important
-- Do NOT reset `qa_feedback.json` — Cowork manages that file
+- Do NOT reset `qa_feedback.json`  -  Cowork manages that file
 - Always verify the dev server is actually running before signaling
 - If the story involved backend-only changes (Edge Functions, DB), note this in build_notes so Cowork knows to test via the UI flows that exercise those endpoints

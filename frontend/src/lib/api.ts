@@ -22,7 +22,7 @@ export async function callEdge<T>(
 ): Promise<T> {
   const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
 
-  // Use getUser() — not getSession() — to force server-side token validation.
+  // Use getUser(), not getSession(), to force server-side token validation.
   // getSession() reads from local storage/cookies and can return a stale session
   // with an expired or invalid access_token without hitting the network. getUser()
   // always validates against the Supabase Auth server and automatically refreshes
@@ -31,7 +31,7 @@ export async function callEdge<T>(
   const { data: { user }, error: userError } = await supabase.auth.getUser();
 
   if (!user || userError) {
-    // Token is invalid or expired and could not be refreshed — force sign-out
+    // Token is invalid or expired and could not be refreshed, force sign-out
     await supabase.auth.signOut();
     throw new Error("Authentication required. Please sign in again.");
   }
@@ -70,7 +70,7 @@ export async function callEdge<T>(
   return res.json();
 }
 
-/** Public Edge Function call — no auth required, but attaches token if available for higher rate limits */
+/** Public Edge Function call, no auth required, but attaches token if available for higher rate limits */
 export async function callEdgePublic<T>(
   fn: string,
   options: { method?: string; body?: unknown } = {}
@@ -97,7 +97,7 @@ export async function callEdgePublic<T>(
   return res.json();
 }
 
-/** Multipart form data upload — requires auth */
+/** Multipart form data upload, requires auth */
 export async function callEdgeMultipart<T>(
   fn: string,
   formData: FormData

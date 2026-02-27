@@ -22,10 +22,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!cat) return {};
 
   return {
-    title: `${cat.label} — CineRads Blog`,
+    title: `${cat.label}, CineRads Blog`,
     description: cat.description,
     openGraph: {
-      title: `${cat.label} — CineRads Blog`,
+      title: `${cat.label}, CineRads Blog`,
       description: cat.description,
       type: "website",
       siteName: "CineRads",

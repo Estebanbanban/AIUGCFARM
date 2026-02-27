@@ -17,12 +17,12 @@ inputDocuments:
   - 'ai-ugc-generator-prd.md'
 ---
 
-# Architecture Document — AI UGC Generator
+# Architecture Document  -  AI UGC Generator
 
 **Author:** Architecture Agent
 **Date:** February 2026
 **Version:** 1.0
-**Status:** Complete — Ready for Implementation
+**Status:** Complete  -  Ready for Implementation
 
 ---
 
@@ -48,8 +48,8 @@ The AI UGC Generator is a B2B SaaS platform enabling e-commerce brands to genera
 
 ### Technical Constraints
 
-- Video generation (Kling 3.0) takes 2–10 minutes — must be async
-- Edge Functions have ~60s execution timeout — long jobs require fire-and-poll pattern
+- Video generation (Kling 3.0) takes 2–10 minutes  -  must be async
+- Edge Functions have ~60s execution timeout  -  long jobs require fire-and-poll pattern
 - All payment data handled by Stripe (PCI compliance)
 - Storage needed for generated videos and persona images
 
@@ -80,9 +80,9 @@ Full-stack TypeScript SaaS application with serverless backend.
 | **Auth** | Supabase Auth | Native JWT, RLS integration, OAuth support |
 | **Storage** | Supabase Storage | Managed buckets with access policies |
 | **Payments** | Stripe | PCI compliant, subscription + one-time credits |
-| **AI — Scripts** | OpenAI API (GPT-4o) | Best-in-class text generation for ad scripts |
-| **AI — Images** | NanoBanana API | Persona image generation from attribute prompts |
-| **AI — Video** | Kling 3.0 API | UGC-style video generation with lip-sync |
+| **AI  -  Scripts** | OpenAI API (GPT-4o) | Best-in-class text generation for ad scripts |
+| **AI  -  Images** | NanoBanana API | Persona image generation from attribute prompts |
+| **AI  -  Video** | Kling 3.0 API | UGC-style video generation with lip-sync |
 | **Hosting** | Vercel (frontend) + Supabase (everything else) | 2 services total, minimal ops |
 
 ### Architectural Decisions Provided by Starter
@@ -105,7 +105,7 @@ Full-stack TypeScript SaaS application with serverless backend.
 **Rationale:**
 - Single backend platform = simpler ops, fewer services, lower cost
 - Edge Functions handle all API calls (scraping, AI, Stripe) via `fetch()`
-- Native integration with Auth, DB, Storage — no sync issues
+- Native integration with Auth, DB, Storage  -  no sync issues
 - Scales automatically with Supabase infrastructure
 
 **Trade-off:** Edge Functions have a ~60s timeout. Video generation (2–10 min) uses fire-and-poll pattern instead of long-running processes.
@@ -115,7 +115,7 @@ Full-stack TypeScript SaaS application with serverless backend.
 **Decision:** Use Supabase Auth for all authentication.
 
 **Rationale:**
-- Native RLS integration — `auth.uid()` works everywhere
+- Native RLS integration  -  `auth.uid()` works everywhere
 - No user sync between systems
 - JWT verified natively in Edge Functions
 - Free, included in Supabase plan
@@ -133,7 +133,7 @@ Full-stack TypeScript SaaS application with serverless backend.
 **Rationale:**
 - Simpler than WebSockets for MVP
 - Works within Edge Function timeout
-- Stateless — any Edge Function instance can check status
+- Stateless  -  any Edge Function instance can check status
 - Easy to add webhook callback from Kling later (Phase 2)
 
 ### AD4: Credit-Based Billing via Stripe
@@ -156,7 +156,7 @@ Full-stack TypeScript SaaS application with serverless backend.
 
 **Rationale:**
 - No public bucket access
-- URLs expire after 1 hour — prevents hotlinking
+- URLs expire after 1 hour  -  prevents hotlinking
 - RLS not needed on Storage if Edge Functions generate signed URLs after auth check
 
 ### AD6: SSRF Protection on Scraping
@@ -405,10 +405,10 @@ CREATE INDEX idx_subscriptions_stripe_customer ON subscriptions(stripe_customer_
 
 | Bucket | Access | Purpose |
 |--------|--------|---------|
-| `persona-images` | Private — signed URLs via Edge Functions | Generated persona images (4 per generation) |
-| `generated-videos` | Private — signed URLs via Edge Functions | Final video outputs (4 per generation) |
-| `composite-images` | Private — signed URLs via Edge Functions | Persona + product composite images |
-| `product-images` | Private — signed URLs via Edge Functions | Manually uploaded product images |
+| `persona-images` | Private  -  signed URLs via Edge Functions | Generated persona images (4 per generation) |
+| `generated-videos` | Private  -  signed URLs via Edge Functions | Final video outputs (4 per generation) |
+| `composite-images` | Private  -  signed URLs via Edge Functions | Persona + product composite images |
+| `product-images` | Private  -  signed URLs via Edge Functions | Manually uploaded product images |
 
 ### Storage Policies
 
@@ -424,7 +424,7 @@ WITH CHECK (
 );
 
 -- All buckets: service_role handles reads/writes from Edge Functions
--- No public SELECT policies — all access via signed URLs
+-- No public SELECT policies  -  all access via signed URLs
 ```
 
 ---
@@ -436,23 +436,23 @@ WITH CHECK (
 | File | Purpose |
 |------|---------|
 | `cors.ts` | CORS headers (allow frontend origin) |
-| `auth.ts` | `requireUserId(req)` — extract & verify JWT, return user ID |
-| `response.ts` | `json(body, cors, status)` — standard JSON response builder |
-| `supabase.ts` | `getAdminClient()` — service_role Supabase client |
+| `auth.ts` | `requireUserId(req)`  -  extract & verify JWT, return user ID |
+| `response.ts` | `json(body, cors, status)`  -  standard JSON response builder |
+| `supabase.ts` | `getAdminClient()`  -  service_role Supabase client |
 | `credits.ts` | `checkCredits(userId)` / `debitCredit(userId, generationId)` |
-| `ssrf.ts` | `validateUrl(url)` — block private IPs, enforce scheme |
+| `ssrf.ts` | `validateUrl(url)`  -  block private IPs, enforce scheme |
 | `rate-limit.ts` | In-memory rate limiter (IP-based for public, user-based for auth) |
 
 ### Endpoints
 
 #### Product Import & Scraping
 
-**`scrape-product/`** — POST
+**`scrape-product/`**  -  POST
 ```
 Input:  { url: string }
-Auth:   Optional (soft gate — works without auth)
+Auth:   Optional (soft gate  -  works without auth)
 Flow:
-  1. validateUrl(url) — SSRF check
+  1. validateUrl(url)  -  SSRF check
   2. Rate limit check (10/hr unauthenticated, 60/hr authenticated)
   3. Fetch URL HTML
   4. Detect platform (Shopify JSON endpoint vs generic HTML)
@@ -462,7 +462,7 @@ Flow:
 Output: { products: Product[], brand_summary: BrandSummary }
 ```
 
-**`confirm-products/`** — POST
+**`confirm-products/`**  -  POST
 ```
 Input:  { product_ids: string[], edits: Record<string, Partial<Product>> }
 Auth:   Required
@@ -472,7 +472,7 @@ Flow:
 Output: { success: true }
 ```
 
-**`upload-product/`** — POST (multipart)
+**`upload-product/`**  -  POST (multipart)
 ```
 Input:  { name, description, price, images: File[] }
 Auth:   Required
@@ -484,7 +484,7 @@ Output: { product: Product }
 
 #### Persona
 
-**`generate-persona/`** — POST
+**`generate-persona/`**  -  POST
 ```
 Input:  { name: string, attributes: PersonaAttributes }
 Auth:   Required
@@ -498,7 +498,7 @@ Output: { persona: Persona }
 Timeout: ~20-30s (within Edge Function limit)
 ```
 
-**`select-persona-image/`** — POST
+**`select-persona-image/`**  -  POST
 ```
 Input:  { persona_id: string, image_index: number }
 Auth:   Required
@@ -510,7 +510,7 @@ Output: { persona: Persona }
 
 #### Video Generation
 
-**`generate-video/`** — POST
+**`generate-video/`**  -  POST
 ```
 Input:  { product_id: string, persona_id: string, mode: 'easy' }
 Auth:   Required
@@ -531,7 +531,7 @@ Output: { generation_id: string, status: 'generating_video' }
 Timeout: Steps 1-9 take ~30-45s total. Kling processing continues async.
 ```
 
-**`video-status/`** — GET
+**`video-status/`**  -  GET
 ```
 Input:  ?generation_id=xxx
 Auth:   Required
@@ -542,14 +542,14 @@ Flow:
      a. Check each Kling job_id status via API
      b. For completed segments: download video, upload to Storage
      c. If all segments done for all 4 variations:
-        - Stitch segments (or return segments — MVP can skip stitching)
+        - Stitch segments (or return segments  -  MVP can skip stitching)
         - Update generation (status: 'completed', videos array populated)
   4. Return current status + completed videos (if any)
 Output: { status: string, progress: { completed: number, total: number }, videos: Video[] }
 Polling: Frontend calls every 5s until status = 'completed' or 'failed'
 ```
 
-**`generation-history/`** — GET
+**`generation-history/`**  -  GET
 ```
 Input:  ?page=1&limit=20
 Auth:   Required
@@ -559,7 +559,7 @@ Output: { generations: Generation[], total: number }
 
 #### Billing
 
-**`stripe-checkout/`** — POST
+**`stripe-checkout/`**  -  POST
 ```
 Input:  { plan: 'starter' | 'growth' | 'scale' }
 Auth:   Required
@@ -570,14 +570,14 @@ Flow:
 Output: { url: string }
 ```
 
-**`stripe-portal/`** — POST
+**`stripe-portal/`**  -  POST
 ```
 Auth:   Required
 Flow:   Create Stripe billing portal session
 Output: { url: string }
 ```
 
-**`stripe-webhook/`** — POST
+**`stripe-webhook/`**  -  POST
 ```
 Auth:   Stripe signature verification (no JWT)
 Flow:
@@ -592,7 +592,7 @@ Flow:
 Output: { received: true }
 ```
 
-**`credit-balance/`** — GET
+**`credit-balance/`**  -  GET
 ```
 Auth:   Required
 Flow:   Read credit_balances for user
@@ -601,7 +601,7 @@ Output: { remaining: number, plan: string }
 
 #### Auth Helpers
 
-**`delete-account/`** — POST
+**`delete-account/`**  -  POST
 ```
 Auth:   Required
 Flow:
@@ -688,7 +688,7 @@ components/
 │   ├── character-builder.tsx       # Main persona creator (9 attributes)
 │   ├── attribute-selector.tsx      # Individual attribute control (slider/picker/grid)
 │   ├── persona-preview.tsx         # Live preview of selected attributes
-│   ├── persona-image-picker.tsx    # 4 generated images — select one
+│   ├── persona-image-picker.tsx    # 4 generated images  -  select one
 │   └── persona-card.tsx            # Persona display card
 │
 ├── generate/
@@ -963,7 +963,7 @@ const statusResponse = await fetch(`https://api.kling.ai/v1/videos/${jobId}`, {
 
 ```typescript
 // Used in: stripe-checkout/, stripe-webhook/, stripe-portal/
-// Standard Stripe Node SDK patterns — same as ZeriFlow implementation
+// Standard Stripe Node SDK patterns  -  same as ZeriFlow implementation
 
 // Price IDs (env vars)
 // STRIPE_PRICE_STARTER_MONTHLY
@@ -1003,14 +1003,14 @@ STRIPE_PRICE_SCALE_MONTHLY=price_...
 - Refresh tokens rotated automatically by Supabase client
 
 ### Authorization
-- RLS on all tables — users can only access their own data
+- RLS on all tables  -  users can only access their own data
 - Subscription tier limits enforced in Edge Functions (persona slots, generation quota)
 - Admin role check for future admin endpoints
 
 ### Data Protection
 - Supabase encrypts at rest (AES-256) and in transit (TLS 1.3)
 - Signed URLs for all Storage access (1h expiry)
-- No secrets in frontend code — only `SUPABASE_URL` and `ANON_KEY` are public
+- No secrets in frontend code  -  only `SUPABASE_URL` and `ANON_KEY` are public
 
 ### Input Validation
 - URL validation + SSRF protection on scraping endpoint
@@ -1024,7 +1024,7 @@ STRIPE_PRICE_SCALE_MONTHLY=price_...
 
 ### Abuse Prevention
 - Credit system inherently rate-limits generation
-- Free trial: 1 credit (4 videos) — prevents bulk abuse
+- Free trial: 1 credit (4 videos)  -  prevents bulk abuse
 - Unconfirmed scrape data purged after 24h (DR2)
 
 ---
@@ -1039,7 +1039,7 @@ STRIPE_PRICE_SCALE_MONTHLY=price_...
 | FR7–FR10 | Auth & User Management | Supabase Auth, `profiles` table, `settings/` page |
 | FR11–FR17 | Persona Creation | `generate-persona/`, `select-persona-image/`, `personas` table, character builder UI |
 | FR18–FR26 | Video Generation (Easy Mode) | `generate-video/`, `video-status/`, `generations` table, generation wizard UI |
-| FR27–FR30 | Expert Mode (Phase 2) | Deferred — `mode` field in generations, UI not in MVP |
+| FR27–FR30 | Expert Mode (Phase 2) | Deferred  -  `mode` field in generations, UI not in MVP |
 | FR31–FR36 | Paywall & Billing | `stripe-checkout/`, `stripe-webhook/`, `credit_balances`, `credit_ledger`, paywall modal |
 | FR37–FR38 | Dashboard & Video Library | `generation-history/`, dashboard page, video library UI |
 
@@ -1049,9 +1049,9 @@ STRIPE_PRICE_SCALE_MONTHLY=price_...
 |-----|------------|---------|
 | NFR1 | Scraping < 15s | Single Edge Function fetch + parse |
 | NFR2 | Persona images < 30s | NanoBanana API call within Edge Function timeout |
-| NFR3 | Video segment < 3 min | Kling async — not blocked by Edge Function timeout |
+| NFR3 | Video segment < 3 min | Kling async  -  not blocked by Edge Function timeout |
 | NFR4 | Total generation < 10 min | Parallel segment generation via multiple Kling jobs |
-| NFR5 | 50 concurrent jobs | Each job is independent Kling API calls — no shared resources |
+| NFR5 | 50 concurrent jobs | Each job is independent Kling API calls  -  no shared resources |
 | NFR6 | 99.5% uptime | Supabase SLA + Vercel SLA |
 | NFR7 | Retry on AI failure | Edge Function retries (3x exponential backoff) on Kling/NanoBanana failures |
 | NFR9–10 | Encryption at rest + in transit | Supabase default (AES-256 + TLS 1.3) |
@@ -1071,6 +1071,6 @@ STRIPE_PRICE_SCALE_MONTHLY=price_...
   - Credit system provides natural rate limiting
   - RLS provides data isolation without custom middleware
 - **Known Gaps (acceptable for MVP):**
-  - Video stitching (crossfade between segments) may need a simple ffmpeg step — evaluate during implementation
-  - Email notifications on generation completion (NFR8) — defer to Phase 2
-  - Expert Mode (FR27–30) — deferred by design
+  - Video stitching (crossfade between segments) may need a simple ffmpeg step  -  evaluate during implementation
+  - Email notifications on generation completion (NFR8)  -  defer to Phase 2
+  - Expert Mode (FR27–30)  -  deferred by design

@@ -1,5 +1,5 @@
 /**
- * Supabase Auth Hook — Send Email
+ * Supabase Auth Hook  -  Send Email
  *
  * Configured in: Supabase Dashboard → Authentication → Hooks → Send Email Hook
  * URL: https://<project>.supabase.co/functions/v1/send-email
@@ -31,7 +31,7 @@ const HOOK_SECRET = Deno.env.get("SEND_EMAIL_HOOK_SECRET");
  * Verify the Supabase Auth Hook HMAC-SHA256 signature.
  * Supabase sends: Authorization: <version>,<signature>
  * where <version> = "v1" and <signature> = hex(HMAC-SHA256(body, secret))
- * The secret in env is stored as "v1,whsec_<base64>" — we extract the base64 key part.
+ * The secret in env is stored as "v1,whsec_<base64>"  -  we extract the base64 key part.
  */
 async function verifyHookSignature(req: Request, body: string): Promise<boolean> {
   if (!HOOK_SECRET) return true; // Skip verification if secret not configured (dev)
@@ -43,7 +43,7 @@ async function verifyHookSignature(req: Request, body: string): Promise<boolean>
   const [version, signature] = authHeader.split(",");
   if (version !== "v1" || !signature) return false;
 
-  // Secret format: "v1,whsec_<base64>" — extract the base64 part after "whsec_"
+  // Secret format: "v1,whsec_<base64>"  -  extract the base64 part after "whsec_"
   const secretPart = HOOK_SECRET.replace(/^v1,whsec_/, "").replace(/^whsec_/, "");
   const keyBytes = Uint8Array.from(atob(secretPart), (c) => c.charCodeAt(0));
 
