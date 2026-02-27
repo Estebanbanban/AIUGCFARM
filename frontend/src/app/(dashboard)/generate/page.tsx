@@ -187,7 +187,17 @@ export default function GeneratePage() {
     setScrapeError(null);
     try {
       const result = await scrapeProduct.mutateAsync({ url: importUrl.trim() });
-      if (result.save_failed || !result.saved) {
+      if (result.products.length === 0) {
+        if (result.blocked_by_robots) {
+          throw new Error(
+            "This store blocks automated scraping (robots.txt). Try manual upload.",
+          );
+        }
+        throw new Error(
+          "No products could be extracted from this URL. Try a direct product page.",
+        );
+      }
+      if (result.save_failed) {
         throw new Error(
           "We scraped this page but could not save products to your account. Please try again.",
         );
@@ -212,7 +222,7 @@ export default function GeneratePage() {
         }));
       if (scraped.length === 0) {
         throw new Error(
-          "No products were saved from this URL. Please try another page.",
+          "Products were found but none were saved to your account. Please try again.",
         );
       }
       setScrapedProducts(scraped);
