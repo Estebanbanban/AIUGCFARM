@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -37,7 +37,8 @@ import {
 } from "@/components/ui/dialog";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { useProducts } from "@/hooks/use-products";
-import { usePersonas } from "@/hooks/use-personas";
+import { usePersonas, resolvePersonaImageUrl } from "@/hooks/use-personas";
+import type { Persona } from "@/types/database";
 import { useCredits } from "@/hooks/use-credits";
 import { useCreateGeneration } from "@/hooks/use-generations";
 import { useCheckout } from "@/hooks/use-checkout";
@@ -47,6 +48,34 @@ const steps = [
   { number: 2, label: "Persona" },
   { number: 3, label: "Review" },
 ];
+
+/** Resolve image URLs for a list of personas (handles storage paths). */
+function useResolvedPersonaImages(personas: Persona[] | undefined) {
+  const [imageMap, setImageMap] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    if (!personas || personas.length === 0) return;
+
+    let cancelled = false;
+    async function resolve() {
+      const entries = await Promise.all(
+        personas!.map(async (p) => {
+          const url = await resolvePersonaImageUrl(p.selected_image_url);
+          return [p.id, url] as [string, string | null];
+        })
+      );
+      if (!cancelled) {
+        setImageMap(Object.fromEntries(entries));
+      }
+    }
+    resolve();
+    return () => {
+      cancelled = true;
+    };
+  }, [personas]);
+
+  return imageMap;
+}
 
 export default function GeneratePage() {
   const router = useRouter();
@@ -58,6 +87,7 @@ export default function GeneratePage() {
   const { data: credits, isLoading: creditsLoading } = useCredits();
   const createGeneration = useCreateGeneration();
   const checkout = useCheckout();
+  const personaImageMap = useResolvedPersonaImages(personas);
 
   const confirmedProducts = products?.filter((p) => p.confirmed) ?? [];
   const activePersonas = personas ?? [];
@@ -104,9 +134,9 @@ export default function GeneratePage() {
         mode: store.mode as "easy" | "expert",
       },
       {
-        onSuccess: (generation) => {
+        onSuccess: (result) => {
           store.reset();
-          router.push(`/dashboard/generate/${generation.id}`);
+          router.push(`/generate/${result.generation_id}`);
           toast.success("Generation started!");
         },
         onError: (err) => {
@@ -325,9 +355,9 @@ export default function GeneratePage() {
                     >
                       <CardContent className="flex flex-col items-center gap-3 py-6">
                         <div className="flex size-20 items-center justify-center rounded-full bg-muted">
-                          {persona.selected_image_url ? (
+                          {personaImageMap[persona.id] ? (
                             <img
-                              src={persona.selected_image_url}
+                              src={personaImageMap[persona.id]!}
                               alt={persona.name}
                               className="size-full rounded-full object-cover"
                             />

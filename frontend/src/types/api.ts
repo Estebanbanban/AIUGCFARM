@@ -44,3 +44,68 @@ export interface ScrapeResponse {
 export interface ConfirmProductsResponse {
   data: { confirmed: Array<{ id: string; updated: boolean }> };
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Generation (Epic 6) response types                                        */
+/* -------------------------------------------------------------------------- */
+
+import type {
+  GenerationStatus,
+  GenerationScript,
+  GenerationSegments,
+} from "./database";
+
+/** Response from generate-video Edge Function */
+export interface CreateGenerationResponse {
+  data: {
+    generation_id: string;
+    status: string;
+  };
+}
+
+/** Response from video-status Edge Function */
+export interface GenerationProgressResponse {
+  data: {
+    generation_id: string;
+    status: GenerationStatus;
+    script?: GenerationScript | null;
+    composite_image_url?: string | null;
+    progress?: { completed: number; total: number };
+    segments?: GenerationSegments | null;
+    error_message?: string | null;
+    completed_at?: string | null;
+  };
+}
+
+/** A single generation item returned by generation-history */
+export interface GenerationHistoryItem {
+  id: string;
+  product_id: string;
+  persona_id: string;
+  mode: string;
+  status: GenerationStatus;
+  script: GenerationScript | null;
+  composite_image_url: string | null;
+  videos: GenerationSegments | null;
+  error_message: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  products: { name: string; images: string[] } | null;
+  personas: { name: string; selected_image_url: string | null } | null;
+}
+
+/** Response from generation-history Edge Function */
+export interface GenerationHistoryResponse {
+  data: {
+    generations: GenerationHistoryItem[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      total_pages: number;
+      has_next: boolean;
+      has_prev: boolean;
+    };
+  };
+}

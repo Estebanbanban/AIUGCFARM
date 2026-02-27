@@ -2,32 +2,117 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
+import { checkKlingJob } from "../_shared/kling.ts";
+import { refundCredits } from "../_shared/credits.ts";
 
-const KLING_API_KEY = Deno.env.get("KLING_API_KEY")!;
-const KLING_BASE_URL =
-  Deno.env.get("KLING_BASE_URL") || "https://api.klingai.com/v1";
+const BATCH_COST = 9;
 
-/** Poll Kling API for a single job's status. */
-async function checkKlingJob(
-  jobId: string,
-): Promise<{ status: string; video_url?: string }> {
-  const res = await fetch(`${KLING_BASE_URL}/videos/jobs/${jobId}`, {
-    headers: {
-      Authorization: `Bearer ${KLING_API_KEY}`,
-    },
-  });
+// ── Types ─────────────────────────────────────────────────────────────
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Kling status check failed: ${err}`);
+interface StoredSegmentVideo {
+  storage_path: string;
+  duration: number;
+  variation: number;
+  variant_label: string;
+}
+
+interface StoredVideos {
+  hooks: StoredSegmentVideo[];
+  bodies: StoredSegmentVideo[];
+  ctas: StoredSegmentVideo[];
+}
+
+interface ResponseSegmentVideo {
+  url: string;
+  duration: number;
+  variation: number;
+  variant_label: string;
+}
+
+interface ResponseSegments {
+  hooks: ResponseSegmentVideo[];
+  bodies: ResponseSegmentVideo[];
+  ctas: ResponseSegmentVideo[];
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Generate a fresh signed URL for a composite image storage path.
+ * Returns null if the path is already a full URL or signing fails.
+ */
+async function getCompositeSignedUrl(
+  sb: ReturnType<typeof getAdminClient>,
+  storagePath: string,
+): Promise<string | null> {
+  if (storagePath.startsWith("http")) return storagePath;
+
+  const { data, error } = await sb.storage
+    .from("composite-images")
+    .createSignedUrl(storagePath, 3600);
+
+  if (error || !data?.signedUrl) {
+    console.error("Failed to sign composite image URL:", error?.message);
+    return null;
   }
 
-  const body = await res.json();
-  return {
-    status: body.status, // "pending" | "processing" | "completed" | "failed"
-    video_url: body.output?.video_url,
-  };
+  return data.signedUrl;
 }
+
+/**
+ * Generate fresh signed URLs for all segment videos in a StoredVideos structure.
+ */
+async function signSegmentVideos(
+  sb: ReturnType<typeof getAdminClient>,
+  stored: StoredVideos,
+): Promise<ResponseSegments> {
+  const result: ResponseSegments = { hooks: [], bodies: [], ctas: [] };
+  const segmentTypes = ["hooks", "bodies", "ctas"] as const;
+
+  for (const segType of segmentTypes) {
+    for (const seg of stored[segType]) {
+      const { data, error } = await sb.storage
+        .from("generated-videos")
+        .createSignedUrl(seg.storage_path, 3600);
+
+      if (error || !data?.signedUrl) {
+        console.error(`Failed to sign video URL for ${seg.storage_path}:`, error?.message);
+        continue;
+      }
+
+      result[segType].push({
+        url: data.signedUrl,
+        duration: seg.duration,
+        variation: seg.variation,
+        variant_label: seg.variant_label,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Parse a job key like "hook_1" into its segment type and variation number.
+ */
+function parseJobKey(jobKey: string): { segType: "hooks" | "bodies" | "ctas"; variation: number } {
+  const parts = jobKey.split("_");
+  const variation = parseInt(parts[parts.length - 1], 10);
+  const prefix = parts.slice(0, -1).join("_"); // "hook", "body", "cta"
+
+  const typeMap: Record<string, "hooks" | "bodies" | "ctas"> = {
+    hook: "hooks",
+    body: "bodies",
+    cta: "ctas",
+  };
+
+  const segType = typeMap[prefix];
+  if (!segType) throw new Error(`Unknown job key prefix: ${prefix}`);
+
+  return { segType, variation };
+}
+
+// ── Main handler ─────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req);
@@ -59,129 +144,231 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "Generation not found" }, cors, 404);
     }
 
-    // If already completed or failed, return current state
-    if (gen.status === "completed" || gen.status === "failed") {
+    // ── Helper: build composite signed URL if available ──────────────
+    let compositeImageUrl: string | null = null;
+    if (gen.composite_image_url) {
+      compositeImageUrl = await getCompositeSignedUrl(sb, gen.composite_image_url);
+    }
+
+    // ── Handle "completed" — return current state with fresh signed URLs ─
+    if (gen.status === "completed") {
+      let segments: ResponseSegments | undefined;
+      if (gen.videos && typeof gen.videos === "object" && !Array.isArray(gen.videos)) {
+        segments = await signSegmentVideos(sb, gen.videos as StoredVideos);
+      }
+
       return json({
         data: {
           generation_id: gen.id,
           status: gen.status,
-          videos: gen.videos,
-          error_message: gen.error_message,
+          script: gen.script,
+          composite_image_url: compositeImageUrl,
+          segments,
           completed_at: gen.completed_at,
         },
       }, cors);
     }
 
-    // If generating_video, poll Kling for each job
-    if (gen.status === "generating_video" && gen.external_job_ids) {
-      const jobIds = gen.external_job_ids as Record<string, string>;
-      const segments = Object.keys(jobIds);
-      const videoResults: Record<string, { status: string; url?: string }> = {};
-      const videos = (gen.videos as { segment: string; url: string }[]) ?? [];
-      const completedSegments = new Set(videos.map((v) => v.segment));
-      let allDone = true;
-      let anyFailed = false;
+    // ── Handle "failed" — return current state ──────────────────────
+    if (gen.status === "failed") {
+      return json({
+        data: {
+          generation_id: gen.id,
+          status: gen.status,
+          script: gen.script,
+          composite_image_url: compositeImageUrl,
+          error_message: gen.error_message,
+        },
+      }, cors);
+    }
 
-      for (const segment of segments) {
-        if (completedSegments.has(segment)) {
-          videoResults[segment] = { status: "completed" };
+    // ── Handle "generating_segments" — poll Kling for each job ──────
+    if (gen.status === "generating_segments" && gen.external_job_ids) {
+      const jobIds = gen.external_job_ids as Record<string, string>;
+      const jobKeys = Object.keys(jobIds);
+
+      // Load existing stored videos progress (or start fresh)
+      const storedVideos: StoredVideos = (
+        gen.videos &&
+        typeof gen.videos === "object" &&
+        !Array.isArray(gen.videos) &&
+        (gen.videos as StoredVideos).hooks
+      )
+        ? gen.videos as StoredVideos
+        : { hooks: [], bodies: [], ctas: [] };
+
+      // Build a set of already-completed job keys from stored videos
+      const completedKeys = new Set<string>();
+      const segmentTypes = ["hooks", "bodies", "ctas"] as const;
+      for (const segType of segmentTypes) {
+        for (const seg of storedVideos[segType]) {
+          // Derive job key from storage_path: e.g. "userId/genId/hook_1.mp4" -> "hook_1"
+          const filename = seg.storage_path.split("/").pop() ?? "";
+          const jobKey = filename.replace(".mp4", "");
+          completedKeys.add(jobKey);
+        }
+      }
+
+      let anyFailed = false;
+      let failedMessage = "";
+
+      // Get the script for looking up variant_label and duration
+      const script = gen.script as Record<string, Array<Record<string, unknown>>> | null;
+
+      for (const jobKey of jobKeys) {
+        // Skip already completed jobs
+        if (completedKeys.has(jobKey)) continue;
+
+        let klingResult;
+        try {
+          klingResult = await checkKlingJob(jobIds[jobKey]);
+        } catch (err) {
+          console.error(`Kling check failed for ${jobKey}:`, err);
+          // Treat transient errors as still-in-progress, not failure
           continue;
         }
 
-        const result = await checkKlingJob(jobIds[segment]);
-        videoResults[segment] = { status: result.status };
-
-        if (result.status === "completed" && result.video_url) {
+        if (klingResult.status === "completed" && klingResult.video_url) {
           // Download and store the video
-          const videoRes = await fetch(result.video_url);
-          if (videoRes.ok) {
+          try {
+            const videoRes = await fetch(klingResult.video_url);
+            if (!videoRes.ok) {
+              throw new Error(`Failed to download video: HTTP ${videoRes.status}`);
+            }
             const videoBlob = await videoRes.blob();
-            const storagePath = `${userId}/${generationId}/${segment}.mp4`;
+            const storagePath = `${userId}/${generationId}/${jobKey}.mp4`;
 
             const { error: uploadErr } = await sb.storage
               .from("generated-videos")
               .upload(storagePath, videoBlob, {
                 contentType: "video/mp4",
-                upsert: false,
+                upsert: true,
               });
 
-            if (!uploadErr) {
-              const {
-                data: { publicUrl },
-              } = sb.storage
-                .from("generated-videos")
-                .getPublicUrl(storagePath);
-
-              videos.push({ segment, url: publicUrl });
-              videoResults[segment].url = publicUrl;
-            } else {
-              console.error(`Video upload failed for ${segment}:`, uploadErr);
-              anyFailed = true;
+            if (uploadErr) {
+              throw new Error(`Video upload failed for ${jobKey}: ${uploadErr.message}`);
             }
+
+            // Parse job key to get segment type and variation
+            const { segType, variation } = parseJobKey(jobKey);
+
+            // Look up duration and variant_label from script
+            let duration = 5;
+            let variantLabel = "";
+            if (script && script[segType]) {
+              const segIndex = variation - 1;
+              const segData = script[segType][segIndex];
+              if (segData) {
+                duration = (segData.duration_seconds as number) ?? 5;
+                variantLabel = (segData.variant_label as string) ?? "";
+              }
+            }
+
+            storedVideos[segType].push({
+              storage_path: storagePath,
+              duration,
+              variation,
+              variant_label: variantLabel,
+            });
+
+            completedKeys.add(jobKey);
+          } catch (dlErr) {
+            console.error(`Video download/upload failed for ${jobKey}:`, dlErr);
+            anyFailed = true;
+            failedMessage = dlErr instanceof Error ? dlErr.message : String(dlErr);
           }
-        } else if (result.status === "failed") {
+        } else if (klingResult.status === "failed") {
           anyFailed = true;
-        } else {
-          allDone = false;
+          failedMessage = klingResult.error_message || `Video generation failed for segment ${jobKey}`;
         }
       }
 
-      // Update generation
-      if (allDone && !anyFailed) {
-        await sb
-          .from("generations")
-          .update({
-            status: "completed",
-            videos,
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", generationId);
-      } else if (anyFailed && allDone) {
+      const completedCount = completedKeys.size;
+      const totalCount = jobKeys.length;
+
+      // Check if all jobs have a final status (completed or failed)
+      const allJobsResolved = completedCount === totalCount || anyFailed;
+
+      if (anyFailed) {
+        // Mark as failed and refund credits
         await sb
           .from("generations")
           .update({
             status: "failed",
-            videos,
-            error_message: "One or more video segments failed",
+            videos: storedVideos,
+            error_message: failedMessage || "One or more video segments failed",
           })
           .eq("id", generationId);
-      } else {
-        // Partial progress — update videos array
-        await sb
-          .from("generations")
-          .update({ videos })
-          .eq("id", generationId);
+
+        // Refund credits
+        try {
+          await refundCredits(userId, BATCH_COST, generationId);
+        } catch (refundErr) {
+          console.error("Credit refund failed:", refundErr);
+        }
+
+        return json({
+          data: {
+            generation_id: generationId,
+            status: "failed",
+            script: gen.script,
+            composite_image_url: compositeImageUrl,
+            error_message: failedMessage || "One or more video segments failed",
+            progress: { completed: completedCount, total: totalCount },
+          },
+        }, cors);
       }
 
-      const completedCount = videos.length;
-      const totalCount = segments.length;
+      if (allJobsResolved && completedCount === totalCount) {
+        // All 9 completed successfully
+        await sb
+          .from("generations")
+          .update({
+            status: "completed",
+            videos: storedVideos,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", generationId);
+
+        // Generate signed URLs for response
+        const segments = await signSegmentVideos(sb, storedVideos);
+
+        return json({
+          data: {
+            generation_id: generationId,
+            status: "completed",
+            script: gen.script,
+            composite_image_url: compositeImageUrl,
+            segments,
+            progress: { completed: completedCount, total: totalCount },
+          },
+        }, cors);
+      }
+
+      // Still in progress — save partial progress
+      await sb
+        .from("generations")
+        .update({ videos: storedVideos })
+        .eq("id", generationId);
 
       return json({
         data: {
           generation_id: generationId,
-          status: allDone
-            ? anyFailed
-              ? "failed"
-              : "completed"
-            : "generating_video",
-          progress: {
-            completed: completedCount,
-            total: totalCount,
-            segments: videoResults,
-          },
-          videos,
+          status: "generating_segments",
+          script: gen.script,
+          composite_image_url: compositeImageUrl,
+          progress: { completed: completedCount, total: totalCount },
         },
       }, cors);
     }
 
-    // For other statuses (scripting, generating_image), return current state
+    // ── Handle pre-video statuses (scripting, generating_image, submitting_jobs) ─
     return json({
       data: {
         generation_id: gen.id,
         status: gen.status,
-        script: gen.script,
-        composite_image_url: gen.composite_image_url,
-        videos: gen.videos,
+        script: gen.script ?? undefined,
+        composite_image_url: compositeImageUrl,
       },
     }, cors);
   } catch (e: unknown) {

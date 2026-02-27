@@ -370,8 +370,8 @@ export default function PersonaDetailPage() {
                             <p className="text-sm font-medium text-foreground">
                               {gen.products?.name ?? "Unknown Product"}
                             </p>
-                            <p className="text-xs text-muted-foreground">
-                              {gen.videos?.length ?? 0} video{(gen.videos?.length ?? 0) !== 1 ? "s" : ""}
+                            <p className="text-xs capitalize text-muted-foreground">
+                              {gen.status.replace(/_/g, " ")}
                             </p>
                           </div>
                         </div>

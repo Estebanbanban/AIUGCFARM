@@ -4,7 +4,17 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { callEdge } from "@/lib/api";
 import type { Generation } from "@/types/database";
-import type { CreateGenerationInput } from "@/schemas/generation";
+import type {
+  CreateGenerationResponse,
+  GenerationProgressResponse,
+  GenerationHistoryResponse,
+} from "@/types/api";
+
+interface GenerationInput {
+  product_id: string;
+  persona_id: string;
+  mode: "easy" | "expert";
+}
 
 export function useGenerations() {
   return useQuery<Generation[]>({
@@ -38,13 +48,58 @@ export function useGeneration(id: string) {
   });
 }
 
+/** Create a new generation (calls generate-video Edge Function). */
 export function useCreateGeneration() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: CreateGenerationInput) => {
-      return callEdge<Generation>("generate-video", { body: data });
+    mutationFn: async (input: GenerationInput) => {
+      const res = await callEdge<CreateGenerationResponse>("generate-video", {
+        body: input,
+      });
+      return res.data;
     },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["generations"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["credits"] });
+      queryClient.invalidateQueries({ queryKey: ["generations"] });
+    },
+  });
+}
+
+/** Poll generation status (auto-refetches while processing). */
+export function useGenerationStatus(generationId: string | null) {
+  return useQuery({
+    queryKey: ["generation-progress", generationId],
+    queryFn: async () => {
+      const res = await callEdge<GenerationProgressResponse>(
+        `video-status?generation_id=${generationId}`,
+        { method: "GET" }
+      );
+      return res.data;
+    },
+    enabled: !!generationId,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (
+        data?.status === "completed" ||
+        data?.status === "failed"
+      ) {
+        return false;
+      }
+      return 5000;
+    },
+  });
+}
+
+/** Fetch paginated generation history from the Edge Function. */
+export function useGenerationHistory(page = 1) {
+  return useQuery({
+    queryKey: ["generation-history", page],
+    queryFn: async () => {
+      const res = await callEdge<GenerationHistoryResponse>(
+        `generation-history?page=${page}&limit=20`,
+        { method: "GET" }
+      );
+      return res.data;
+    },
   });
 }

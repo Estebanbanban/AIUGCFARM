@@ -2,6 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -9,11 +10,21 @@ import {
   Check,
   X,
   Loader2,
-  Play,
-  Download,
   AlertCircle,
   Clock,
+  FileText,
+  ImageIcon,
+  Video,
+  RefreshCw,
+  Play,
+  Pause,
+  Download,
+  ChevronDown,
+  ChevronUp,
+  Send,
 } from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,140 +33,648 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import type {
-  GenerationStatus,
-  GenerationScript,
-  GenerationVideo,
-} from "@/types/database";
+import { useGenerationStatus } from "@/hooks/use-generations";
+import type { GenerationStatus, ScriptSegment, SegmentVideo } from "@/types/database";
 
-const mockGeneration = {
-  id: "gen-new-1",
-  productName: "Vitamin C Serum",
-  personaName: "Sophie",
-  mode: "easy" as const,
-  status: "generating_video" as GenerationStatus,
-  script: {
-    hook: {
-      text: "Ever wondered why your skin looks dull in the morning?",
-      duration: 5,
-    },
-    body: {
-      text: "This Vitamin C Serum has 20% L-Ascorbic Acid that really brightens your skin tone...",
-      duration: 15,
-    },
-    cta: {
-      text: "Click the link below to get 20% off your first order!",
-      duration: 5,
-    },
-  } as GenerationScript,
-  videos: [
-    {
-      url: "",
-      thumbnail_url: "",
-      duration: 25,
-      variation_index: 0,
-    },
-    {
-      url: "",
-      thumbnail_url: "",
-      duration: 25,
-      variation_index: 1,
-    },
-  ] as GenerationVideo[],
-  error_message: null as string | null,
-};
+/* -------------------------------------------------------------------------- */
+/*  Status configuration                                                      */
+/* -------------------------------------------------------------------------- */
 
 const statusConfig: Record<
   GenerationStatus,
-  { label: string; color: string; icon: React.ReactNode }
+  { label: string; badgeClass: string }
 > = {
   pending: {
-    label: "Pending",
-    color: "text-zinc-400",
-    icon: <Clock className="size-4 text-zinc-400" />,
+    label: "Queued",
+    badgeClass: "bg-zinc-500/10 text-zinc-400",
   },
   scripting: {
-    label: "Writing script",
-    color: "text-amber-400",
-    icon: <Loader2 className="size-4 animate-spin text-amber-400" />,
+    label: "Writing scripts...",
+    badgeClass: "bg-amber-500/10 text-amber-400",
   },
-  generating_image: {
-    label: "Generating image",
-    color: "text-blue-400",
-    icon: <Loader2 className="size-4 animate-spin text-blue-400" />,
+  content_ready: {
+    label: "Content ready",
+    badgeClass: "bg-violet-500/10 text-violet-400",
   },
   submitting_jobs: {
-    label: "Submitting jobs",
-    color: "text-blue-400",
-    icon: <Loader2 className="size-4 animate-spin text-blue-400" />,
+    label: "Submitting video jobs...",
+    badgeClass: "bg-violet-500/10 text-violet-400",
   },
   generating_segments: {
-    label: "Generating segments",
-    color: "text-blue-400",
-    icon: <Loader2 className="size-4 animate-spin text-blue-400" />,
+    label: "Generating segments...",
+    badgeClass: "bg-blue-500/10 text-blue-400",
   },
   generating_video: {
-    label: "Generating videos",
-    color: "text-blue-400",
-    icon: <Loader2 className="size-4 animate-spin text-blue-400" />,
+    label: "Generating video...",
+    badgeClass: "bg-blue-500/10 text-blue-400",
   },
   stitching: {
-    label: "Stitching videos",
-    color: "text-blue-400",
-    icon: <Loader2 className="size-4 animate-spin text-blue-400" />,
+    label: "Assembling videos...",
+    badgeClass: "bg-blue-500/10 text-blue-400",
   },
   completed: {
-    label: "Completed",
-    color: "text-emerald-400",
-    icon: <Check className="size-4 text-emerald-400" />,
+    label: "Complete",
+    badgeClass: "bg-emerald-500/10 text-emerald-400",
   },
   failed: {
     label: "Failed",
-    color: "text-red-400",
-    icon: <X className="size-4 text-red-400" />,
+    badgeClass: "bg-red-500/10 text-red-400",
   },
 };
 
-export default function GenerationProgressPage() {
+/* -------------------------------------------------------------------------- */
+/*  Pipeline stages                                                           */
+/* -------------------------------------------------------------------------- */
+
+interface PipelineStage {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  activeStatuses: GenerationStatus[];
+  doneStatuses: GenerationStatus[];
+}
+
+const pipelineStages: PipelineStage[] = [
+  {
+    key: "scripting",
+    label: "Writing Scripts",
+    icon: <FileText className="size-4" />,
+    activeStatuses: ["pending", "scripting"],
+    doneStatuses: [
+      "content_ready",
+      "submitting_jobs",
+      "generating_segments",
+      "generating_video",
+      "stitching",
+      "completed",
+    ],
+  },
+  {
+    key: "image",
+    label: "Generating POV Image",
+    icon: <ImageIcon className="size-4" />,
+    activeStatuses: ["scripting"],
+    doneStatuses: [
+      "content_ready",
+      "submitting_jobs",
+      "generating_segments",
+      "generating_video",
+      "stitching",
+      "completed",
+    ],
+  },
+  {
+    key: "submitting",
+    label: "Submitting Video Jobs",
+    icon: <Send className="size-4" />,
+    activeStatuses: ["submitting_jobs"],
+    doneStatuses: [
+      "generating_segments",
+      "generating_video",
+      "stitching",
+      "completed",
+    ],
+  },
+  {
+    key: "segments",
+    label: "Generating Video Segments",
+    icon: <Video className="size-4" />,
+    activeStatuses: ["generating_segments", "generating_video", "stitching"],
+    doneStatuses: ["completed"],
+  },
+  {
+    key: "complete",
+    label: "Complete",
+    icon: <Check className="size-4" />,
+    activeStatuses: [],
+    doneStatuses: ["completed"],
+  },
+];
+
+function getStageState(
+  stage: PipelineStage,
+  currentStatus: GenerationStatus
+): "done" | "active" | "pending" {
+  if (currentStatus === "failed") return "pending";
+  if (stage.doneStatuses.includes(currentStatus)) return "done";
+  if (stage.activeStatuses.includes(currentStatus)) return "active";
+  return "pending";
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Loading skeleton                                                          */
+/* -------------------------------------------------------------------------- */
+
+function LoadingSkeleton() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-3">
+        <Skeleton className="size-9 rounded-md" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-7 w-48" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+        <Skeleton className="h-6 w-24 rounded-full" />
+      </div>
+      <Skeleton className="h-40 rounded-xl" />
+      <Skeleton className="h-64 rounded-xl" />
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Script segment card                                                       */
+/* -------------------------------------------------------------------------- */
+
+function ScriptSegmentCard({
+  segment,
+  type,
+}: {
+  segment: ScriptSegment;
+  type: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border px-4 py-3">
+      <div className="mb-2 flex items-center gap-2">
+        <Badge variant="outline" className="text-xs">
+          {segment.duration_seconds}s
+        </Badge>
+        <Badge variant="secondary" className="text-xs capitalize">
+          {segment.variant_label}
+        </Badge>
+        <span className="text-xs text-muted-foreground capitalize">{type}</span>
+      </div>
+      <p className="text-sm text-foreground">{segment.text}</p>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Video segment card                                                        */
+/* -------------------------------------------------------------------------- */
+
+function VideoSegmentCard({
+  video,
+  label,
+  isSelected,
+  onSelect,
+}: {
+  video: SegmentVideo;
+  label: string;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  function togglePlay() {
+    const el = videoRef.current;
+    if (!el) return;
+    if (el.paused) {
+      el.play();
+      setIsPlaying(true);
+    } else {
+      el.pause();
+      setIsPlaying(false);
+    }
+  }
+
+  function handleDownload() {
+    window.open(video.url, "_blank");
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "group relative flex flex-col overflow-hidden rounded-xl border-2 text-left transition-all",
+        isSelected
+          ? "border-violet-500 ring-2 ring-violet-500/30"
+          : "border-border hover:border-muted-foreground/40"
+      )}
+    >
+      {/* Selection indicator */}
+      {isSelected && (
+        <div className="absolute right-2 top-2 z-10 flex size-6 items-center justify-center rounded-full bg-violet-600">
+          <Check className="size-3.5 text-white" />
+        </div>
+      )}
+
+      {/* Video player */}
+      <div className="relative aspect-[9/16] w-full bg-black">
+        <video
+          ref={videoRef}
+          src={video.url}
+          className="size-full object-contain"
+          preload="metadata"
+          playsInline
+          onEnded={() => setIsPlaying(false)}
+          onClick={(e) => {
+            e.stopPropagation();
+            togglePlay();
+          }}
+        />
+        {/* Play/Pause overlay */}
+        <div
+          className={cn(
+            "absolute inset-0 flex items-center justify-center bg-black/20 transition-opacity",
+            isPlaying
+              ? "opacity-0 hover:opacity-100"
+              : "opacity-100"
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            togglePlay();
+          }}
+        >
+          <div className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm">
+            {isPlaying ? (
+              <Pause className="size-5" />
+            ) : (
+              <Play className="ml-0.5 size-5" />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Card info */}
+      <div className="flex items-center justify-between px-3 py-2">
+        <div>
+          <p className="text-sm font-medium text-foreground">{label}</p>
+          <div className="mt-0.5 flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs capitalize">
+              {video.variant_label}
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              {video.duration}s
+            </span>
+          </div>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 shrink-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDownload();
+          }}
+        >
+          <Download className="size-4" />
+        </Button>
+      </div>
+    </button>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Combination preview player                                                */
+/* -------------------------------------------------------------------------- */
+
+function CombinationPreview({
+  hookVideo,
+  bodyVideo,
+  ctaVideo,
+}: {
+  hookVideo: SegmentVideo | undefined;
+  bodyVideo: SegmentVideo | undefined;
+  ctaVideo: SegmentVideo | undefined;
+}) {
+  const hookRef = useRef<HTMLVideoElement>(null);
+  const bodyRef = useRef<HTMLVideoElement>(null);
+  const ctaRef = useRef<HTMLVideoElement>(null);
+
+  const [currentSegment, setCurrentSegment] = useState<
+    "idle" | "hook" | "body" | "cta"
+  >("idle");
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const stopAll = useCallback(() => {
+    hookRef.current?.pause();
+    bodyRef.current?.pause();
+    ctaRef.current?.pause();
+    setCurrentSegment("idle");
+    setIsPlaying(false);
+  }, []);
+
+  function playSequence() {
+    stopAll();
+    if (!hookRef.current) return;
+    hookRef.current.currentTime = 0;
+    hookRef.current.play();
+    setCurrentSegment("hook");
+    setIsPlaying(true);
+  }
+
+  function handleHookEnded() {
+    if (bodyRef.current) {
+      bodyRef.current.currentTime = 0;
+      bodyRef.current.play();
+      setCurrentSegment("body");
+    }
+  }
+
+  function handleBodyEnded() {
+    if (ctaRef.current) {
+      ctaRef.current.currentTime = 0;
+      ctaRef.current.play();
+      setCurrentSegment("cta");
+    }
+  }
+
+  function handleCtaEnded() {
+    stopAll();
+  }
+
+  function togglePlay() {
+    if (isPlaying) {
+      stopAll();
+    } else {
+      playSequence();
+    }
+  }
+
+  // Reset when selection changes
+  useEffect(() => {
+    stopAll();
+  }, [hookVideo?.url, bodyVideo?.url, ctaVideo?.url, stopAll]);
+
+  const segmentLabels: Record<string, string> = {
+    idle: "Ready to preview",
+    hook: "Playing Hook",
+    body: "Playing Body",
+    cta: "Playing CTA",
+  };
+
+  if (!hookVideo || !bodyVideo || !ctaVideo) {
+    return (
+      <div className="flex aspect-[9/16] max-w-xs items-center justify-center rounded-xl bg-muted">
+        <p className="text-sm text-muted-foreground">
+          Select all segments to preview
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <div className="relative aspect-[9/16] w-full max-w-xs overflow-hidden rounded-xl bg-black">
+        {/* Stacked videos -- only the active one is visible */}
+        <video
+          ref={hookRef}
+          src={hookVideo.url}
+          className={cn(
+            "absolute inset-0 size-full object-contain",
+            currentSegment === "hook" ? "z-10" : "z-0 hidden"
+          )}
+          preload="metadata"
+          playsInline
+          onEnded={handleHookEnded}
+        />
+        <video
+          ref={bodyRef}
+          src={bodyVideo.url}
+          className={cn(
+            "absolute inset-0 size-full object-contain",
+            currentSegment === "body" ? "z-10" : "z-0 hidden"
+          )}
+          preload="metadata"
+          playsInline
+          onEnded={handleBodyEnded}
+        />
+        <video
+          ref={ctaRef}
+          src={ctaVideo.url}
+          className={cn(
+            "absolute inset-0 size-full object-contain",
+            currentSegment === "cta" ? "z-10" : "z-0 hidden"
+          )}
+          preload="metadata"
+          playsInline
+          onEnded={handleCtaEnded}
+        />
+
+        {/* Play overlay when idle */}
+        {currentSegment === "idle" && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center">
+            {/* Show poster from hook video */}
+            <video
+              src={hookVideo.url}
+              className="absolute inset-0 size-full object-contain opacity-40"
+              preload="metadata"
+              playsInline
+              muted
+            />
+            <button
+              type="button"
+              onClick={togglePlay}
+              className="relative z-10 flex size-16 items-center justify-center rounded-full bg-violet-600/90 text-white backdrop-blur-sm transition-transform hover:scale-105"
+            >
+              <Play className="ml-1 size-7" />
+            </button>
+          </div>
+        )}
+
+        {/* Pause overlay when playing */}
+        {isPlaying && (
+          <button
+            type="button"
+            onClick={togglePlay}
+            className="absolute inset-0 z-20 flex items-center justify-center bg-transparent opacity-0 transition-opacity hover:opacity-100"
+          >
+            <div className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm">
+              <Pause className="size-5" />
+            </div>
+          </button>
+        )}
+
+        {/* Segment indicator */}
+        {currentSegment !== "idle" && (
+          <div className="absolute bottom-3 left-3 z-30">
+            <Badge className="bg-black/70 text-white backdrop-blur-sm">
+              {segmentLabels[currentSegment]}
+            </Badge>
+          </div>
+        )}
+      </div>
+
+      {/* Controls */}
+      <div className="flex items-center gap-3">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={togglePlay}
+        >
+          {isPlaying ? (
+            <>
+              <Pause className="size-3.5" />
+              Stop
+            </>
+          ) : (
+            <>
+              <Play className="size-3.5" />
+              Play Combination
+            </>
+          )}
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          {segmentLabels[currentSegment]}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Main page component                                                       */
+/* -------------------------------------------------------------------------- */
+
+export default function GenerationDetailPage() {
   const params = useParams();
   const generationId = params.id as string;
 
-  const gen = mockGeneration;
-  const config = statusConfig[gen.status];
-  const isComplete = gen.status === "completed";
-  const isFailed = gen.status === "failed";
+  const {
+    data: gen,
+    isLoading,
+    error,
+    refetch,
+  } = useGenerationStatus(generationId);
+
+  // Script collapsible state
+  const [scriptExpanded, setScriptExpanded] = useState(true);
+
+  // Combination builder selection
+  const [selectedHook, setSelectedHook] = useState(0);
+  const [selectedBody, setSelectedBody] = useState(0);
+  const [selectedCta, setSelectedCta] = useState(0);
+
+  const status = (gen?.status as GenerationStatus) ?? "pending";
+  const config = statusConfig[status] ?? statusConfig.pending;
+  const isComplete = status === "completed";
+  const isFailed = status === "failed";
   const isProcessing = !isComplete && !isFailed;
 
-  const totalVariations = 4;
-  const completedVariations = gen.videos.length;
-  const progressPercent = isComplete
-    ? 100
-    : Math.round((completedVariations / totalVariations) * 100);
+  const segments = gen?.segments ?? null;
+  const script = gen?.script ?? null;
+  const progress = gen?.progress;
+
+  // Collapse script when videos are ready
+  useEffect(() => {
+    if (isComplete && segments) {
+      setScriptExpanded(false);
+    }
+  }, [isComplete, segments]);
+
+  /* ----- Download all segments ----- */
+  function handleDownloadAll() {
+    if (!segments) return;
+    const allVideos = [
+      ...(segments.hooks ?? []),
+      ...(segments.bodies ?? []),
+      ...(segments.ctas ?? []),
+    ];
+    allVideos.forEach((v) => window.open(v.url, "_blank"));
+    toast.success(`Opening ${allVideos.length} segment downloads`);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /*  Loading state                                                          */
+  /* ---------------------------------------------------------------------- */
+
+  if (isLoading && !gen) {
+    return <LoadingSkeleton />;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /*  Error state -- could not fetch at all                                  */
+  /* ---------------------------------------------------------------------- */
+
+  if (error && !gen) {
+    const is404 =
+      error.message?.includes("not found") ||
+      error.message?.includes("Not found") ||
+      error.message?.includes("404");
+
+    if (is404) {
+      return (
+        <div className="flex flex-col items-center gap-6 py-20">
+          <div className="flex size-16 items-center justify-center rounded-full bg-muted">
+            <AlertCircle className="size-8 text-muted-foreground" />
+          </div>
+          <div className="text-center">
+            <h1 className="text-xl font-bold text-foreground">
+              Generation Not Found
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              The generation you are looking for does not exist or you do not
+              have access to it.
+            </p>
+          </div>
+          <Button asChild variant="outline">
+            <Link href="/generate">
+              <ArrowLeft className="size-4" />
+              Back to Generate
+            </Link>
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col items-center gap-6 py-20">
+        <div className="flex size-16 items-center justify-center rounded-full bg-red-500/10">
+          <AlertCircle className="size-8 text-red-400" />
+        </div>
+        <div className="text-center">
+          <h1 className="text-xl font-bold text-foreground">
+            Something went wrong
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {error.message || "Failed to load generation status."}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => {
+            refetch();
+            toast.info("Retrying...");
+          }}
+        >
+          <RefreshCw className="size-4" />
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /*  Main content                                                           */
+  /* ---------------------------------------------------------------------- */
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
+      {/* ---------------------------------------------------------------- */}
+      {/*  Header                                                           */}
+      {/* ---------------------------------------------------------------- */}
       <div className="flex items-center gap-3">
         <Button asChild variant="ghost" size="icon">
-          <Link href="/dashboard/generate">
+          <Link href="/generate">
             <ArrowLeft className="size-4" />
           </Link>
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Generation Progress
+            Generation Details
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            {gen.productName} / {gen.personaName}
+            ID: {generationId.slice(0, 8)}...
           </p>
         </div>
         {isProcessing && (
-          <Badge
-            variant="secondary"
-            className="bg-amber-500/10 text-amber-400"
-          >
+          <Badge variant="secondary" className={config.badgeClass}>
             <Loader2 className="size-3 animate-spin" />
             {config.label}
           </Badge>
@@ -177,102 +696,429 @@ export default function GenerationProgressPage() {
         )}
       </div>
 
-      {/* Progress Bar */}
-      <Card>
-        <CardContent className="flex flex-col gap-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Overall Progress</span>
-            <span className="font-medium text-foreground">
-              {completedVariations}/{totalVariations} video variations
-            </span>
-          </div>
-          <Progress
-            value={progressPercent}
-            className="h-2 bg-muted [&>[data-slot=progress-indicator]]:bg-violet-500"
-          />
-        </CardContent>
-      </Card>
-
-      {/* Script Preview */}
-      {gen.script && (
+      {/* ---------------------------------------------------------------- */}
+      {/*  Progress section                                                 */}
+      {/* ---------------------------------------------------------------- */}
+      {isProcessing && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-foreground">Generated Script</CardTitle>
+            <CardTitle className="text-foreground">Pipeline Progress</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <div className="rounded-lg border border-border px-4 py-3">
-              <Badge variant="outline" className="mb-2 text-xs">
-                Hook ({gen.script.hook.duration}s)
-              </Badge>
-              <p className="text-sm text-foreground">{gen.script.hook.text}</p>
-            </div>
-            <div className="rounded-lg border border-border px-4 py-3">
-              <Badge variant="outline" className="mb-2 text-xs">
-                Body ({gen.script.body.duration}s)
-              </Badge>
-              <p className="text-sm text-foreground">{gen.script.body.text}</p>
-            </div>
-            <div className="rounded-lg border border-border px-4 py-3">
-              <Badge variant="outline" className="mb-2 text-xs">
-                CTA ({gen.script.cta.duration}s)
-              </Badge>
-              <p className="text-sm text-foreground">{gen.script.cta.text}</p>
+            {/* Progress bar for segment generation */}
+            {progress && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Segments generated
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {progress.completed}/{progress.total}
+                  </span>
+                </div>
+                <Progress
+                  value={
+                    progress.total > 0
+                      ? (progress.completed / progress.total) * 100
+                      : 0
+                  }
+                  className="h-2 bg-muted [&>[data-slot=progress-indicator]]:bg-violet-500"
+                />
+              </div>
+            )}
+
+            {/* Stage indicators */}
+            <div className="flex flex-col gap-1">
+              {pipelineStages.map((stage, i) => {
+                const state = getStageState(stage, status);
+                return (
+                  <div key={stage.key} className="flex items-start gap-3">
+                    <div className="flex flex-col items-center">
+                      <div
+                        className={cn(
+                          "flex size-8 items-center justify-center rounded-full",
+                          state === "done"
+                            ? "bg-emerald-500/10 text-emerald-400"
+                            : state === "active"
+                              ? "bg-violet-500/10 text-violet-400"
+                              : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        {state === "done" ? (
+                          <Check className="size-4" />
+                        ) : state === "active" ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          stage.icon
+                        )}
+                      </div>
+                      {i < pipelineStages.length - 1 && (
+                        <div
+                          className={cn(
+                            "my-1 h-4 w-px",
+                            state === "done"
+                              ? "bg-emerald-500/30"
+                              : "bg-border"
+                          )}
+                        />
+                      )}
+                    </div>
+                    <div className="flex min-h-8 items-center">
+                      <span
+                        className={cn(
+                          "text-sm font-medium",
+                          state === "done"
+                            ? "text-emerald-400"
+                            : state === "active"
+                              ? "text-foreground"
+                              : "text-muted-foreground"
+                        )}
+                      >
+                        {stage.label}
+                        {stage.key === "segments" &&
+                          state === "active" &&
+                          progress && (
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              ({progress.completed}/{progress.total})
+                            </span>
+                          )}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Error Message */}
-      {gen.error_message && (
-        <Card className="border-red-500/30">
-          <CardContent className="flex items-center gap-3">
-            <AlertCircle className="size-5 text-red-400" />
-            <p className="text-sm text-red-400">{gen.error_message}</p>
+      {/* ---------------------------------------------------------------- */}
+      {/*  POV Composite Image                                              */}
+      {/* ---------------------------------------------------------------- */}
+      {gen?.composite_image_url && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-foreground">
+              POV Composite Image
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="aspect-[9/16] max-w-xs overflow-hidden rounded-lg bg-muted">
+              <img
+                src={gen.composite_image_url}
+                alt="POV composite"
+                className="size-full object-cover"
+              />
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Video Variations */}
-      {gen.videos.length > 0 && (
+      {/* ---------------------------------------------------------------- */}
+      {/*  Script preview (collapsible)                                     */}
+      {/* ---------------------------------------------------------------- */}
+      {script && (
+        <Card>
+          <CardHeader>
+            <button
+              type="button"
+              onClick={() => setScriptExpanded(!scriptExpanded)}
+              className="flex w-full items-center justify-between"
+            >
+              <CardTitle className="text-foreground">
+                Generated Script
+              </CardTitle>
+              {scriptExpanded ? (
+                <ChevronUp className="size-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="size-5 text-muted-foreground" />
+              )}
+            </button>
+          </CardHeader>
+          {scriptExpanded && (
+            <CardContent>
+              <div className="grid gap-6 md:grid-cols-3">
+                {/* Hooks */}
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Hooks ({script.hooks?.length ?? 0})
+                  </h3>
+                  {script.hooks?.map((seg, i) => (
+                    <ScriptSegmentCard
+                      key={i}
+                      segment={seg}
+                      type={`Hook ${i + 1}`}
+                    />
+                  ))}
+                  {(!script.hooks || script.hooks.length === 0) && (
+                    <p className="py-4 text-center text-sm text-muted-foreground">
+                      No hook variants yet.
+                    </p>
+                  )}
+                </div>
+
+                {/* Bodies */}
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Bodies ({script.bodies?.length ?? 0})
+                  </h3>
+                  {script.bodies?.map((seg, i) => (
+                    <ScriptSegmentCard
+                      key={i}
+                      segment={seg}
+                      type={`Body ${i + 1}`}
+                    />
+                  ))}
+                  {(!script.bodies || script.bodies.length === 0) && (
+                    <p className="py-4 text-center text-sm text-muted-foreground">
+                      No body variants yet.
+                    </p>
+                  )}
+                </div>
+
+                {/* CTAs */}
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    CTAs ({script.ctas?.length ?? 0})
+                  </h3>
+                  {script.ctas?.map((seg, i) => (
+                    <ScriptSegmentCard
+                      key={i}
+                      segment={seg}
+                      type={`CTA ${i + 1}`}
+                    />
+                  ))}
+                  {(!script.ctas || script.ctas.length === 0) && (
+                    <p className="py-4 text-center text-sm text-muted-foreground">
+                      No CTA variants yet.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
+      {/* ---------------------------------------------------------------- */}
+      {/*  Segment grid (shown when completed)                              */}
+      {/* ---------------------------------------------------------------- */}
+      {isComplete && segments && (
         <>
+          {/* Download all button */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-foreground">
+              Video Segments
+            </h2>
+            <Button variant="outline" size="sm" onClick={handleDownloadAll}>
+              <Download className="size-4" />
+              Download All Segments
+            </Button>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-3">
+            {/* Hooks column */}
+            <div className="flex flex-col gap-3">
+              <h3 className="text-sm font-semibold text-violet-400">Hooks</h3>
+              {segments.hooks?.map((video, i) => (
+                <VideoSegmentCard
+                  key={i}
+                  video={video}
+                  label={`Hook ${i + 1}`}
+                  isSelected={selectedHook === i}
+                  onSelect={() => setSelectedHook(i)}
+                />
+              ))}
+              {(!segments.hooks || segments.hooks.length === 0) && (
+                <div className="flex aspect-[9/16] items-center justify-center rounded-xl border border-dashed border-border">
+                  <p className="text-sm text-muted-foreground">
+                    No hook segments
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Bodies column */}
+            <div className="flex flex-col gap-3">
+              <h3 className="text-sm font-semibold text-violet-400">Bodies</h3>
+              {segments.bodies?.map((video, i) => (
+                <VideoSegmentCard
+                  key={i}
+                  video={video}
+                  label={`Body ${i + 1}`}
+                  isSelected={selectedBody === i}
+                  onSelect={() => setSelectedBody(i)}
+                />
+              ))}
+              {(!segments.bodies || segments.bodies.length === 0) && (
+                <div className="flex aspect-[9/16] items-center justify-center rounded-xl border border-dashed border-border">
+                  <p className="text-sm text-muted-foreground">
+                    No body segments
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* CTAs column */}
+            <div className="flex flex-col gap-3">
+              <h3 className="text-sm font-semibold text-violet-400">CTAs</h3>
+              {segments.ctas?.map((video, i) => (
+                <VideoSegmentCard
+                  key={i}
+                  video={video}
+                  label={`CTA ${i + 1}`}
+                  isSelected={selectedCta === i}
+                  onSelect={() => setSelectedCta(i)}
+                />
+              ))}
+              {(!segments.ctas || segments.ctas.length === 0) && (
+                <div className="flex aspect-[9/16] items-center justify-center rounded-xl border border-dashed border-border">
+                  <p className="text-sm text-muted-foreground">
+                    No CTA segments
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* -------------------------------------------------------------- */}
+          {/*  Combination builder                                            */}
+          {/* -------------------------------------------------------------- */}
           <Separator />
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">
-                  Video Variations
-                </h2>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-foreground">
+                Combination Preview
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Select one hook, one body, and one CTA above, then preview the
+                full combination here.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col items-center gap-6 lg:flex-row lg:items-start lg:gap-8">
+                {/* Preview player */}
+                <CombinationPreview
+                  hookVideo={segments.hooks?.[selectedHook]}
+                  bodyVideo={segments.bodies?.[selectedBody]}
+                  ctaVideo={segments.ctas?.[selectedCta]}
+                />
+
+                {/* Selection summary */}
+                <div className="flex flex-1 flex-col gap-4">
+                  <h4 className="text-sm font-semibold text-foreground">
+                    Selected Combination
+                  </h4>
+
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-3 rounded-lg border border-border px-4 py-3">
+                      <div className="flex size-8 items-center justify-center rounded-full bg-violet-500/10">
+                        <span className="text-xs font-bold text-violet-400">
+                          H
+                        </span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-foreground">
+                          Hook {selectedHook + 1}
+                        </p>
+                        <p className="text-xs capitalize text-muted-foreground">
+                          {segments.hooks?.[selectedHook]?.variant_label ??
+                            "N/A"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 rounded-lg border border-border px-4 py-3">
+                      <div className="flex size-8 items-center justify-center rounded-full bg-violet-500/10">
+                        <span className="text-xs font-bold text-violet-400">
+                          B
+                        </span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-foreground">
+                          Body {selectedBody + 1}
+                        </p>
+                        <p className="text-xs capitalize text-muted-foreground">
+                          {segments.bodies?.[selectedBody]?.variant_label ??
+                            "N/A"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 rounded-lg border border-border px-4 py-3">
+                      <div className="flex size-8 items-center justify-center rounded-full bg-violet-500/10">
+                        <span className="text-xs font-bold text-violet-400">
+                          C
+                        </span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-foreground">
+                          CTA {selectedCta + 1}
+                        </p>
+                        <p className="text-xs capitalize text-muted-foreground">
+                          {segments.ctas?.[selectedCta]?.variant_label ?? "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    3 hooks x 3 bodies x 3 CTAs = 27 possible combinations.
+                    Select different segments above to preview other
+                    combinations.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* ---------------------------------------------------------------- */}
+      {/*  Failed generation error                                          */}
+      {/* ---------------------------------------------------------------- */}
+      {isFailed && (
+        <Card className="border-red-500/30">
+          <CardContent className="flex flex-col gap-4 py-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 size-5 shrink-0 text-red-400" />
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium text-red-400">
+                  Generation Failed
+                </p>
                 <p className="text-sm text-muted-foreground">
-                  {completedVariations} of {totalVariations} variations ready
+                  {gen?.error_message ||
+                    "An error occurred during generation. Please try again."}
                 </p>
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              {gen.videos.map((video) => (
-                <Card key={video.variation_index}>
-                  <CardContent className="flex flex-col gap-3">
-                    <div className="relative flex aspect-video items-center justify-center rounded-lg bg-muted">
-                      <Play className="size-8 text-muted-foreground" />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Badge variant="secondary" className="text-xs">
-                        Variation {video.variation_index + 1}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {video.duration}s
-                      </span>
-                    </div>
-                    <Button variant="outline" size="sm" disabled={!video.url}>
-                      <Download className="size-4" />
-                      Download MP4
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 px-4 py-3">
+              <Clock className="size-4 shrink-0 text-amber-400" />
+              <p className="text-sm text-amber-400">
+                Your 9 credits have been refunded to your account.
+              </p>
             </div>
-          </div>
-        </>
+
+            <Button asChild variant="outline" className="w-fit">
+              <Link href="/generate">
+                <RefreshCw className="size-4" />
+                Try Again
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Non-fatal error message during processing */}
+      {gen?.error_message && !isFailed && (
+        <Card className="border-amber-500/30">
+          <CardContent className="flex items-center gap-3 py-4">
+            <AlertCircle className="size-5 shrink-0 text-amber-400" />
+            <p className="text-sm text-amber-400">{gen.error_message}</p>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

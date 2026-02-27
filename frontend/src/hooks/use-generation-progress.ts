@@ -2,16 +2,17 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { callEdge } from "@/lib/api";
-import type { Generation } from "@/types/database";
+import type { GenerationProgressResponse } from "@/types/api";
 
 export function useGenerationProgress(generationId: string) {
-  return useQuery<Generation>({
+  return useQuery({
     queryKey: ["generation-progress", generationId],
     queryFn: async () => {
-      return callEdge<Generation>(
+      const res = await callEdge<GenerationProgressResponse>(
         `video-status?generation_id=${generationId}`,
         { method: "GET" }
       );
+      return res.data;
     },
     refetchInterval: (query) => {
       const data = query.state.data;
