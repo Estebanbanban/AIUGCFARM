@@ -58,6 +58,13 @@ import type {
   GenerationSegments,
 } from "./database";
 
+/** Response from generate-composite-images Edge Function */
+export interface CompositeImagesResponse {
+  data: {
+    images: Array<{ path: string; signed_url: string }>;
+  };
+}
+
 /** Response from generate-video Edge Function */
 export interface CreateGenerationResponse {
   data: {

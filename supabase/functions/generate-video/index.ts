@@ -6,7 +6,6 @@ import { checkCredits, debitCredits, refundCredits } from "../_shared/credits.ts
 import { callOpenRouter } from "../_shared/openrouter.ts";
 import { withRetry } from "../_shared/retry.ts";
 import { submitKlingJob } from "../_shared/kling.ts";
-import { generateCompositeFromImages, type GeneratedImage } from "../_shared/nanobanana.ts";
 
 // Credits per segment set  -  HD (kling-v3) costs 2× standard (kling-v2-6)
 const COSTS = {
@@ -38,20 +37,72 @@ interface GeneratedScript {
 
 function buildSystemPrompt(count: number): string {
   const plural = count > 1 ? "s" : "";
+  const hookAngles = count > 1
+    ? " Each uses a DIFFERENT angle from the list below."
+    : " Use the BEST angle from the list below for this product.";
+  const bodyAngles = count > 1
+    ? " Each uses a DIFFERENT structure."
+    : " Use whichever structure fits best.";
+  const ctaAngles = count > 1
+    ? " Each uses a DIFFERENT pattern."
+    : " Use the most natural-sounding pattern.";
+
   return `You are an expert UGC (User-Generated Content) ad scriptwriter for e-commerce brands.
-Write scripts in first-person, casual, authentic tone  -  as if a real person is speaking directly to camera.
-Write SPOKEN DIALOGUE ONLY. No stage directions, no camera notes.
+Write scripts in first-person, conversational tone — exactly how a real person speaks to camera. NOT how a marketer writes.
 
-Generate:
-- ${count} HOOK variant${plural} (3-5 seconds each, ~2.5 words/second): Opening line${plural} that stop the scroll.${count > 1 ? " Each uses a DIFFERENT persuasion angle." : ""}
-- ${count} BODY variant${plural} (5-10 seconds each): Product benefits and proof.${count > 1 ? " Each uses a DIFFERENT angle." : ""}
-- ${count} CTA variant${plural} (3-5 seconds each): Urgency-driven close.${count > 1 ? " Each uses a DIFFERENT angle." : ""}
+CRITICAL VOICE RULES:
+- Sound like a friend sharing something they genuinely love, not a brand announcing a product.
+- Use contractions and natural speech patterns ("I've been using", "honestly", "I was like").
+- Be SPECIFIC: "lost 8 lbs in 3 weeks" beats "great results". "$30 cheaper" beats "affordable".
+- NEVER use: "game-changer", "amazing", "incredible", "life-changing", "must-have" — these sound fake.
+- Write at a natural speaking pace: ~2.5 words per second. Set duration_seconds based on actual word count.
 
-Return ONLY valid JSON matching this exact structure (exactly ${count} item${plural} in each array):
+---
+
+HOOK — ${count} variant${plural} | 2–4 seconds each | 5–10 words max${hookAngles}
+The hook must STOP THE SCROLL in the first 2 seconds. One punchy sentence. No setup.
+
+Available hook angles:
+- pain_point: "I used to [problem] until I found this..."
+- skeptic_convert: "I was literally about to return this when..."
+- specific_result: "I [specific measurable result] using this one thing."
+- pattern_interrupt: Unexpected statement that creates a "wait, what?" moment.
+- direct_address: "If you have [exact problem], you need to stop scrolling."
+- before_after: "My [thing] before vs. after — I can't believe this is real."
+- social_proof: "I've seen this everywhere so I finally caved and... wow."
+- gatekeeping: "I've been lowkey hiding this for months but I can't anymore."
+
+---
+
+BODY — ${count} variant${plural} | 5–9 seconds each | 12–22 words max${bodyAngles}
+Deliver the payoff fast. Cover: what it does → why it works → one proof point.
+At 2.5 words/sec: 5s ≈ 12 words, 7s ≈ 17 words, 9s ≈ 22 words. Stay within limits.
+
+Available body structures:
+- problem_solution: "[Problem] was ruining [thing]. This [does X] in [timeframe]. [Specific result]."
+- demo_tease: Describe what they'd see if they tried it — specific sensory detail.
+- story_beat: One vivid moment of discovery or transformation. First-person, present-tense feel.
+- social_proof_stack: "[X people / weeks / uses later] — here's what actually happened."
+
+---
+
+CTA — ${count} variant${plural} | 2–4 seconds each | 5–10 words max${ctaAngles}
+One clear action. Low friction. Natural, not pushy. Never just "buy now."
+
+Available CTA patterns:
+- link_drop: "Link's in [bio/comments] — I put the exact one I use."
+- risk_reversal: "Try it — if it doesn't work, it's fully returnable."
+- urgency_soft: "Grab it before [reason] — [link/where to find it]."
+- comment_trigger: "Comment [word] and I'll drop the link — seriously."
+- recommendation: "If you're dealing with [problem], just try it. I promise."
+
+---
+
+Return ONLY valid JSON (exactly ${count} item${plural} per array). Set duration_seconds to match actual word count at 2.5 words/sec:
 {
-  "hooks": [{ "text": "...", "duration_seconds": 5, "variant_label": "curiosity" }${count > 1 ? ", ..." : ""}],
-  "bodies": [{ "text": "...", "duration_seconds": 8, "variant_label": "benefits" }${count > 1 ? ", ..." : ""}],
-  "ctas": [{ "text": "...", "duration_seconds": 4, "variant_label": "urgency" }${count > 1 ? ", ..." : ""}]
+  "hooks": [{ "text": "...", "duration_seconds": 3, "variant_label": "pain_point" }${count > 1 ? ", ..." : ""}],
+  "bodies": [{ "text": "...", "duration_seconds": 7, "variant_label": "problem_solution" }${count > 1 ? ", ..." : ""}],
+  "ctas": [{ "text": "...", "duration_seconds": 3, "variant_label": "link_drop" }${count > 1 ? ", ..." : ""}]
 }`;
 }
 
@@ -60,9 +111,15 @@ function buildUserPrompt(product: Record<string, unknown>): string {
   return `Product: ${product.name}
 Description: ${product.description}
 Price: ${product.price ?? "N/A"}
-Brand tone: ${brandSummary.tone ?? "N/A"}
-Target demographic: ${brandSummary.demographic ?? "N/A"}
-Key selling points: ${brandSummary.selling_points ?? "N/A"}`;
+Brand tone: ${brandSummary.tone ?? "conversational, authentic"}
+Target demographic: ${brandSummary.demographic ?? "general adults"}
+Key selling points: ${brandSummary.selling_points ?? "N/A"}
+
+CALIBRATION INSTRUCTIONS:
+- Match the hook to a real pain point this demographic actually feels.
+- If price is listed and it's a clear value advantage, you may reference it in the hook or body.
+- Mirror the brand tone: if "playful" → be light and fun; if "premium" → be aspirational but still authentic.
+- Write scripts AS IF the persona IS the target demographic speaking to their peers.`;
 }
 
 /** Clamp a number to [min, max]. */
@@ -115,9 +172,9 @@ function validateScript(raw: unknown, expectedCount: number): GeneratedScript {
     });
 
   return {
-    hooks: validateSegments(obj.hooks, 3, 5),
-    bodies: validateSegments(obj.bodies, 5, 10),
-    ctas: validateSegments(obj.ctas, 3, 5),
+    hooks: validateSegments(obj.hooks, 2, 4),
+    bodies: validateSegments(obj.bodies, 5, 9),
+    ctas: validateSegments(obj.ctas, 2, 4),
   };
 }
 
@@ -145,19 +202,6 @@ async function generateScript(
   return validateScript(parsed, variantCount);
 }
 
-// ── Composite image via Gemini / NanoBanana 2 ────────────────────────
-
-function generateCompositeImage(
-  personaImageUrl: string,
-  productImageUrl: string,
-  scenePrompt?: string,
-): Promise<GeneratedImage> {
-  const compositePrompt = scenePrompt
-    ? `${scenePrompt} The person is naturally holding and using the product, which is clearly visible in frame.`
-    : undefined;
-  return withRetry(() => generateCompositeFromImages(personaImageUrl, productImageUrl, compositePrompt));
-}
-
 // ── Main handler ─────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -174,10 +218,11 @@ Deno.serve(async (req: Request) => {
 
     // ── 1. Validate input ──────────────────────────────────────────
 
-    const { product_id, persona_id, mode, quality } = await req.json();
+    const { product_id, persona_id, mode, quality, composite_image_path } = await req.json();
 
     if (!product_id) return json({ detail: "product_id is required" }, cors, 400);
     if (!persona_id) return json({ detail: "persona_id is required" }, cors, 400);
+    if (!composite_image_path) return json({ detail: "composite_image_path is required" }, cors, 400);
 
     const resolvedMode = mode || "single";
     if (resolvedMode !== "single" && resolvedMode !== "triple") {
@@ -268,90 +313,17 @@ Deno.serve(async (req: Request) => {
     await debitCredits(userId, creditCost, generationId);
 
     try {
-      // ── 7. Generate persona signed URL (storage path -> signed URL)
+      // ── 7. Generate script ──────────────────────────────────────────
 
-      const { data: personaSignedUrlData, error: personaSignedUrlErr } = await sb
-        .storage
-        .from("persona-images")
-        .createSignedUrl(persona.selected_image_url, 600); // 10 min expiry
+      const script = await generateScript(product, variantCount);
 
-      if (personaSignedUrlErr || !personaSignedUrlData?.signedUrl) {
-        throw new Error(
-          `Failed to generate signed URL for persona image: ${personaSignedUrlErr?.message}`,
-        );
-      }
-
-      const personaSignedUrl = personaSignedUrlData.signedUrl;
-
-      // ── 8. Product image URL ──────────────────────────────────────
-
-      const productImageUrl = (product.images as string[])?.[0] ?? "";
-      if (!productImageUrl) {
-        throw new Error("Product has no images available");
-      }
-
-      // Generate signed URL for product image if it's a storage path
-      let resolvedProductImageUrl = productImageUrl;
-      if (!productImageUrl.startsWith("http")) {
-        const { data: prodSignedUrlData, error: prodSignedUrlErr } = await sb
-          .storage
-          .from("product-images")
-          .createSignedUrl(productImageUrl, 600);
-
-        if (prodSignedUrlErr || !prodSignedUrlData?.signedUrl) {
-          throw new Error(
-            `Failed to generate signed URL for product image: ${prodSignedUrlErr?.message}`,
-          );
-        }
-        resolvedProductImageUrl = prodSignedUrlData.signedUrl;
-      }
-
-      // ── 9. Run script + composite in parallel ────────────────────
-
-      // Use the scene prompt saved at persona creation time (if available)
-      const scenePrompt = (persona.attributes as Record<string, unknown>)
-        ?.scene_prompt as string | undefined;
-
-      const [script, compositeExternalUrl] = await Promise.all([
-        generateScript(product, variantCount),
-        generateCompositeImage(personaSignedUrl, resolvedProductImageUrl, scenePrompt),
-      ]);
-
-      // ── 10. Upload composite image to Supabase Storage ───────────
-
-      const compositeExt = compositeExternalUrl.mimeType.includes("png") ? "png" : "jpg";
-      const compositeStoragePath = `${userId}/${generationId}/composite.${compositeExt}`;
-
-      const { error: uploadErr } = await sb.storage
-        .from("composite-images")
-        .upload(compositeStoragePath, compositeExternalUrl.data, {
-          contentType: compositeExternalUrl.mimeType,
-          upsert: false,
-        });
-      if (uploadErr) {
-        throw new Error(`Composite image upload failed: ${uploadErr.message}`);
-      }
-
-      // ── 11. Generate signed URL for the response ─────────────────
-
-      const { data: compositeSignedData, error: compositeSignedErr } = await sb
-        .storage
-        .from("composite-images")
-        .createSignedUrl(compositeStoragePath, 3600); // 1 hour expiry
-
-      if (compositeSignedErr || !compositeSignedData?.signedUrl) {
-        throw new Error(
-          `Failed to generate signed URL for composite: ${compositeSignedErr?.message}`,
-        );
-      }
-
-      // ── 12. Save script + composite, update status to submitting_jobs ──
+      // ── 8. Save script + composite path, update status ─────────────
 
       const { error: updateErr } = await sb
         .from("generations")
         .update({
           script,
-          composite_image_url: compositeStoragePath, // store PATH, not signed URL
+          composite_image_url: composite_image_path, // pre-generated by user
           status: "submitting_jobs",
         })
         .eq("id", generationId);
@@ -360,11 +332,11 @@ Deno.serve(async (req: Request) => {
         throw new Error(`Failed to update generation: ${updateErr.message}`);
       }
 
-      // ── 13. Generate signed URL for Kling to access composite ────
+      // ── 9. Generate signed URL for Kling (2h expiry) ───────────────
 
       const { data: klingCompositeUrl, error: klingUrlErr } = await sb.storage
         .from("composite-images")
-        .createSignedUrl(compositeStoragePath, 7200); // 2h for Kling to access
+        .createSignedUrl(composite_image_path, 7200);
 
       if (klingUrlErr || !klingCompositeUrl?.signedUrl) {
         throw new Error(
