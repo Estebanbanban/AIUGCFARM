@@ -52,23 +52,23 @@ export function FaqSection() {
   const [open, setOpen] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="bg-[#050505] py-24 px-4 sm:px-6">
+    <section id="faq" className="bg-background-secondary py-24 px-4 sm:px-6">
       <div className="max-w-2xl mx-auto">
         <FadeInUp className="text-center mb-12">
-          <p className="text-xs uppercase tracking-[0.15em] text-[#555] mb-3">FAQ</p>
-          <h2 className="text-[clamp(2rem,4vw,3rem)] font-semibold tracking-tight text-white">
+          <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground mb-3">FAQ</p>
+          <h2 className="text-[clamp(2rem,4vw,3rem)] font-semibold tracking-tight text-foreground">
             Frequently Asked Questions
           </h2>
         </FadeInUp>
 
         <StaggerContainer staggerDelay={0.07}>
           {faqs.map((faq, i) => (
-            <motion.div key={i} variants={staggerItem} className="border-b border-[#1a1a1a]">
+            <motion.div key={i} variants={staggerItem} className="border-b border-border">
               <button
                 onClick={() => setOpen(open === i ? null : i)}
                 className="flex w-full items-center justify-between py-5 text-left group"
               >
-                <span className="text-sm font-medium text-white group-hover:text-[#ccc] transition-colors pr-4">
+                <span className="pr-4 text-sm font-medium text-foreground transition-colors group-hover:text-muted-foreground">
                   {faq.question}
                 </span>
                 <motion.div
@@ -76,7 +76,7 @@ export function FaqSection() {
                   transition={{ duration: 0.2 }}
                   className="flex-shrink-0"
                 >
-                  <ChevronDown className="size-4 text-[#555]" />
+                  <ChevronDown className="size-4 text-muted-foreground" />
                 </motion.div>
               </button>
               <AnimatePresence initial={false}>
@@ -88,7 +88,7 @@ export function FaqSection() {
                     transition={{ duration: 0.25, ease: [0.25, 0.4, 0.25, 1] }}
                     className="overflow-hidden"
                   >
-                    <p className="text-sm text-[#888] pb-5 leading-relaxed">{faq.answer}</p>
+                    <p className="pb-5 text-sm leading-relaxed text-muted-foreground">{faq.answer}</p>
                   </motion.div>
                 )}
               </AnimatePresence>

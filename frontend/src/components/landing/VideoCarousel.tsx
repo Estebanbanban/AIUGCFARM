@@ -56,7 +56,7 @@ const reels = [
 function ReelCard({ reel }: { reel: (typeof reels)[number] }) {
   return (
     <div className="flex-shrink-0 px-2.5 md:px-3">
-      <div className="relative w-[180px] sm:w-[210px] md:w-[240px] aspect-[9/16] overflow-hidden rounded-2xl border border-[#2a2a2a] bg-[#101010] shadow-[0_14px_26px_rgba(0,0,0,0.35)]">
+      <div className="relative w-[180px] sm:w-[210px] md:w-[240px] aspect-[9/16] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_14px_26px_rgba(0,0,0,0.16)] dark:shadow-[0_14px_26px_rgba(0,0,0,0.35)]">
         <video
           className="h-full w-full object-cover"
           poster={reel.poster}
@@ -68,7 +68,7 @@ function ReelCard({ reel }: { reel: (typeof reels)[number] }) {
         >
           <source src={reel.videoSrc} type="video/mp4" />
         </video>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/28 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/15 to-transparent dark:from-black/30" />
       </div>
     </div>
   );
@@ -79,7 +79,7 @@ export function VideoCarousel() {
   const doubled = [...reels, ...reels];
 
   return (
-    <section className="bg-black pb-20 pt-14 md:pb-28 md:pt-20">
+    <section className="bg-background pb-20 pt-14 md:pb-28 md:pt-20">
       <div
         className="overflow-hidden"
         onMouseEnter={() => setPaused(true)}

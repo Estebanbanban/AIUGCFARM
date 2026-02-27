@@ -27,17 +27,19 @@ export function MarketingHeader() {
     <>
       <header className="fixed left-0 right-0 top-3 z-50 px-3 sm:px-5">
         <div
-          className={`mx-auto flex h-16 max-w-7xl items-center justify-between rounded-full border px-5 transition-all duration-300 sm:px-7 ${
+          className={`relative mx-auto flex h-16 max-w-7xl items-center justify-between rounded-full border px-5 transition-all duration-300 sm:px-7 ${
             scrolled
-              ? "border-border bg-background/92 shadow-[0_8px_22px_rgba(0,0,0,0.28)] backdrop-blur-xl"
-              : "border-border/80 bg-background/78 backdrop-blur-xl"
+              ? "border-border/70 bg-background/75 shadow-[0_10px_24px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:shadow-[0_10px_24px_rgba(0,0,0,0.35)]"
+              : "border-border/60 bg-background/60 backdrop-blur-xl"
           }`}
         >
-          <Link href="/" className="text-lg font-semibold tracking-tight text-foreground">
+          <div className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-b from-white/40 via-white/10 to-transparent dark:from-white/10 dark:via-white/[0.03]" />
+
+          <Link href="/" className="relative z-10 text-lg font-semibold tracking-tight text-foreground">
             CineRads
           </Link>
 
-          <nav className="hidden items-center gap-8 md:flex">
+          <nav className="relative z-10 hidden items-center gap-8 md:flex">
             {navItems.map((item) => (
               <Link
                 key={item.label}
@@ -49,7 +51,7 @@ export function MarketingHeader() {
             ))}
           </nav>
 
-          <div className="hidden items-center gap-3 md:flex">
+          <div className="relative z-10 hidden items-center gap-3 md:flex">
             <ThemeToggle />
             <Link
               href="/login"
@@ -65,7 +67,7 @@ export function MarketingHeader() {
             </Link>
           </div>
 
-          <div className="flex items-center gap-2 md:hidden">
+          <div className="relative z-10 flex items-center gap-2 md:hidden">
             <ThemeToggle />
             <button
               className="text-foreground"
