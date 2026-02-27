@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
 import { FadeInUp, ScaleIn } from "@/lib/motion";
+import Image from "next/image";
 
 /* ──────────────────────────────────────────
    PART A — Scroll-linked feature showcase
@@ -40,6 +41,36 @@ const features = [
 ] as const;
 
 type FeatureId = (typeof features)[number]["id"];
+
+const featureMedia: Record<
+  FeatureId,
+  {
+    type: "image" | "video";
+    src: string;
+    alt: string;
+  }
+> = {
+  import: {
+    type: "image",
+    src: "https://images.unsplash.com/photo-1556740749-887f6717d7e4?auto=format&fit=crop&w=1200&q=80",
+    alt: "Ecommerce storefront with product catalog",
+  },
+  persona: {
+    type: "image",
+    src: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=1200&q=80",
+    alt: "Creator portrait for AI persona",
+  },
+  generate: {
+    type: "video",
+    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+    alt: "AI generated ad video timeline",
+  },
+  mixer: {
+    type: "video",
+    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
+    alt: "Multiple ad variations preview",
+  },
+};
 
 /* ── Mockup: Import — full product import UI ── */
 function MockImport() {
@@ -315,6 +346,7 @@ function FeatureShowcase() {
 
   const active = features[activeIndex];
   const ActiveMockup = mockups[active.id];
+  const activeMedia = featureMedia[active.id];
 
   return (
     // Tall outer container: 100vh per feature so scroll drives transitions
@@ -403,10 +435,43 @@ function FeatureShowcase() {
           {/* ── RIGHT PANEL ── large mockup, takes remaining space */}
           <div className="hidden lg:flex flex-1 items-center justify-center p-10 bg-[#040404]">
             <div className="w-full max-w-xl h-full max-h-[580px] rounded-2xl bg-[#0d0d0d] border border-[#1a1a1a] p-7 shadow-[0_0_80px_rgba(0,0,0,0.6)]">
+              <div className="relative w-full h-40 rounded-xl overflow-hidden border border-[#1f1f1f] mb-5 bg-[#0b0b0b]">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={`${active.id}-media`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="h-full w-full"
+                  >
+                    {activeMedia.type === "image" ? (
+                      <Image
+                        src={activeMedia.src}
+                        alt={activeMedia.alt}
+                        fill
+                        className="object-cover"
+                        sizes="40vw"
+                      />
+                    ) : (
+                      <video
+                        className="h-full w-full object-cover"
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        preload="none"
+                      >
+                        <source src={activeMedia.src} type="video/mp4" />
+                      </video>
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeIndex}
-                  className="h-full"
+                  className="h-[calc(100%-9rem)]"
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -16 }}
