@@ -22,6 +22,7 @@ import {
   ChevronDown,
   ChevronUp,
   Send,
+  Scissors,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ import { Separator } from "@/components/ui/separator";
 import { useGenerationStatus, useRegenerateSegment } from "@/hooks/use-generations";
 import type { GenerationStatus, ScriptSegment, SegmentVideo } from "@/types/database";
 import { trackVideoCompleted } from "@/lib/datafast";
+import { useVideoStitcher, STITCH_STATUS_LABELS } from "@/hooks/use-video-stitcher";
 
 /* -------------------------------------------------------------------------- */
 /*  Status configuration                                                      */
@@ -332,24 +334,39 @@ function CombinationPreview({
   hookVideo,
   bodyVideo,
   ctaVideo,
+  generationId,
 }: {
   hookVideo: SegmentVideo | undefined;
   bodyVideo: SegmentVideo | undefined;
   ctaVideo: SegmentVideo | undefined;
+  generationId: string;
 }) {
   const hookRef = useRef<HTMLVideoElement>(null);
   const bodyRef = useRef<HTMLVideoElement>(null);
   const ctaRef = useRef<HTMLVideoElement>(null);
+  const stitchedRef = useRef<HTMLVideoElement>(null);
 
   const [currentSegment, setCurrentSegment] = useState<
     "idle" | "hook" | "body" | "cta"
   >("idle");
   const [isPlaying, setIsPlaying] = useState(false);
+  const [viewMode, setViewMode] = useState<"sequential" | "stitched">(
+    "sequential",
+  );
+
+  const { stitch, reset, status: stitchStatus, stitchedUrl, error: stitchError } =
+    useVideoStitcher();
+
+  const isStitching =
+    stitchStatus !== "idle" &&
+    stitchStatus !== "done" &&
+    stitchStatus !== "error";
 
   const stopAll = useCallback(() => {
     hookRef.current?.pause();
     bodyRef.current?.pause();
     ctaRef.current?.pause();
+    stitchedRef.current?.pause();
     setCurrentSegment("idle");
     setIsPlaying(false);
   }, []);
@@ -384,6 +401,16 @@ function CombinationPreview({
   }
 
   function togglePlay() {
+    if (viewMode === "stitched" && stitchedRef.current) {
+      if (isPlaying) {
+        stitchedRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        stitchedRef.current.play();
+        setIsPlaying(true);
+      }
+      return;
+    }
     if (isPlaying) {
       stopAll();
     } else {
@@ -394,7 +421,35 @@ function CombinationPreview({
   // Reset when selection changes
   useEffect(() => {
     stopAll();
-  }, [hookVideo?.url, bodyVideo?.url, ctaVideo?.url, stopAll]);
+    reset();
+    setViewMode("sequential");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hookVideo?.url, bodyVideo?.url, ctaVideo?.url]);
+
+  // Auto-switch to stitched view when done
+  useEffect(() => {
+    if (stitchStatus === "done" && stitchedUrl) {
+      stopAll();
+      setViewMode("stitched");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stitchStatus, stitchedUrl]);
+
+  function handleStitch() {
+    if (!hookVideo || !bodyVideo || !ctaVideo) return;
+    stitch(hookVideo.url, bodyVideo.url, ctaVideo.url);
+  }
+
+  function handleDownloadStitched() {
+    if (!stitchedUrl) return;
+    const a = document.createElement("a");
+    a.href = stitchedUrl;
+    a.download = `${generationId}_stitched.mp4`;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
 
   const segmentLabels: Record<string, string> = {
     idle: "Ready to preview",
@@ -416,13 +471,32 @@ function CombinationPreview({
   return (
     <div className="flex flex-col items-center gap-3">
       <div className="relative aspect-[9/16] w-full max-w-xs overflow-hidden rounded-xl bg-black">
-        {/* Stacked videos -- only the active one is visible */}
+
+        {/* ── Stitched single video (shown after stitching) ── */}
+        {viewMode === "stitched" && stitchedUrl && (
+          <>
+            <video
+              ref={stitchedRef}
+              src={stitchedUrl}
+              className="absolute inset-0 z-10 size-full object-contain"
+              playsInline
+              onEnded={() => setIsPlaying(false)}
+            />
+            <Badge className="absolute bottom-3 left-3 z-30 bg-black/70 text-white backdrop-blur-sm">
+              Stitched
+            </Badge>
+          </>
+        )}
+
+        {/* ── Sequential stacked videos (default / fallback) ── */}
         <video
           ref={hookRef}
           src={hookVideo.url}
           className={cn(
             "absolute inset-0 size-full object-contain",
-            currentSegment === "hook" ? "z-10" : "z-0 hidden"
+            viewMode === "sequential" && currentSegment === "hook"
+              ? "z-10"
+              : "z-0 hidden",
           )}
           preload="metadata"
           playsInline
@@ -433,7 +507,9 @@ function CombinationPreview({
           src={bodyVideo.url}
           className={cn(
             "absolute inset-0 size-full object-contain",
-            currentSegment === "body" ? "z-10" : "z-0 hidden"
+            viewMode === "sequential" && currentSegment === "body"
+              ? "z-10"
+              : "z-0 hidden",
           )}
           preload="metadata"
           playsInline
@@ -444,7 +520,9 @@ function CombinationPreview({
           src={ctaVideo.url}
           className={cn(
             "absolute inset-0 size-full object-contain",
-            currentSegment === "cta" ? "z-10" : "z-0 hidden"
+            viewMode === "sequential" && currentSegment === "cta"
+              ? "z-10"
+              : "z-0 hidden",
           )}
           preload="metadata"
           playsInline
@@ -452,9 +530,8 @@ function CombinationPreview({
         />
 
         {/* Play overlay when idle */}
-        {currentSegment === "idle" && (
+        {currentSegment === "idle" && !isPlaying && (
           <div className="absolute inset-0 z-20 flex items-center justify-center">
-            {/* Show poster from hook video */}
             <video
               src={hookVideo.url}
               className="absolute inset-0 size-full object-contain opacity-40"
@@ -485,8 +562,8 @@ function CombinationPreview({
           </button>
         )}
 
-        {/* Segment indicator */}
-        {currentSegment !== "idle" && (
+        {/* Segment indicator (sequential mode) */}
+        {viewMode === "sequential" && currentSegment !== "idle" && (
           <div className="absolute bottom-3 left-3 z-30">
             <Badge className="bg-black/70 text-white backdrop-blur-sm">
               {segmentLabels[currentSegment]}
@@ -495,13 +572,9 @@ function CombinationPreview({
         )}
       </div>
 
-      {/* Controls */}
+      {/* Play controls */}
       <div className="flex items-center gap-3">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={togglePlay}
-        >
+        <Button variant="outline" size="sm" onClick={togglePlay}>
           {isPlaying ? (
             <>
               <Pause className="size-3.5" />
@@ -510,13 +583,76 @@ function CombinationPreview({
           ) : (
             <>
               <Play className="size-3.5" />
-              Play Combination
+              {viewMode === "stitched" ? "Play Stitched" : "Play Combination"}
             </>
           )}
         </Button>
-        <span className="text-xs text-muted-foreground">
-          {segmentLabels[currentSegment]}
-        </span>
+        {viewMode === "sequential" && (
+          <span className="text-xs text-muted-foreground">
+            {segmentLabels[currentSegment]}
+          </span>
+        )}
+        {viewMode === "stitched" && (
+          <button
+            type="button"
+            onClick={() => { stopAll(); setViewMode("sequential"); }}
+            className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+          >
+            Back to segments
+          </button>
+        )}
+      </div>
+
+      {/* ── Stitch bar ── */}
+      <div className="w-full rounded-lg border border-border bg-muted/40 px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-0.5">
+            <p className="text-xs font-medium text-foreground">
+              Stitch &amp; Export
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Trims silence, joins Hook → Body → CTA into one file
+            </p>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            {stitchStatus === "done" && stitchedUrl && (
+              <Button size="sm" variant="outline" onClick={handleDownloadStitched}>
+                <Download className="size-3.5" />
+                Download
+              </Button>
+            )}
+
+            <Button
+              size="sm"
+              onClick={
+                stitchStatus === "done" ? handleDownloadStitched : handleStitch
+              }
+              disabled={isStitching}
+            >
+              {isStitching ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  {STITCH_STATUS_LABELS[stitchStatus]}
+                </>
+              ) : stitchStatus === "done" ? (
+                <>
+                  <Scissors className="size-3.5" />
+                  Re-stitch
+                </>
+              ) : (
+                <>
+                  <Scissors className="size-3.5" />
+                  {STITCH_STATUS_LABELS[stitchStatus]}
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {stitchError && (
+          <p className="mt-2 text-xs text-red-400">{stitchError}</p>
+        )}
       </div>
     </div>
   );
@@ -1059,6 +1195,7 @@ export default function GenerationDetailPage() {
                   hookVideo={segments.hooks?.[selectedHook]}
                   bodyVideo={segments.bodies?.[selectedBody]}
                   ctaVideo={segments.ctas?.[selectedCta]}
+                  generationId={generationId}
                 />
 
                 {/* Selection summary */}
