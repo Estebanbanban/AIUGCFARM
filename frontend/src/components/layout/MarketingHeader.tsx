@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Menu, X, LayoutDashboard, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { createClient } from "@/lib/supabase/client";
@@ -19,27 +20,80 @@ const navItems = [
   { label: "FAQ", href: "#faq" },
 ];
 
-function UserAvatar({ user }: { user: AuthUser }) {
+function UserMenu({ user }: { user: AuthUser }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setOpen(false);
+    router.push("/");
+    router.refresh();
+  };
+
   return (
-    <Link
-      href="/dashboard"
-      className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 transition-colors duration-200 hover:border-border/80 hover:bg-muted/50"
-    >
-      {user.avatar_url ? (
-        <img
-          src={user.avatar_url}
-          alt={user.name}
-          className="size-6 rounded-full object-cover"
-        />
-      ) : (
-        <div className="size-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-semibold flex-shrink-0">
-          {user.name[0].toUpperCase()}
-        </div>
-      )}
-      <span className="text-sm font-medium text-foreground max-w-[120px] truncate">
-        {user.name}
-      </span>
-    </Link>
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 transition-colors duration-200 hover:border-border/80 hover:bg-muted/50"
+      >
+        {user.avatar_url ? (
+          <img
+            src={user.avatar_url}
+            alt={user.name}
+            className="size-6 rounded-full object-cover"
+          />
+        ) : (
+          <div className="size-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-semibold flex-shrink-0">
+            {user.name[0].toUpperCase()}
+          </div>
+        )}
+        <span className="text-sm font-medium text-foreground max-w-[120px] truncate">
+          {user.name}
+        </span>
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.97 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 top-full mt-2 w-44 rounded-xl border border-border bg-background shadow-lg overflow-hidden"
+          >
+            <Link
+              href="/dashboard"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 px-4 py-3 text-sm text-foreground hover:bg-muted/60 transition-colors"
+            >
+              <LayoutDashboard className="size-4 text-muted-foreground" />
+              Dashboard
+            </Link>
+            <div className="border-t border-border" />
+            <button
+              onClick={handleSignOut}
+              className="flex w-full items-center gap-2.5 px-4 py-3 text-sm text-destructive hover:bg-destructive/5 transition-colors"
+            >
+              <LogOut className="size-4" />
+              Se déconnecter
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -47,6 +101,7 @@ export function MarketingHeader() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 24);
@@ -91,6 +146,14 @@ export function MarketingHeader() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const handleMobileSignOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setMobileOpen(false);
+    router.push("/");
+    router.refresh();
+  };
+
   return (
     <>
       <header className="fixed left-0 right-0 top-3 z-50 px-3 sm:px-5">
@@ -122,7 +185,7 @@ export function MarketingHeader() {
           <div className="relative z-10 hidden items-center gap-3 md:flex">
             <ThemeToggle />
             {authUser ? (
-              <UserAvatar user={authUser} />
+              <UserMenu user={authUser} />
             ) : (
               <>
                 <Link
@@ -199,26 +262,39 @@ export function MarketingHeader() {
                 className="mt-8 flex flex-col gap-3"
               >
                 {authUser ? (
-                  <Link
-                    href="/dashboard"
-                    className="flex items-center gap-3 rounded-full border border-border px-4 py-3"
-                    onClick={() => setMobileOpen(false)}
-                  >
-                    {authUser.avatar_url ? (
-                      <img
-                        src={authUser.avatar_url}
-                        alt={authUser.name}
-                        className="size-8 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="size-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-semibold flex-shrink-0">
-                        {authUser.name[0].toUpperCase()}
-                      </div>
-                    )}
-                    <span className="text-sm font-medium text-foreground">
-                      {authUser.name}
-                    </span>
-                  </Link>
+                  <>
+                    <div className="flex items-center gap-3 px-1 pb-3 border-b border-border">
+                      {authUser.avatar_url ? (
+                        <img
+                          src={authUser.avatar_url}
+                          alt={authUser.name}
+                          className="size-9 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="size-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-semibold flex-shrink-0">
+                          {authUser.name[0].toUpperCase()}
+                        </div>
+                      )}
+                      <span className="text-sm font-medium text-foreground">
+                        {authUser.name}
+                      </span>
+                    </div>
+                    <Link
+                      href="/dashboard"
+                      className="flex items-center gap-2.5 rounded-full border border-border py-3 px-4 text-sm text-foreground"
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      <LayoutDashboard className="size-4 text-muted-foreground" />
+                      Dashboard
+                    </Link>
+                    <button
+                      onClick={handleMobileSignOut}
+                      className="flex items-center gap-2.5 rounded-full border border-destructive/30 py-3 px-4 text-sm text-destructive"
+                    >
+                      <LogOut className="size-4" />
+                      Se déconnecter
+                    </button>
+                  </>
                 ) : (
                   <>
                     <Link
