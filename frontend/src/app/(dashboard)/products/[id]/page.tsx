@@ -2,7 +2,14 @@
 
 export const dynamic = "force-dynamic";
 
-import { use, useEffect, useState, useCallback } from "react";
+import {
+  use,
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  type ChangeEvent,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -11,6 +18,8 @@ import {
   Pencil,
   Trash2,
   Loader2,
+  Plus,
+  X,
   ExternalLink,
   Tag,
   Calendar,
@@ -41,10 +50,15 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useProduct, useUpdateProduct, useDeleteProduct } from "@/hooks/use-products";
-import { isExternalUrl, getSignedImageUrl, getSignedImageUrls } from "@/lib/storage";
+import { createClient } from "@/lib/supabase/client";
+import { isExternalUrl, getSignedImageUrls } from "@/lib/storage";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Product } from "@/types/database";
+
+const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_PRODUCT_IMAGES = 10;
 
 /** Resolve all image URLs for a product. */
 function useResolvedProductImages(product: Product | undefined) {
@@ -108,12 +122,99 @@ export default function ProductDetailPage({
 
   const resolvedImages = useResolvedProductImages(product);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editPrice, setEditPrice] = useState("");
+
+  const handleUploadImages = useCallback(
+    async (newFiles: FileList | File[]) => {
+      if (!product) return;
+      const files = Array.from(newFiles);
+      if (files.length === 0) return;
+
+      const existingCount = product.images?.length ?? 0;
+      if (existingCount + files.length > MAX_PRODUCT_IMAGES) {
+        toast.error(
+          `You can store up to ${MAX_PRODUCT_IMAGES} images per product.`,
+        );
+        return;
+      }
+
+      for (const file of files) {
+        if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {
+          toast.error(`${file.name}: only JPEG, PNG, or WebP is supported.`);
+          return;
+        }
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          toast.error(`${file.name}: file size must be under 5MB.`);
+          return;
+        }
+      }
+
+      setIsUploadingImages(true);
+      try {
+        const supabase = createClient();
+        const uploadedPaths: string[] = [];
+
+        for (const file of files) {
+          const ext = file.name.split(".").pop() || "jpg";
+          const storagePath = `${product.owner_id}/${crypto.randomUUID()}.${ext}`;
+          const { error: uploadError } = await supabase.storage
+            .from("product-images")
+            .upload(storagePath, file, {
+              contentType: file.type,
+              upsert: false,
+            });
+          if (uploadError) {
+            throw new Error(uploadError.message);
+          }
+          uploadedPaths.push(storagePath);
+        }
+
+        await updateProduct.mutateAsync({
+          images: [...(product.images ?? []), ...uploadedPaths],
+        });
+        toast.success(
+          `${uploadedPaths.length} image${uploadedPaths.length > 1 ? "s" : ""} added.`,
+        );
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Failed to upload images",
+        );
+      } finally {
+        setIsUploadingImages(false);
+      }
+    },
+    [product, updateProduct],
+  );
+
+  const handleRemoveImage = useCallback(
+    async (index: number) => {
+      if (!product?.images || product.images.length === 0) return;
+      if (index < 0 || index >= product.images.length) return;
+
+      const nextImages = product.images.filter((_, i) => i !== index);
+      try {
+        await updateProduct.mutateAsync({ images: nextImages });
+        setSelectedImageIndex((current) => {
+          if (current === index) return 0;
+          if (current > index) return current - 1;
+          return current;
+        });
+        toast.success("Image removed.");
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Failed to remove image",
+        );
+      }
+    },
+    [product, updateProduct],
+  );
 
   // Sync edit fields when product loads or changes
   useEffect(() => {
@@ -123,6 +224,12 @@ export default function ProductDetailPage({
       setEditPrice(product.price != null ? String(product.price) : "");
     }
   }, [product]);
+
+  useEffect(() => {
+    if (selectedImageIndex >= resolvedImages.length && resolvedImages.length > 0) {
+      setSelectedImageIndex(0);
+    }
+  }, [resolvedImages.length, selectedImageIndex]);
 
   const handleSave = useCallback(() => {
     const updates: Record<string, unknown> = {};
@@ -159,6 +266,13 @@ export default function ProductDetailPage({
         toast.error(err.message || "Failed to delete product");
       },
     });
+  }
+
+  function handleImageInputChange(e: ChangeEvent<HTMLInputElement>) {
+    if (e.target.files && e.target.files.length > 0) {
+      handleUploadImages(e.target.files);
+      e.target.value = "";
+    }
   }
 
   if (isLoading) {
@@ -310,28 +424,83 @@ export default function ProductDetailPage({
             )}
           </div>
 
-          {/* Thumbnail grid */}
-          {resolvedImages.length > 1 && (
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              {resolvedImages.length}/{MAX_PRODUCT_IMAGES} product images
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={
+                isUploadingImages ||
+                updateProduct.isPending ||
+                (product.images?.length ?? 0) >= MAX_PRODUCT_IMAGES
+              }
+            >
+              {isUploadingImages ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Plus className="size-4" />
+              )}
+              Add image
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="hidden"
+              onChange={handleImageInputChange}
+            />
+          </div>
+
+          {resolvedImages.length > 0 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
               {resolvedImages.map((imgUrl, i) => (
-                <button
-                  key={i}
-                  onClick={() => setSelectedImageIndex(i)}
-                  className={`flex size-16 shrink-0 items-center justify-center rounded-md border-2 bg-muted overflow-hidden transition-colors ${
-                    i === selectedImageIndex
-                      ? "border-primary"
-                      : "border-transparent hover:border-muted-foreground/30"
-                  }`}
-                >
-                  <img
-                    src={imgUrl}
-                    alt={`${product.name} ${i + 1}`}
-                    className="size-full object-cover"
-                  />
-                </button>
+                <div key={i} className="group relative size-16 shrink-0">
+                  <button
+                    onClick={() => setSelectedImageIndex(i)}
+                    className={`flex size-full items-center justify-center overflow-hidden rounded-md border-2 bg-muted transition-colors ${
+                      i === selectedImageIndex
+                        ? "border-primary"
+                        : "border-transparent hover:border-muted-foreground/30"
+                    }`}
+                  >
+                    <img
+                      src={imgUrl}
+                      alt={`${product.name} ${i + 1}`}
+                      className="size-full object-cover"
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveImage(i)}
+                    disabled={
+                      isUploadingImages ||
+                      updateProduct.isPending ||
+                      (product.images?.length ?? 0) <= 1
+                    }
+                    className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition-opacity group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    title={
+                      (product.images?.length ?? 0) <= 1
+                        ? "At least one image is required"
+                        : "Remove image"
+                    }
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
               ))}
             </div>
           )}
+
+          <p className="text-xs text-muted-foreground">
+            Add multiple reference images so preview generation can better match
+            your product angles, packaging, and details.
+          </p>
         </div>
 
         {/* Info section */}
