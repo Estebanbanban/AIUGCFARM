@@ -171,7 +171,7 @@ export default function ProductUploadPage() {
 
       await uploadProduct(formData);
       toast.success("Product uploaded successfully!");
-      router.push("/dashboard/products");
+      router.push("/products");
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to upload product"
@@ -187,7 +187,7 @@ export default function ProductUploadPage() {
       <div className="flex items-center justify-between">
         <div>
           <Link
-            href="/dashboard/products"
+            href="/products"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="size-4" />
@@ -353,7 +353,7 @@ export default function ProductUploadPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => router.push("/dashboard/products")}
+                onClick={() => router.push("/products")}
               >
                 Cancel
               </Button>

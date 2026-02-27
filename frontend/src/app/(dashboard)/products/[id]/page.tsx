@@ -153,7 +153,7 @@ export default function ProductDetailPage({
     deleteProduct.mutate(undefined, {
       onSuccess: () => {
         toast.success("Product deleted");
-        router.push("/dashboard/products");
+        router.push("/products");
       },
       onError: (err) => {
         toast.error(err.message || "Failed to delete product");
@@ -185,7 +185,7 @@ export default function ProductDetailPage({
     return (
       <div className="flex flex-col gap-6">
         <Link
-          href="/dashboard/products"
+          href="/products"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="size-4" />
@@ -197,7 +197,7 @@ export default function ProductDetailPage({
               {error?.message || "Product not found."}
             </p>
             <Button asChild variant="outline">
-              <Link href="/dashboard/products">Go to Products</Link>
+              <Link href="/products">Go to Products</Link>
             </Button>
           </CardContent>
         </Card>
@@ -212,7 +212,7 @@ export default function ProductDetailPage({
       {/* Back link + actions */}
       <div className="flex items-center justify-between">
         <Link
-          href="/dashboard/products"
+          href="/products"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="size-4" />

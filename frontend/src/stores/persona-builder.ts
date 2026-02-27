@@ -24,6 +24,21 @@ interface PersonaBuilderState {
   setIsGenerating: (val: boolean) => void;
   setIsSaving: (val: boolean) => void;
   setPersonaId: (id: string) => void;
+  initFromPersona: (persona: {
+    id: string;
+    name: string;
+    attributes: {
+      gender?: string;
+      age?: string;
+      skin_tone?: string;
+      hair_color?: string;
+      hair_style?: string;
+      eye_color?: string;
+      body_type?: string;
+      clothing_style?: string;
+      accessories?: string[];
+    };
+  }) => void;
   reset: () => void;
 }
 
@@ -79,6 +94,21 @@ export const usePersonaBuilderStore = create<PersonaBuilderState>()(
       set((state) => {
         state.personaId = id;
       }),
+    initFromPersona: (persona) =>
+      set(() => ({
+        ...initialState,
+        personaId: persona.id,
+        name: persona.name,
+        gender: persona.attributes.gender ?? initialState.gender,
+        ageRange: persona.attributes.age ?? initialState.ageRange,
+        skinTone: persona.attributes.skin_tone ?? initialState.skinTone,
+        hairColor: persona.attributes.hair_color ?? initialState.hairColor,
+        hairStyle: persona.attributes.hair_style ?? initialState.hairStyle,
+        eyeColor: persona.attributes.eye_color ?? initialState.eyeColor,
+        bodyType: persona.attributes.body_type ?? initialState.bodyType,
+        clothingStyle: persona.attributes.clothing_style ?? initialState.clothingStyle,
+        accessories: persona.attributes.accessories ?? [],
+      })),
     reset: () => set(() => ({ ...initialState })),
   }))
 );

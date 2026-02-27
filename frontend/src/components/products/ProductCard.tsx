@@ -55,7 +55,7 @@ export function ProductCard({ product, onDelete }: ProductCardProps) {
 
   return (
     <>
-      <Link href={`/dashboard/products/${product.id}`} className="group/card block">
+      <Link href={`/products/${product.id}`} className="group/card block">
         <Card className="group h-full transition-colors hover:border-violet-500/30">
           <CardContent className="flex flex-col gap-3">
             {/* Product Image */}

@@ -13,16 +13,16 @@ const stripe = new Stripe(STRIPE_SECRET_KEY, {
 });
 
 /** Map plan names to Stripe Price IDs (configure in env or Stripe dashboard). */
-const PLAN_PRICE_IDS: Record<string, string> = {
-  starter: Deno.env.get("STRIPE_PRICE_STARTER") || "price_starter_placeholder",
-  growth: Deno.env.get("STRIPE_PRICE_GROWTH") || "price_growth_placeholder",
-  scale: Deno.env.get("STRIPE_PRICE_SCALE") || "price_scale_placeholder",
+const PLAN_PRICE_IDS: Record<string, string | undefined> = {
+  starter: Deno.env.get("STRIPE_PRICE_STARTER"),
+  growth: Deno.env.get("STRIPE_PRICE_GROWTH"),
+  scale: Deno.env.get("STRIPE_PRICE_SCALE"),
 };
 
 const PLAN_NAMES: Record<string, string> = {
   starter: "Starter ($29/mo)",
   growth: "Growth ($79/mo)",
-  scale: "Scale ($149/mo)",
+  scale: "Scale ($199/mo)",
 };
 
 Deno.serve(async (req: Request) => {
@@ -44,6 +44,16 @@ Deno.serve(async (req: Request) => {
         { detail: `Invalid plan. Choose: ${Object.keys(PLAN_PRICE_IDS).join(", ")}` },
         cors,
         400,
+      );
+    }
+
+    const priceId = PLAN_PRICE_IDS[plan];
+    if (!priceId) {
+      console.error(`Stripe price ID not configured for plan: ${plan}`);
+      return json(
+        { detail: "Checkout is not available right now. Please try again later." },
+        cors,
+        503,
       );
     }
 
@@ -85,7 +95,7 @@ Deno.serve(async (req: Request) => {
       mode: "subscription",
       line_items: [
         {
-          price: PLAN_PRICE_IDS[plan],
+          price: priceId,
           quantity: 1,
         },
       ],

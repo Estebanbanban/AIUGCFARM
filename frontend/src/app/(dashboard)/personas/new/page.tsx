@@ -128,7 +128,7 @@ export default function NewPersonaPage() {
         },
       });
       toast.success("Persona saved!");
-      router.push("/dashboard/personas");
+      router.push("/personas");
       store.reset();
     } catch (error) {
       const message =
@@ -144,7 +144,7 @@ export default function NewPersonaPage() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button asChild variant="ghost" size="icon">
-          <Link href="/dashboard/personas">
+          <Link href="/personas">
             <ArrowLeft className="size-4" />
           </Link>
         </Button>
