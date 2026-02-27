@@ -4,28 +4,56 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const EDGE_URL = `${supabaseUrl}/functions/v1`;
 
+async function parseEdgeError(res: Response): Promise<string> {
+  const json = await res.json().catch(() => null);
+  if (json?.detail) return String(json.detail);
+  if (json?.error?.message) return String(json.error.message);
+
+  const text = await res.text().catch(() => "");
+  if (text) return text;
+
+  if (res.status === 401) return "Authentication required. Please sign in again.";
+  return `Edge function error: ${res.status}`;
+}
+
 export async function callEdge<T>(
   fn: string,
   options: { method?: string; body?: unknown } = {}
 ): Promise<T> {
   const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
-  const {
+  let {
     data: { session },
   } = await supabase.auth.getSession();
-  if (!session) throw new Error("Not authenticated");
 
-  const res = await fetch(`${EDGE_URL}/${fn}`, {
-    method: options.method || "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`,
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  if (!session) {
+    const refreshed = await supabase.auth.refreshSession();
+    session = refreshed.data.session;
+  }
+
+  if (!session) throw new Error("Authentication required. Please sign in again.");
+
+  const makeRequest = (accessToken: string) =>
+    fetch(`${EDGE_URL}/${fn}`, {
+      method: options.method || "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+
+  let res = await makeRequest(session.access_token);
+
+  if (res.status === 401) {
+    const refreshed = await supabase.auth.refreshSession();
+    const retrySession = refreshed.data.session;
+    if (retrySession?.access_token) {
+      res = await makeRequest(retrySession.access_token);
+    }
+  }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Unknown error" }));
-    throw new Error(err.detail || `Edge function error: ${res.status}`);
+    throw new Error(await parseEdgeError(res));
   }
   return res.json();
 }
