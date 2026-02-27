@@ -35,6 +35,7 @@ export interface ScrapeResponseData {
   blocked_by_robots?: boolean;
   fallback_available?: boolean;
   saved: boolean;
+  save_failed?: boolean;
 }
 
 export interface ScrapeResponse {
