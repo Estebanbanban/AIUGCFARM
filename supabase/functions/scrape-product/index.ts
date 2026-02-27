@@ -371,6 +371,7 @@ Deno.serve(async (req: Request) => {
 
     // Save to DB if authenticated and requested
     let savedIds: string[] = [];
+    let saveFailed = false;
     if (userId && save !== false && products.length > 0) {
       const sb = getAdminClient();
       const rows = products.map((p) => ({
@@ -392,6 +393,7 @@ Deno.serve(async (req: Request) => {
         .insert(rows)
         .select("id");
       if (error) {
+        saveFailed = true;
         console.error("DB insert failed (non-fatal):", error.message);
       } else {
         savedIds = (inserted ?? []).map((r: { id: string }) => r.id);
@@ -413,6 +415,7 @@ Deno.serve(async (req: Request) => {
           blocked_by_robots: blockedByRobots,
           fallback_available: fallbackAvailable,
           saved: savedIds.length > 0,
+          save_failed: saveFailed,
         },
       },
       cors,

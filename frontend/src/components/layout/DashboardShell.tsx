@@ -5,8 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
-  Package,
-  Users,
   Film,
   Clock,
   Settings,
@@ -29,8 +27,6 @@ import {
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Products", href: "/products", icon: Package },
-  { label: "Personas", href: "/personas", icon: Users },
   { label: "Generate", href: "/generate", icon: Film },
   { label: "History", href: "/history", icon: Clock },
   { label: "Settings", href: "/settings", icon: Settings },
@@ -38,9 +34,6 @@ const navItems = [
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
-  "/products": "Products",
-  "/personas": "Personas",
-  "/personas/new": "Create Persona",
   "/generate": "Generate",
   "/history": "History",
   "/settings": "Settings",

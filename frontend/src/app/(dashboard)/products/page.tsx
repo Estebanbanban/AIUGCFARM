@@ -70,6 +70,11 @@ export default function ProductsPage() {
 
     try {
       const result = await scrapeProduct.mutateAsync({ url: importUrl.trim() });
+      if (result.save_failed || !result.saved) {
+        throw new Error(
+          'We scraped this page but could not save products to your account. Please try again.'
+        );
+      }
       const scraped: Product[] = result.products
         .filter((p) => p.id != null)
         .map((p) => ({
@@ -88,6 +93,9 @@ export default function ProductsPage() {
           created_at: '',
           updated_at: '',
         }));
+      if (scraped.length === 0) {
+        throw new Error('No products were saved from this URL. Please try another page.');
+      }
       setScrapedProducts(scraped);
       setScrapedBrandSummary(result.brand_summary ?? null);
       setShowScrapeResults(true);
