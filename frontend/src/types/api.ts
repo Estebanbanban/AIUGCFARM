@@ -125,6 +125,30 @@ export interface GenerationHistoryItem {
   personas: { name: string; selected_image_url: string | null } | null;
 }
 
+// ── Advanced Mode API types ────────────────────────────────────────────────
+
+export interface AdvancedSegmentInput {
+  script_text: string;
+  global_emotion: string;
+  global_intensity: number;
+  action_description?: string;
+  image_path?: string;
+}
+
+export interface AdvancedSegmentsInput {
+  hooks: AdvancedSegmentInput[];
+  bodies: AdvancedSegmentInput[];
+  ctas: AdvancedSegmentInput[];
+}
+
+export interface GenerateSegmentScriptResponse {
+  data: { text: string; duration_seconds: number; variant_label: string };
+}
+
+export interface GenerateSegmentCompositeResponse {
+  data: { image: { path: string; signed_url: string } };
+}
+
 /** Response from generation-history Edge Function */
 export interface GenerationHistoryResponse {
   data: {
