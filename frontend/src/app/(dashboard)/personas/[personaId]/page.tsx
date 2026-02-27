@@ -41,6 +41,7 @@ import {
   usePersonaGenerations,
   resolvePersonaImageUrl,
 } from "@/hooks/use-personas";
+import { usePersonaBuilderStore } from "@/stores/persona-builder";
 import type { PersonaAttributes } from "@/types/database";
 
 /** Resolve a single persona image URL (handles storage paths). */
@@ -138,15 +139,22 @@ export default function PersonaDetailPage() {
 
   const deleteMutation = useDeletePersona(personaId);
   const resolvedImage = useResolvedImage(persona?.selected_image_url);
+  const builderStore = usePersonaBuilderStore();
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  function handleEditRegenerate() {
+    if (!persona) return;
+    builderStore.initFromPersona(persona);
+    router.push("/personas/new");
+  }
 
   function handleDelete() {
     deleteMutation.mutate(undefined, {
       onSuccess: () => {
         toast.success("Persona deleted successfully");
         setDeleteDialogOpen(false);
-        router.push("/dashboard/personas");
+        router.push("/personas");
       },
       onError: (err) => {
         toast.error(err.message || "Failed to delete persona");
@@ -165,7 +173,7 @@ export default function PersonaDetailPage() {
       <div className="flex flex-col gap-6">
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="icon">
-            <Link href="/dashboard/personas">
+            <Link href="/personas">
               <ArrowLeft className="size-4" />
             </Link>
           </Button>
@@ -180,7 +188,7 @@ export default function PersonaDetailPage() {
               This persona does not exist or has been deleted.
             </p>
             <Button asChild variant="outline">
-              <Link href="/dashboard/personas">Back to Personas</Link>
+              <Link href="/personas">Back to Personas</Link>
             </Button>
           </CardContent>
         </Card>
@@ -198,7 +206,7 @@ export default function PersonaDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="icon">
-            <Link href="/dashboard/personas">
+            <Link href="/personas">
               <ArrowLeft className="size-4" />
             </Link>
           </Button>
@@ -241,11 +249,9 @@ export default function PersonaDetailPage() {
             </DialogContent>
           </Dialog>
 
-          <Button asChild variant="outline" size="sm">
-            <Link href="/dashboard/personas/new">
-              <Pencil className="size-4" />
-              Edit &amp; Regenerate
-            </Link>
+          <Button variant="outline" size="sm" onClick={handleEditRegenerate}>
+            <Pencil className="size-4" />
+            Edit &amp; Regenerate
           </Button>
         </div>
       </div>
@@ -357,7 +363,7 @@ export default function PersonaDetailPage() {
                 {generations.map((gen) => (
                   <Link
                     key={gen.id}
-                    href={`/dashboard/generate/${gen.id}`}
+                    href={`/generate/${gen.id}`}
                     className="group"
                   >
                     <Card className="transition-colors hover:border-violet-500/30">
@@ -399,7 +405,7 @@ export default function PersonaDetailPage() {
                       size="sm"
                       className="bg-violet-600 hover:bg-violet-700"
                     >
-                      <Link href="/dashboard/generate">
+                      <Link href="/generate">
                         <Sparkles className="size-4" />
                         Generate Video
                       </Link>

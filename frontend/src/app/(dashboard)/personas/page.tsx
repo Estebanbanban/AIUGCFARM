@@ -101,7 +101,7 @@ export default function PersonasPage() {
             asChild
             className="bg-violet-600 hover:bg-violet-700"
           >
-            <Link href="/dashboard/personas/new">
+            <Link href="/personas/new">
               <Plus className="size-4" />
               Create New Persona
             </Link>
@@ -139,7 +139,7 @@ export default function PersonasPage() {
             return (
               <Link
                 key={persona.id}
-                href={`/dashboard/personas/${persona.id}`}
+                href={`/personas/${persona.id}`}
                 className="group"
               >
                 <Card className="h-full transition-colors hover:border-violet-500/30">
@@ -210,7 +210,7 @@ export default function PersonasPage() {
               </p>
             </div>
             <Button asChild className="bg-violet-600 hover:bg-violet-700">
-              <Link href="/dashboard/personas/new">
+              <Link href="/personas/new">
                 <Plus className="size-4" />
                 Create Persona
               </Link>

@@ -45,7 +45,7 @@ Deno.serve(async (req: Request) => {
     // Create billing portal session
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: subscription.stripe_customer_id,
-      return_url: `${FRONTEND_URL}/dashboard/settings`,
+      return_url: `${FRONTEND_URL}/settings`,
     });
 
     return json({ data: { url: portalSession.url } }, cors);

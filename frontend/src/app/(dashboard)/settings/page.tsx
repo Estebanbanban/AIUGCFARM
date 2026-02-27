@@ -75,7 +75,7 @@ export default function SettingsPage() {
             </div>
           </div>
           <Button asChild variant="ghost" size="sm">
-            <Link href="/dashboard/settings/billing">
+            <Link href="/settings/billing">
               Manage Billing
               <ArrowRight className="size-4" />
             </Link>

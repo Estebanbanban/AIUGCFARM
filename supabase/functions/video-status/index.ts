@@ -5,6 +5,7 @@ import { getAdminClient } from "../_shared/supabase.ts";
 import { checkKlingJob } from "../_shared/kling.ts";
 import { refundCredits } from "../_shared/credits.ts";
 
+const SINGLE_COST = 3;
 const BATCH_COST = 9;
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -309,9 +310,10 @@ Deno.serve(async (req: Request) => {
           })
           .eq("id", generationId);
 
-        // Refund credits
+        // Refund credits — use actual cost based on mode
+        const creditCost = gen.mode === "single" ? SINGLE_COST : BATCH_COST;
         try {
-          await refundCredits(userId, BATCH_COST, generationId);
+          await refundCredits(userId, creditCost, generationId);
         } catch (refundErr) {
           console.error("Credit refund failed:", refundErr);
         }

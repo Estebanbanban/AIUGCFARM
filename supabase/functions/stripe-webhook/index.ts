@@ -14,7 +14,7 @@ const stripe = new Stripe(STRIPE_SECRET_KEY, {
 const PLAN_CREDITS: Record<string, number> = {
   starter: 27,
   growth: 90,
-  scale: 300,
+  scale: 270,
 };
 
 /** NOTE: No auth middleware — this endpoint uses Stripe webhook signature verification. */

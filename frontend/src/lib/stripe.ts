@@ -37,13 +37,13 @@ export const PLANS = {
   },
   scale: {
     name: "Scale",
-    price: 149,
-    credits: 300,
+    price: 199,
+    credits: 270,
     personas: 10,
     brands: 10,
     resolution: "1080p",
     features: [
-      "300 segment credits/month",
+      "270 segment credits/month",
       "10 AI personas",
       "10 brand profiles",
       "Easy + Expert Mode",

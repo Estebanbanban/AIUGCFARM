@@ -90,7 +90,7 @@ export default function BillingPage() {
       <div className="flex flex-col gap-6">
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="icon">
-            <Link href="/dashboard/settings">
+            <Link href="/settings">
               <ArrowLeft className="size-4" />
             </Link>
           </Button>
@@ -114,7 +114,7 @@ export default function BillingPage() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button asChild variant="ghost" size="icon">
-          <Link href="/dashboard/settings">
+          <Link href="/settings">
             <ArrowLeft className="size-4" />
           </Link>
         </Button>

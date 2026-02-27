@@ -31,11 +31,11 @@ import {
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Products", href: "/dashboard/products", icon: Package },
-  { label: "Personas", href: "/dashboard/personas", icon: Users },
+  { label: "Products", href: "/products", icon: Package },
+  { label: "Personas", href: "/personas", icon: Users },
   { label: "Generate", href: "/generate", icon: Sparkles },
   { label: "History", href: "/history", icon: Clock },
-  { label: "Settings", href: "/dashboard/settings", icon: Settings },
+  { label: "Settings", href: "/settings", icon: Settings },
 ];
 
 function SidebarContent({

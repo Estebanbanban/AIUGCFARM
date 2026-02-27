@@ -251,7 +251,7 @@ export default function GeneratePage() {
                     </p>
                   </div>
                   <Button asChild variant="outline">
-                    <Link href="/dashboard/products">Import Products</Link>
+                    <Link href="/products">Import Products</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -334,7 +334,7 @@ export default function GeneratePage() {
                     </p>
                   </div>
                   <Button asChild variant="outline">
-                    <Link href="/dashboard/personas/new">Create Persona</Link>
+                    <Link href="/personas/new">Create Persona</Link>
                   </Button>
                 </CardContent>
               </Card>
