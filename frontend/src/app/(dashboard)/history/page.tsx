@@ -188,7 +188,7 @@ export default function HistoryPage() {
                         variant="secondary"
                         className={cn(
                           "text-xs capitalize",
-                          statusColors[gen.status] ?? statusColors.scripting
+                          statusColors[gen.status] ?? statusColors.pending
                         )}
                       >
                         {statusLabel(gen.status)}

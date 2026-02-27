@@ -89,7 +89,7 @@ const pipelineStages: PipelineStage[] = [
     key: "scripting",
     label: "Writing Script & POV Image",
     icon: <FileText className="size-4" />,
-    activeStatuses: ["scripting"],
+    activeStatuses: ["pending", "scripting"],
     doneStatuses: ["submitting_jobs", "generating_segments", "completed"],
   },
   {

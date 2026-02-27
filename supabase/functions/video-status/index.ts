@@ -373,7 +373,7 @@ Deno.serve(async (req: Request) => {
       }, cors);
     }
 
-    // ── Handle pre-video statuses (scripting, generating_image, submitting_jobs) ─
+    // ── Handle pre-video statuses (pending, scripting, submitting_jobs) ─
     return json({
       data: {
         generation_id: gen.id,
