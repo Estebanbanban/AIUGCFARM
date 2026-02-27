@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { callEdgeMultipart } from "@/lib/api";
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -39,25 +40,7 @@ const CURRENCIES = [
 ];
 
 async function uploadProduct(formData: FormData) {
-  const { createClient } = await import("@/lib/supabase/client");
-  const supabase = createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) throw new Error("Not authenticated");
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const res = await fetch(`${supabaseUrl}/functions/v1/upload-product`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${session.access_token}` },
-    body: formData,
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Upload failed" }));
-    throw new Error(err.detail || "Upload failed");
-  }
-  return res.json();
+  return callEdgeMultipart("upload-product", formData);
 }
 
 interface PreviewFile {
