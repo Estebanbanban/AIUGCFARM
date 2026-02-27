@@ -15,11 +15,12 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.75, ease: [0.25, 0.4, 0.25, 1] }}
-            className="mx-auto max-w-5xl text-[clamp(2.8rem,8vw,7rem)] font-semibold leading-[0.98] tracking-[-0.03em] text-white"
+            className="mx-auto max-w-5xl text-[clamp(2.4rem,7vw,5.8rem)] font-semibold leading-[1.02] tracking-[-0.03em] text-white"
           >
-            Turn Any Product URL
-            <br />
-            Into <span className="font-serif italic text-primary">UGC Video Ads.</span>
+            <span className="block whitespace-nowrap">Turn Any Product URL</span>
+            <span className="block whitespace-nowrap">
+              Into <span className="font-serif italic text-primary">UGC Video Ads.</span>
+            </span>
           </motion.h1>
 
           <motion.p
