@@ -59,7 +59,7 @@ export function HowItWorksSection() {
             <motion.div key={step.number} variants={staggerItem} className="relative">
               {/* Connecting dashed line between steps (desktop) */}
               {i < steps.length - 1 && (
-                <div className="hidden md:block absolute top-5 left-[60%] w-[80%] border-t border-dashed border-border z-0" />
+                <div className="absolute left-16 top-[3.25rem] z-0 hidden h-0 w-[calc(100%-40px)] border-t border-dashed border-border md:block" />
               )}
 
               <div className="relative z-10 flex flex-col items-center md:items-start text-center md:text-left px-6 py-8">
