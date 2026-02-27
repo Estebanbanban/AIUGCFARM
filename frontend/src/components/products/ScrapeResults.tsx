@@ -142,7 +142,7 @@ export function ScrapeResults({
         <Button
           onClick={handleConfirmAll}
           disabled={confirming}
-          className="bg-violet-600 hover:bg-violet-700"
+          className="bg-primary hover:bg-primary/90"
         >
           {confirming ? (
             <>
@@ -268,7 +268,7 @@ function ProductEditCard({
                   size="sm"
                   onClick={handleSave}
                   disabled={updateProduct.isPending}
-                  className="bg-violet-600 hover:bg-violet-700"
+                  className="bg-primary hover:bg-primary/90"
                 >
                   {updateProduct.isPending ? (
                     <Loader2 className="size-3 animate-spin" />

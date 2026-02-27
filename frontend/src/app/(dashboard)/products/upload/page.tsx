@@ -217,7 +217,7 @@ export default function ProductUploadPage() {
               onClick={() => fileInputRef.current?.click()}
               className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-10 transition-colors ${
                 isDragOver
-                  ? "border-violet-500 bg-violet-500/5"
+                  ? "border-primary bg-primary/5"
                   : "border-muted-foreground/25 hover:border-muted-foreground/50"
               }`}
             >
@@ -335,7 +335,7 @@ export default function ProductUploadPage() {
             <div className="flex items-center gap-3 pt-2">
               <Button
                 type="submit"
-                className="bg-violet-600 hover:bg-violet-700"
+                className="bg-primary hover:bg-primary/90"
                 disabled={isSubmitting || !name.trim()}
               >
                 {isSubmitting ? (

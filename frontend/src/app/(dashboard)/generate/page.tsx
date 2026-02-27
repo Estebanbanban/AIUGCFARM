@@ -522,7 +522,7 @@ export default function GeneratePage() {
                         className={cn(
                           "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
                           store.quality === "standard"
-                            ? "border-violet-500 bg-violet-500/5 ring-1 ring-violet-500/30"
+                            ? "border-primary bg-primary/5 ring-1 ring-primary/30"
                             : "border-border hover:border-muted-foreground/30"
                         )}
                       >
@@ -535,7 +535,7 @@ export default function GeneratePage() {
                         className={cn(
                           "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
                           store.quality === "hd"
-                            ? "border-violet-500 bg-violet-500/5 ring-1 ring-violet-500/30"
+                            ? "border-primary bg-primary/5 ring-1 ring-primary/30"
                             : "border-border hover:border-muted-foreground/30"
                         )}
                       >

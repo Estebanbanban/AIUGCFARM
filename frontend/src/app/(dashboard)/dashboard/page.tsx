@@ -40,7 +40,7 @@ const statusColors: Record<string, string> = {
   generating_video: "bg-amber-500/10 text-amber-400",
   generating_image: "bg-amber-500/10 text-amber-400",
   scripting: "bg-amber-500/10 text-amber-400",
-  submitting_jobs: "bg-violet-500/10 text-violet-400",
+  submitting_jobs: "bg-primary/10 text-primary",
   generating_segments: "bg-blue-500/10 text-blue-400",
   failed: "bg-red-500/10 text-red-400",
 };
