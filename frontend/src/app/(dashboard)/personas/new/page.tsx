@@ -229,54 +229,60 @@ function optionImageDataUri(key: string) {
 }
 
 function optionHumanPhotoUri(key: string) {
+  const seed = (hashString(key) % 997) + 1;
+  const base = "https://source.unsplash.com/800x1000/?";
+  const neutral = "portrait,studio,neutral background,person";
+
+  const q = (query: string) => `${base}${encodeURIComponent(`${neutral},${query}`)}&sig=${seed}`;
+
   const genderMap: Record<string, string> = {
-    male: "https://randomuser.me/api/portraits/men/32.jpg",
-    female: "https://randomuser.me/api/portraits/women/44.jpg",
-    non_binary: "https://randomuser.me/api/portraits/women/65.jpg",
+    male: q("man"),
+    female: q("woman"),
+    non_binary: q("androgynous person"),
   };
 
   const hairStyleMap: Record<string, string> = {
-    "Short Straight": "https://randomuser.me/api/portraits/men/11.jpg",
-    "Short Curly": "https://randomuser.me/api/portraits/men/28.jpg",
-    "Medium Straight": "https://randomuser.me/api/portraits/women/12.jpg",
-    "Medium Wavy": "https://randomuser.me/api/portraits/women/33.jpg",
-    "Long Straight": "https://randomuser.me/api/portraits/women/24.jpg",
-    "Long Curly": "https://randomuser.me/api/portraits/women/52.jpg",
-    "Buzz Cut": "https://randomuser.me/api/portraits/men/47.jpg",
-    Bob: "https://randomuser.me/api/portraits/women/36.jpg",
-    Ponytail: "https://randomuser.me/api/portraits/women/57.jpg",
-    Braids: "https://randomuser.me/api/portraits/women/68.jpg",
-    Afro: "https://randomuser.me/api/portraits/men/73.jpg",
-    Bald: "https://randomuser.me/api/portraits/men/86.jpg",
+    "Short Straight": q("short straight hair"),
+    "Short Curly": q("short curly hair"),
+    "Medium Straight": q("medium straight hair"),
+    "Medium Wavy": q("medium wavy hair"),
+    "Long Straight": q("long straight hair"),
+    "Long Curly": q("long curly hair"),
+    "Buzz Cut": q("buzz cut"),
+    Bob: q("bob haircut"),
+    Ponytail: q("ponytail hairstyle"),
+    Braids: q("braids hairstyle"),
+    Afro: q("afro hairstyle"),
+    Bald: q("bald head"),
   };
 
   const bodyTypeMap: Record<string, string> = {
-    slim: "https://randomuser.me/api/portraits/women/70.jpg",
-    average: "https://randomuser.me/api/portraits/men/54.jpg",
-    athletic: "https://randomuser.me/api/portraits/men/63.jpg",
-    curvy: "https://randomuser.me/api/portraits/women/61.jpg",
-    plus_size: "https://randomuser.me/api/portraits/women/79.jpg",
+    slim: q("slim body portrait"),
+    average: q("average body portrait"),
+    athletic: q("athletic body portrait"),
+    curvy: q("curvy body portrait"),
+    plus_size: q("plus size portrait"),
   };
 
   const clothingMap: Record<string, string> = {
-    Casual: "https://randomuser.me/api/portraits/women/29.jpg",
-    "Business Casual": "https://randomuser.me/api/portraits/men/22.jpg",
-    Streetwear: "https://randomuser.me/api/portraits/men/45.jpg",
-    Sporty: "https://randomuser.me/api/portraits/women/19.jpg",
-    Elegant: "https://randomuser.me/api/portraits/women/39.jpg",
-    Bohemian: "https://randomuser.me/api/portraits/women/26.jpg",
-    Minimalist: "https://randomuser.me/api/portraits/men/35.jpg",
+    Casual: q("casual outfit"),
+    "Business Casual": q("business casual outfit"),
+    Streetwear: q("streetwear outfit"),
+    Sporty: q("sporty outfit"),
+    Elegant: q("elegant outfit"),
+    Bohemian: q("bohemian style outfit"),
+    Minimalist: q("minimalist outfit"),
   };
 
   const accessoryMap: Record<string, string> = {
-    None: "https://randomuser.me/api/portraits/women/41.jpg",
-    Glasses: "https://randomuser.me/api/portraits/men/76.jpg",
-    Sunglasses: "https://randomuser.me/api/portraits/women/75.jpg",
-    Earrings: "https://randomuser.me/api/portraits/women/27.jpg",
-    Necklace: "https://randomuser.me/api/portraits/women/31.jpg",
-    Watch: "https://randomuser.me/api/portraits/men/82.jpg",
-    Hat: "https://randomuser.me/api/portraits/men/69.jpg",
-    Scarf: "https://randomuser.me/api/portraits/women/83.jpg",
+    None: q("simple portrait"),
+    Glasses: q("person wearing glasses"),
+    Sunglasses: q("person wearing sunglasses"),
+    Earrings: q("person wearing earrings"),
+    Necklace: q("person wearing necklace"),
+    Watch: q("person wearing watch"),
+    Hat: q("person wearing hat"),
+    Scarf: q("person wearing scarf"),
   };
 
   if (key.startsWith("gender-")) return genderMap[key.slice(7)] ?? optionImageDataUri(key);
