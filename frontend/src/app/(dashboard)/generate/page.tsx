@@ -123,6 +123,7 @@ export default function GeneratePage() {
   // Step 1 — product add state
   const [addingProduct, setAddingProduct] = useState(false);
   const [importUrl, setImportUrl] = useState("");
+  const [scrapeError, setScrapeError] = useState<string | null>(null);
   const [scrapedProducts, setScrapedProducts] = useState<Product[]>([]);
   const [scrapedBrandSummary, setScrapedBrandSummary] =
     useState<BrandSummary | null>(null);
@@ -183,8 +184,24 @@ export default function GeneratePage() {
 
   async function handleScrape() {
     if (!importUrl.trim()) return;
+    setScrapeError(null);
     try {
       const result = await scrapeProduct.mutateAsync({ url: importUrl.trim() });
+      if (result.products.length === 0) {
+        if (result.blocked_by_robots) {
+          throw new Error(
+            "This store blocks automated scraping (robots.txt). Try manual upload.",
+          );
+        }
+        throw new Error(
+          "No products could be extracted from this URL. Try a direct product page.",
+        );
+      }
+      if (result.save_failed) {
+        throw new Error(
+          "We scraped this page but could not save products to your account. Please try again.",
+        );
+      }
       const scraped: Product[] = result.products
         .filter((p) => p.id != null)
         .map((p) => ({
@@ -203,13 +220,21 @@ export default function GeneratePage() {
           created_at: "",
           updated_at: "",
         }));
+      if (scraped.length === 0) {
+        throw new Error(
+          "Products were found but none were saved to your account. Please try again.",
+        );
+      }
       setScrapedProducts(scraped);
       setScrapedBrandSummary(result.brand_summary ?? null);
       setShowScrapeResults(true);
       setImportUrl("");
     } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to import product";
+      setScrapeError(message);
       toast.error(
-        err instanceof Error ? err.message : "Failed to import product",
+        message,
         { action: { label: "Retry", onClick: handleScrape } },
       );
     }
@@ -221,6 +246,7 @@ export default function GeneratePage() {
     setScrapedBrandSummary(null);
     setShowScrapeResults(false);
     setAddingProduct(false);
+    setScrapeError(null);
     queryClient.invalidateQueries({ queryKey: ["products"] });
     if (firstId) {
       store.setProductId(firstId);
@@ -239,7 +265,9 @@ export default function GeneratePage() {
     setAddingProduct(false);
     setShowScrapeResults(false);
     setScrapedProducts([]);
+    setScrapedBrandSummary(null);
     setImportUrl("");
+    setScrapeError(null);
   }
 
   // ── Persona builder callback ─────────────────────────────────────────────
@@ -438,6 +466,9 @@ export default function GeneratePage() {
                           Supports Shopify stores and most e-commerce product
                           pages.
                         </p>
+                        {scrapeError && (
+                          <p className="text-xs text-destructive">{scrapeError}</p>
+                        )}
                       </div>
                       <Button
                         onClick={handleScrape}
