@@ -25,6 +25,43 @@
 import { sendEmail } from "../_shared/email.ts";
 
 const SITE_URL = Deno.env.get("FRONTEND_URL") || "https://www.cinerads.com";
+const HOOK_SECRET = Deno.env.get("SEND_EMAIL_HOOK_SECRET");
+
+/**
+ * Verify the Supabase Auth Hook HMAC-SHA256 signature.
+ * Supabase sends: Authorization: <version>,<signature>
+ * where <version> = "v1" and <signature> = hex(HMAC-SHA256(body, secret))
+ * The secret in env is stored as "v1,whsec_<base64>" — we extract the base64 key part.
+ */
+async function verifyHookSignature(req: Request, body: string): Promise<boolean> {
+  if (!HOOK_SECRET) return true; // Skip verification if secret not configured (dev)
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return false;
+
+  // Header format: "v1,<hex-signature>"
+  const [version, signature] = authHeader.split(",");
+  if (version !== "v1" || !signature) return false;
+
+  // Secret format: "v1,whsec_<base64>" — extract the base64 part after "whsec_"
+  const secretPart = HOOK_SECRET.replace(/^v1,whsec_/, "").replace(/^whsec_/, "");
+  const keyBytes = Uint8Array.from(atob(secretPart), (c) => c.charCodeAt(0));
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    keyBytes,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["verify"]
+  );
+
+  const signatureBytes = new Uint8Array(
+    signature.match(/.{1,2}/g)!.map((b) => parseInt(b, 16))
+  );
+  const bodyBytes = new TextEncoder().encode(body);
+
+  return crypto.subtle.verify("HMAC", cryptoKey, signatureBytes, bodyBytes);
+}
 
 interface AuthHookPayload {
   user: {
@@ -152,7 +189,16 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const payload = (await req.json()) as AuthHookPayload;
+    const rawBody = await req.text();
+
+    if (!(await verifyHookSignature(req, rawBody))) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const payload = JSON.parse(rawBody) as AuthHookPayload;
     const { user, email_data } = payload;
     const toEmail = user.email;
     const { email_action_type, token_hash, redirect_to } = email_data;

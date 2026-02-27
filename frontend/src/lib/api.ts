@@ -21,14 +21,25 @@ export async function callEdge<T>(
   options: { method?: string; body?: unknown } = {}
 ): Promise<T> {
   const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
+
+  // Use getUser() — not getSession() — to force server-side token validation.
+  // getSession() reads from local storage/cookies and can return a stale session
+  // with an expired or invalid access_token without hitting the network. getUser()
+  // always validates against the Supabase Auth server and automatically refreshes
+  // the session when the access_token has expired, ensuring we always send a
+  // current, server-verified token to edge functions.
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+  if (!user || userError) {
+    // Token is invalid or expired and could not be refreshed — force sign-out
+    await supabase.auth.signOut();
+    throw new Error("Authentication required. Please sign in again.");
+  }
+
+  // After getUser() succeeds the session is guaranteed to be fresh (auto-refreshed)
   let {
     data: { session },
   } = await supabase.auth.getSession();
-
-  if (!session) {
-    const refreshed = await supabase.auth.refreshSession();
-    session = refreshed.data.session;
-  }
 
   if (!session) throw new Error("Authentication required. Please sign in again.");
 
@@ -92,6 +103,15 @@ export async function callEdgeMultipart<T>(
   formData: FormData
 ): Promise<T> {
   const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
+
+  // Same pattern as callEdge: use getUser() to force server validation before
+  // reading the session, ensuring the access_token is fresh.
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (!user || userError) {
+    await supabase.auth.signOut();
+    throw new Error("Not authenticated");
+  }
+
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Not authenticated");
 
