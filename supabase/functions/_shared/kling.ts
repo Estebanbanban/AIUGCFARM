@@ -14,12 +14,13 @@ export interface KlingJobStatus {
 
 /**
  * Submit a video generation job to Kling AI.
+ * Uses kling-v2-6 std (720p) for cost efficiency per architecture decision AD-KLING-01.
+ * image2video endpoint infers aspect ratio from the input image — no aspect_ratio param.
  */
 export async function submitKlingJob(params: {
   image_url: string;
   script: string;
   duration: number;
-  aspect_ratio?: string;
   mode?: string;
 }): Promise<KlingSubmitResult> {
   const apiKey = Deno.env.get("KLING_API_KEY");
@@ -32,11 +33,11 @@ export async function submitKlingJob(params: {
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      image_url: params.image_url,
+      model_name: "kling-v2-6",
+      image: params.image_url,
       prompt: params.script,
       duration: String(params.duration),
-      aspect_ratio: params.aspect_ratio || "9:16",
-      mode: params.mode || "standard",
+      mode: params.mode || "std",
     }),
   });
 

@@ -16,17 +16,22 @@ interface GenerationInput {
   mode: "single" | "triple";
 }
 
+export interface GenerationWithRelations extends Generation {
+  products: { name: string; images: string[] } | null;
+  personas: { name: string; selected_image_url: string | null } | null;
+}
+
 export function useGenerations() {
-  return useQuery<Generation[]>({
+  return useQuery<GenerationWithRelations[]>({
     queryKey: ["generations"],
     queryFn: async () => {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("generations")
-        .select("*")
+        .select("*, products(name, images), personas(name, selected_image_url)")
         .order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
-      return data;
+      return data as GenerationWithRelations[];
     },
   });
 }

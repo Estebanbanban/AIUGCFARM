@@ -312,11 +312,11 @@ Platform expansion and ecosystem.
 | FR19 | System generates multiple AI-written script variants per segment type: 3 Hook variants (3–5s each), 3 Body variants (5–10s each), and 3 CTA variants (3–5s each), tuned to the product's scraped description and brand tone | UJ2.7 |
 | FR20 | System generates a composite POV-style image of the persona holding/using the selected product | UJ2.7 |
 | FR21 | System generates video segments independently (Hook, Body, CTA) to maintain lip-sync quality (each segment < 10 seconds) | UJ2.7 |
-| FR22 | Body segments exceeding 10 seconds are split into 2 sub-segments for generation | UJ2.7 |
-| FR23 | System assembles user-selected segment combinations (any hook + any body + any CTA) into complete videos via on-demand FFmpeg stitching with smooth transitions (crossfade or jump cut) | UJ2.7 |
+| FR22 | Body segments are bounded at 10 seconds maximum. The script generation LLM enforces this constraint (5–10s body duration cap) — no runtime splitting required. Body sub-segment splitting deferred to Phase 1.5 if needed. | UJ2.7 |
+| FR23 | **[Deferred — Phase 1.5]** System assembles user-selected segment combinations via on-demand FFmpeg stitching. MVP: individual segments delivered; client-side sequential preview only. FFmpeg not available in Deno Edge Functions. | UJ2.7 |
 | FR24 | Each Easy Mode generation produces 3 variants per segment type (3 hooks + 3 bodies + 3 CTAs = 9 segments), each with slight prompt diversity. Combinatorially yields 27 unique video outputs | UJ2.8 |
 | FR25 | Users can review generated segments by type (hooks, bodies, CTAs), select favorites, combine them into custom videos, and preview assembled combinations | UJ2.8 |
-| FR26 | Users can download any or all generated videos as MP4 files | UJ2.9 |
+| FR26 | Users can download individual generated video segments as MP4 files via signed URL. Bulk zip download deferred to Phase 1.5. | UJ2.9 |
 
 ### Video Generation — Expert Mode (Phase 2)
 
