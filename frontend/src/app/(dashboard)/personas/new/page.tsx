@@ -57,9 +57,6 @@ const bodyTypeLabels: Record<string, string> = {
   plus_size: "Plus Size",
 };
 
-// The persona-builder store keeps flat fields for the UI,
-// which get assembled into the attributes JSONB on save.
-
 export default function NewPersonaPage() {
   const router = useRouter();
   const store = usePersonaBuilderStore();
@@ -149,9 +146,7 @@ export default function NewPersonaPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Create Persona
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight">Create Persona</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
             Build your AI avatar from scratch.
           </p>
@@ -159,7 +154,7 @@ export default function NewPersonaPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        {/* Left Panel — Attribute Controls */}
+        {/* Left Panel -- Attribute Controls */}
         <ScrollArea className="h-[calc(100vh-180px)] pr-4 lg:h-auto lg:pr-0">
           <fieldset disabled={store.isGenerating || store.isSaving}>
           <div className={cn(
@@ -168,7 +163,7 @@ export default function NewPersonaPage() {
           )}>
             {/* Name */}
             <Card>
-              <CardContent className="flex flex-col gap-3">
+              <CardContent className="flex flex-col gap-3 p-5">
                 <Label htmlFor="persona-name" className="text-sm font-medium">
                   Persona Name
                 </Label>
@@ -184,9 +179,7 @@ export default function NewPersonaPage() {
             {/* Gender */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-foreground">
-                  Gender
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">Gender</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-3 gap-2">
@@ -197,7 +190,7 @@ export default function NewPersonaPage() {
                       className={cn(
                         "rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors",
                         store.gender === g
-                          ? "border-violet-500 bg-violet-500/10 text-violet-400"
+                          ? "border-primary bg-primary/10 text-primary"
                           : "border-border bg-card text-muted-foreground hover:border-muted-foreground/30"
                       )}
                     >
@@ -211,9 +204,7 @@ export default function NewPersonaPage() {
             {/* Skin Tone */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-foreground">
-                  Skin Tone
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">Skin Tone</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-3">
@@ -224,7 +215,7 @@ export default function NewPersonaPage() {
                       className={cn(
                         "size-10 rounded-full border-2 transition-all",
                         store.skinTone === tone
-                          ? "border-violet-500 ring-2 ring-violet-500/30 scale-110"
+                          ? "border-primary ring-2 ring-primary/30 scale-110"
                           : "border-transparent hover:scale-105"
                       )}
                       style={{ backgroundColor: tone }}
@@ -238,9 +229,7 @@ export default function NewPersonaPage() {
             {/* Age Range */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-foreground">
-                  Age Range
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">Age Range</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
@@ -251,7 +240,7 @@ export default function NewPersonaPage() {
                       className={cn(
                         "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
                         store.ageRange === range
-                          ? "border-violet-500 bg-violet-500/10 text-violet-400"
+                          ? "border-primary bg-primary/10 text-primary"
                           : "border-border text-muted-foreground hover:border-muted-foreground/30"
                       )}
                     >
@@ -265,7 +254,7 @@ export default function NewPersonaPage() {
             {/* Hair Color */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-foreground">
+                <CardTitle className="text-sm font-medium">
                   Hair Color
                 </CardTitle>
               </CardHeader>
@@ -278,7 +267,7 @@ export default function NewPersonaPage() {
                       className={cn(
                         "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                         store.hairColor === color
-                          ? "border-violet-500 bg-violet-500/10 text-violet-400"
+                          ? "border-primary bg-primary/10 text-primary"
                           : "border-border text-muted-foreground hover:border-muted-foreground/30"
                       )}
                     >
@@ -292,7 +281,7 @@ export default function NewPersonaPage() {
             {/* Hair Style */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-foreground">
+                <CardTitle className="text-sm font-medium">
                   Hair Style
                 </CardTitle>
               </CardHeader>
@@ -305,7 +294,7 @@ export default function NewPersonaPage() {
                       className={cn(
                         "rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
                         store.hairStyle === style
-                          ? "border-violet-500 bg-violet-500/10 text-violet-400"
+                          ? "border-primary bg-primary/10 text-primary"
                           : "border-border text-muted-foreground hover:border-muted-foreground/30"
                       )}
                     >
@@ -319,7 +308,7 @@ export default function NewPersonaPage() {
             {/* Eye Color */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-foreground">
+                <CardTitle className="text-sm font-medium">
                   Eye Color
                 </CardTitle>
               </CardHeader>
@@ -332,7 +321,7 @@ export default function NewPersonaPage() {
                       className={cn(
                         "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                         store.eyeColor === color
-                          ? "border-violet-500 bg-violet-500/10 text-violet-400"
+                          ? "border-primary bg-primary/10 text-primary"
                           : "border-border text-muted-foreground hover:border-muted-foreground/30"
                       )}
                     >
@@ -346,7 +335,7 @@ export default function NewPersonaPage() {
             {/* Body Type */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-foreground">
+                <CardTitle className="text-sm font-medium">
                   Body Type
                 </CardTitle>
               </CardHeader>
@@ -359,7 +348,7 @@ export default function NewPersonaPage() {
                       className={cn(
                         "rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
                         store.bodyType === type
-                          ? "border-violet-500 bg-violet-500/10 text-violet-400"
+                          ? "border-primary bg-primary/10 text-primary"
                           : "border-border text-muted-foreground hover:border-muted-foreground/30"
                       )}
                     >
@@ -373,7 +362,7 @@ export default function NewPersonaPage() {
             {/* Clothing Style */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-foreground">
+                <CardTitle className="text-sm font-medium">
                   Clothing Style
                 </CardTitle>
               </CardHeader>
@@ -386,7 +375,7 @@ export default function NewPersonaPage() {
                       className={cn(
                         "rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
                         store.clothingStyle === style
-                          ? "border-violet-500 bg-violet-500/10 text-violet-400"
+                          ? "border-primary bg-primary/10 text-primary"
                           : "border-border text-muted-foreground hover:border-muted-foreground/30"
                       )}
                     >
@@ -400,7 +389,7 @@ export default function NewPersonaPage() {
             {/* Accessories */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-foreground">
+                <CardTitle className="text-sm font-medium">
                   Accessories{" "}
                   <span className="text-xs font-normal text-muted-foreground">
                     (max 5)
@@ -418,7 +407,7 @@ export default function NewPersonaPage() {
                         className={cn(
                           "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                           isSelected
-                            ? "border-violet-500 bg-violet-500/10 text-violet-400"
+                            ? "border-primary bg-primary/10 text-primary"
                             : "border-border text-muted-foreground hover:border-muted-foreground/30"
                         )}
                       >
@@ -434,10 +423,10 @@ export default function NewPersonaPage() {
           </fieldset>
         </ScrollArea>
 
-        {/* Right Panel — Preview & Generation */}
+        {/* Right Panel -- Preview & Generation */}
         <div className="flex flex-col gap-4">
           <div className="sticky top-6">
-            {/* Loading Skeleton — shown while generating */}
+            {/* Loading Skeleton -- shown while generating */}
             {store.isGenerating && store.generatedImages.length === 0 && (
               <Card className="mb-4">
                 <CardHeader>
@@ -465,7 +454,7 @@ export default function NewPersonaPage() {
             {store.generatedImages.length === 0 && !store.isGenerating && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm font-medium text-foreground">
+                  <CardTitle className="text-sm font-medium">
                     Persona Summary
                   </CardTitle>
                 </CardHeader>
@@ -481,23 +470,17 @@ export default function NewPersonaPage() {
                       <span className="text-xs text-muted-foreground">
                         Name
                       </span>
-                      <p className="font-medium text-foreground">
-                        {store.name || "Not set"}
-                      </p>
+                      <p className="font-medium">{store.name || "Not set"}</p>
                     </div>
                     <div>
                       <span className="text-xs text-muted-foreground">
                         Gender
                       </span>
-                      <p className="font-medium text-foreground">
-                        {genderLabels[store.gender]}
-                      </p>
+                      <p className="font-medium">{genderLabels[store.gender]}</p>
                     </div>
                     <div>
-                      <span className="text-xs text-muted-foreground">
-                        Age
-                      </span>
-                      <p className="font-medium text-foreground">
+                      <span className="text-xs text-muted-foreground">Age</span>
+                      <p className="font-medium">
                         {ageRangeLabels[store.ageRange]}
                       </p>
                     </div>
@@ -505,25 +488,19 @@ export default function NewPersonaPage() {
                       <span className="text-xs text-muted-foreground">
                         Body Type
                       </span>
-                      <p className="font-medium capitalize text-foreground">
+                      <p className="font-medium capitalize">
                         {bodyTypeLabels[store.bodyType]}
                       </p>
                     </div>
                     <div>
-                      <span className="text-xs text-muted-foreground">
-                        Hair
-                      </span>
-                      <p className="font-medium text-foreground">
+                      <span className="text-xs text-muted-foreground">Hair</span>
+                      <p className="font-medium">
                         {store.hairColor}, {store.hairStyle}
                       </p>
                     </div>
                     <div>
-                      <span className="text-xs text-muted-foreground">
-                        Eyes
-                      </span>
-                      <p className="font-medium text-foreground">
-                        {store.eyeColor}
-                      </p>
+                      <span className="text-xs text-muted-foreground">Eyes</span>
+                      <p className="font-medium">{store.eyeColor}</p>
                     </div>
                     <div>
                       <span className="text-xs text-muted-foreground">
@@ -534,7 +511,7 @@ export default function NewPersonaPage() {
                           className="size-4 rounded-full border"
                           style={{ backgroundColor: store.skinTone }}
                         />
-                        <span className="text-xs font-medium text-foreground">
+                        <span className="text-xs font-medium">
                           {store.skinTone}
                         </span>
                       </div>
@@ -543,9 +520,7 @@ export default function NewPersonaPage() {
                       <span className="text-xs text-muted-foreground">
                         Style
                       </span>
-                      <p className="font-medium text-foreground">
-                        {store.clothingStyle}
-                      </p>
+                      <p className="font-medium">{store.clothingStyle}</p>
                     </div>
                   </div>
 
@@ -578,7 +553,7 @@ export default function NewPersonaPage() {
             {store.generatedImages.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm font-medium text-foreground">
+                  <CardTitle className="text-sm font-medium">
                     Choose Your Persona
                   </CardTitle>
                 </CardHeader>
@@ -591,7 +566,7 @@ export default function NewPersonaPage() {
                         className={cn(
                           "relative aspect-square overflow-hidden rounded-lg border-2 bg-muted transition-all",
                           store.selectedImageIndex === index
-                            ? "border-violet-500 ring-2 ring-violet-500/30"
+                            ? "border-primary ring-2 ring-primary/30"
                             : "border-transparent hover:border-muted-foreground/30"
                         )}
                       >
@@ -612,7 +587,7 @@ export default function NewPersonaPage() {
                           />
                         )}
                         {store.selectedImageIndex === index && (
-                          <div className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-violet-500">
+                          <div className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-primary">
                             <Check className="size-3.5 text-white" />
                           </div>
                         )}
@@ -629,7 +604,7 @@ export default function NewPersonaPage() {
                 <Button
                   onClick={handleGenerate}
                   disabled={!store.name.trim() || store.isGenerating}
-                  className="w-full bg-violet-600 hover:bg-violet-700"
+                  className="w-full"
                   size="lg"
                 >
                   {store.isGenerating ? (
@@ -653,7 +628,7 @@ export default function NewPersonaPage() {
                       !store.personaId ||
                       store.isSaving
                     }
-                    className="w-full bg-violet-600 hover:bg-violet-700"
+                    className="w-full"
                     size="lg"
                   >
                     {store.isSaving ? (

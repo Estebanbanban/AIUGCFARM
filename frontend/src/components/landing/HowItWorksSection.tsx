@@ -1,70 +1,144 @@
-import { Globe, UserCircle, Video } from "lucide-react";
+"use client";
+
+import { motion } from "framer-motion";
+import { fadeInUp, staggerContainer } from "@/lib/animations";
+import { Link, Sparkles, Film, ArrowRight, ShoppingBag, User, Clapperboard } from "lucide-react";
 
 const steps = [
   {
     number: "01",
-    title: "Paste Your Store URL",
+    icon: Link,
+    title: "Paste Your URL",
     description:
-      "We scrape your Shopify store and auto-import all product data, images, and descriptions.",
-    icon: Globe,
+      "Import your products automatically from any store. Zero data entry required.",
   },
   {
     number: "02",
-    title: "Build Your AI Persona",
+    icon: Sparkles,
+    title: "Build Your Persona",
     description:
-      "Create a custom AI spokesperson with our Sims-like character builder. 9 attributes, infinite combinations.",
-    icon: UserCircle,
+      "Create your AI spokesperson with our character builder. 9 configurable attributes.",
   },
   {
     number: "03",
+    icon: Film,
     title: "Generate & Download",
     description:
-      "One click generates 4 video variations with Hook/Body/CTA structure optimized for paid social.",
-    icon: Video,
+      "AI generates Hook/Body/CTA segments. Mix, match, download MP4. Ready for TikTok & Meta.",
   },
 ];
 
-export function HowItWorksSection() {
-  return (
-    <section className="relative py-20 md:py-32">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        {/* Section header */}
-        <div className="text-center">
-          <p className="text-sm font-medium uppercase tracking-widest text-violet-400">
-            Simple Process
-          </p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            How It Works
-          </h2>
+function StepMiniVisual({ stepNumber }: { stepNumber: string }) {
+  if (stepNumber === "01") {
+    return (
+      <div className="mt-6 mx-auto max-w-[220px] rounded-xl border border-border bg-zinc-900/60 p-3 space-y-2">
+        <div className="flex items-center gap-1.5 rounded-md bg-zinc-800 px-2 py-1.5 text-[10px] text-muted-foreground">
+          <Link className="size-3 text-primary/60 shrink-0" />
+          <span className="truncate">mystore.com/product</span>
         </div>
-
-        {/* Steps */}
-        <div className="relative mt-16 grid gap-8 md:grid-cols-3 md:gap-12">
-          {/* Connecting line (desktop only) */}
-          <div className="pointer-events-none absolute top-14 left-[16.67%] right-[16.67%] hidden h-px bg-gradient-to-r from-transparent via-violet-500/30 to-transparent md:block" />
-
-          {steps.map((step) => (
-            <div key={step.number} className="relative flex flex-col items-center text-center">
-              {/* Number badge + icon */}
-              <div className="relative">
-                <div className="flex size-28 items-center justify-center rounded-2xl border border-white/5 bg-zinc-900/50">
-                  <step.icon className="size-10 text-violet-400" />
-                </div>
-                <span className="absolute -top-3 -right-3 flex size-8 items-center justify-center rounded-full bg-violet-600 text-xs font-bold text-white">
-                  {step.number}
-                </span>
-              </div>
-
-              {/* Content */}
-              <h3 className="mt-6 text-lg font-semibold text-white">
-                {step.title}
-              </h3>
-              <p className="mt-3 max-w-xs text-sm leading-relaxed text-zinc-400">
-                {step.description}
-              </p>
+        <div className="flex items-center gap-1 justify-center py-1">
+          <ArrowRight className="size-3 text-primary animate-pulse" />
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {[1, 2].map((i) => (
+            <div key={i} className="rounded-md bg-zinc-800/80 p-2 flex flex-col items-center gap-1">
+              <ShoppingBag className="size-3.5 text-primary/40" />
+              <div className="w-full h-1 rounded bg-zinc-700" />
             </div>
           ))}
         </div>
+      </div>
+    );
+  }
+  if (stepNumber === "02") {
+    return (
+      <div className="mt-6 mx-auto max-w-[220px] rounded-xl border border-border bg-zinc-900/60 p-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center ring-1 ring-primary/20">
+            <User className="size-4 text-primary" />
+          </div>
+          <div className="flex-1 space-y-1">
+            <div className="h-1.5 rounded bg-primary/30 w-3/4" />
+            <div className="h-1.5 rounded bg-zinc-700 w-1/2" />
+          </div>
+        </div>
+        {[70, 50, 85].map((w, i) => (
+          <div key={i} className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+            <div className="h-full rounded-full bg-gradient-to-r from-primary/60 to-primary/20" style={{ width: `${w}%` }} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="mt-6 mx-auto max-w-[220px] rounded-xl border border-border bg-zinc-900/60 p-3 space-y-2">
+      <div className="flex items-center gap-1.5 mb-1">
+        <Clapperboard className="size-3 text-primary" />
+        <span className="text-[9px] font-medium text-muted-foreground">3 Segments Ready</span>
+      </div>
+      <div className="flex gap-1">
+        {["Hook", "Body", "CTA"].map((seg) => (
+          <div key={seg} className="flex-1 rounded-md bg-primary/10 border border-primary/20 py-1.5 text-center">
+            <p className="text-[8px] font-medium text-primary">{seg}</p>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-center gap-1 pt-0.5">
+        <div className="size-1 rounded-full bg-green-500" />
+        <span className="text-[9px] text-green-400">Ready to export</span>
+      </div>
+    </div>
+  );
+}
+
+export function HowItWorksSection() {
+  return (
+    <section id="features" className="py-24 md:py-32">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        <motion.div
+          {...fadeInUp}
+          whileInView={fadeInUp.animate}
+          viewport={{ once: true }}
+          className="text-center mb-16"
+        >
+          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">
+            How It Works
+          </p>
+          <h2 className="text-4xl md:text-5xl font-bold tracking-tight">
+            From URL to Video Ad in 3 Steps
+          </h2>
+        </motion.div>
+
+        <motion.div
+          variants={staggerContainer}
+          initial="initial"
+          whileInView="animate"
+          viewport={{ once: true }}
+          className="relative grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12"
+        >
+          {/* Dotted line connector (desktop) */}
+          <div className="hidden md:block absolute top-16 left-[20%] right-[20%] border-t-2 border-dashed border-border" />
+
+          {steps.map((step) => (
+            <motion.div
+              key={step.number}
+              variants={fadeInUp}
+              className="relative text-center"
+            >
+              <div className="relative z-10 mx-auto mb-6 flex size-14 items-center justify-center rounded-xl bg-primary/10">
+                <step.icon className="size-6 text-primary" />
+              </div>
+              <span className="font-mono text-sm font-bold text-primary mb-2 block">
+                {step.number}
+              </span>
+              <h3 className="text-xl font-semibold mb-2">{step.title}</h3>
+              <p className="text-muted-foreground text-sm leading-relaxed max-w-xs mx-auto">
+                {step.description}
+              </p>
+              <StepMiniVisual stepNumber={step.number} />
+            </motion.div>
+          ))}
+        </motion.div>
       </div>
     </section>
   );

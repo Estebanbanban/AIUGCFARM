@@ -1,15 +1,15 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+"use client";
+
+import { motion } from "framer-motion";
+import { fadeInUp, staggerContainer } from "@/lib/animations";
 import { Check } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const plans = [
   {
     name: "Starter",
-    price: "$29",
-    period: "/month",
-    popular: false,
+    price: 29,
+    description: "Perfect for testing the waters",
     features: [
       "27 segment credits/month",
       "3 batch generations",
@@ -18,106 +18,113 @@ const plans = [
       "720p export",
       "MP4 download",
     ],
+    highlighted: false,
   },
   {
     name: "Growth",
-    price: "$79",
-    period: "/month",
-    popular: true,
+    price: 79,
+    description: "For brands ready to scale",
     features: [
       "90 segment credits/month",
       "10 batch generations",
       "3 AI personas",
       "Easy Mode generation",
-      "720p export",
-      "MP4 download",
+      "1080p export",
+      "Segment mixer (27 combos)",
       "Priority support",
+      "Bulk product import",
+      "Custom watermark",
     ],
+    highlighted: true,
   },
 ];
 
 export function PricingSection() {
   return (
-    <section id="pricing" className="relative py-20 md:py-32">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        {/* Section header */}
-        <div className="text-center">
-          <p className="text-sm font-medium uppercase tracking-widest text-violet-400">
+    <section id="pricing" className="py-24 md:py-32">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        <motion.div
+          {...fadeInUp}
+          whileInView={fadeInUp.animate}
+          viewport={{ once: true }}
+          className="text-center mb-16"
+        >
+          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">
             Pricing
           </p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+          <h2 className="text-4xl md:text-5xl font-bold tracking-tight">
             Simple, Transparent Pricing
           </h2>
-          <p className="mt-4 text-zinc-400">
-            Start free. Scale as you grow.
+          <p className="mt-4 text-lg text-muted-foreground max-w-xl mx-auto">
+            Start free. Upgrade when you&apos;re ready to scale.
           </p>
-        </div>
+        </motion.div>
 
-        {/* Pricing cards */}
-        <div className="mt-16 grid gap-8 md:grid-cols-2">
+        <motion.div
+          variants={staggerContainer}
+          initial="initial"
+          whileInView="animate"
+          viewport={{ once: true }}
+          className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto"
+        >
           {plans.map((plan) => (
-            <div
+            <motion.div
               key={plan.name}
-              className={cn(
-                "relative flex flex-col rounded-2xl border p-8 transition-all",
-                plan.popular
-                  ? "border-violet-500/40 bg-zinc-900/60 shadow-lg shadow-violet-500/5"
-                  : "border-white/5 bg-zinc-900/30"
-              )}
+              variants={fadeInUp}
+              className={`relative rounded-2xl border p-8 ${
+                plan.highlighted
+                  ? "border-primary shadow-lg shadow-primary/5"
+                  : "border-border"
+              }`}
             >
-              {/* Popular badge */}
-              {plan.popular && (
-                <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-violet-600 text-white hover:bg-violet-600">
-                  Most Popular
-                </Badge>
+              {plan.highlighted && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <span className="inline-block rounded-full bg-primary px-3 py-0.5 text-xs font-medium text-primary-foreground">
+                    Most Popular
+                  </span>
+                </div>
               )}
-
-              {/* Plan name */}
-              <h3 className="text-lg font-semibold text-white">{plan.name}</h3>
-
-              {/* Price */}
-              <div className="mt-4 flex items-baseline gap-1">
-                <span className="text-4xl font-bold text-white">
-                  {plan.price}
-                </span>
-                <span className="text-sm text-zinc-500">{plan.period}</span>
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold">{plan.name}</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {plan.description}
+                </p>
               </div>
-
-              {/* Features */}
-              <ul className="mt-8 flex flex-col gap-3 flex-1">
+              <div className="mb-6">
+                <span className="text-5xl font-bold">${plan.price}</span>
+                <span className="text-muted-foreground">/mo</span>
+              </div>
+              <ul className="space-y-3 mb-8">
                 {plan.features.map((feature) => (
                   <li
                     key={feature}
-                    className="flex items-start gap-3 text-sm text-zinc-300"
+                    className="flex items-center gap-3 text-sm"
                   >
-                    <Check className="mt-0.5 size-4 shrink-0 text-violet-400" />
+                    <Check className="size-4 text-primary shrink-0" />
                     {feature}
                   </li>
                 ))}
               </ul>
-
-              {/* CTA */}
               <Button
-                asChild
+                variant={plan.highlighted ? "default" : "secondary"}
                 size="lg"
-                className={cn(
-                  "mt-8 w-full",
-                  plan.popular
-                    ? "bg-violet-600 text-white hover:bg-violet-500"
-                    : "bg-white/5 text-white hover:bg-white/10"
-                )}
+                className="w-full"
               >
-                <Link href="/signup">Get Started</Link>
+                Get Started
               </Button>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
 
-        {/* Bottom note */}
-        <p className="mt-10 text-center text-sm text-zinc-500">
-          All plans include: 9 free segment credits &bull; No watermarks on paid &bull;
-          MP4 download
-        </p>
+        <motion.p
+          {...fadeInUp}
+          whileInView={fadeInUp.animate}
+          viewport={{ once: true }}
+          className="text-center text-sm text-muted-foreground mt-12"
+        >
+          All plans include: 9 free segment credits &middot; No watermarks on
+          paid &middot; MP4 download &middot; Cancel anytime
+        </motion.p>
       </div>
     </section>
   );

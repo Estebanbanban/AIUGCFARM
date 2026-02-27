@@ -5,11 +5,17 @@ export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { ArrowRight, CreditCard, User } from "lucide-react";
+import { ArrowRight, CreditCard, User, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
 export default function SettingsPage() {
@@ -50,9 +56,7 @@ export default function SettingsPage() {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Settings
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Manage your account and billing preferences.
         </p>
@@ -60,15 +64,13 @@ export default function SettingsPage() {
 
       {/* Billing Link */}
       <Card>
-        <CardContent className="flex items-center justify-between">
+        <CardContent className="flex items-center justify-between p-5">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-violet-500/10">
-              <CreditCard className="size-5 text-violet-500" />
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+              <CreditCard className="size-5 text-primary" />
             </div>
             <div>
-              <p className="text-sm font-medium text-foreground">
-                Billing & Subscription
-              </p>
+              <p className="text-sm font-medium">Billing & Subscription</p>
               <p className="text-xs text-muted-foreground">
                 Manage your plan, credits, and payment methods.
               </p>
@@ -89,8 +91,8 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-violet-500/10">
-              <User className="size-5 text-violet-500" />
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+              <User className="size-5 text-primary" />
             </div>
             <div>
               <CardTitle className="text-base">Profile</CardTitle>
@@ -129,15 +131,37 @@ export default function SettingsPage() {
             )}
 
             <div>
-              <Button
-                type="submit"
-                className="bg-violet-600 hover:bg-violet-700"
-                disabled={loading}
-              >
+              <Button type="submit" disabled={loading}>
                 {loading ? "Saving..." : "Save changes"}
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      {/* Danger Zone */}
+      <Card className="border-red-500/20">
+        <CardHeader>
+          <CardTitle className="text-base text-red-400">Danger Zone</CardTitle>
+          <CardDescription>
+            Irreversible actions. Proceed with caution.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Delete Account</p>
+              <p className="text-xs text-muted-foreground">
+                Permanently delete your account and all associated data.
+              </p>
+            </div>
+            <Button variant="destructive" size="sm">
+              <Trash2 className="size-4" />
+              Delete Account
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

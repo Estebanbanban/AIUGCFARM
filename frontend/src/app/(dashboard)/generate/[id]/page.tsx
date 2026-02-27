@@ -210,13 +210,13 @@ function VideoSegmentCard({
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-xl border-2 text-left transition-all",
         isSelected
-          ? "border-violet-500 ring-2 ring-violet-500/30"
+          ? "border-primary ring-2 ring-primary/30"
           : "border-border hover:border-muted-foreground/40"
       )}
     >
       {/* Selection indicator */}
       {isSelected && (
-        <div className="absolute right-2 top-2 z-10 flex size-6 items-center justify-center rounded-full bg-violet-600">
+        <div className="absolute right-2 top-2 z-10 flex size-6 items-center justify-center rounded-full bg-primary">
           <Check className="size-3.5 text-white" />
         </div>
       )}
@@ -428,7 +428,7 @@ function CombinationPreview({
             <button
               type="button"
               onClick={togglePlay}
-              className="relative z-10 flex size-16 items-center justify-center rounded-full bg-violet-600/90 text-white backdrop-blur-sm transition-transform hover:scale-105"
+              className="relative z-10 flex size-16 items-center justify-center rounded-full bg-primary/90 text-white backdrop-blur-sm transition-transform hover:scale-105"
             >
               <Play className="ml-1 size-7" />
             </button>
@@ -632,8 +632,8 @@ export default function GenerationDetailPage() {
           </Link>
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Generation Details
+          <h1 className="text-2xl font-bold tracking-tight">
+            Generation Result
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
             ID: {generationId.slice(0, 8)}...
@@ -688,7 +688,7 @@ export default function GenerationDetailPage() {
                       ? (progress.completed / progress.total) * 100
                       : 0
                   }
-                  className="h-2 bg-muted [&>[data-slot=progress-indicator]]:bg-violet-500"
+                  className="h-2 bg-muted [&>[data-slot=progress-indicator]]:bg-primary"
                 />
               </div>
             )}
@@ -706,7 +706,7 @@ export default function GenerationDetailPage() {
                           state === "done"
                             ? "bg-emerald-500/10 text-emerald-400"
                             : state === "active"
-                              ? "bg-violet-500/10 text-violet-400"
+                              ? "bg-primary/10 text-primary"
                               : "bg-muted text-muted-foreground"
                         )}
                       >
@@ -754,6 +754,18 @@ export default function GenerationDetailPage() {
                 );
               })}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ---------------------------------------------------------------- */}
+      {/*  Error Message (non-fatal during processing)                      */}
+      {/* ---------------------------------------------------------------- */}
+      {gen?.error_message && !isFailed && (
+        <Card className="border-amber-500/30">
+          <CardContent className="flex items-center gap-3 py-4">
+            <AlertCircle className="size-5 shrink-0 text-amber-400" />
+            <p className="text-sm text-amber-400">{gen.error_message}</p>
           </CardContent>
         </Card>
       )}
@@ -885,7 +897,7 @@ export default function GenerationDetailPage() {
           <div className="grid gap-6 md:grid-cols-3">
             {/* Hooks column */}
             <div className="flex flex-col gap-3">
-              <h3 className="text-sm font-semibold text-violet-400">Hooks</h3>
+              <h3 className="text-sm font-semibold text-primary">Hooks</h3>
               {segments.hooks?.map((video, i) => (
                 <VideoSegmentCard
                   key={i}
@@ -906,7 +918,7 @@ export default function GenerationDetailPage() {
 
             {/* Bodies column */}
             <div className="flex flex-col gap-3">
-              <h3 className="text-sm font-semibold text-violet-400">Bodies</h3>
+              <h3 className="text-sm font-semibold text-primary">Bodies</h3>
               {segments.bodies?.map((video, i) => (
                 <VideoSegmentCard
                   key={i}
@@ -927,7 +939,7 @@ export default function GenerationDetailPage() {
 
             {/* CTAs column */}
             <div className="flex flex-col gap-3">
-              <h3 className="text-sm font-semibold text-violet-400">CTAs</h3>
+              <h3 className="text-sm font-semibold text-primary">CTAs</h3>
               {segments.ctas?.map((video, i) => (
                 <VideoSegmentCard
                   key={i}
@@ -979,8 +991,8 @@ export default function GenerationDetailPage() {
 
                   <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-3 rounded-lg border border-border px-4 py-3">
-                      <div className="flex size-8 items-center justify-center rounded-full bg-violet-500/10">
-                        <span className="text-xs font-bold text-violet-400">
+                      <div className="flex size-8 items-center justify-center rounded-full bg-primary/10">
+                        <span className="text-xs font-bold text-primary">
                           H
                         </span>
                       </div>
@@ -996,8 +1008,8 @@ export default function GenerationDetailPage() {
                     </div>
 
                     <div className="flex items-center gap-3 rounded-lg border border-border px-4 py-3">
-                      <div className="flex size-8 items-center justify-center rounded-full bg-violet-500/10">
-                        <span className="text-xs font-bold text-violet-400">
+                      <div className="flex size-8 items-center justify-center rounded-full bg-primary/10">
+                        <span className="text-xs font-bold text-primary">
                           B
                         </span>
                       </div>
@@ -1013,8 +1025,8 @@ export default function GenerationDetailPage() {
                     </div>
 
                     <div className="flex items-center gap-3 rounded-lg border border-border px-4 py-3">
-                      <div className="flex size-8 items-center justify-center rounded-full bg-violet-500/10">
-                        <span className="text-xs font-bold text-violet-400">
+                      <div className="flex size-8 items-center justify-center rounded-full bg-primary/10">
+                        <span className="text-xs font-bold text-primary">
                           C
                         </span>
                       </div>

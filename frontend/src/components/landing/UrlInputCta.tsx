@@ -1,70 +1,55 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
-import { scrapeRequestSchema } from "@/schemas/scrape";
-import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
+import { ArrowRight, Link as LinkIcon } from "lucide-react";
+import { fadeInUp } from "@/lib/animations";
 
-interface UrlInputCtaProps {
-  className?: string;
-}
-
-export function UrlInputCta({ className }: UrlInputCtaProps) {
+export function UrlInputCta({ inverted = false }: { inverted?: boolean }) {
   const [url, setUrl] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-
-    const result = scrapeRequestSchema.safeParse({ url });
-    if (!result.success) {
-      setError(result.error.issues[0]?.message ?? "Please enter a valid URL");
-      return;
-    }
-
-    localStorage.setItem("pendingScrapeUrl", url);
-    router.push("/signup");
-  }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className={cn("flex w-full flex-col gap-3", className)}
-    >
-      <div className="flex w-full flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
+    <motion.div {...fadeInUp} className="w-full max-w-xl mx-auto">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (url.trim()) {
+            localStorage.setItem("pendingScrapeUrl", url);
+            window.location.href = "/signup";
+          }
+        }}
+        className={`flex items-center gap-2 rounded-xl border p-1.5 shadow-lg ${
+          inverted
+            ? "bg-white/10 border-white/20"
+            : "bg-white border-border shadow-black/5"
+        }`}
+      >
+        <div className="flex items-center gap-2 flex-1 px-3">
+          <LinkIcon
+            className={`size-4 shrink-0 ${
+              inverted ? "text-white/40" : "text-muted-foreground"
+            }`}
+          />
           <input
-            type="text"
+            type="url"
             value={url}
-            onChange={(e) => {
-              setUrl(e.target.value);
-              if (error) setError(null);
-            }}
-            placeholder="https://your-store.com"
-            className={cn(
-              "h-12 w-full rounded-lg border bg-zinc-900/50 px-4 text-sm text-white placeholder:text-zinc-500 transition-all duration-200 outline-none",
-              error
-                ? "border-red-500/50 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
-                : "border-white/10 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
-            )}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="Paste your product or store URL..."
+            className={`flex-1 bg-transparent text-sm outline-none placeholder:text-sm ${
+              inverted
+                ? "text-white placeholder:text-white/40"
+                : "text-foreground placeholder:text-muted-foreground"
+            }`}
           />
         </div>
-        <Button
+        <button
           type="submit"
-          size="lg"
-          className="h-12 gap-2 bg-violet-600 px-6 text-white hover:bg-violet-500 shrink-0"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] shrink-0"
         >
-          Analyze My Store
+          Get Started
           <ArrowRight className="size-4" />
-        </Button>
-      </div>
-      {error && (
-        <p className="text-sm text-red-400">{error}</p>
-      )}
-    </form>
+        </button>
+      </form>
+    </motion.div>
   );
 }

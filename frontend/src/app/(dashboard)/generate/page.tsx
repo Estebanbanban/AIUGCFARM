@@ -12,6 +12,7 @@ import {
   ImageIcon,
   Loader2,
   Package,
+  Film,
   User,
   Zap,
 } from "lucide-react";
@@ -22,9 +23,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -44,9 +42,10 @@ import { useCreateGeneration } from "@/hooks/use-generations";
 import { useCheckout } from "@/hooks/use-checkout";
 
 const steps = [
-  { number: 1, label: "Product" },
-  { number: 2, label: "Persona" },
+  { number: 1, label: "Select Product" },
+  { number: 2, label: "Select Persona" },
   { number: 3, label: "Review" },
+  { number: 4, label: "Generate" },
 ];
 
 /** Resolve image URLs for a list of personas (handles storage paths). */
@@ -100,7 +99,9 @@ export default function GeneratePage() {
   const hasEnoughCredits = creditsRemaining >= creditCost;
 
   function handleNext() {
-    if (store.step < 3) store.setStep(store.step + 1);
+    if (store.step < 4) {
+      store.setStep(store.step + 1);
+    }
   }
 
   function handleBack() {
@@ -162,11 +163,11 @@ export default function GeneratePage() {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+        <h1 className="text-2xl font-bold tracking-tight">
           Generate UGC Video
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Create AI-powered video ads in 3 simple steps.
+          Create AI-powered video ads in a few simple steps.
           {!creditsLoading && (
             <span className="ml-2 font-medium text-foreground">
               {creditsRemaining} credits remaining
@@ -176,9 +177,9 @@ export default function GeneratePage() {
       </div>
 
       {/* Step Indicator */}
-      <div className="flex items-center justify-center gap-2 sm:gap-4">
+      <div className="flex items-center justify-center gap-2 sm:gap-3">
         {steps.map((s, i) => (
-          <div key={s.number} className="flex items-center gap-2 sm:gap-4">
+          <div key={s.number} className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => {
                 if (s.number < store.step) store.setStep(s.number);
@@ -189,10 +190,10 @@ export default function GeneratePage() {
                 className={cn(
                   "flex size-8 items-center justify-center rounded-full text-sm font-medium transition-colors",
                   store.step === s.number
-                    ? "bg-violet-600 text-white"
+                    ? "bg-primary text-primary-foreground"
                     : store.step > s.number
-                      ? "bg-violet-600/20 text-violet-400"
-                      : "bg-muted text-muted-foreground"
+                      ? "bg-primary/20 text-primary"
+                      : "bg-card text-muted-foreground"
                 )}
               >
                 {store.step > s.number ? (
@@ -215,8 +216,8 @@ export default function GeneratePage() {
             {i < steps.length - 1 && (
               <div
                 className={cn(
-                  "h-px w-8 sm:w-12",
-                  store.step > s.number ? "bg-violet-500" : "bg-border"
+                  "h-px w-6 sm:w-10",
+                  store.step > s.number ? "bg-primary" : "bg-border"
                 )}
               />
             )}
@@ -229,9 +230,7 @@ export default function GeneratePage() {
         {/* Step 1: Select Product */}
         {store.step === 1 && (
           <div className="flex flex-col gap-4">
-            <h2 className="text-lg font-semibold text-foreground">
-              Select a Product
-            </h2>
+            <h2 className="text-lg font-semibold">Select a Product</h2>
             {productsLoading ? (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {[1, 2, 3].map((i) => (
@@ -267,11 +266,11 @@ export default function GeneratePage() {
                       className={cn(
                         "h-full transition-all",
                         store.productId === product.id
-                          ? "border-violet-500 ring-1 ring-violet-500/30"
+                          ? "border-primary ring-1 ring-primary/30"
                           : "hover:border-muted-foreground/30"
                       )}
                     >
-                      <CardContent className="flex flex-col gap-3">
+                      <CardContent className="flex flex-col gap-3 p-5">
                         <div className="flex aspect-video items-center justify-center rounded-lg bg-muted">
                           {product.images?.[0] ? (
                             <img
@@ -284,18 +283,16 @@ export default function GeneratePage() {
                           )}
                         </div>
                         <div>
-                          <h3 className="font-medium text-foreground">
-                            {product.name}
-                          </h3>
+                          <h3 className="font-medium">{product.name}</h3>
                           {product.price && (
-                            <p className="mt-1 text-sm font-semibold text-foreground">
+                            <p className="mt-1 font-mono text-sm font-semibold">
                               {product.currency === "USD" ? "$" : product.currency}
                               {product.price}
                             </p>
                           )}
                         </div>
                         {store.productId === product.id && (
-                          <div className="flex items-center gap-1.5 text-xs text-violet-400">
+                          <div className="flex items-center gap-1.5 text-xs text-primary">
                             <Check className="size-3.5" />
                             Selected
                           </div>
@@ -312,9 +309,7 @@ export default function GeneratePage() {
         {/* Step 2: Select Persona */}
         {store.step === 2 && (
           <div className="flex flex-col gap-4">
-            <h2 className="text-lg font-semibold text-foreground">
-              Select a Persona
-            </h2>
+            <h2 className="text-lg font-semibold">Select a Persona</h2>
             {personasLoading ? (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {[1, 2].map((i) => (
@@ -350,11 +345,11 @@ export default function GeneratePage() {
                       className={cn(
                         "h-full transition-all",
                         store.personaId === persona.id
-                          ? "border-violet-500 ring-1 ring-violet-500/30"
+                          ? "border-primary ring-1 ring-primary/30"
                           : "hover:border-muted-foreground/30"
                       )}
                     >
-                      <CardContent className="flex flex-col items-center gap-3 py-6">
+                      <CardContent className="flex flex-col items-center gap-3 p-6">
                         <div className="flex size-20 items-center justify-center rounded-full bg-muted">
                           {personaImageMap[persona.id] ? (
                             <img
@@ -367,7 +362,7 @@ export default function GeneratePage() {
                           )}
                         </div>
                         <div className="text-center">
-                          <h3 className="font-medium text-foreground">
+                          <h3 className="font-medium">
                             {persona.name}
                           </h3>
                           <p className="text-xs text-muted-foreground">
@@ -375,7 +370,7 @@ export default function GeneratePage() {
                           </p>
                         </div>
                         {store.personaId === persona.id && (
-                          <div className="flex items-center gap-1.5 text-xs text-violet-400">
+                          <div className="flex items-center gap-1.5 text-xs text-primary">
                             <Check className="size-3.5" />
                             Selected
                           </div>
@@ -389,16 +384,14 @@ export default function GeneratePage() {
           </div>
         )}
 
-        {/* Step 3: Review & Generate */}
+        {/* Step 3: Review */}
         {store.step === 3 && (
           <div className="flex flex-col gap-6">
-            <h2 className="text-lg font-semibold text-foreground">
-              Review & Generate
-            </h2>
+            <h2 className="text-lg font-semibold">Review & Confirm</h2>
 
             <div className="mx-auto w-full max-w-lg">
               <Card>
-                <CardContent className="flex flex-col gap-4">
+                <CardContent className="flex flex-col gap-4 p-6">
                   {/* Product */}
                   <div className="flex items-center gap-3">
                     <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
@@ -406,7 +399,7 @@ export default function GeneratePage() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Product</p>
-                      <p className="text-sm font-medium text-foreground">
+                      <p className="text-sm font-medium">
                         {selectedProduct?.name || "Not selected"}
                       </p>
                     </div>
@@ -419,7 +412,7 @@ export default function GeneratePage() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Persona</p>
-                      <p className="text-sm font-medium text-foreground">
+                      <p className="text-sm font-medium">
                         {selectedPersona?.name || "Not selected"}
                       </p>
                     </div>
@@ -439,7 +432,7 @@ export default function GeneratePage() {
                         className={cn(
                           "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
                           store.mode === "single"
-                            ? "border-violet-500 bg-violet-500/5 ring-1 ring-violet-500/30"
+                            ? "border-primary bg-primary/5 ring-1 ring-primary/30"
                             : "border-border hover:border-muted-foreground/30"
                         )}
                       >
@@ -447,7 +440,7 @@ export default function GeneratePage() {
                           <p className="text-sm font-semibold text-foreground">
                             Single
                           </p>
-                          <p className="text-sm font-bold text-violet-400">
+                          <p className="text-sm font-bold text-primary">
                             {CREDITS_PER_SINGLE} credits
                           </p>
                         </div>
@@ -461,7 +454,7 @@ export default function GeneratePage() {
                         className={cn(
                           "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
                           store.mode === "triple"
-                            ? "border-violet-500 bg-violet-500/5 ring-1 ring-violet-500/30"
+                            ? "border-primary bg-primary/5 ring-1 ring-primary/30"
                             : "border-border hover:border-muted-foreground/30"
                         )}
                       >
@@ -469,7 +462,7 @@ export default function GeneratePage() {
                           <p className="text-sm font-semibold text-foreground">
                             3x
                           </p>
-                          <p className="text-sm font-bold text-violet-400">
+                          <p className="text-sm font-bold text-primary">
                             {CREDITS_PER_BATCH} credits
                           </p>
                         </div>
@@ -484,7 +477,7 @@ export default function GeneratePage() {
                   <div className="rounded-lg bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
                     {store.mode === "single"
                       ? "You'll get 1 complete video combination."
-                      : "You'll get 27 possible combinations (3×3×3)."}
+                      : "You'll get 27 possible combinations (3x3x3)."}
                   </div>
 
                   {!hasEnoughCredits && !creditsLoading && (
@@ -498,12 +491,58 @@ export default function GeneratePage() {
             </div>
           </div>
         )}
+
+        {/* Step 4: Generate */}
+        {store.step === 4 && (
+          <div className="flex flex-col items-center gap-6 py-8">
+            <div className="flex size-16 items-center justify-center rounded-full bg-primary/10">
+              <Film className="size-8 text-primary" />
+            </div>
+            <div className="text-center">
+              <h2 className="text-lg font-semibold">Ready to Generate</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {selectedProduct?.name} with {selectedPersona?.name}
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center gap-2">
+              <Button
+                onClick={handleGenerate}
+                disabled={createGeneration.isPending || !hasEnoughCredits}
+                size="lg"
+              >
+                {createGeneration.isPending ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="size-4" />
+                    Generate &mdash; {creditCost} credits
+                  </>
+                )}
+              </Button>
+              {!hasEnoughCredits && (
+                <p className="text-sm text-muted-foreground">
+                  Insufficient credits.{" "}
+                  <Link
+                    href="/settings/billing"
+                    className="text-primary underline"
+                  >
+                    Upgrade
+                  </Link>
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Navigation Buttons */}
       <div className="flex items-center justify-between border-t border-border pt-4">
         <Button
-          variant="outline"
+          variant="secondary"
           onClick={handleBack}
           disabled={store.step === 1}
         >
@@ -511,12 +550,8 @@ export default function GeneratePage() {
           Back
         </Button>
 
-        {store.step < 3 ? (
-          <Button
-            onClick={handleNext}
-            disabled={!canProceed()}
-            className="bg-violet-600 hover:bg-violet-700"
-          >
+        {store.step < 4 ? (
+          <Button onClick={handleNext} disabled={!canProceed()}>
             Next
             <ArrowRight className="size-4" />
           </Button>
@@ -524,7 +559,6 @@ export default function GeneratePage() {
           <Button
             onClick={handleGenerate}
             disabled={createGeneration.isPending}
-            className="bg-violet-600 hover:bg-violet-700"
             size="lg"
           >
             {createGeneration.isPending ? (
@@ -565,17 +599,17 @@ export default function GeneratePage() {
                   className={cn(
                     "flex items-center justify-between rounded-lg border px-4 py-3",
                     key === "growth"
-                      ? "border-violet-500/50 bg-violet-500/5"
+                      ? "border-primary/50 bg-primary/5"
                       : "border-border"
                   )}
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="font-medium text-foreground">{plan.name}</p>
+                      <p className="font-medium">{plan.name}</p>
                       {key === "growth" && (
                         <Badge
                           variant="secondary"
-                          className="bg-violet-500/10 text-violet-400 text-xs"
+                          className="bg-primary/10 text-primary text-xs"
                         >
                           Popular
                         </Badge>
@@ -586,17 +620,12 @@ export default function GeneratePage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-semibold text-foreground">
+                    <span className="font-semibold">
                       ${plan.price}/mo
                     </span>
                     <Button
                       size="sm"
                       variant={key === "growth" ? "default" : "outline"}
-                      className={
-                        key === "growth"
-                          ? "bg-violet-600 hover:bg-violet-700"
-                          : ""
-                      }
                       onClick={() => handleCheckout(key)}
                       disabled={checkout.isPending}
                     >

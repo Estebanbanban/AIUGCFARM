@@ -2,20 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { fadeIn } from "@/lib/animations";
+import { ArrowLeft } from "lucide-react";
 
 export default function SignupPage() {
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +29,7 @@ export default function SignupPage() {
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
+        data: { full_name: fullName },
       },
     });
 
@@ -58,39 +55,63 @@ export default function SignupPage() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold">Check your email</CardTitle>
-            <CardDescription>
-              We sent a confirmation link to <strong>{email}</strong>. Click the
-              link to activate your account.
-            </CardDescription>
-          </CardHeader>
-          <CardFooter className="justify-center">
-            <Link href="/login" className="text-sm text-violet-500 hover:underline">
+      <div className="flex min-h-screen items-center justify-center bg-white px-4">
+        <motion.div {...fadeIn} className="w-full max-w-sm text-center">
+          <div className="mb-8">
+            <Link href="/" className="inline-block text-2xl font-bold tracking-tight text-zinc-900">
+              CineRads
+            </Link>
+          </div>
+          <div className="rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
+            <h1 className="text-xl font-semibold text-zinc-900">Check your email</h1>
+            <p className="mt-3 text-sm text-zinc-500">
+              We sent a confirmation link to <strong className="text-zinc-700">{email}</strong>.
+              Click the link to activate your account.
+            </p>
+          </div>
+          <p className="mt-6 text-sm text-zinc-500">
+            <Link href="/login" className="font-medium text-primary hover:underline">
               Back to sign in
             </Link>
-          </CardFooter>
-        </Card>
+          </p>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">
-            <span className="text-violet-500">AI</span>
-            <span className="text-foreground">UGC</span>
-          </CardTitle>
-          <CardDescription>Create your account</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
+    <div className="flex min-h-screen items-center justify-center bg-white px-4">
+      <Link
+        href="/"
+        className="absolute left-6 top-6 flex items-center gap-1.5 text-sm text-zinc-500 transition-colors hover:text-zinc-900"
+      >
+        <ArrowLeft className="size-4" />
+        Back to home
+      </Link>
+
+      <motion.div
+        {...fadeIn}
+        className="w-full max-w-sm"
+      >
+        {/* Logo */}
+        <div className="mb-8 text-center">
+          <Link href="/" className="inline-block text-2xl font-bold tracking-tight text-zinc-900">
+            CineRads
+          </Link>
+        </div>
+
+        {/* Card */}
+        <div className="rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
+          <div className="mb-6 text-center">
+            <h1 className="text-xl font-semibold text-zinc-900">Create your account</h1>
+            <p className="mt-1 text-sm text-zinc-500">
+              Get started with CineRads for free
+            </p>
+          </div>
+
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
             onClick={handleGoogleSignup}
             type="button"
           >
@@ -112,21 +133,37 @@ export default function SignupPage() {
                 fill="#EA4335"
               />
             </svg>
-            Continue with Google
+            Sign up with Google
           </Button>
 
-          <div className="relative">
+          <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
+              <span className="w-full border-t border-zinc-200" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">or</span>
+              <span className="bg-white px-2 text-zinc-400">or</span>
             </div>
           </div>
 
           <form onSubmit={handleSignup} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="email">Email</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="fullName" className="text-sm font-medium text-zinc-700">
+                Full name
+              </Label>
+              <Input
+                id="fullName"
+                type="text"
+                placeholder="Jane Doe"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+                className="border-zinc-200 bg-white text-zinc-900 placeholder:text-zinc-400"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="email" className="text-sm font-medium text-zinc-700">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -134,10 +171,13 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="border-zinc-200 bg-white text-zinc-900 placeholder:text-zinc-400"
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="password">Password</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="password" className="text-sm font-medium text-zinc-700">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -146,31 +186,31 @@ export default function SignupPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
+                className="border-zinc-200 bg-white text-zinc-900 placeholder:text-zinc-400"
               />
             </div>
 
             {error && (
-              <p className="text-sm text-red-500">{error}</p>
+              <p className="text-sm text-red-600">{error}</p>
             )}
 
             <Button
               type="submit"
-              className="w-full bg-violet-600 hover:bg-violet-700"
+              className="w-full"
               disabled={loading}
             >
               {loading ? "Creating account..." : "Create account"}
             </Button>
           </form>
-        </CardContent>
-        <CardFooter className="justify-center">
-          <p className="text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link href="/login" className="text-violet-500 hover:underline">
-              Sign in
-            </Link>
-          </p>
-        </CardFooter>
-      </Card>
+        </div>
+
+        <p className="mt-6 text-center text-sm text-zinc-500">
+          Already have an account?{" "}
+          <Link href="/login" className="font-medium text-primary hover:underline">
+            Sign in
+          </Link>
+        </p>
+      </motion.div>
     </div>
   );
 }

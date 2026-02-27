@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 const navLinks = [
   { label: "Features", href: "#features" },
   { label: "Pricing", href: "#pricing" },
+  { label: "Blog", href: "/blog" },
   { label: "FAQ", href: "#faq" },
 ];
 
@@ -27,16 +28,14 @@ export function MarketingHeader() {
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
         scrolled
-          ? "bg-zinc-950/80 backdrop-blur-xl border-b border-white/5"
+          ? "bg-background/80 backdrop-blur-xl border-b border-border"
           : "bg-transparent"
       )}
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <span className="text-xl font-bold tracking-tight text-white">
-            CineRads
-          </span>
+          <span className="text-xl font-bold tracking-tight">CineRads</span>
         </Link>
 
         {/* Desktop Nav */}
@@ -45,7 +44,7 @@ export function MarketingHeader() {
             <a
               key={link.href}
               href={link.href}
-              className="text-sm text-zinc-400 transition-colors hover:text-white"
+              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
               {link.label}
             </a>
@@ -54,51 +53,58 @@ export function MarketingHeader() {
 
         {/* Desktop Auth */}
         <div className="hidden items-center gap-3 md:flex">
-          <Link
-            href="/login"
-            className="text-sm text-zinc-400 transition-colors hover:text-white"
-          >
-            Sign In
-          </Link>
-          <Button asChild size="sm" className="bg-violet-600 text-white hover:bg-violet-500">
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/login">Sign In</Link>
+          </Button>
+          <Button asChild size="sm">
             <Link href="/signup">Get Started</Link>
           </Button>
         </div>
 
         {/* Mobile Toggle */}
         <button
-          className="text-zinc-400 md:hidden"
+          className="text-muted-foreground md:hidden"
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Toggle menu"
         >
-          {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+          {mobileOpen ? (
+            <X className="size-5" />
+          ) : (
+            <Menu className="size-5" />
+          )}
         </button>
       </div>
 
       {/* Mobile Menu */}
       {mobileOpen && (
-        <div className="border-t border-white/5 bg-zinc-950/95 backdrop-blur-xl md:hidden">
+        <div className="border-t border-border bg-background/95 backdrop-blur-xl md:hidden">
           <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 sm:px-6">
             {navLinks.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
-                className="text-sm text-zinc-400 transition-colors hover:text-white"
+                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                 onClick={() => setMobileOpen(false)}
               >
                 {link.label}
               </a>
             ))}
-            <div className="flex flex-col gap-3 pt-4 border-t border-white/5">
-              <Link
-                href="/login"
-                className="text-sm text-zinc-400 transition-colors hover:text-white"
-                onClick={() => setMobileOpen(false)}
-              >
-                Sign In
-              </Link>
-              <Button asChild size="sm" className="bg-violet-600 text-white hover:bg-violet-500 w-full">
-                <Link href="/signup">Get Started</Link>
+            <div className="flex flex-col gap-3 pt-4 border-t border-border">
+              <Button asChild variant="ghost" size="sm" className="w-full">
+                <Link
+                  href="/login"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Sign In
+                </Link>
+              </Button>
+              <Button asChild size="sm" className="w-full">
+                <Link
+                  href="/signup"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Get Started
+                </Link>
               </Button>
             </div>
           </div>
