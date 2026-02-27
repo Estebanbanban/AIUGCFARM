@@ -356,7 +356,7 @@ Deno.serve(async (req: Request) => {
           return withRetry(() =>
             submitKlingJob({
               image_url: klingCompositeUrl.signedUrl,
-              script: segment.text,
+              script: `A UGC creator speaking directly to camera, saying: "${segment.text}" Natural, authentic talking-head style, casual handheld selfie aesthetic.`,
               duration: segment.duration_seconds <= 5 ? 5 : 10, // Kling only accepts 5 or 10
               mode: "std",
               model_name: klingModel,
