@@ -153,7 +153,13 @@ async function generateScript(
 async function generateCompositeImage(
   personaImageUrl: string,
   productImageUrl: string,
+  scenePrompt?: string,
 ): Promise<string> {
+  // Build composite prompt: base scene from persona + product-in-hand instruction
+  const compositePrompt = scenePrompt
+    ? `${scenePrompt} The person is naturally holding and using the product, which is clearly visible in frame.`
+    : undefined;
+
   const res = await fetch(`${NANOBANANA_BASE_URL}/images/composite`, {
     method: "POST",
     headers: {
@@ -163,6 +169,7 @@ async function generateCompositeImage(
     body: JSON.stringify({
       person_image_url: personaImageUrl,
       product_image_url: productImageUrl,
+      ...(compositePrompt ? { prompt: compositePrompt } : {}),
       style: "ugc_natural",
       width: 768,
       height: 1024,
@@ -328,10 +335,14 @@ Deno.serve(async (req: Request) => {
 
       // ── 9. Run script + composite in parallel ────────────────────
 
+      // Use the scene prompt saved at persona creation time (if available)
+      const scenePrompt = (persona.attributes as Record<string, unknown>)
+        ?.scene_prompt as string | undefined;
+
       const [script, compositeExternalUrl] = await Promise.all([
         generateScript(product, variantCount),
         withRetry(() =>
-          generateCompositeImage(personaSignedUrl, resolvedProductImageUrl),
+          generateCompositeImage(personaSignedUrl, resolvedProductImageUrl, scenePrompt),
         ),
       ]);
 
