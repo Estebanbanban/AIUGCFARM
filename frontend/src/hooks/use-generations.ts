@@ -11,6 +11,9 @@ import type {
   GenerationProgressResponse,
   GenerationHistoryResponse,
   RegenerateSegmentResponse,
+  AdvancedSegmentsInput,
+  GenerateSegmentScriptResponse,
+  GenerateSegmentCompositeResponse,
 } from "@/types/api";
 
 interface GenerationInput {
@@ -27,6 +30,7 @@ interface GenerationInput {
     | "comment_keyword"
     | "check_description";
   cta_comment_keyword?: string;
+  advanced_segments?: AdvancedSegmentsInput;
 }
 
 export interface GenerationWithRelations extends Generation {
@@ -164,6 +168,42 @@ export function useGenerationStatus(generationId: string | null) {
         return false;
       }
       return 5000;
+    },
+  });
+}
+
+/** Generate a single segment script for Advanced Mode. */
+export function useGenerateSegmentScript() {
+  return useMutation({
+    mutationFn: async (input: {
+      product_id: string;
+      persona_id: string;
+      segment_type: "hook" | "body" | "cta";
+      variant_index: number;
+      cta_style?: string;
+      cta_comment_keyword?: string;
+    }) => {
+      const res = await callEdge<GenerateSegmentScriptResponse>("generate-segment-script", {
+        body: input,
+      });
+      return res.data;
+    },
+  });
+}
+
+/** Generate a single composite image for a segment in Advanced Mode. */
+export function useGenerateSegmentComposite() {
+  return useMutation({
+    mutationFn: async (input: {
+      product_id: string;
+      persona_id: string;
+      format: "9:16" | "16:9";
+      custom_scene_prompt?: string;
+    }) => {
+      const res = await callEdge<GenerateSegmentCompositeResponse>("generate-segment-composite", {
+        body: input,
+      });
+      return res.data;
     },
   });
 }

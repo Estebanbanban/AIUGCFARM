@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
+import type { AdvancedSegmentConfig, AdvancedSegmentsConfig } from "@/types/database";
 
 interface GenerationWizardState {
   step: number;
@@ -17,6 +18,10 @@ interface GenerationWizardState {
     | "check_description";
   ctaCommentKeyword: string;
   compositeImagePath: string | null;
+  // Advanced Mode
+  advancedMode: boolean;
+  advancedSegments: AdvancedSegmentsConfig | null;
+  // Actions
   setStep: (step: number) => void;
   setProductId: (id: string) => void;
   setPersonaId: (id: string) => void;
@@ -34,6 +39,13 @@ interface GenerationWizardState {
   ) => void;
   setCtaCommentKeyword: (keyword: string) => void;
   setCompositeImagePath: (path: string | null) => void;
+  setAdvancedMode: (enabled: boolean) => void;
+  setAdvancedSegments: (segments: AdvancedSegmentsConfig | null) => void;
+  updateAdvancedSegment: (
+    type: "hooks" | "bodies" | "ctas",
+    index: number,
+    patch: Partial<AdvancedSegmentConfig>,
+  ) => void;
   reset: () => void;
 }
 
@@ -48,6 +60,8 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
     ctaStyle: "auto",
     ctaCommentKeyword: "",
     compositeImagePath: null,
+    advancedMode: false,
+    advancedSegments: null,
     setStep: (step) =>
       set((state) => {
         state.step = step;
@@ -63,6 +77,11 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
     setMode: (mode) =>
       set((state) => {
         state.mode = mode;
+        // Reset advanced mode when mode changes
+        if (state.advancedMode) {
+          state.advancedMode = false;
+          state.advancedSegments = null;
+        }
       }),
     setQuality: (quality) =>
       set((state) => {
@@ -84,6 +103,24 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
       set((state) => {
         state.compositeImagePath = path;
       }),
+    setAdvancedMode: (enabled) =>
+      set((state) => {
+        state.advancedMode = enabled;
+        if (!enabled) {
+          state.advancedSegments = null;
+        }
+      }),
+    setAdvancedSegments: (segments) =>
+      set((state) => {
+        state.advancedSegments = segments;
+      }),
+    updateAdvancedSegment: (type, index, patch) =>
+      set((state) => {
+        if (!state.advancedSegments) return;
+        const seg = state.advancedSegments[type][index];
+        if (!seg) return;
+        Object.assign(seg, patch);
+      }),
     reset: () =>
       set(() => ({
         step: 1,
@@ -95,6 +132,8 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
         ctaStyle: "auto" as const,
         ctaCommentKeyword: "",
         compositeImagePath: null,
+        advancedMode: false,
+        advancedSegments: null,
       })),
   }))
 );

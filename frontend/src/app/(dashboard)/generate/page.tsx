@@ -64,6 +64,11 @@ import { useCheckout } from "@/hooks/use-checkout";
 import { ManualUploadForm } from "@/components/products/ManualUploadForm";
 import { ScrapeResults } from "@/components/products/ScrapeResults";
 import { PersonaBuilderInline } from "@/components/personas/PersonaBuilderInline";
+import { AdvancedModePanel } from "@/components/generate/AdvancedModePanel";
+import { Switch } from "@/components/ui/switch";
+import { callEdge } from "@/lib/api";
+import type { GenerateSegmentScriptResponse } from "@/types/api";
+import type { AdvancedSegmentConfig, AdvancedSegmentsConfig } from "@/types/database";
 
 const steps = [
   { number: 1, label: "Product" },
@@ -189,6 +194,9 @@ export default function GeneratePage() {
   >([]);
   const [selectedCompositeIdx, setSelectedCompositeIdx] = useState<number | null>(null);
   const [previewEditPrompt, setPreviewEditPrompt] = useState("");
+
+  // Step 4, advanced mode state
+  const [isInitializingAdvanced, setIsInitializingAdvanced] = useState(false);
 
   const { data: products, isLoading: productsLoading } = useProducts();
   const productImageMap = useResolvedProductImages(products);
@@ -420,6 +428,33 @@ export default function GeneratePage() {
     }
     if (!store.productId || !store.personaId || !store.compositeImagePath) return;
 
+    const advancedSegmentsInput =
+      store.advancedMode && store.advancedSegments
+        ? {
+            hooks: store.advancedSegments.hooks.map((s) => ({
+              script_text: s.scriptText,
+              global_emotion: s.globalEmotion,
+              global_intensity: s.globalIntensity,
+              action_description: s.actionDescription || undefined,
+              image_path: s.imagePath || undefined,
+            })),
+            bodies: store.advancedSegments.bodies.map((s) => ({
+              script_text: s.scriptText,
+              global_emotion: s.globalEmotion,
+              global_intensity: s.globalIntensity,
+              action_description: s.actionDescription || undefined,
+              image_path: s.imagePath || undefined,
+            })),
+            ctas: store.advancedSegments.ctas.map((s) => ({
+              script_text: s.scriptText,
+              global_emotion: s.globalEmotion,
+              global_intensity: s.globalIntensity,
+              action_description: s.actionDescription || undefined,
+              image_path: s.imagePath || undefined,
+            })),
+          }
+        : undefined;
+
     createGeneration.mutate(
       {
         product_id: store.productId,
@@ -429,6 +464,7 @@ export default function GeneratePage() {
         composite_image_path: store.compositeImagePath,
         cta_style: store.ctaStyle,
         cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
+        advanced_segments: advancedSegmentsInput,
       },
       {
         onSuccess: (result) => {
@@ -441,6 +477,66 @@ export default function GeneratePage() {
         },
       },
     );
+  }
+
+  async function handleAdvancedModeToggle(enabled: boolean) {
+    if (!enabled) {
+      store.setAdvancedMode(false);
+      return;
+    }
+
+    if (!store.productId || !store.personaId) return;
+
+    setIsInitializingAdvanced(true);
+    const variantCount = store.mode === "single" ? 1 : 3;
+    const segTypes = ["hook", "body", "cta"] as const;
+
+    // Fire variantCount × 3 parallel calls
+    const calls = Array.from({ length: variantCount }, (_, vi) =>
+      segTypes.map((segType) =>
+        callEdge<GenerateSegmentScriptResponse>("generate-segment-script", {
+          body: {
+            product_id: store.productId,
+            persona_id: store.personaId,
+            segment_type: segType,
+            variant_index: vi,
+            cta_style: store.ctaStyle !== "auto" ? store.ctaStyle : undefined,
+            cta_comment_keyword: store.ctaStyle === "comment_keyword" ? store.ctaCommentKeyword : undefined,
+          },
+        }).then((res) => ({ ok: true as const, text: res.data.text, variantIndex: vi, segType }))
+        .catch(() => ({ ok: false as const, text: "", variantIndex: vi, segType }))
+      )
+    ).flat();
+
+    const results = await Promise.allSettled(calls);
+
+    const defaultSeg = (): AdvancedSegmentConfig => ({
+      scriptText: "",
+      globalEmotion: "neutral",
+      globalIntensity: 2,
+      actionDescription: "",
+      imagePath: null,
+      imageSignedUrl: null,
+      isRegeneratingImage: false,
+    });
+
+    const hooks: AdvancedSegmentConfig[] = Array.from({ length: variantCount }, defaultSeg);
+    const bodies: AdvancedSegmentConfig[] = Array.from({ length: variantCount }, defaultSeg);
+    const ctas: AdvancedSegmentConfig[] = Array.from({ length: variantCount }, defaultSeg);
+
+    for (const settled of results) {
+      if (settled.status !== "fulfilled") continue;
+      const r = settled.value;
+      if (!r.ok) continue;
+      if (r.segType === "hook") hooks[r.variantIndex] = { ...defaultSeg(), scriptText: r.text };
+      if (r.segType === "body") bodies[r.variantIndex] = { ...defaultSeg(), scriptText: r.text };
+      if (r.segType === "cta") ctas[r.variantIndex] = { ...defaultSeg(), scriptText: r.text };
+    }
+
+    const segments: AdvancedSegmentsConfig = { hooks, bodies, ctas };
+    store.setAdvancedSegments(segments);
+    store.setAdvancedMode(true);
+    setIsInitializingAdvanced(false);
   }
 
   async function handleCheckout(plan: PlanTier) {
@@ -1221,6 +1317,30 @@ export default function GeneratePage() {
                     )}
                   </div>
 
+                  <Separator />
+
+                  {/* Advanced Mode toggle */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-medium">Advanced Mode</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Customize script, emotion, and image per segment.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={store.advancedMode}
+                      onCheckedChange={handleAdvancedModeToggle}
+                      disabled={isInitializingAdvanced || !store.productId || !store.personaId}
+                    />
+                  </div>
+
+                  {isInitializingAdvanced && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="size-4 animate-spin" />
+                      Generating scripts…
+                    </div>
+                  )}
+
                   {/* Info */}
                   <div className="rounded-lg bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
                     {store.mode === "single"
@@ -1263,6 +1383,27 @@ export default function GeneratePage() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Advanced Mode Panel — full width below the card */}
+            {store.advancedMode && store.advancedSegments && !isInitializingAdvanced && (
+              <div className="mt-4">
+                <AdvancedModePanel
+                  mode={store.mode}
+                  segments={store.advancedSegments}
+                  productId={store.productId!}
+                  personaId={store.personaId!}
+                  format={store.format}
+                  mainCompositeSignedUrl={
+                    selectedCompositeIdx !== null
+                      ? compositeImages[selectedCompositeIdx]?.signed_url ?? null
+                      : null
+                  }
+                  onSegmentUpdate={(type, index, patch) =>
+                    store.updateAdvancedSegment(type, index, patch)
+                  }
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
