@@ -19,15 +19,14 @@ export async function middleware(request: NextRequest) {
   )
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Public routes
-  const publicPaths = ['/', '/pricing', '/login', '/signup', '/auth/callback']
-  const isPublic = publicPaths.some(p =>
-    p === '/'
-      ? request.nextUrl.pathname === '/'
-      : request.nextUrl.pathname.startsWith(p)
+  // Require auth only for app routes; marketing/docs/blog stay public.
+  const protectedPrefixes = ['/dashboard', '/generate', '/history', '/personas', '/products', '/settings']
+  const requiresAuth = protectedPrefixes.some((prefix) =>
+    request.nextUrl.pathname === prefix ||
+    request.nextUrl.pathname.startsWith(`${prefix}/`)
   )
 
-  if (!user && !isPublic) {
+  if (!user && requiresAuth) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
   if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
