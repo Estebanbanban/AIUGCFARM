@@ -4,7 +4,8 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Users, User } from "lucide-react";
+import { Plus, Users, User, Trash2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,7 +13,19 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { usePersonas, resolvePersonaImageUrl } from "@/hooks/use-personas";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  useDeletePersona,
+  usePersonas,
+  resolvePersonaImageUrl,
+} from "@/hooks/use-personas";
 import { useProfile, PERSONA_SLOT_LIMITS } from "@/hooks/use-profile";
 import type { Persona } from "@/types/database";
 
@@ -67,6 +80,8 @@ export default function PersonasPage() {
   const { data: personas, isLoading: personasLoading, error: personasError } = usePersonas();
   const { data: profile, isLoading: profileLoading } = useProfile();
   const imageMap = useResolvedImages(personas);
+  const [personaToDelete, setPersonaToDelete] = useState<Persona | null>(null);
+  const deleteMutation = useDeletePersona(personaToDelete?.id ?? "");
 
   const isLoading = personasLoading || profileLoading;
   const plan = profile?.plan ?? "free";
@@ -75,6 +90,20 @@ export default function PersonasPage() {
   const slotsUsed = personas?.length ?? 0;
   const atLimit = !isAdmin && slotsUsed >= slotLimit;
   const hasPersonas = (personas?.length ?? 0) > 0;
+
+  function handleDeletePersona() {
+    if (!personaToDelete) return;
+
+    deleteMutation.mutate(undefined, {
+      onSuccess: () => {
+        toast.success("Persona deleted successfully");
+        setPersonaToDelete(null);
+      },
+      onError: (err) => {
+        toast.error(err.message || "Failed to delete persona");
+      },
+    });
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -135,61 +164,111 @@ export default function PersonasPage() {
             const attrs = persona.attributes;
 
             return (
-              <Link
-                key={persona.id}
-                href={`/personas/${persona.id}`}
-                className="group"
-              >
-                <Card className="h-full transition-colors hover:border-primary/30">
-                  <CardContent className="flex flex-col items-center gap-4 p-6">
-                    {/* Avatar / Image */}
-                    <div className="flex size-24 items-center justify-center rounded-full bg-muted">
-                      {resolvedUrl ? (
-                        <img
-                          src={resolvedUrl}
-                          alt={persona.name}
-                          className="size-full rounded-full object-cover"
-                        />
-                      ) : (
-                        <User className="size-10 text-muted-foreground" />
-                      )}
-                    </div>
+              <Card key={persona.id} className="h-full transition-colors hover:border-primary/30">
+                <CardContent className="flex flex-col items-center gap-4 p-6">
+                  {/* Avatar / Image */}
+                  <div className="flex size-24 items-center justify-center rounded-full bg-muted">
+                    {resolvedUrl ? (
+                      <img
+                        src={resolvedUrl}
+                        alt={persona.name}
+                        className="size-full rounded-full object-cover"
+                      />
+                    ) : (
+                      <User className="size-10 text-muted-foreground" />
+                    )}
+                  </div>
 
-                    {/* Name & Info */}
-                    <div className="text-center">
-                      <h3 className="text-lg font-semibold">
-                        {persona.name}
-                      </h3>
-                      <p className="mt-0.5 text-sm text-muted-foreground">
-                        {attrs.gender} / {attrs.age}
-                      </p>
-                    </div>
+                  {/* Name & Info */}
+                  <div className="text-center">
+                    <h3 className="text-lg font-semibold">
+                      {persona.name}
+                    </h3>
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      {attrs.gender} / {attrs.age}
+                    </p>
+                  </div>
 
-                    {/* Attribute Badges */}
-                    <div className="flex flex-wrap justify-center gap-1.5">
-                      {attrs.hair_color && (
-                        <Badge variant="secondary" className="text-xs">
-                          {attrs.hair_color} hair
-                        </Badge>
-                      )}
-                      {attrs.body_type && (
-                        <Badge variant="secondary" className="text-xs">
-                          {attrs.body_type}
-                        </Badge>
-                      )}
-                      {attrs.clothing_style && (
-                        <Badge variant="secondary" className="text-xs">
-                          {attrs.clothing_style}
-                        </Badge>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+                  {/* Attribute Badges */}
+                  <div className="flex flex-wrap justify-center gap-1.5">
+                    {attrs.hair_color && (
+                      <Badge variant="secondary" className="text-xs">
+                        {attrs.hair_color} hair
+                      </Badge>
+                    )}
+                    {attrs.body_type && (
+                      <Badge variant="secondary" className="text-xs">
+                        {attrs.body_type}
+                      </Badge>
+                    )}
+                    {attrs.clothing_style && (
+                      <Badge variant="secondary" className="text-xs">
+                        {attrs.clothing_style}
+                      </Badge>
+                    )}
+                  </div>
+                </CardContent>
+
+                <div className="flex items-center justify-center gap-2 px-6 pb-6">
+                  <Button asChild variant="secondary" size="sm">
+                    <Link href={`/personas/${persona.id}`}>View</Link>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setPersonaToDelete(persona)}
+                  >
+                    <Trash2 className="size-4" />
+                    Delete
+                  </Button>
+                </div>
+              </Card>
             );
           })}
         </div>
       )}
+
+      <Dialog
+        open={!!personaToDelete}
+        onOpenChange={(open) => {
+          if (!open) setPersonaToDelete(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete persona</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{personaToDelete?.name}&quot;?
+              This persona will no longer appear in your library, but existing
+              generations will not be affected.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPersonaToDelete(null)}
+              disabled={deleteMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeletePersona}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Persona"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Empty state */}
       {!isLoading && !personasError && !hasPersonas && (
