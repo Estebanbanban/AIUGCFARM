@@ -231,11 +231,44 @@ async function generateScenePrompt(
       { maxTokens: 300, timeoutMs: 20000 },
     );
     // Strip any accidental surrounding quotes the model might add
-    return { prompt: prompt.trim().replace(/^["']|["']$/g, ""), generated: true };
+    const cleaned = prompt.trim().replace(/^["']|["']$/g, "");
+    // If LLM returned empty content, fall back
+    if (!cleaned) {
+      return { prompt: buildFallbackPrompt(attributes), generated: false };
+    }
+    return { prompt: cleaned, generated: true };
   } catch (err) {
     console.error("Scene prompt generation failed, using fallback:", err);
     return { prompt: buildFallbackPrompt(attributes), generated: false };
   }
+}
+
+/**
+ * Append explicit physical attributes to any scene prompt so Gemini
+ * always renders the correct person — skin tone, gender, hair, etc.
+ * The LLM scene prompt sets the scene/vibe; this pins the appearance.
+ */
+function buildImagePrompt(attributes: PersonaAttributes, scenePrompt: string): string {
+  const skinLabel = hexToSkinToneLabel(attributes.skin_tone);
+  const genderLabel = GENDER_LABEL[attributes.gender] ?? attributes.gender;
+  const ageLabel = AGE_LABEL[attributes.age] ?? attributes.age;
+  const bodyLabel = BODY_TYPE_LABEL[attributes.body_type] ?? attributes.body_type;
+  const realAccessories = attributes.accessories.filter(
+    (a) => a.toLowerCase() !== "none",
+  );
+
+  const physicalAttrs = [
+    genderLabel,
+    ageLabel,
+    `${skinLabel} skin tone`,
+    bodyLabel,
+    `${attributes.hair_color} ${attributes.hair_style.toLowerCase()} hair`,
+    `${attributes.eye_color.toLowerCase()} eyes`,
+    `wearing ${attributes.clothing_style.toLowerCase()} style clothing`,
+    ...(realAccessories.length > 0 ? [`with ${realAccessories.join(", ").toLowerCase()}`] : []),
+  ].join(", ");
+
+  return `${scenePrompt} Subject (follow exactly): ${physicalAttrs}.`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -321,11 +354,16 @@ Deno.serve(async (req: Request) => {
     }
 
     // Generate rich UGC scene prompt via OpenRouter (falls back to basic descriptor)
-    const { prompt, generated: promptGenerated } = await generateScenePrompt(validAttrs);
-    console.log(`Scene prompt (${promptGenerated ? "LLM" : "fallback"}):`, prompt);
+    const { prompt: scenePrompt, generated: promptGenerated } = await generateScenePrompt(validAttrs);
+    console.log(`Scene prompt (${promptGenerated ? "LLM" : "fallback"}):`, scenePrompt);
+
+    // Build final image prompt: scene context + explicit physical attributes pinned
+    // This guarantees Gemini renders the correct skin tone, gender, hair, etc.
+    const imagePrompt = buildImagePrompt(validAttrs, scenePrompt);
+    console.log("Image prompt:", imagePrompt);
 
     // Generate images via Gemini / NanoBanana 2 (with retry)
-    const images = await generateImages(prompt);
+    const images = await generateImages(imagePrompt);
 
     // Upload generated images to persona-images bucket (private)
     const storagePaths: string[] = [];
@@ -364,7 +402,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Persist scene_prompt alongside attributes so generate-video can reuse it
-    const attributesToSave = { ...validAttrs, scene_prompt: prompt };
+    const attributesToSave = { ...validAttrs, scene_prompt: scenePrompt };
 
     // Save persona record — UPDATE on regeneration, INSERT on new creation
     let persona;
