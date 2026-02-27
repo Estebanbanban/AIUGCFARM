@@ -25,7 +25,7 @@ So that **future video scripts automatically match my brand voice without manual
    **When** the scrape response is assembled
    **Then** products are still returned successfully with `brand_summary: null`
    **And** a warning field is included: `brand_summary_error: "Unable to generate brand summary. You can proceed without it."`
-   **And** the scraping does **NOT** fail entirely — the user gets their products regardless
+   **And** the scraping does **NOT** fail entirely  -  the user gets their products regardless
 
 3. **Given** only 1 product was scraped
    **When** the brand summary prompt is built
@@ -49,7 +49,7 @@ So that **future video scripts automatically match my brand voice without manual
   - [ ] Wrap OpenAI call in try/catch
   - [ ] On failure: set `brand_summary: null` and `brand_summary_error` in response
   - [ ] Log error to console for server-side debugging
-  - [ ] Do NOT retry the brand summary call — it's not critical enough to delay the response
+  - [ ] Do NOT retry the brand summary call  -  it's not critical enough to delay the response
 - [ ] Add `OPENAI_API_KEY` to Supabase Edge Function secrets (AC: 1)
   - [ ] Document: `supabase secrets set OPENAI_API_KEY=sk-...`
 - [ ] Update `lib/types.ts` with `BrandSummary` type definition (AC: 1)
@@ -58,14 +58,14 @@ So that **future video scripts automatically match my brand voice without manual
 
 ## Dev Notes
 
-- The brand summary call happens **sequentially AFTER** product extraction — we need product data as input to the prompt
+- The brand summary call happens **sequentially AFTER** product extraction  -  we need product data as input to the prompt
 - Time budget: ~5-8s for product extraction + ~5-7s for OpenAI = within 15s target (NFR1)
-- Use `response_format: { type: "json_object" }` — this guarantees GPT-4o returns valid JSON, no parsing failures
-- The brand summary is **informational** at this stage — it becomes critical input for video script generation in Epic 5 (`generate-video/` uses it to tune script tone)
-- Do **NOT** store the brand summary in the database yet — persistence happens in Story 1.5/1.6 when products are confirmed. At this point it's returned in the API response and held in frontend state
-- Do **NOT** retry the OpenAI call — brand summary is non-critical and we can't afford to add retry delay to the 15s time budget. The user can proceed without it
-- OpenAI API key: set via `supabase secrets set OPENAI_API_KEY=sk-...` — never in code or `.env` files committed to git
-- The prompt should be concise — send product summaries, not full descriptions. Truncate long descriptions to ~200 chars each
+- Use `response_format: { type: "json_object" }`  -  this guarantees GPT-4o returns valid JSON, no parsing failures
+- The brand summary is **informational** at this stage  -  it becomes critical input for video script generation in Epic 5 (`generate-video/` uses it to tune script tone)
+- Do **NOT** store the brand summary in the database yet  -  persistence happens in Story 1.5/1.6 when products are confirmed. At this point it's returned in the API response and held in frontend state
+- Do **NOT** retry the OpenAI call  -  brand summary is non-critical and we can't afford to add retry delay to the 15s time budget. The user can proceed without it
+- OpenAI API key: set via `supabase secrets set OPENAI_API_KEY=sk-...`  -  never in code or `.env` files committed to git
+- The prompt should be concise  -  send product summaries, not full descriptions. Truncate long descriptions to ~200 chars each
 
 ### Prompt Design
 
@@ -81,8 +81,8 @@ User: Here are the products from the store:
 
 ### References
 
-- [Source: architecture.md#External API Integration Contracts — OpenAI]
-- [Source: architecture.md#Endpoints — scrape-product/ step 6]
-- [Source: PRD#FR3 — AI brand summary generation]
-- [Source: PRD#UJ1.3 — AI brand summary displayed alongside products]
-- [Source: PRD#NFR1 — Total scrape < 15s]
+- [Source: architecture.md#External API Integration Contracts  -  OpenAI]
+- [Source: architecture.md#Endpoints  -  scrape-product/ step 6]
+- [Source: PRD#FR3  -  AI brand summary generation]
+- [Source: PRD#UJ1.3  -  AI brand summary displayed alongside products]
+- [Source: PRD#NFR1  -  Total scrape < 15s]

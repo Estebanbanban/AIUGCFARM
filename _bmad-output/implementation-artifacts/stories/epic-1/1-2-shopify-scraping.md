@@ -47,12 +47,12 @@ So that **I don't have to manually enter product information**.
 ## Tasks / Subtasks
 
 - [ ] Create shared Edge Function helpers in `supabase/functions/_shared/` (AC: all)
-  - [ ] `cors.ts` — `getCorsHeaders(req)` returns CORS headers allowing frontend origin
-  - [ ] `response.ts` — `json(body, cors, status?)` wraps response with headers
-  - [ ] `auth.ts` — `requireUserId(req)` throws "Unauthorized" if no valid JWT; `optionalUserId(req)` returns userId or null
-  - [ ] `supabase.ts` — `getAdminClient()` creates service_role Supabase client using env vars
-  - [ ] `ssrf.ts` — `validateUrl(url)` validates scheme, resolves hostname, blocks private/reserved IPs, returns validated URL
-  - [ ] `rate-limit.ts` — in-memory Map-based rate limiter with `checkRateLimit(key, maxRequests, windowMs)` returning boolean
+  - [ ] `cors.ts`  -  `getCorsHeaders(req)` returns CORS headers allowing frontend origin
+  - [ ] `response.ts`  -  `json(body, cors, status?)` wraps response with headers
+  - [ ] `auth.ts`  -  `requireUserId(req)` throws "Unauthorized" if no valid JWT; `optionalUserId(req)` returns userId or null
+  - [ ] `supabase.ts`  -  `getAdminClient()` creates service_role Supabase client using env vars
+  - [ ] `ssrf.ts`  -  `validateUrl(url)` validates scheme, resolves hostname, blocks private/reserved IPs, returns validated URL
+  - [ ] `rate-limit.ts`  -  in-memory Map-based rate limiter with `checkRateLimit(key, maxRequests, windowMs)` returning boolean
 - [ ] Create `supabase/functions/scrape-product/index.ts` (AC: 1, 5, 6, 7)
   - [ ] `Deno.serve()` entrypoint following standard Edge Function pattern
   - [ ] OPTIONS → return CORS
@@ -62,7 +62,7 @@ So that **I don't have to manually enter product information**.
   - [ ] `validateUrl(url)` for SSRF protection
   - [ ] Rate limit check: 10/hr by IP (unauth) or 60/hr by userId (auth)
   - [ ] Normalize URL: strip trailing slash, ensure scheme
-  - [ ] Shopify detection: `fetch(\`${normalizedUrl}/products.json\`)` — check for valid JSON with `.products` array
+  - [ ] Shopify detection: `fetch(\`${normalizedUrl}/products.json\`)`  -  check for valid JSON with `.products` array
   - [ ] Parse Shopify products: map each to `{ name, images: string[], description: string, price: number, currency: string, category: string, tags: string[] }`
   - [ ] Strip HTML from descriptions using regex (no DOM parser needed for Shopify)
   - [ ] Handle Shopify pagination: loop `?page=N&limit=30` while products returned, cap at 50 total
@@ -97,13 +97,13 @@ So that **I don't have to manually enter product information**.
     }
   });
   ```
-- `scrape-product/` auth is **optional** — use `optionalUserId()` not `requireUserId()`
+- `scrape-product/` auth is **optional**  -  use `optionalUserId()` not `requireUserId()`
 - Response format: `{ data: {...} }` on success, `{ detail: "..." }` on error
-- Shopify detection: Shopify stores reliably expose `/products.json` — this is the simplest and fastest detection method
-- Rate limiting is **in-memory** per Edge Function instance — acceptable for MVP. State resets on cold start. Upgrade to Redis/KV in Phase 2 if needed
-- SSRF: Deno's `fetch()` does DNS resolution — we need to validate the **resolved IP**, not just the hostname. Use `Deno.resolveDns()` or validate after initial response headers
+- Shopify detection: Shopify stores reliably expose `/products.json`  -  this is the simplest and fastest detection method
+- Rate limiting is **in-memory** per Edge Function instance  -  acceptable for MVP. State resets on cold start. Upgrade to Redis/KV in Phase 2 if needed
+- SSRF: Deno's `fetch()` does DNS resolution  -  we need to validate the **resolved IP**, not just the hostname. Use `Deno.resolveDns()` or validate after initial response headers
 - Edge Function timeout: Supabase Edge Functions have ~60s limit. Shopify `/products.json` for 50 products should complete well within 15s
-- No `OPENAI_API_KEY` needed yet — brand summary added in Story 1.4
+- No `OPENAI_API_KEY` needed yet  -  brand summary added in Story 1.4
 
 ### Project Structure Notes
 
@@ -123,11 +123,11 @@ supabase/functions/
 ### References
 
 - [Source: architecture.md#Edge Function Pattern]
-- [Source: architecture.md#Endpoints — scrape-product/]
+- [Source: architecture.md#Endpoints  -  scrape-product/]
 - [Source: architecture.md#AD6: SSRF Protection on Scraping]
 - [Source: architecture.md#Shared Helpers (_shared/)]
-- [Source: PRD#FR1 — Store URL submission]
-- [Source: PRD#FR2 — Product data extraction]
-- [Source: PRD#FR6 — Shopify as primary target]
-- [Source: PRD#NFR1 — Scraping < 15s]
-- [Source: PRD#NFR11 — Rate limiting]
+- [Source: PRD#FR1  -  Store URL submission]
+- [Source: PRD#FR2  -  Product data extraction]
+- [Source: PRD#FR6  -  Shopify as primary target]
+- [Source: PRD#NFR1  -  Scraping < 15s]
+- [Source: PRD#NFR11  -  Rate limiting]

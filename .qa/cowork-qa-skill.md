@@ -3,7 +3,7 @@ name: qa-browser
 description: "Visual QA testing of localhost web app against PRD functional requirements. Use this skill when the user says 'QA', 'QA epic X', 'test the app', 'check localhost', or 'visual QA'. Reads build_signal.json to know what to test, browses localhost via Claude in Chrome, verifies FRs from the PRD checklist, takes screenshots of issues, and writes structured feedback to qa_feedback.json for Claude Code to pick up."
 ---
 
-# QA Browser Skill — Visual QA for AIUGC
+# QA Browser Skill  -  Visual QA for AIUGC
 
 ## Trigger
 User says: "QA", "QA epic X story Y", "test the build", "check localhost"
@@ -65,14 +65,14 @@ Write `.qa/qa_feedback.json`:
   ],
   "passed_frs": ["FR1", "FR2"],
   "failed_frs": ["FR3"],
-  "ux_observations": "General UX notes — load times, visual polish, usability",
+  "ux_observations": "General UX notes  -  load times, visual polish, usability",
   "next_action": "fix_and_continue|proceed_to_next_story|re-qa",
   "timestamp": "<ISO timestamp>"
 }
 ```
 
 ### Step 6: Report to User
-- Summary: "QA complete for Epic X Story Y.Z — N/M FRs passed"
+- Summary: "QA complete for Epic X Story Y.Z  -  N/M FRs passed"
 - List critical/major issues
 - State recommended next_action
 - Tell user: "Paste this to Claude Code: **/qa-feedback**"

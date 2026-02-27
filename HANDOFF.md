@@ -1,4 +1,4 @@
-# AIUGC — Agent Handoff
+# AIUGC  -  Agent Handoff
 
 ## What Was Being Built
 
@@ -14,9 +14,9 @@
 
 | Step | What it shows |
 |------|--------------|
-| **1 — Product** | If products exist → product grid to pick from. If no products → inline tabs: "Import from URL" (scrape) or "Upload Manually". After adding → product grid appears, user selects one. |
-| **2 — Persona** | If personas exist → persona grid to pick from + "Create New" button. If no personas → inline full persona builder (all 9 attributes + AI image generation + image picker). After saving → auto-advance to step 3. |
-| **3 — Review & Generate** | Product + persona summary, mode selector (Single/3x), quality selector (Standard/HD), credit cost, Generate button. No more step 4. |
+| **1  -  Product** | If products exist → product grid to pick from. If no products → inline tabs: "Import from URL" (scrape) or "Upload Manually". After adding → product grid appears, user selects one. |
+| **2  -  Persona** | If personas exist → persona grid to pick from + "Create New" button. If no personas → inline full persona builder (all 9 attributes + AI image generation + image picker). After saving → auto-advance to step 3. |
+| **3  -  Review & Generate** | Product + persona summary, mode selector (Single/3x), quality selector (Standard/HD), credit cost, Generate button. No more step 4. |
 
 Nav simplification: Remove **Products** and **Personas** from sidebar. New nav: Dashboard · Generate · History · Settings.
 
@@ -42,7 +42,7 @@ interface PersonaBuilderInlineProps {
 - `handleGenerate()` → calls `generate-persona` edge function, stores result in `usePersonaBuilderStore`
 - `handleSave()` → calls `select-persona-image` edge function, then calls `onSaved(personaId)` + `store.reset()`
 - Button text: "Use This Persona" instead of "Save Persona"
-- No `router.push` — the parent handles navigation
+- No `router.push`  -  the parent handles navigation
 
 **Uses:**
 - `usePersonaBuilderStore` from `@/stores/persona-builder`
@@ -96,7 +96,7 @@ if (scrapedProducts[0]?.id) {
 ```tsx
 queryClient.invalidateQueries({ queryKey: ['products'] });
 setAddingProduct(false);
-// Don't auto-advance — user still needs to click the product in the grid
+// Don't auto-advance  -  user still needs to click the product in the grid
 ```
 
 **Step 2 persona builder:**
@@ -116,7 +116,7 @@ setAddingProduct(false);
 )}
 ```
 
-**Step 3 — merged review + generate (no step 4):**
+**Step 3  -  merged review + generate (no step 4):**
 - Same review card (product, persona, mode, quality)
 - Generate button IS in this card (not a separate step)
 - Steps array is `[{1, "Product"}, {2, "Persona"}, {3, "Generate"}]`
@@ -163,27 +163,27 @@ const navItems = [
 ```
 
 Also remove unused imports: `Package`, `Users` from lucide-react.
-Also clean up `pageTitles` (remove `/products`, `/personas`, `/personas/new` entries — optional).
+Also clean up `pageTitles` (remove `/products`, `/personas`, `/personas/new` entries  -  optional).
 
 ---
 
 ## What's Already Done (No Changes Needed)
 
 - Backend: all edge functions unchanged (`scrape-product`, `upload-product`, `generate-persona`, `select-persona-image`, `generate-video`, etc.)
-- `ManualUploadForm` component — already exists, already wired
-- `ScrapeResults` component — already exists, already wired
-- `usePersonaBuilderStore` — has all methods needed
-- `useScrapeProduct` hook — already exists
-- `useQueryClient` — already used in products page
+- `ManualUploadForm` component  -  already exists, already wired
+- `ScrapeResults` component  -  already exists, already wired
+- `usePersonaBuilderStore`  -  has all methods needed
+- `useScrapeProduct` hook  -  already exists
+- `useQueryClient`  -  already used in products page
 
 ---
 
 ## What Still Exists (Keep As-Is)
 
-- `/products` page — keep it (accessible from Settings or direct URL, acts as product library)
-- `/personas` page — keep it (accessible from direct URL, acts as persona library)
-- `/personas/new` page — keep it
-- All history, dashboard, settings pages — unchanged
+- `/products` page  -  keep it (accessible from Settings or direct URL, acts as product library)
+- `/personas` page  -  keep it (accessible from direct URL, acts as persona library)
+- `/personas/new` page  -  keep it
+- All history, dashboard, settings pages  -  unchanged
 
 ---
 

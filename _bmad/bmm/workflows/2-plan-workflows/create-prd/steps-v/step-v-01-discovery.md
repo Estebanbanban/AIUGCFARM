@@ -76,7 +76,7 @@ This file contains the BMAD PRD philosophy, standards, and validation criteria t
 
 **If exactly ONE PRD found:**
 - Use it automatically
-- Inform user: "Found PRD: {discovered_path} — using it for validation."
+- Inform user: "Found PRD: {discovered_path}  -  using it for validation."
 
 **If MULTIPLE PRDs found:**
 - List all discovered PRDs with numbered options

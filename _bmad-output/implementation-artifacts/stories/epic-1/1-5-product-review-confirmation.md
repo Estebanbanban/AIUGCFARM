@@ -78,8 +78,8 @@ So that **I can correct any scraping inaccuracies before using the data for vide
   - [ ] `createBrowserClient` using `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - [ ] Create API wrapper `lib/api.ts` (AC: all)
   - [ ] `callEdge<T>(fn, { method?, body?, token? })` generic helper
-  - [ ] `scrapeProduct(url: string, token?: string)` — calls `scrape-product/`
-  - [ ] `confirmProducts(products: Product[], brandSummary: BrandSummary | null, token: string)` — calls `confirm-products/`
+  - [ ] `scrapeProduct(url: string, token?: string)`  -  calls `scrape-product/`
+  - [ ] `confirmProducts(products: Product[], brandSummary: BrandSummary | null, token: string)`  -  calls `confirm-products/`
 - [ ] Build `components/products/scrape-form.tsx` (AC: 1, 6)
   - [ ] URL input + submit button (replaces static input from Story 1.1)
   - [ ] Loading state with disabled input during request
@@ -101,15 +101,15 @@ So that **I can correct any scraping inaccuracies before using the data for vide
 
 ## Dev Notes
 
-- The `products` table schema is defined in architecture.md — use it exactly
-- This migration also creates the shared `update_updated_at()` trigger function — it will be reused by `personas`, `subscriptions`, `credit_balances` tables in later epics
+- The `products` table schema is defined in architecture.md  -  use it exactly
+- This migration also creates the shared `update_updated_at()` trigger function  -  it will be reused by `personas`, `subscriptions`, `credit_balances` tables in later epics
 - `confirm-products/` receives the **full product array from the frontend** (which may include edits). It does NOT re-fetch from the scraper. The frontend is the source of truth after editing
 - Auth is **required** for `confirm-products/` but **optional** for `scrape-product/`. The UI should show different CTAs based on auth state
 - Until Epic 2 is built, test `confirm-products/` with Supabase-issued tokens via CLI: `supabase functions invoke confirm-products --body '...' --token <jwt>`
 - The Edge Function uses `getAdminClient()` (service_role) to write to the `products` table, bypassing RLS. It verifies the user is authenticated and sets `owner_id` to the JWT's user ID
 - `brand_summary` is stored as JSONB: `{ tone: string, demographic: string, selling_points: string[] }`
 - Unconfirmed product data purge (DR2): document as ops/cron task for now. Don't build the purge mechanism in this story
-- Frontend API client: `callEdge<T>()` supports optional `token` param — if present, sets `Authorization: Bearer ${token}`. This allows the same function to work for both auth and unauth calls
+- Frontend API client: `callEdge<T>()` supports optional `token` param  -  if present, sets `Authorization: Bearer ${token}`. This allows the same function to work for both auth and unauth calls
 
 ### Project Structure Notes
 
@@ -124,25 +124,25 @@ supabase/
 
 frontend/src/
 ├── lib/
-│   ├── supabase.ts                   # NEW — browser client
-│   ├── api.ts                        # NEW — Edge Function wrappers
-│   └── types.ts                      # UPDATED — Product, BrandSummary, ScrapeResponse
+│   ├── supabase.ts                   # NEW  -  browser client
+│   ├── api.ts                        # NEW  -  Edge Function wrappers
+│   └── types.ts                      # UPDATED  -  Product, BrandSummary, ScrapeResponse
 └── components/
     └── products/
-        ├── scrape-form.tsx           # NEW — URL input wired to backend
-        ├── product-card.tsx          # NEW — display + edit mode
-        └── scrape-results.tsx        # NEW — grid + brand summary + confirm
+        ├── scrape-form.tsx           # NEW  -  URL input wired to backend
+        ├── product-card.tsx          # NEW  -  display + edit mode
+        └── scrape-results.tsx        # NEW  -  grid + brand summary + confirm
 ```
 
 ### References
 
-- [Source: architecture.md#Database Schema — products]
-- [Source: architecture.md#Row Level Security Policies — products]
-- [Source: architecture.md#Database Triggers — update_updated_at]
-- [Source: architecture.md#Endpoints — confirm-products/]
+- [Source: architecture.md#Database Schema  -  products]
+- [Source: architecture.md#Row Level Security Policies  -  products]
+- [Source: architecture.md#Database Triggers  -  update_updated_at]
+- [Source: architecture.md#Endpoints  -  confirm-products/]
 - [Source: architecture.md#API Call Pattern (Frontend)]
-- [Source: architecture.md#Key Components — products/]
-- [Source: PRD#FR4 — Review, inline-edit, confirm]
-- [Source: PRD#FR1, FR2, FR3 — Display of scraped data]
-- [Source: PRD#DR2 — 24h purge of unconfirmed data]
-- [Source: PRD#UJ1 — Steps 2-4 (scraping + viewing + editing)]
+- [Source: architecture.md#Key Components  -  products/]
+- [Source: PRD#FR4  -  Review, inline-edit, confirm]
+- [Source: PRD#FR1, FR2, FR3  -  Display of scraped data]
+- [Source: PRD#DR2  -  24h purge of unconfirmed data]
+- [Source: PRD#UJ1  -  Steps 2-4 (scraping + viewing + editing)]

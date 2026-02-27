@@ -1,8 +1,8 @@
-# Consolidated Audit Report — AI UGC Generator
+# Consolidated Audit Report  -  AI UGC Generator
 
 **Date:** 2026-02-26
 **Auditors:** 5 parallel agents (PRD Alignment, Architecture Feasibility, MVP Scope, Cross-Epic Dependencies, AI Model Migration)
-**Status:** COMPLETE — All issues resolved with decisions
+**Status:** COMPLETE  -  All issues resolved with decisions
 
 ---
 
@@ -22,7 +22,7 @@
 
 ## BLOCKER Issues (Must Fix Before Dev)
 
-### B1: Generation Model Mismatch — RESOLVED
+### B1: Generation Model Mismatch  -  RESOLVED
 
 **Found by:** PRD Alignment Audit
 **Issue:** Stories (Epics 5-6) implement a "4 monolithic video variations" model. PRD defines a segment-based model: 3 hooks × 3 bodies × 3 CTAs = 9 segments, yielding 27 combinatorial video outputs. 1 credit = 1 segment.
@@ -41,7 +41,7 @@
 - New: Segment combination builder UI (mix-and-match hooks/bodies/CTAs)
 - New: On-demand FFmpeg stitching for assembled combinations
 
-### B2: Video Stitching Cannot Run in Edge Functions — RESOLVED
+### B2: Video Stitching Cannot Run in Edge Functions  -  RESOLVED
 
 **Found by:** Architecture Feasibility Audit
 **Issue:** FFmpeg cannot run in Deno Edge Functions (no binary execution, 60s timeout, memory limits). Story 6.3 (Video Stitching) is unimplementable as designed.
@@ -54,13 +54,13 @@
 - Story 6.5 becomes "Segment Review & Combination Builder" (not "Side-by-Side Video Review")
 - Story 6.6 allows downloading individual segments
 
-### B3: FFmpeg Stitching Credit Model Conflict — RESOLVED
+### B3: FFmpeg Stitching Credit Model Conflict  -  RESOLVED
 
 **Found by:** PRD Alignment Audit
 **Issue:** PRD says "on-demand FFmpeg stitching at no additional credit cost" (FR23). Without server-side stitching, this needs reframing.
 **Resolution:** For MVP, combination preview is free (client-side sequential playback). Individual segment downloads are free. Full stitched MP4 assembly deferred to Phase 1.5.
 
-### B4: Free Trial Credit Count — RESOLVED
+### B4: Free Trial Credit Count  -  RESOLVED
 
 **Found by:** Cross-Epic Dependencies Audit
 **Issue:** Architecture `handle_new_user()` trigger gives 1 credit. PRD FR34 says 9 segment credits. Stories reference both values.
@@ -71,7 +71,7 @@
 - Story 2.1, Story 4.1: Update to 9 credits
 - Architecture.md line 364: Update from 1 to 9
 
-### B5: Epic 5 Missing Dependency on Epic 4 — RESOLVED
+### B5: Epic 5 Missing Dependency on Epic 4  -  RESOLVED
 
 **Found by:** Cross-Epic Dependencies Audit
 **Issue:** `generate-video/` Edge Function checks credit balance and debits credits (Epic 4 functionality). Epic 5 declares dependency on Epics 1, 2, 3 only.
@@ -80,7 +80,7 @@
 - epics.md: Epic 5 depends on "Epic 1, 2, 3, 4" (add Epic 4)
 - This means Epic 5 cannot start until both Epic 3 AND Epic 4 complete
 
-### B6: Pricing Mismatch — RESOLVED
+### B6: Pricing Mismatch  -  RESOLVED
 
 **Found by:** PRD Alignment Audit
 **Issue:** Story 1.1 pricing section shows Starter $15/mo, Growth $59/mo. PRD says $29/mo and $79/mo.
@@ -94,7 +94,7 @@
 
 ## HIGH Priority Issues
 
-### H1: AI Model Migration (OpenAI → OpenRouter) — RESOLVED
+### H1: AI Model Migration (OpenAI → OpenRouter)  -  RESOLVED
 
 **Found by:** AI Model Migration Audit
 **Issue:** Architecture.md and all stories reference OpenAI GPT-4o (`api.openai.com`, `OPENAI_API_KEY`). User specified using `chatgpt-oss-120b` from OpenRouter.
@@ -106,33 +106,33 @@
 - Required header: `HTTP-Referer: https://aiugcgenerator.com` (OpenRouter requirement)
 - Optional header: `X-Title: AI UGC Generator`
 - Env var: `OPENROUTER_API_KEY` (not `OPENAI_API_KEY`)
-- `response_format: { type: "json_object" }` may not be supported — add JSON instruction to system prompt as fallback
+- `response_format: { type: "json_object" }` may not be supported  -  add JSON instruction to system prompt as fallback
 **Changes needed:**
 - Architecture.md: Update External API Integration section
 - Story 1.4: Update brand summary call
 - All stories referencing OpenAI: Update to OpenRouter
 - Environment variables: `OPENROUTER_API_KEY` replaces `OPENAI_API_KEY`
 
-### H2: Edge Function Timeout Risk for generate-video/ — RESOLVED
+### H2: Edge Function Timeout Risk for generate-video/  -  RESOLVED
 
 **Found by:** Architecture Feasibility Audit
 **Issue:** `generate-video/` does: credit check + script generation (OpenRouter, ~5-10s) + composite image (NanoBanana, ~10-20s) + submit 9 Kling jobs (~5-10s) = 20-40s total. Dangerously close to 60s limit.
 **Resolution:** Split into 2 Edge Functions:
-1. `generate-video/` — Credit check, script generation, composite image request → returns `generation_id` with status `generating_image`
+1. `generate-video/`  -  Credit check, script generation, composite image request → returns `generation_id` with status `generating_image`
 2. Image polling happens client-side or inline (NanoBanana is fast enough)
-3. `submit-video-jobs/` — Called after composite image ready. Submits 9 Kling jobs → returns job IDs
+3. `submit-video-jobs/`  -  Called after composite image ready. Submits 9 Kling jobs → returns job IDs
 Alternative: Keep as single function but use aggressive timeouts and fail fast.
 **Decision for MVP:** Keep single function but add AbortController timeouts: OpenRouter 15s, NanoBanana 20s, Kling submissions 5s each (parallel). Total worst case ~40s. Acceptable for MVP with monitoring.
 
-### H3: SSRF DNS Rebinding Vulnerability — RESOLVED
+### H3: SSRF DNS Rebinding Vulnerability  -  RESOLVED
 
 **Found by:** Architecture Feasibility Audit
 **Issue:** `ssrf.ts` validates hostname strings but doesn't check resolved IPs. Attacker can use DNS rebinding to resolve to private IPs after validation.
-**Resolution:** Use `Deno.resolveDns()` to resolve IPs before fetching, then validate resolved IPs against blocklist. Story 1.2 dev notes already mention this — ensure implementation follows through.
+**Resolution:** Use `Deno.resolveDns()` to resolve IPs before fetching, then validate resolved IPs against blocklist. Story 1.2 dev notes already mention this  -  ensure implementation follows through.
 **Changes needed:**
 - Story 1.2: Explicit task to validate resolved IPs, not just hostnames
 
-### H4: Kling API Endpoints May Be Incorrect — RESOLVED
+### H4: Kling API Endpoints May Be Incorrect  -  RESOLVED
 
 **Found by:** Architecture Feasibility Audit
 **Issue:** Architecture.md shows `https://api.kling.ai/v1/videos/generate` and `https://api.kling.ai/v1/videos/${jobId}`. These may not match actual Kling 3.0 API.
@@ -141,7 +141,7 @@ Alternative: Keep as single function but use aggressive timeouts and fail fast.
 - Create `_shared/kling.ts` with `submitKlingJob()` and `checkKlingStatus()` helpers
 - Epic 6 stories reference these helpers instead of raw URLs
 
-### H5: `generations.status` CHECK Constraint Mismatch — RESOLVED
+### H5: `generations.status` CHECK Constraint Mismatch  -  RESOLVED
 
 **Found by:** Cross-Epic Dependencies Audit
 **Issue:** Architecture.md defines status values: `pending, scripting, generating_image, generating_video, stitching, completed, failed`. With segment model and no stitching, `stitching` is invalid and new states may be needed.
@@ -152,7 +152,7 @@ Alternative: Keep as single function but use aggressive timeouts and fail fast.
 - `generate-video/` flow: Use new status progression
 - `video-status/` polling: Check segment completion counts
 
-### H6: Rate Limiting In-Memory Resets on Cold Start — ACKNOWLEDGED
+### H6: Rate Limiting In-Memory Resets on Cold Start  -  ACKNOWLEDGED
 
 **Found by:** Architecture Feasibility Audit
 **Issue:** `rate-limit.ts` uses in-memory Map. Resets on every cold start. Not effective rate limiting.
@@ -164,39 +164,39 @@ Alternative: Keep as single function but use aggressive timeouts and fail fast.
 
 ## MEDIUM Priority Issues
 
-### M1: `getPublicUrl()` Used on Private Buckets — RESOLVED
+### M1: `getPublicUrl()` Used on Private Buckets  -  RESOLVED
 
 **Found by:** Architecture Feasibility Audit
 **Issue:** Code references `getPublicUrl()` for private storage buckets. This returns a URL that requires the bucket to be public.
 **Resolution:** Use `createSignedUrl(path, 3600)` for all private bucket access.
 **Changes needed:** Story 1.7 already handles this correctly with signed URL helpers. Verify all stories use signed URLs.
 
-### M2: Missing Overage Billing (FR36) — DEFERRED
+### M2: Missing Overage Billing (FR36)  -  DEFERRED
 
 **Found by:** PRD Alignment Audit
 **Issue:** PRD FR36 specifies overage charges ($1.50/credit Starter, $1.00/credit Growth). No story covers this.
 **Resolution:** Defer to Phase 1.5. MVP blocks generation when credits = 0 and shows paywall. No overage billing.
 **Rationale:** Overage billing adds significant Stripe complexity (metered billing, usage records). For MVP, the paywall is sufficient.
 
-### M3: Missing Email Notifications (NFR8) — DEFERRED
+### M3: Missing Email Notifications (NFR8)  -  DEFERRED
 
 **Found by:** PRD Alignment Audit
 **Issue:** PRD NFR8 says users get email on generation completion. No story covers this.
 **Resolution:** Defer to Phase 2. Architecture.md already acknowledges this gap.
 
-### M4: Missing Watermark on Free Tier (DR3) — DEFERRED
+### M4: Missing Watermark on Free Tier (DR3)  -  DEFERRED
 
 **Found by:** PRD Alignment Audit
 **Issue:** PRD DR3 says watermark on free-tier outputs. No story implements this.
 **Resolution:** Defer to Phase 1.5. Requires video processing capability (same blocker as stitching).
 
-### M5: Missing NPS Survey (SC7) — DEFERRED
+### M5: Missing NPS Survey (SC7)  -  DEFERRED
 
 **Found by:** PRD Alignment Audit
 **Issue:** PRD SC7 measures NPS. No in-app survey story exists.
 **Resolution:** Defer to Phase 2. Use third-party tool (Hotjar, Canny) when ready.
 
-### M6: Epic 1 Undeclared Auth Dependency — RESOLVED
+### M6: Epic 1 Undeclared Auth Dependency  -  RESOLVED
 
 **Found by:** Cross-Epic Dependencies Audit
 **Issue:** Stories 1.5, 1.6, 1.7 require Supabase Auth but Epic 1 declares "No dependencies."
@@ -215,15 +215,15 @@ Alternative: Keep as single function but use aggressive timeouts and fail fast.
 |-------|--------|
 | 1.3 Generic HTML Scraping | Simplify → JSON-LD only, merge into 1.2 as fallback path |
 | 1.8 Scraping Error Handling | Merge error handling into Stories 1.2, 1.5 |
-| 2.6 Account Deletion (GDPR) | Defer to Phase 1.5 — manual process via support |
+| 2.6 Account Deletion (GDPR) | Defer to Phase 1.5  -  manual process via support |
 | 3.4 Persona Regeneration | Merge into 3.2 (add "Regenerate" button) |
 | 3.7 Persona Detail Page | Merge into 3.6 (click card → expand or modal) |
 | 4.1 Free Trial Credit on Signup | Merge into 2.1 (trigger handles it) |
-| 4.6 Webhook — Subscription Renewal | Merge into 4.5 (same webhook handler) |
+| 4.6 Webhook  -  Subscription Renewal | Merge into 4.5 (same webhook handler) |
 | 4.7 Credit Balance Display | Merge into 7.1 (dashboard shows credits) |
 | 4.8 Credit Deduction on Generation | Merge into 5.2 (generate-video/ handles it) |
-| 6.3 Video Stitching | DESCOPED — blocker, deferred to Phase 1.5 |
-| 6.4 4-Variant Output | Replaced by segment model (3 per type) — merge into 6.1 |
+| 6.3 Video Stitching | DESCOPED  -  blocker, deferred to Phase 1.5 |
+| 6.4 4-Variant Output | Replaced by segment model (3 per type)  -  merge into 6.1 |
 | 6.8 Generation Progress UI | Merge into 5.5 (same progress component) |
 | 7.4 Generation Status Indicators | Merge into 7.2 (history list shows status) |
 | 7.5 Empty States | Merge into each individual page story |
@@ -281,7 +281,7 @@ const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
   body: JSON.stringify({
     model: "openai/gpt-oss-120b",
     messages: [...],
-    // Note: response_format may not be supported — include JSON instruction in system prompt
+    // Note: response_format may not be supported  -  include JSON instruction in system prompt
   }),
 });
 ```

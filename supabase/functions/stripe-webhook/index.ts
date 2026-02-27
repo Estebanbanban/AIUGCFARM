@@ -17,9 +17,9 @@ const PLAN_CREDITS: Record<string, number> = {
   scale: 270,
 };
 
-/** NOTE: No auth middleware — this endpoint uses Stripe webhook signature verification. */
+/** NOTE: No auth middleware  -  this endpoint uses Stripe webhook signature verification. */
 Deno.serve(async (req: Request) => {
-  // No CORS needed for webhooks — Stripe calls this server-to-server
+  // No CORS needed for webhooks  -  Stripe calls this server-to-server
   const headers: HeadersInit = { "Content-Type": "application/json" };
 
   if (req.method !== "POST") {

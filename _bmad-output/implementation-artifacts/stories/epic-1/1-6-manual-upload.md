@@ -64,7 +64,7 @@ So that **I can still use the platform to generate video ads**.
   - [ ] Submit button with loading state
   - [ ] Disable submit until at least 1 image and name provided
 - [ ] Add `uploadProduct()` to `lib/api.ts` (AC: 2)
-  - [ ] This uses `FormData` and `multipart/form-data` Content-Type — different from `callEdge` JSON pattern
+  - [ ] This uses `FormData` and `multipart/form-data` Content-Type  -  different from `callEdge` JSON pattern
   - [ ] Auth token sent via `Authorization` header
 - [ ] Wire manual upload CTA from scrape results empty state (AC: 4)
   - [ ] Add route: manual upload can be a modal on the landing page or a page at `/products/upload`
@@ -80,11 +80,11 @@ So that **I can still use the platform to generate video ads**.
 
 - **Multipart form handling** in Deno Edge Functions: use `req.formData()` to parse multipart body. Each file is a `File` object with `.name`, `.type`, `.size`, `.arrayBuffer()`
 - **Storage paths:** Store the relative path (`{userId}/{uuid}.ext`) in the `images` JSONB array, NOT signed URLs. Signed URLs are generated on-the-fly when the frontend requests them (via a separate helper or Edge Function). This avoids URL expiry issues in the database
-- **Signed URL generation:** When displaying products, the frontend or an API call generates signed URLs from storage paths. For MVP, the products page can use Supabase client-side `createSignedUrl()` — but note this requires the user to be authenticated
-- **Storage bucket policy** ensures users can only upload to `{auth.uid()}/` path — enforced at Supabase level, not just application code
-- The `app/(app)/` layout is a minimal scaffold — full sidebar navigation will be fleshed out in Epic 2 and Epic 7
+- **Signed URL generation:** When displaying products, the frontend or an API call generates signed URLs from storage paths. For MVP, the products page can use Supabase client-side `createSignedUrl()`  -  but note this requires the user to be authenticated
+- **Storage bucket policy** ensures users can only upload to `{auth.uid()}/` path  -  enforced at Supabase level, not just application code
+- The `app/(app)/` layout is a minimal scaffold  -  full sidebar navigation will be fleshed out in Epic 2 and Epic 7
 - **File upload from frontend:** Build the `FormData` object client-side, append files and text fields, send directly to the Edge Function. Do NOT base64-encode images
-- **Maximum 5 images per product** — enforce client-side (disable upload zone after 5) and server-side (reject if > 5 files)
+- **Maximum 5 images per product**  -  enforce client-side (disable upload zone after 5) and server-side (reject if > 5 files)
 
 ### Project Structure Notes
 
@@ -92,7 +92,7 @@ So that **I can still use the platform to generate video ads**.
 supabase/
 ├── migrations/
 │   ├── 001_initial_schema.sql        # from Story 1.5
-│   └── 002_storage_buckets.sql       # NEW — product-images bucket
+│   └── 002_storage_buckets.sql       # NEW  -  product-images bucket
 └── functions/
     └── upload-product/
         └── index.ts                  # NEW
@@ -100,21 +100,21 @@ supabase/
 frontend/src/
 ├── app/
 │   └── (app)/
-│       ├── layout.tsx                # NEW — minimal app shell
+│       ├── layout.tsx                # NEW  -  minimal app shell
 │       └── products/
-│           └── page.tsx              # NEW — product library
+│           └── page.tsx              # NEW  -  product library
 ├── components/
 │   └── products/
-│       └── manual-upload.tsx         # NEW — upload form
+│       └── manual-upload.tsx         # NEW  -  upload form
 └── lib/
-    └── api.ts                        # UPDATED — add uploadProduct()
+    └── api.ts                        # UPDATED  -  add uploadProduct()
 ```
 
 ### References
 
-- [Source: architecture.md#Supabase Storage Buckets — product-images]
-- [Source: architecture.md#Storage Policies — product-images upload policy]
-- [Source: architecture.md#Endpoints — upload-product/]
+- [Source: architecture.md#Supabase Storage Buckets  -  product-images]
+- [Source: architecture.md#Storage Policies  -  product-images upload policy]
+- [Source: architecture.md#Endpoints  -  upload-product/]
 - [Source: architecture.md#AD5: Signed URLs for Storage Access]
-- [Source: PRD#FR5 — Manual upload fallback]
-- [Source: PRD#UJ1 — Fallback when scraping fails]
+- [Source: PRD#FR5  -  Manual upload fallback]
+- [Source: PRD#UJ1  -  Fallback when scraping fails]

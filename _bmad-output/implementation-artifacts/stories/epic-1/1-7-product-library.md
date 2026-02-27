@@ -56,8 +56,8 @@ So that **I can manage my product catalog and select products for video generati
   - [ ] Save edits via `supabase.from('products').update({...}).eq('id', productId)`
   - [ ] Delete with confirmation dialog
 - [ ] Create signed URL helper in `lib/storage.ts` (AC: 5)
-  - [ ] `getSignedProductImageUrl(path: string)` — generates 1h signed URL from storage path
-  - [ ] `getSignedProductImageUrls(paths: string[])` — batch version
+  - [ ] `getSignedProductImageUrl(path: string)`  -  generates 1h signed URL from storage path
+  - [ ] `getSignedProductImageUrls(paths: string[])`  -  batch version
   - [ ] Fallback: return placeholder image URL if signing fails
 - [ ] Add "Add Product" button to products page header (AC: 1)
   - [ ] Links to manual upload form from Story 1.6
@@ -65,13 +65,13 @@ So that **I can manage my product catalog and select products for video generati
 
 ## Dev Notes
 
-- Product data access uses the **Supabase browser client directly** with RLS — no Edge Function needed for reads. RLS policy `auth.uid() = owner_id` ensures data isolation
-- Edits and deletes also go through the Supabase client directly — RLS permits `UPDATE` and `DELETE` for `auth.uid() = owner_id`
+- Product data access uses the **Supabase browser client directly** with RLS  -  no Edge Function needed for reads. RLS policy `auth.uid() = owner_id` ensures data isolation
+- Edits and deletes also go through the Supabase client directly  -  RLS permits `UPDATE` and `DELETE` for `auth.uid() = owner_id`
 - **Signed URLs for images:** For manually uploaded images (source = 'manual'), images are stored as storage paths in the `images` JSONB array. Use `supabase.storage.from('product-images').createSignedUrl(path, 3600)` to generate display URLs
-- For scraped images (source = 'shopify' or 'generic'), the `images` array contains external URLs — display them directly with `<img>`. No signing needed
+- For scraped images (source = 'shopify' or 'generic'), the `images` array contains external URLs  -  display them directly with `<img>`. No signing needed
 - Distinguish between storage paths and external URLs: storage paths start with `{userId}/`, external URLs start with `http`
-- The product detail page is a simple CRUD view — no complex state management needed. Use React state for edit mode toggle
-- This page lives under `app/(app)/` which requires auth — the layout from Story 1.6 handles the auth guard
+- The product detail page is a simple CRUD view  -  no complex state management needed. Use React state for edit mode toggle
+- This page lives under `app/(app)/` which requires auth  -  the layout from Story 1.6 handles the auth guard
 
 ### Project Structure Notes
 
@@ -85,15 +85,15 @@ frontend/src/
 │               └── page.tsx          # Product detail + edit
 ├── components/
 │   └── products/
-│       └── product-card.tsx          # UPDATED — add source badge
+│       └── product-card.tsx          # UPDATED  -  add source badge
 └── lib/
-    └── storage.ts                    # NEW — signed URL helpers
+    └── storage.ts                    # NEW  -  signed URL helpers
 ```
 
 ### References
 
-- [Source: architecture.md#Row Level Security Policies — products]
+- [Source: architecture.md#Row Level Security Policies  -  products]
 - [Source: architecture.md#AD5: Signed URLs for Storage Access]
-- [Source: architecture.md#Frontend Architecture — products/ pages]
-- [Source: PRD#FR4 — Product review and editing]
-- [Source: PRD#UJ4.2 — Returning user product management]
+- [Source: architecture.md#Frontend Architecture  -  products/ pages]
+- [Source: PRD#FR4  -  Product review and editing]
+- [Source: PRD#UJ4.2  -  Returning user product management]

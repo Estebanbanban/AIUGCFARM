@@ -8,7 +8,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "CineRads — AI UGC Video Ads for E-Commerce",
+  title: "CineRads, AI UGC Video Ads for E-Commerce",
   description:
     "Turn any product URL into scroll-stopping UGC video ads in minutes. AI-powered personas, hook/body/CTA structure optimized for TikTok, Instagram Reels & Meta Ads.",
   keywords: [
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     "AI ad generator",
   ],
   openGraph: {
-    title: "CineRads — AI UGC Video Ads for E-Commerce",
+    title: "CineRads, AI UGC Video Ads for E-Commerce",
     description:
       "Turn any product URL into scroll-stopping UGC video ads in minutes. AI-powered personas, hook/body/CTA structure optimized for TikTok, Instagram Reels & Meta Ads.",
     type: "website",
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "CineRads — AI UGC Video Ads for E-Commerce",
+    title: "CineRads, AI UGC Video Ads for E-Commerce",
     description:
       "Turn any product URL into scroll-stopping UGC video ads in minutes. AI-powered personas, hook/body/CTA structure optimized for TikTok, Instagram Reels & Meta Ads.",
   },

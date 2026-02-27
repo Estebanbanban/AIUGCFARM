@@ -330,7 +330,7 @@ const features = [
   {
     title: "AI Persona Builder",
     description:
-      "Design a virtual spokesperson with 9 brand attributes. Tone, energy, style, age — saved and reused across every campaign.",
+      "Design a virtual spokesperson with 9 brand attributes. Tone, energy, style, age, saved and reused across every campaign.",
     subtext: "Create unlimited personas per brand.",
     bullets: [
       "9 configurable persona attributes",

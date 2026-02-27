@@ -526,23 +526,23 @@ Based on the competitor and keyword analysis, the following are significant gaps
 - **Differentiate through specificity:** Target ecommerce/Shopify sellers specifically, not the broad "AI video" market.
 - **Differentiate through data:** Include real performance metrics, cost comparisons, and benchmarks that no competitor provides.
 - **Differentiate through actionability:** Provide templates, frameworks, scripts, and workflows that readers can immediately use.
-- **Differentiate through honesty:** Cover compliance, limitations, and "when NOT to use AI UGC" — building trust that pure product-marketing blogs lack.
+- **Differentiate through honesty:** Cover compliance, limitations, and "when NOT to use AI UGC", building trust that pure product-marketing blogs lack.
 
 ### Priority Ranking for Article Publication
 
-**Tier 1 — Publish First (highest opportunity, lowest competition):**
+**Tier 1, Publish First (highest opportunity, lowest competition):**
 1. Article 8: Ecommerce Video Marketing Strategy (lowest competition SERP)
 2. Article 9: Beat Ad Fatigue with AI Creatives (pure content gap)
 3. Article 14: Real Cost of UGC (linkable asset, no competition)
 4. Article 15: AI Ad Creative Frameworks (actionable, shareable)
 
-**Tier 2 — Publish Next (strong opportunity, moderate competition):**
+**Tier 2, Publish Next (strong opportunity, moderate competition):**
 5. Article 1: What Is AI UGC (cornerstone content)
 6. Article 3: AI Video Ads for Ecommerce (fragmented SERP)
 7. Article 7: UGC Creator Alternative (low competition)
 8. Article 6: AI Avatar for Ads (accessible SERP)
 
-**Tier 3 — Publish Last (higher competition, still valuable):**
+**Tier 3, Publish Last (higher competition, still valuable):**
 9. Article 2: How to Make UGC Ads (high-volume keyword)
 10. Article 4: Best AI Video Generators for Ads (comparison traffic)
 11. Article 5: TikTok Ads with AI (platform-dominated SERP)

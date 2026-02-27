@@ -17,7 +17,7 @@ partyModeWorkflow: '{project-root}/_bmad/core/workflows/party-mode/workflow.md'
 
 ## STEP GOAL:
 
-Discover what makes this product special and understand the product vision through collaborative conversation. No content generation — facilitation only.
+Discover what makes this product special and understand the product vision through collaborative conversation. No content generation  -  facilitation only.
 
 ## MANDATORY EXECUTION RULES (READ FIRST):
 
@@ -38,7 +38,7 @@ Discover what makes this product special and understand the product vision throu
 
 ### Step-Specific Rules:
 
-- 🎯 Focus on discovering vision and differentiator — no content generation yet
+- 🎯 Focus on discovering vision and differentiator  -  no content generation yet
 - 🚫 FORBIDDEN to generate executive summary content (that's the next step)
 - 🚫 FORBIDDEN to append anything to the document in this step
 - 💬 APPROACH: Natural conversation to understand what makes this product special
@@ -57,7 +57,7 @@ Discover what makes this product special and understand the product vision throu
 - Project classification exists from step 2 (project type, domain, complexity, context)
 - Input documents already loaded are in memory (product briefs, research, brainstorming, project docs)
 - No executive summary content yet (that's step 2c)
-- This step ONLY discovers — it does NOT write to the document
+- This step ONLY discovers  -  it does NOT write to the document
 
 ## YOUR TASK:
 
@@ -84,7 +84,7 @@ Guide the conversation to uncover the product's unique value:
 
 Dig deeper into the product vision:
 
-- **Problem framing:** "What's the real problem you're solving — not the surface symptom, but the deeper need?"
+- **Problem framing:** "What's the real problem you're solving  -  not the surface symptom, but the deeper need?"
 - **Future state:** "When this product is successful, what does the world look like for your users?"
 - **Why now:** "Why is this the right time to build this?"
 

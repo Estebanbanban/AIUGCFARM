@@ -185,12 +185,12 @@ The prompt must:
 Scene rules:
 - Camera: arm's-length iPhone front camera, slight wide-angle distortion
 - Lighting: natural window light or soft warm indoor light
-- Background: hints at personality (modern apartment, cozy café, outdoors, home office) — match the clothing style
+- Background: hints at personality (modern apartment, cozy café, outdoors, home office)  -  match the clothing style
 - Expression: candid "talking to camera", warm approachable energy
 - Props: 1–2 natural props max (coffee cup, phone, earbuds, etc.)
 
 Example of a great output:
-"A casual handheld iPhone front-camera selfie vlog. A young woman sits at a tidy desk, filming herself at arm's length (slight wide-angle distortion), natural window light, small imperfections like tiny hand shake and imperfect framing. Modern NYC penthouse apartment vibe in the background (clean lines, big windows, soft daylight, skyline hints), minimal makeup, relaxed hair, comfy-but-stylish outfit. Realistic, candid, 'talking to camera' expression, warm approachable energy — looks like a real creator filming a quick update, not a professional shoot. Coffee cup in hand."
+"A casual handheld iPhone front-camera selfie vlog. A young woman sits at a tidy desk, filming herself at arm's length (slight wide-angle distortion), natural window light, small imperfections like tiny hand shake and imperfect framing. Modern NYC penthouse apartment vibe in the background (clean lines, big windows, soft daylight, skyline hints), minimal makeup, relaxed hair, comfy-but-stylish outfit. Realistic, candid, 'talking to camera' expression, warm approachable energy  -  looks like a real creator filming a quick update, not a professional shoot. Coffee cup in hand."
 
 Return ONLY the prompt text. No explanation, no surrounding quotes, no prefix.`;
 
@@ -326,7 +326,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Check plan persona limits (skip for regeneration — not creating a new slot)
+    // Check plan persona limits (skip for regeneration  -  not creating a new slot)
     if (!isRegeneration) {
       const { data: profile } = await sb
         .from("profiles")
@@ -404,7 +404,7 @@ Deno.serve(async (req: Request) => {
     // Persist scene_prompt alongside attributes so generate-video can reuse it
     const attributesToSave = { ...validAttrs, scene_prompt: scenePrompt };
 
-    // Save persona record — UPDATE on regeneration, INSERT on new creation
+    // Save persona record  -  UPDATE on regeneration, INSERT on new creation
     let persona;
     if (isRegeneration) {
       const { data, error } = await sb

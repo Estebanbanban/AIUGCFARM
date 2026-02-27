@@ -83,7 +83,7 @@ const jsonLd = {
           name: "Is there a free trial?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Yes. Every new account gets 1 free video credit - no credit card required. Generate a full video ad and see the quality before you commit.",
+            text: "Yes. Every new account gets 1 free video credit, no credit card required. Generate a full video ad and see the quality before you commit.",
           },
         },
         {

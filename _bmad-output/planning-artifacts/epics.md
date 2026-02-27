@@ -27,7 +27,7 @@ Complete epic and story breakdown for AIUGC. Decomposed from PRD v2.0 (BMAD Stan
 
 | Epic | Name | Priority | Depends On | Stories |
 |------|------|----------|------------|---------|
-| 1 | Product Discovery — Landing, Scraping & Import | P0 | None | 6 |
+| 1 | Product Discovery  -  Landing, Scraping & Import | P0 | None | 6 |
 | 2 | User Authentication & Account Management | P0 | None | 5 |
 | 3 | AI Persona Creation | P0 | Epic 2 | 5 |
 | 4 | Paywall & Subscription Billing | P0 | Epic 2 | 4 |
@@ -65,9 +65,9 @@ FR37-FR38 → Epic 7 (`generation-history/` Edge Function, dashboard page)
 
 ---
 
-## Epic 1: Product Discovery — Landing Page, Scraping & Import
+## Epic 1: Product Discovery  -  Landing Page, Scraping & Import
 
-Users land on the platform, paste their store URL, see products auto-imported with AI brand summary — or manually upload. Landing page = marketing site + product funnel entry.
+Users land on the platform, paste their store URL, see products auto-imported with AI brand summary  -  or manually upload. Landing page = marketing site + product funnel entry.
 
 **FRs:** FR1-FR6 | **NFRs:** NFR1, NFR11 | **Domain:** DR2 | **Arch:** `scrape-product/`, `confirm-products/`, `upload-product/`, `products` table
 
@@ -81,14 +81,14 @@ As a store owner, I want to paste my Shopify store URL and have products automat
 
 **Given** a user submits a Shopify store URL **When** `scrape-product/` Edge Function processes the request **Then** products are extracted (name, images, description, price, category) within 15 seconds **And** SSRF validation blocks private/reserved IPs (resolved via DNS, not just hostname) before fetching **And** rate limiting enforces max 10 requests/hour for unauthenticated users **And** if not Shopify, basic JSON-LD extraction is attempted as fallback **And** robots.txt is checked before HTML fetching
 
-> **Audit note:** Merged Story 1.3 (Generic HTML Scraping) into this story. Only JSON-LD fallback for MVP — Open Graph and microdata deferred. SSRF must validate resolved IPs, not just hostnames.
+> **Audit note:** Merged Story 1.3 (Generic HTML Scraping) into this story. Only JSON-LD fallback for MVP  -  Open Graph and microdata deferred. SSRF must validate resolved IPs, not just hostnames.
 
 ### Story 1.4: AI Brand Summary Generation
 As a store owner, I want an AI-generated brand summary from my scraped products, so that generated video scripts match my brand's tone and audience.
 
 **Given** products are successfully scraped **When** the scraping Edge Function completes extraction **Then** OpenRouter (`openai/gpt-oss-120b`) generates brand summary (tone, demographic, selling points) **And** brand summary included in response as `brand_summary` JSONB **And** if OpenRouter fails, products still returned with `brand_summary: null`
 
-> **Audit note:** OpenAI GPT-4o replaced with OpenRouter `openai/gpt-oss-120b`. Endpoint: `openrouter.ai/api/v1/chat/completions`. Env var: `OPENROUTER_API_KEY`. Add `HTTP-Referer` and `X-Title` headers. `response_format: { type: "json_object" }` may not be supported — include JSON instruction in system prompt as fallback.
+> **Audit note:** OpenAI GPT-4o replaced with OpenRouter `openai/gpt-oss-120b`. Endpoint: `openrouter.ai/api/v1/chat/completions`. Env var: `OPENROUTER_API_KEY`. Add `HTTP-Referer` and `X-Title` headers. `response_format: { type: "json_object" }` may not be supported  -  include JSON instruction in system prompt as fallback.
 
 ### Story 1.5: Product Review and Confirmation
 As a store owner, I want to review, edit, and confirm my imported product data, so that I can correct scraping errors.
@@ -152,7 +152,7 @@ Users build a custom AI spokesperson via visual character builder, generate 4 im
 
 **FRs:** FR11-FR17 | **NFRs:** NFR2 | **Depends on:** Epic 2 | **Arch:** `generate-persona/`, `select-persona-image/`, `personas` table, NanoBanana API
 
-### Story 3.1: Character Builder UI — 9 Attributes
+### Story 3.1: Character Builder UI  -  9 Attributes
 As an authenticated user, I want to configure a persona using visual controls for 9 attributes.
 
 **Given** user navigates to `/personas/new` **When** builder loads **Then** 9 attribute selectors displayed: gender, skin tone, age range, hair color, hair style, eye color, body type, clothing style, accessories **And** each uses appropriate visual controls (gradient picker, option grids, etc.)
@@ -162,7 +162,7 @@ As a user, I want to generate 4 AI images based on my attribute selections.
 
 **Given** user configured all 9 attributes and submits **When** `generate-persona/` called **Then** attributes converted to optimized text prompt **And** NanoBanana generates 4 photorealistic images in < 30s **And** images uploaded to `persona-images` Storage bucket **And** persona record created with `generated_images` array **And** user can modify attributes and click "Regenerate" for fresh images
 
-> **Audit note:** Merged Story 3.4 (Persona Regeneration) — "Regenerate" is a button on the same UI, not a separate story.
+> **Audit note:** Merged Story 3.4 (Persona Regeneration)  -  "Regenerate" is a button on the same UI, not a separate story.
 
 ### Story 3.3: Persona Image Selection
 As a user, I want to select my preferred image from 4 options.
@@ -179,7 +179,7 @@ As a user, I want to view all my personas and their details.
 
 **Given** user navigates to `/personas` **When** page loads **Then** persona cards with selected image, name, attributes summary **And** clicking a card shows full detail (all 4 generated images, all attributes, regenerate option)
 
-> **Audit note:** Merged Story 3.7 (Persona Detail Page) — detail view can be a modal or expandable card, not a separate page.
+> **Audit note:** Merged Story 3.7 (Persona Detail Page)  -  detail view can be a modal or expandable card, not a separate page.
 
 ---
 
@@ -208,7 +208,7 @@ As a user selecting a plan, I want to complete payment through Stripe.
 
 **Given** user selects plan and clicks "Subscribe" **When** `stripe-checkout/` creates Checkout session **Then** redirected to Stripe hosted checkout **And** on success, returns to dashboard with active subscription
 
-### Story 4.5: Webhook — Subscription Lifecycle
+### Story 4.5: Webhook  -  Subscription Lifecycle
 As the system, I want to process all Stripe subscription webhooks reliably.
 
 **Given** Stripe sends webhook events **When** `stripe-webhook/` processes them **Then** handles:
@@ -218,7 +218,7 @@ As the system, I want to process all Stripe subscription webhooks reliably.
 - `customer.subscription.deleted` → set plan to 'free', clear credits
 **And** event logged in `audit_logs` for idempotency **And** `credit_ledger` entry for each credit change
 
-> **Audit note:** Merged Story 4.6 (Subscription Renewal) into this story — same webhook handler processes all events.
+> **Audit note:** Merged Story 4.6 (Subscription Renewal) into this story  -  same webhook handler processes all events.
 
 ---
 
@@ -228,9 +228,9 @@ System generates 3 Hook + 3 Body + 3 CTA script variants (OpenRouter) and compos
 
 **FRs:** FR18-FR20 | **NFRs:** NFR7 | **Depends on:** Epic 1, 2, 3, **4** | **Arch:** `generate-video/` steps 1-8, OpenRouter (`openai/gpt-oss-120b`), NanoBanana API
 
-> **Audit note:** Epic 4 added as dependency — `generate-video/` checks credit balance and debits credits (Epic 4 functionality). Generation model aligned with PRD: 3 variants per segment type, 9 segments total, 9 credits per batch.
+> **Audit note:** Epic 4 added as dependency  -  `generate-video/` checks credit balance and debits credits (Epic 4 functionality). Generation model aligned with PRD: 3 variants per segment type, 9 segments total, 9 credits per batch.
 
-### Story 5.1: Generation Wizard — Product & Persona Selection
+### Story 5.1: Generation Wizard  -  Product & Persona Selection
 As a user, I want to select product and persona in a step-by-step wizard.
 
 **Given** user navigates to `/generate` **When** wizard loads **Then** Step 1: select from confirmed products, Step 2: select from available personas, Step 3: review + "Generate" button (Easy Mode) **And** credit balance shown (need 9 credits) **And** if insufficient credits, show paywall (Story 4.2)
@@ -244,7 +244,7 @@ As the system, I want to generate 9 UGC ad script variants from product data and
 - 3 CTA variants (3-5s each, different urgency/action framing)
 **And** tuned to product description and brand tone **And** status set to `'scripting'` at creation **And** scripts saved to `generations.script`
 
-> **Audit note:** Credit deduction (from Story 4.8) merged here. 9 credits per batch, not 1. OpenRouter replaces OpenAI. Status flow clarification: script generation and composite image run **in parallel** (both happen while status = `'scripting'`). There is no separate `generating_image` status — both complete before status advances to `'submitting_jobs'`.
+> **Audit note:** Credit deduction (from Story 4.8) merged here. 9 credits per batch, not 1. OpenRouter replaces OpenAI. Status flow clarification: script generation and composite image run **in parallel** (both happen while status = `'scripting'`). There is no separate `generating_image` status  -  both complete before status advances to `'submitting_jobs'`.
 
 ### Story 5.3: POV Composite Image Generation
 As the system, I want to generate a composite image of persona holding/using the product.
@@ -263,7 +263,7 @@ As a user, I want real-time progress of my generation.
 
 **Given** generation in progress **When** frontend polls `video-status/` every 5s **Then** current status returned with these transitions: `scripting → submitting_jobs → generating_segments → completed` **And** progress indicator shows segments completed / 9 total **And** stage label displayed per pipeline step
 
-> **Audit note (2026-02-27):** Merged Story 6.8 (Generation Progress UI) — same component handles all progress states. Status flow corrected: `generating_image` removed (script + image run in parallel under `scripting`). Actual backend status flow: `pending → scripting → submitting_jobs → generating_segments → completed|failed`.
+> **Audit note (2026-02-27):** Merged Story 6.8 (Generation Progress UI)  -  same component handles all progress states. Status flow corrected: `generating_image` removed (script + image run in parallel under `scripting`). Actual backend status flow: `pending → scripting → submitting_jobs → generating_segments → completed|failed`.
 
 ---
 
@@ -273,18 +273,18 @@ System submits 9 segment jobs to Kling 3.0, polls for completion, delivers segme
 
 **FRs:** FR21-FR22, FR24-FR26 | **NFRs:** NFR3-5, NFR7, NFR14-15 | **Arch:** `generate-video/` segment submission, `video-status/`, Kling 3.0 API, Supabase Storage
 
-> **Audit note:** FR23 (FFmpeg stitching) deferred to Phase 1.5 — cannot run in Deno Edge Functions. MVP delivers individual segments with client-side sequential preview. Story 6.3 (Stitching) and 6.4 (4-Variant) removed.
+> **Audit note:** FR23 (FFmpeg stitching) deferred to Phase 1.5  -  cannot run in Deno Edge Functions. MVP delivers individual segments with client-side sequential preview. Story 6.3 (Stitching) and 6.4 (4-Variant) removed.
 
 ### Story 6.1: Segment Job Submission (9 Jobs)
 As the system, I want to submit independent Kling jobs for each segment variant.
 
 **Given** composite image and 9 script variants ready **When** `generate-video/` submits jobs **Then** Kling `kling-v2-6` model receives 9 jobs in parallel:
-- 3 Hook jobs (hook_1, hook_2, hook_3) — 3-5s duration
-- 3 Body jobs (body_1, body_2, body_3) — 5-10s duration (LLM caps at 10s max; no runtime splitting needed)
-- 3 CTA jobs (cta_1, cta_2, cta_3) — 3-5s duration
+- 3 Hook jobs (hook_1, hook_2, hook_3)  -  3-5s duration
+- 3 Body jobs (body_1, body_2, body_3)  -  5-10s duration (LLM caps at 10s max; no runtime splitting needed)
+- 3 CTA jobs (cta_1, cta_2, cta_3)  -  3-5s duration
 **And** each job uses the composite image (`image` field) + segment script text (`prompt`) + `mode: "std"` **And** job IDs stored in `generations.external_job_ids` JSONB **And** status set to `'generating_segments'` **And** generation_id returned to frontend
 
-> **Audit note (2026-02-27):** FR22 (body segment splitting for >10s) satisfied by LLM script constraint (body bounded 5-10s), not runtime splitting. Kling API fixed: field name `image` (not `image_url`), mode `std` (not `standard`), model `kling-v2-6` explicitly set. Kling image2video endpoint does not accept `aspect_ratio` — aspect ratio inferred from input image.
+> **Audit note (2026-02-27):** FR22 (body segment splitting for >10s) satisfied by LLM script constraint (body bounded 5-10s), not runtime splitting. Kling API fixed: field name `image` (not `image_url`), mode `std` (not `standard`), model `kling-v2-6` explicitly set. Kling image2video endpoint does not accept `aspect_ratio`  -  aspect ratio inferred from input image.
 
 ### Story 6.2: Video Segment Polling
 As the system, I want to poll Kling 3.0 for each segment's completion.
@@ -332,7 +332,7 @@ As a user, I want to browse my full generation history.
 
 > **Audit note:** Status indicators (from Story 7.4) merged here.
 
-### Story 7.3: Video Library — Re-download
+### Story 7.3: Video Library  -  Re-download
 As a user, I want to re-download past video segments.
 
 **Given** user clicks completed generation **When** navigate to `/generate/[id]` **Then** segment review & combination builder loads (same as Story 6.5) **And** signed URLs freshly generated
@@ -364,10 +364,10 @@ supabase/functions/_shared/
 - `generations.external_job_ids` JSONB: `{ hook_1: "id", hook_2: "id", ..., cta_3: "id" }`
 
 ### Items Deferred to Phase 1.5+
-- Server-side FFmpeg video stitching (FR23) — needs worker service
-- Overage billing (FR36) — Stripe metered billing
-- Watermark on free tier (DR3) — needs video processing
-- Account deletion (Story 2.6 / GDPR) — manual via support
+- Server-side FFmpeg video stitching (FR23)  -  needs worker service
+- Overage billing (FR36)  -  Stripe metered billing
+- Watermark on free tier (DR3)  -  needs video processing
+- Account deletion (Story 2.6 / GDPR)  -  manual via support
 - Email notifications (NFR8)
 - NPS survey (SC7)
 - Expert Mode (FR27-30)

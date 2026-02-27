@@ -11,7 +11,7 @@ const steps = [
     icon: Link,
     title: "Paste URL",
     description:
-      "Drop any product or store URL. We import everything — name, images, price, description — in seconds.",
+      "Drop any product or store URL. We import everything, name, images, price, description, in seconds.",
     mediaType: "image" as const,
     mediaSrc:
       "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&w=1200&q=80",
@@ -22,7 +22,7 @@ const steps = [
     icon: Upload,
     title: "Build Persona",
     description:
-      "Define your AI spokesperson with 9 brand attributes. Tone, energy, style — saved and reused forever.",
+      "Define your AI spokesperson with 9 brand attributes. Tone, energy, style, saved and reused forever.",
     mediaType: "image" as const,
     mediaSrc:
       "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=1200&q=80",
@@ -59,7 +59,7 @@ export function HowItWorksSection() {
             <motion.div key={step.number} variants={staggerItem} className="relative">
               {/* Connecting dashed line between steps (desktop) */}
               {i < steps.length - 1 && (
-                <div className="hidden md:block absolute top-5 left-[60%] w-[80%] border-t border-dashed border-border z-0" />
+                <div className="absolute left-16 top-[3.25rem] z-0 hidden h-0 w-[calc(100%-40px)] border-t border-dashed border-border md:block" />
               )}
 
               <div className="relative z-10 flex flex-col items-center md:items-start text-center md:text-left px-6 py-8">

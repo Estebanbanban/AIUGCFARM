@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`);
     }
-    // PKCE code exchange failed (code_verifier missing — e.g. link opened in
+    // PKCE code exchange failed (code_verifier missing, e.g. link opened in
     // a different browser than where signup was initiated). Fall through so
     // the user can still sign in manually.
     console.error("PKCE code exchange failed:", error?.message);

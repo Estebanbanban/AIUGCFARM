@@ -163,7 +163,7 @@ Deno.serve(async (req: Request) => {
       compositeImageUrl = await getCompositeSignedUrl(sb, gen.composite_image_url);
     }
 
-    // ── Handle "completed" — return current state with fresh signed URLs ─
+    // ── Handle "completed"  -  return current state with fresh signed URLs ─
     if (gen.status === "completed") {
       let segments: ResponseSegments | undefined;
       if (gen.videos && typeof gen.videos === "object" && !Array.isArray(gen.videos)) {
@@ -183,7 +183,7 @@ Deno.serve(async (req: Request) => {
       }, cors);
     }
 
-    // ── Handle "failed" — return current state ──────────────────────
+    // ── Handle "failed"  -  return current state ──────────────────────
     if (gen.status === "failed") {
       return json({
         data: {
@@ -197,7 +197,7 @@ Deno.serve(async (req: Request) => {
       }, cors);
     }
 
-    // ── Handle "generating_segments" — poll Kling for each job ──────
+    // ── Handle "generating_segments"  -  poll Kling for each job ──────
     if (gen.status === "generating_segments" && gen.external_job_ids) {
       const jobIds = gen.external_job_ids as Record<string, string>;
       const jobKeys = Object.keys(jobIds);
@@ -315,7 +315,7 @@ Deno.serve(async (req: Request) => {
           })
           .eq("id", generationId);
 
-        // Refund credits — use actual cost based on mode + quality
+        // Refund credits  -  use actual cost based on mode + quality
         const quality = (gen.video_quality ?? "standard") as keyof typeof COSTS;
         const creditCost = gen.mode === "single"
           ? COSTS[quality].single
@@ -366,7 +366,7 @@ Deno.serve(async (req: Request) => {
         }, cors);
       }
 
-      // Still in progress — save partial progress
+      // Still in progress  -  save partial progress
       await sb
         .from("generations")
         .update({ videos: storedVideos })

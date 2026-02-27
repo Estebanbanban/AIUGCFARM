@@ -1,4 +1,4 @@
-# QA Handoff Protocol — AIUGC
+# QA Handoff Protocol  -  AIUGC
 
 ## Overview
 

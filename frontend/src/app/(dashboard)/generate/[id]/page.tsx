@@ -1047,7 +1047,7 @@ export default function GenerationDetailPage() {
 
                   <p className="text-xs text-muted-foreground">
                     {gen?.mode === "single"
-                      ? "1 hook · 1 body · 1 CTA — your complete ad."
+                      ? "1 hook · 1 body · 1 CTA, your complete ad."
                       : "3 hooks x 3 bodies x 3 CTAs = 27 possible combinations. Select different segments above to preview other combinations."}
                   </p>
                 </div>

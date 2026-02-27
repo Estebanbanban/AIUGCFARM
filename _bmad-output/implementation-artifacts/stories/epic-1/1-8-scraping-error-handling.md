@@ -44,7 +44,7 @@ So that **I know exactly what went wrong and what to do next**.
 7. **Given** brand summary generation fails but product extraction succeeds
    **When** the response is returned
    **Then** products are displayed normally
-   **And** the brand summary section shows a subtle notice: "Brand analysis unavailable — you can add this later"
+   **And** the brand summary section shows a subtle notice: "Brand analysis unavailable  -  you can add this later"
    **And** the user can still confirm and save products
 
 ## Tasks / Subtasks
@@ -58,7 +58,7 @@ So that **I know exactly what went wrong and what to do next**.
 - [ ] Add network error handling in `scrape-product/` (AC: 3)
   - [ ] Wrap external `fetch()` calls in try/catch
   - [ ] Distinguish between network errors (502) and parsing errors (500)
-  - [ ] Handle Shopify rate limiting (429 from Shopify) — pass through as "Website temporarily unavailable"
+  - [ ] Handle Shopify rate limiting (429 from Shopify)  -  pass through as "Website temporarily unavailable"
 - [ ] Update `components/products/scrape-results.tsx` for all error states (AC: 4, 5, 7)
   - [ ] robots.txt blocked state: message + manual upload CTA
   - [ ] Zero products state: message + "Try another URL" + "Upload manually" CTAs
@@ -73,11 +73,11 @@ So that **I know exactly what went wrong and what to do next**.
 
 ## Dev Notes
 
-- **Error response format** is standardized: `{ detail: "Human-readable message" }` — the frontend can always read `.detail` for user-facing text
+- **Error response format** is standardized: `{ detail: "Human-readable message" }`  -  the frontend can always read `.detail` for user-facing text
 - **Never expose** internal error messages, API keys, or stack traces in responses. Always use generic messages. Log the real error server-side via `console.error`
 - **Toast vs inline messages:** Use toasts for transient errors (network, rate limit) that the user can retry. Use inline messages for states that require user action (empty results, robots.txt block)
-- **Shopify rate limiting:** Shopify may return 429 if we fetch `/products.json` too aggressively. Handle this as "Website temporarily unavailable" — the user can retry
-- This story is primarily a **polish pass** on error handling introduced in Stories 1.2-1.5. It should not create new endpoints or tables — only improve error handling in existing code
+- **Shopify rate limiting:** Shopify may return 429 if we fetch `/products.json` too aggressively. Handle this as "Website temporarily unavailable"  -  the user can retry
+- This story is primarily a **polish pass** on error handling introduced in Stories 1.2-1.5. It should not create new endpoints or tables  -  only improve error handling in existing code
 - Test error scenarios manually: submit localhost URLs, submit non-existent domains, submit URLs to sites with restrictive robots.txt
 
 ### Error State Matrix
@@ -94,8 +94,8 @@ So that **I know exactly what went wrong and what to do next**.
 
 ### References
 
-- [Source: architecture.md#Error Handling — Edge Functions, Frontend]
-- [Source: architecture.md#Response Format — detail field on error]
+- [Source: architecture.md#Error Handling  -  Edge Functions, Frontend]
+- [Source: architecture.md#Response Format  -  detail field on error]
 - [Source: architecture.md#AD6: SSRF Protection on Scraping]
-- [Source: PRD#NFR11 — Rate limiting]
-- [Source: PRD#DR2 — robots.txt compliance]
+- [Source: PRD#NFR11  -  Rate limiting]
+- [Source: PRD#DR2  -  robots.txt compliance]

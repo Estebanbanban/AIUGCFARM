@@ -143,7 +143,7 @@ function ImageCard({
           : 'ring-1 ring-border hover:ring-primary/40',
       )}
     >
-      {/* Placeholder — swap with <Image fill .../> per option when photo is ready */}
+      {/* Placeholder, swap with <Image fill .../> per option when photo is ready */}
       <div
         className="absolute inset-0 bg-muted"
         style={placeholderStyle}
@@ -417,7 +417,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
               </div>
             </Section>
 
-            {/* Accessories — multi-select */}
+            {/* Accessories, multi-select */}
             <Section
               icon={<Watch className="size-4" />}
               label="Accessories"

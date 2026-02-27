@@ -34,7 +34,7 @@ const faqs = [
   {
     question: "Is there a free trial?",
     answer:
-      "Yes. Every new account gets 1 free video credit — no credit card required. Generate a full video ad and see the quality before you commit.",
+      "Yes. Every new account gets 1 free video credit, no credit card required. Generate a full video ad and see the quality before you commit.",
   },
   {
     question: "Can I cancel anytime?",

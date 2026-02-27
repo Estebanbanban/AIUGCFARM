@@ -56,11 +56,11 @@ export const PLANS = {
 
 export type PlanTier = keyof typeof PLANS;
 
-/** Cost per single generation (1 hook + 1 body + 1 CTA) — kling-v2-6 std */
+/** Cost per single generation (1 hook + 1 body + 1 CTA), kling-v2-6 std */
 export const CREDITS_PER_SINGLE = 3;
-/** Cost per triple generation (3 hooks + 3 bodies + 3 CTAs) — kling-v2-6 std */
+/** Cost per triple generation (3 hooks + 3 bodies + 3 CTAs), kling-v2-6 std */
 export const CREDITS_PER_BATCH = 9;
-/** Cost per single generation — kling-v3 std (2× v2-6) */
+/** Cost per single generation, kling-v3 std (2× v2-6) */
 export const CREDITS_PER_SINGLE_HD = 6;
-/** Cost per triple generation — kling-v3 std (2× v2-6) */
+/** Cost per triple generation, kling-v3 std (2× v2-6) */
 export const CREDITS_PER_BATCH_HD = 18;

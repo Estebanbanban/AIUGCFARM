@@ -47,7 +47,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // generated_images stores storage paths — select the path
+    // generated_images stores storage paths  -  select the path
     const selectedPath = images[image_index];
 
     // Store the storage PATH as selected_image_url (not a signed URL)
