@@ -6,8 +6,8 @@ import { checkKlingJob } from "../_shared/kling.ts";
 import { refundCredits } from "../_shared/credits.ts";
 
 const COSTS = {
-  standard: { single: 3, batch: 9 },
-  hd:       { single: 6, batch: 18 },
+  standard: { single: 5, batch: 15 },
+  hd:       { single: 10, batch: 30 },
 } as const;
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -102,6 +102,35 @@ async function signSegmentVideos(
   }
 
   return result;
+}
+
+/**
+ * Return the most recent generation debit amount (absolute value) for a given generation.
+ * This captures either the initial generation charge or a 1-credit segment regeneration charge.
+ */
+async function getLatestGenerationDebitAmount(
+  sb: ReturnType<typeof getAdminClient>,
+  userId: string,
+  generationId: string,
+): Promise<number | null> {
+  const { data, error } = await sb
+    .from("credit_ledger")
+    .select("amount")
+    .eq("owner_id", userId)
+    .eq("reference_id", generationId)
+    .eq("reason", "generation")
+    .lt("amount", 0)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to read latest generation debit:", error.message);
+    return null;
+  }
+
+  if (typeof data?.amount !== "number") return null;
+  return Math.abs(data.amount);
 }
 
 /**
@@ -329,17 +358,44 @@ Deno.serve(async (req: Request) => {
           })
           .eq("id", generationId);
 
-        // Refund credits  -  use actual cost based on mode + quality
+        // Refund credits based on the latest debit for this generation.
+        // This correctly handles both initial generation failures and 1-credit segment regenerations.
         const quality = (gen.video_quality ?? "standard") as keyof typeof COSTS;
-        const creditCost = gen.mode === "single"
+        const fallbackCost = gen.mode === "single"
           ? COSTS[quality].single
           : COSTS[quality].batch;
+        const latestDebitAmount = await getLatestGenerationDebitAmount(sb, userId, generationId);
+        const refundAmount = latestDebitAmount ?? fallbackCost;
         try {
-          await refundCredits(userId, creditCost, generationId);
-          console.log(`Credits refunded: ${creditCost} → user ${userId} for generation ${generationId}`);
+          await refundCredits(userId, refundAmount, generationId);
+          console.log(`Credits refunded: ${refundAmount} → user ${userId} for generation ${generationId}`);
+
+          // If this was a discounted first-video attempt that failed, restore eligibility.
+          if (refundAmount > 1) {
+            const { data: profile } = await sb
+              .from("profiles")
+              .select("first_video_discount_used")
+              .eq("id", userId)
+              .maybeSingle();
+
+            if (profile?.first_video_discount_used) {
+              const { count: completedCount } = await sb
+                .from("generations")
+                .select("id", { count: "exact", head: true })
+                .eq("owner_id", userId)
+                .eq("status", "completed");
+
+              if ((completedCount ?? 0) === 0) {
+                await sb
+                  .from("profiles")
+                  .update({ first_video_discount_used: false })
+                  .eq("id", userId);
+              }
+            }
+          }
         } catch (refundErr) {
           // Log prominently — user loses credits if this fails
-          console.error(`CRITICAL: Credit refund failed for generation ${generationId} (user ${userId}, ${creditCost} credits):`, refundErr);
+          console.error(`CRITICAL: Credit refund failed for generation ${generationId} (user ${userId}, ${refundAmount} credits):`, refundErr);
           // Update the generation error_message to include refund failure so it's traceable
           await sb.from("generations")
             .update({ error_message: `${failedMessage || "Generation failed"} | REFUND FAILED: ${refundErr instanceof Error ? refundErr.message : String(refundErr)}` })

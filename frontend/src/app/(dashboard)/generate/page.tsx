@@ -191,6 +191,7 @@ export default function GeneratePage() {
     Array<{ path: string; signed_url: string }>
   >([]);
   const [selectedCompositeIdx, setSelectedCompositeIdx] = useState<number | null>(null);
+  const [showPreviewEditor, setShowPreviewEditor] = useState(false);
   const [previewEditPrompt, setPreviewEditPrompt] = useState("");
 
   const { data: products, isLoading: productsLoading } = useProducts();
@@ -363,6 +364,7 @@ export default function GeneratePage() {
     // Clear composites when format changes so user regenerates with correct aspect ratio
     setCompositeImages([]);
     setSelectedCompositeIdx(null);
+    setShowPreviewEditor(false);
     store.setCompositeImagePath(null);
     setPreviewEditPrompt("");
   }
@@ -371,6 +373,7 @@ export default function GeneratePage() {
     if (!store.productId || !store.personaId) return;
     setCompositeImages([]);
     setSelectedCompositeIdx(null);
+    setShowPreviewEditor(false);
     store.setCompositeImagePath(null);
     setPreviewEditPrompt("");
 
@@ -389,6 +392,7 @@ export default function GeneratePage() {
 
   function handleSelectComposite(idx: number) {
     setSelectedCompositeIdx(idx);
+    setShowPreviewEditor(false);
     store.setCompositeImagePath(compositeImages[idx].path);
   }
 
@@ -406,6 +410,7 @@ export default function GeneratePage() {
         onSuccess: (result) => {
           setCompositeImages((prev) => [result.image, ...prev]);
           setSelectedCompositeIdx(0);
+          setShowPreviewEditor(false);
           store.setCompositeImagePath(result.image.path);
           setPreviewEditPrompt("");
           toast.success("Preview image updated");
@@ -932,54 +937,6 @@ export default function GeneratePage() {
                   Click an image to select it — this becomes the base for your video.
                 </p>
 
-                <div className="rounded-lg border border-border bg-muted/20 p-4">
-                  <div className="flex flex-col gap-3">
-                    <div>
-                      <Label htmlFor="preview-edit-prompt" className="text-sm font-medium">
-                        Quick edit (optional)
-                      </Label>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Ask for changes like outfit, background, lighting, or time of day.
-                      </p>
-                    </div>
-
-                    <Textarea
-                      id="preview-edit-prompt"
-                      value={previewEditPrompt}
-                      onChange={(e) => setPreviewEditPrompt(e.target.value)}
-                      placeholder="Example: Change the outfit to a black hoodie and make the background a cozy cafe at sunset."
-                      maxLength={500}
-                    />
-
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs text-muted-foreground">
-                        Uses the selected preview image as the reference.
-                      </p>
-                      <Button
-                        size="sm"
-                        onClick={handleApplyPreviewEdit}
-                        disabled={
-                          editComposite.isPending ||
-                          !store.compositeImagePath ||
-                          previewEditPrompt.trim().length === 0
-                        }
-                      >
-                        {editComposite.isPending ? (
-                          <>
-                            <Loader2 className="size-3.5 animate-spin" />
-                            Applying Edit...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="size-3.5" />
-                            Apply Edit
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Full-width image grid: 4-col for portrait (tall), 2-col for landscape (wide) */}
                 <div className={cn(
                   "grid gap-3",
@@ -1017,6 +974,79 @@ export default function GeneratePage() {
                     </button>
                   ))}
                 </div>
+
+                {selectedCompositeIdx !== null && compositeImages[selectedCompositeIdx] && (
+                  <div className="rounded-lg border border-border bg-muted/20 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium">Quick edit (optional)</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Adjust the selected preview before generating your videos.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowPreviewEditor((prev) => !prev)}
+                      >
+                        <Sparkles className="size-3.5" />
+                        {showPreviewEditor ? "Hide Edit" : "Edit Selected"}
+                      </Button>
+                    </div>
+
+                    {showPreviewEditor && (
+                      <div className="mt-3 flex flex-col gap-3">
+                        <Textarea
+                          id="preview-edit-prompt"
+                          value={previewEditPrompt}
+                          onChange={(e) => setPreviewEditPrompt(e.target.value)}
+                          placeholder="Example: Change the outfit to a black hoodie and make the background a cozy cafe at sunset."
+                          maxLength={500}
+                        />
+
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs text-muted-foreground">
+                            Uses the selected preview image as the reference.
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowPreviewEditor(false)}
+                              disabled={editComposite.isPending}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={handleApplyPreviewEdit}
+                              disabled={
+                                editComposite.isPending ||
+                                !store.compositeImagePath ||
+                                previewEditPrompt.trim().length === 0
+                              }
+                            >
+                              {editComposite.isPending ? (
+                                <>
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                  Applying Edit...
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="size-3.5" />
+                                  Apply Edit
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
