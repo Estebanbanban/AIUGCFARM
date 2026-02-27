@@ -11,6 +11,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
@@ -30,15 +32,12 @@ import type { GenerationStatus } from "@/types/database";
 /*  Status helpers                                                            */
 /* -------------------------------------------------------------------------- */
 
-const statusColors: Record<string, string> = {
-  completed: "bg-emerald-500/10 text-emerald-400",
-  generating_segments: "bg-blue-500/10 text-blue-400",
-  generating_video: "bg-amber-500/10 text-amber-400",
-  content_ready: "bg-violet-500/10 text-violet-400",
+const statusColors: Record<GenerationStatus, string> = {
   scripting: "bg-amber-500/10 text-amber-400",
-  stitching: "bg-amber-500/10 text-amber-400",
+  submitting_jobs: "bg-violet-500/10 text-violet-400",
+  generating_segments: "bg-blue-500/10 text-blue-400",
+  completed: "bg-emerald-500/10 text-emerald-400",
   failed: "bg-red-500/10 text-red-400",
-  pending: "bg-zinc-500/10 text-zinc-400",
 };
 
 function statusLabel(status: string): string {
@@ -47,8 +46,6 @@ function statusLabel(status: string): string {
       return "Completed";
     case "failed":
       return "Failed";
-    case "pending":
-      return "Pending";
     default:
       return "In Progress";
   }
@@ -184,7 +181,7 @@ export default function HistoryPage() {
                       </Badge>
                     </div>
 
-                    {/* Mode badge */}
+                    {/* Mode + segment count */}
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="text-xs capitalize">
                         {gen.mode} mode
@@ -198,6 +195,29 @@ export default function HistoryPage() {
                         </span>
                       )}
                     </div>
+
+                    {/* Failed: show error + retry */}
+                    {gen.status === "failed" && (
+                      <div
+                        className="flex items-start gap-2 rounded-md bg-red-500/10 px-3 py-2"
+                        onClick={(e) => e.preventDefault()}
+                      >
+                        <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-red-400" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs text-red-400">
+                            {gen.error_message ?? "Generation failed"}
+                          </p>
+                          <Link
+                            href="/generate"
+                            className="mt-1 inline-flex items-center gap-1 text-xs text-red-400 underline-offset-2 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <RefreshCw className="size-3" />
+                            Try again
+                          </Link>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </Link>

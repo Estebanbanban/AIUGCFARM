@@ -13,7 +13,6 @@ import {
   AlertCircle,
   Clock,
   FileText,
-  ImageIcon,
   Video,
   RefreshCw,
   Play,
@@ -47,17 +46,9 @@ const statusConfig: Record<
   GenerationStatus,
   { label: string; badgeClass: string }
 > = {
-  pending: {
-    label: "Queued",
-    badgeClass: "bg-zinc-500/10 text-zinc-400",
-  },
   scripting: {
     label: "Writing scripts...",
     badgeClass: "bg-amber-500/10 text-amber-400",
-  },
-  content_ready: {
-    label: "Content ready",
-    badgeClass: "bg-violet-500/10 text-violet-400",
   },
   submitting_jobs: {
     label: "Submitting video jobs...",
@@ -65,14 +56,6 @@ const statusConfig: Record<
   },
   generating_segments: {
     label: "Generating segments...",
-    badgeClass: "bg-blue-500/10 text-blue-400",
-  },
-  generating_video: {
-    label: "Generating video...",
-    badgeClass: "bg-blue-500/10 text-blue-400",
-  },
-  stitching: {
-    label: "Assembling videos...",
     badgeClass: "bg-blue-500/10 text-blue-400",
   },
   completed: {
@@ -100,49 +83,23 @@ interface PipelineStage {
 const pipelineStages: PipelineStage[] = [
   {
     key: "scripting",
-    label: "Writing Scripts",
+    label: "Writing Script & POV Image",
     icon: <FileText className="size-4" />,
-    activeStatuses: ["pending", "scripting"],
-    doneStatuses: [
-      "content_ready",
-      "submitting_jobs",
-      "generating_segments",
-      "generating_video",
-      "stitching",
-      "completed",
-    ],
-  },
-  {
-    key: "image",
-    label: "Generating POV Image",
-    icon: <ImageIcon className="size-4" />,
     activeStatuses: ["scripting"],
-    doneStatuses: [
-      "content_ready",
-      "submitting_jobs",
-      "generating_segments",
-      "generating_video",
-      "stitching",
-      "completed",
-    ],
+    doneStatuses: ["submitting_jobs", "generating_segments", "completed"],
   },
   {
     key: "submitting",
     label: "Submitting Video Jobs",
     icon: <Send className="size-4" />,
     activeStatuses: ["submitting_jobs"],
-    doneStatuses: [
-      "generating_segments",
-      "generating_video",
-      "stitching",
-      "completed",
-    ],
+    doneStatuses: ["generating_segments", "completed"],
   },
   {
     key: "segments",
     label: "Generating Video Segments",
     icon: <Video className="size-4" />,
-    activeStatuses: ["generating_segments", "generating_video", "stitching"],
+    activeStatuses: ["generating_segments"],
     doneStatuses: ["completed"],
   },
   {
@@ -551,8 +508,8 @@ export default function GenerationDetailPage() {
   const [selectedBody, setSelectedBody] = useState(0);
   const [selectedCta, setSelectedCta] = useState(0);
 
-  const status = (gen?.status as GenerationStatus) ?? "pending";
-  const config = statusConfig[status] ?? statusConfig.pending;
+  const status = (gen?.status as GenerationStatus) ?? "scripting";
+  const config = statusConfig[status] ?? statusConfig.scripting;
   const isComplete = status === "completed";
   const isFailed = status === "failed";
   const isProcessing = !isComplete && !isFailed;
@@ -1106,7 +1063,7 @@ export default function GenerationDetailPage() {
             <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 px-4 py-3">
               <Clock className="size-4 shrink-0 text-amber-400" />
               <p className="text-sm text-amber-400">
-                Your 9 credits have been refunded to your account.
+                Your credits have been refunded to your account.
               </p>
             </div>
 
