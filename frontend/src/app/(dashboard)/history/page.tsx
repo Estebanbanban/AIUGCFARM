@@ -32,15 +32,12 @@ import type { GenerationStatus } from "@/types/database";
 /*  Status helpers                                                            */
 /* -------------------------------------------------------------------------- */
 
-const statusColors: Record<string, string> = {
-  completed: "bg-emerald-500/10 text-emerald-400",
-  generating_segments: "bg-blue-500/10 text-blue-400",
-  generating_video: "bg-amber-500/10 text-amber-400",
-  content_ready: "bg-violet-500/10 text-violet-400",
+const statusColors: Record<GenerationStatus, string> = {
   scripting: "bg-amber-500/10 text-amber-400",
-  stitching: "bg-amber-500/10 text-amber-400",
+  submitting_jobs: "bg-violet-500/10 text-violet-400",
+  generating_segments: "bg-blue-500/10 text-blue-400",
+  completed: "bg-emerald-500/10 text-emerald-400",
   failed: "bg-red-500/10 text-red-400",
-  pending: "bg-zinc-500/10 text-zinc-400",
 };
 
 function statusLabel(status: string): string {
@@ -49,8 +46,6 @@ function statusLabel(status: string): string {
       return "Completed";
     case "failed":
       return "Failed";
-    case "pending":
-      return "Pending";
     default:
       return "In Progress";
   }

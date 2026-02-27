@@ -35,19 +35,16 @@ import { useGenerations, type GenerationWithRelations } from "@/hooks/use-genera
 import { usePersonas } from "@/hooks/use-personas";
 import type { GenerationStatus } from "@/types/database";
 
-const statusColors: Record<string, string> = {
-  completed: "bg-emerald-500/10 text-emerald-400",
+const statusColors: Record<GenerationStatus, string> = {
+  scripting: "bg-amber-500/10 text-amber-400",
   submitting_jobs: "bg-violet-500/10 text-violet-400",
   generating_segments: "bg-blue-500/10 text-blue-400",
-  generating_image: "bg-amber-500/10 text-amber-400",
-  scripting: "bg-amber-500/10 text-amber-400",
+  completed: "bg-emerald-500/10 text-emerald-400",
   failed: "bg-red-500/10 text-red-400",
-  pending: "bg-zinc-500/10 text-zinc-400",
 };
 
 function statusLabel(status: GenerationStatus): string {
-  if (status === "completed" || status === "failed" || status === "pending")
-    return status;
+  if (status === "completed" || status === "failed") return status;
   return "In Progress";
 }
 

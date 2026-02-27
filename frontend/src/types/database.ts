@@ -127,13 +127,9 @@ export interface GenerationVideo {
 }
 
 export type GenerationStatus =
-  | "pending"
   | "scripting"
-  | "content_ready"
   | "submitting_jobs"
   | "generating_segments"
-  | "generating_video"
-  | "stitching"
   | "completed"
   | "failed";
 
