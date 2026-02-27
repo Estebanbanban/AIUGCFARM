@@ -5,7 +5,7 @@ import { getAdminClient } from "../_shared/supabase.ts";
 import { withRetry } from "../_shared/retry.ts";
 import { callOpenRouter } from "../_shared/openrouter.ts";
 
-const NANOBANANA_API_KEY = Deno.env.get("NANOBANANA_API_KEY")!;
+const NANOBANANA_API_KEY = Deno.env.get("NANOBANANA_API_KEY");
 const NANOBANANA_BASE_URL =
   Deno.env.get("NANOBANANA_BASE_URL") || "https://api.nanobanana.com/v1";
 
@@ -247,6 +247,10 @@ async function generateScenePrompt(
 
 /** Call NanoBanana API to generate persona images (with retry). */
 async function generateImages(prompt: string): Promise<string[]> {
+  if (!NANOBANANA_API_KEY) {
+    throw new Error("NANOBANANA_API_KEY is not configured");
+  }
+
   return withRetry(async () => {
     const res = await fetch(`${NANOBANANA_BASE_URL}/images/generate`, {
       method: "POST",
@@ -264,7 +268,7 @@ async function generateImages(prompt: string): Promise<string[]> {
     });
 
     if (!res.ok) {
-      const errText = await res.text();
+      const errText = (await res.text()).slice(0, 500);
       throw new Error(`NanoBanana image generation failed (${res.status}): ${errText}`);
     }
 
@@ -450,7 +454,19 @@ Deno.serve(async (req: Request) => {
     if (msg === "Unauthorized") {
       return json({ detail: "Authentication required" }, cors, 401);
     }
+
+    // Return actionable messages for known upstream/config failures so the UI
+    // can show the real cause instead of a generic 500.
+    if (
+      msg.includes("NANOBANANA_API_KEY") ||
+      msg.includes("NanoBanana") ||
+      msg.includes("OpenRouter")
+    ) {
+      console.error("generate-persona upstream/config error:", e);
+      return json({ detail: msg }, cors, 502);
+    }
+
     console.error("generate-persona error:", e);
-    return json({ detail: "Failed to generate persona. Please try again." }, cors, 500);
+    return json({ detail: msg || "Failed to generate persona. Please try again." }, cors, 500);
   }
 });
