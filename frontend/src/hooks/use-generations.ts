@@ -76,6 +76,7 @@ export function useGenerateCompositeImages() {
     }) => {
       const res = await callEdge<CompositeImagesResponse>("generate-composite-images", {
         body: input,
+        timeoutMs: 180_000,
       });
       return res.data;
     },
@@ -92,6 +93,7 @@ export function useEditCompositeImage() {
     }) => {
       const res = await callEdge<EditCompositeImageResponse>("edit-composite-image", {
         body: input,
+        timeoutMs: 180_000,
       });
       return res.data;
     },

@@ -3,6 +3,32 @@ import { createBrowserClient } from "@supabase/ssr";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const EDGE_URL = `${supabaseUrl}/functions/v1`;
+const DEFAULT_TIMEOUT_MS = 120_000;
+
+function isAbortError(err: unknown): boolean {
+  return (
+    err instanceof DOMException
+      ? err.name === "AbortError"
+      : typeof err === "object" &&
+        err !== null &&
+        "name" in err &&
+        (err as { name?: string }).name === "AbortError"
+  );
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs: number
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 async function parseEdgeError(res: Response): Promise<string> {
   const json = await res.json().catch(() => null);
@@ -18,7 +44,7 @@ async function parseEdgeError(res: Response): Promise<string> {
 
 export async function callEdge<T>(
   fn: string,
-  options: { method?: string; body?: unknown } = {}
+  options: { method?: string; body?: unknown; timeoutMs?: number } = {}
 ): Promise<T> {
   const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
 
@@ -43,8 +69,9 @@ export async function callEdge<T>(
 
   if (!session) throw new Error("Authentication required. Please sign in again.");
 
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const makeRequest = (accessToken: string) =>
-    fetch(`${EDGE_URL}/${fn}`, {
+    fetchWithTimeout(`${EDGE_URL}/${fn}`, {
       method: options.method || "POST",
       mode: "cors",
       credentials: "omit",
@@ -54,15 +81,34 @@ export async function callEdge<T>(
         Authorization: `Bearer ${accessToken}`,
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
-    });
+    }, timeoutMs);
 
-  let res = await makeRequest(session.access_token);
+  let res: Response;
+  try {
+    res = await makeRequest(session.access_token);
+  } catch (err) {
+    if (isAbortError(err)) {
+      throw new Error(
+        `Request timed out after ${Math.round(timeoutMs / 1000)}s. Please try again.`
+      );
+    }
+    throw err;
+  }
 
   if (res.status === 401) {
     const refreshed = await supabase.auth.refreshSession();
     const retrySession = refreshed.data.session;
     if (retrySession?.access_token) {
-      res = await makeRequest(retrySession.access_token);
+      try {
+        res = await makeRequest(retrySession.access_token);
+      } catch (err) {
+        if (isAbortError(err)) {
+          throw new Error(
+            `Request timed out after ${Math.round(timeoutMs / 1000)}s. Please try again.`
+          );
+        }
+        throw err;
+      }
     }
   }
 
@@ -75,7 +121,7 @@ export async function callEdge<T>(
 /** Public Edge Function call, no auth required, but attaches token if available for higher rate limits */
 export async function callEdgePublic<T>(
   fn: string,
-  options: { method?: string; body?: unknown } = {}
+  options: { method?: string; body?: unknown; timeoutMs?: number } = {}
 ): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   headers.apikey = supabaseAnonKey;
@@ -86,13 +132,28 @@ export async function callEdgePublic<T>(
     if (session) headers.Authorization = `Bearer ${session.access_token}`;
   } catch { /* no auth available */ }
 
-  const res = await fetch(`${EDGE_URL}/${fn}`, {
-    method: options.method || "POST",
-    mode: "cors",
-    credentials: "omit",
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(
+      `${EDGE_URL}/${fn}`,
+      {
+        method: options.method || "POST",
+        mode: "cors",
+        credentials: "omit",
+        headers,
+        body: options.body ? JSON.stringify(options.body) : undefined,
+      },
+      timeoutMs
+    );
+  } catch (err) {
+    if (isAbortError(err)) {
+      throw new Error(
+        `Request timed out after ${Math.round(timeoutMs / 1000)}s. Please try again.`
+      );
+    }
+    throw err;
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Unknown error" }));
@@ -104,7 +165,8 @@ export async function callEdgePublic<T>(
 /** Multipart form data upload, requires auth */
 export async function callEdgeMultipart<T>(
   fn: string,
-  formData: FormData
+  formData: FormData,
+  timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<T> {
   const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
 
@@ -119,16 +181,30 @@ export async function callEdgeMultipart<T>(
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Not authenticated");
 
-  const res = await fetch(`${EDGE_URL}/${fn}`, {
-    method: "POST",
-    mode: "cors",
-    credentials: "omit",
-    headers: {
-      apikey: supabaseAnonKey,
-      Authorization: `Bearer ${session.access_token}`,
-    },
-    body: formData,
-  });
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(
+      `${EDGE_URL}/${fn}`,
+      {
+        method: "POST",
+        mode: "cors",
+        credentials: "omit",
+        headers: {
+          apikey: supabaseAnonKey,
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: formData,
+      },
+      timeoutMs
+    );
+  } catch (err) {
+    if (isAbortError(err)) {
+      throw new Error(
+        `Request timed out after ${Math.round(timeoutMs / 1000)}s. Please try again.`
+      );
+    }
+    throw err;
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Unknown error" }));

@@ -85,7 +85,7 @@ Deno.serve(async (req: Request) => {
       ?.scene_prompt as string | undefined;
 
     // Generate COMPOSITE_COUNT composites — staggered to avoid Gemini 500 bursts.
-    // withRetry uses 5 attempts with 1s base delay (1s, 2s, 4s, 8s) per composite.
+    // Keep retries bounded so the caller never waits indefinitely.
     const staggeredTasks = Array.from({ length: COMPOSITE_COUNT }, (_, i) =>
       new Promise<Awaited<ReturnType<typeof generateCompositeFromImages>>>((resolve, reject) => {
         setTimeout(() => {
@@ -96,8 +96,8 @@ Deno.serve(async (req: Request) => {
               scenePrompt,
               format as "9:16" | "16:9",
             ),
-            5,   // attempts
-            1000, // 1s base → 1s, 2s, 4s, 8s between retries
+            3,   // attempts
+            1000, // 1s base → 1s, 2s between retries
           ).then(resolve).catch(reject);
         }, i * 500); // stagger each by 500ms
       })

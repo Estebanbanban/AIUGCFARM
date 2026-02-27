@@ -21,6 +21,7 @@ const GEMINI_API_KEY = Deno.env.get("NANOBANANA_API_KEY");
 // Docs: https://ai.google.dev/gemini-api/docs/image-generation
 const GEMINI_MODEL = "gemini-3.1-flash-image-preview";
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
+const GEMINI_FETCH_TIMEOUT_MS = 45_000;
 
 export interface GeneratedImage {
   data: Uint8Array;
@@ -32,9 +33,30 @@ function endpoint(): string {
   return `${GEMINI_BASE}/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 }
 
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  timeoutMs = GEMINI_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (
+      err instanceof DOMException && err.name === "AbortError"
+    ) {
+      throw new Error(`Gemini request timed out after ${Math.round(timeoutMs / 1000)}s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 /** Call Gemini with a text prompt, return a single generated image. */
 async function generateSingleImage(prompt: string): Promise<GeneratedImage> {
-  const res = await fetch(endpoint(), {
+  const res = await fetchWithTimeout(endpoint(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -85,8 +107,8 @@ export async function generateCompositeFromImages(
   aspectRatio: "9:16" | "16:9" = "9:16",
 ): Promise<GeneratedImage> {
   const [personRes, productRes] = await Promise.all([
-    fetch(personImageUrl),
-    fetch(productImageUrl),
+    fetchWithTimeout(personImageUrl, undefined, 20_000),
+    fetchWithTimeout(productImageUrl, undefined, 20_000),
   ]);
 
   if (!personRes.ok) throw new Error(`Failed to download persona image: ${personRes.status}`);
@@ -113,7 +135,7 @@ export async function generateCompositeFromImages(
     ? `${framingRule} ${scenePrompt} The person is filming themselves POV-style (arm extended, front-camera angle, slight wide-angle distortion), naturally holding and showcasing the product which is clearly visible in frame. iPhone selfie aesthetic, talking-to-camera energy. ${formatHint}`
     : `${framingRule} UGC phone selfie: extreme close-up POV, front-camera angle, arm extended at selfie distance, slight wide-angle distortion. The person looks directly into the lens while naturally holding the product near their upper chest — the product is clearly visible in frame. Natural window lighting, authentic imperfections, talking-to-camera energy. ${formatHint}`;
 
-  const res = await fetch(endpoint(), {
+  const res = await fetchWithTimeout(endpoint(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -159,7 +181,7 @@ export async function editCompositeFromReference(
   editPrompt: string,
   aspectRatio: "9:16" | "16:9" = "9:16",
 ): Promise<GeneratedImage> {
-  const refRes = await fetch(referenceImageUrl);
+  const refRes = await fetchWithTimeout(referenceImageUrl, undefined, 20_000);
   if (!refRes.ok) {
     throw new Error(`Failed to download reference image: ${refRes.status}`);
   }
@@ -181,7 +203,7 @@ export async function editCompositeFromReference(
     formatHint,
   ].join(" ");
 
-  const res = await fetch(endpoint(), {
+  const res = await fetchWithTimeout(endpoint(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

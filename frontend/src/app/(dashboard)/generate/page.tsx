@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -187,6 +187,9 @@ export default function GeneratePage() {
   >([]);
   const [selectedCompositeIdx, setSelectedCompositeIdx] = useState<number | null>(null);
   const [previewEditPrompt, setPreviewEditPrompt] = useState("");
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewWaitSeconds, setPreviewWaitSeconds] = useState(0);
+  const previewRequestRef = useRef(0);
 
   const { data: products, isLoading: productsLoading } = useProducts();
   const productImageMap = useResolvedProductImages(products);
@@ -357,27 +360,44 @@ export default function GeneratePage() {
 
   async function handleGenerateComposites() {
     if (!store.productId || !store.personaId) return;
+    const requestId = ++previewRequestRef.current;
     setCompositeImages([]);
     setSelectedCompositeIdx(null);
     store.setCompositeImagePath(null);
     setPreviewEditPrompt("");
+    setPreviewError(null);
+    setPreviewWaitSeconds(0);
 
     generateComposites.mutate(
       { product_id: store.productId, persona_id: store.personaId, format: store.format },
       {
         onSuccess: (result) => {
+          if (requestId !== previewRequestRef.current) return;
           setCompositeImages(result.images);
         },
         onError: (err) => {
-          toast.error(err.message || "Failed to generate preview images");
+          if (requestId !== previewRequestRef.current) return;
+          const message = err.message || "Failed to generate preview images";
+          setPreviewError(message);
+          toast.error(message);
         },
       },
     );
   }
 
+  function handleRetryCompositesNow() {
+    if (!store.productId || !store.personaId) return;
+    // Invalidate callbacks from any in-flight older request, then start a fresh one.
+    previewRequestRef.current += 1;
+    generateComposites.reset();
+    toast.info("Retrying preview generation...");
+    void handleGenerateComposites();
+  }
+
   function handleSelectComposite(idx: number) {
     setSelectedCompositeIdx(idx);
     store.setCompositeImagePath(compositeImages[idx].path);
+    setPreviewError(null);
   }
 
   function handleApplyPreviewEdit() {
@@ -404,6 +424,18 @@ export default function GeneratePage() {
       },
     );
   }
+
+  useEffect(() => {
+    if (!generateComposites.isPending) {
+      setPreviewWaitSeconds(0);
+      return;
+    }
+    const start = Date.now();
+    const interval = setInterval(() => {
+      setPreviewWaitSeconds(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [generateComposites.isPending]);
 
   // ── Generation ───────────────────────────────────────────────────────────
 
@@ -790,6 +822,21 @@ export default function GeneratePage() {
                     <Loader2 className="size-10 animate-spin text-primary" />
                     <p className="text-base font-medium">Generating preview images…</p>
                     <p className="text-sm text-muted-foreground">This usually takes 20–40 seconds</p>
+                    {previewWaitSeconds >= 45 && (
+                      <div className="mt-2 flex flex-col items-center gap-3">
+                        <p className="max-w-sm text-center text-xs text-muted-foreground">
+                          This is taking longer than expected. You can retry now.
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleRetryCompositesNow}
+                        >
+                          <RefreshCw className="size-3.5" />
+                          Retry Now
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <>
@@ -843,6 +890,9 @@ export default function GeneratePage() {
                       <ImageIcon className="size-4" />
                       Generate Preview Images
                     </Button>
+                    {previewError && (
+                      <p className="text-sm text-destructive">{previewError}</p>
+                    )}
                   </>
                 )}
               </div>
