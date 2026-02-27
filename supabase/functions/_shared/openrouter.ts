@@ -1,5 +1,5 @@
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
-const OPENROUTER_MODEL = "openai/gpt-oss-120b";
+const OPENROUTER_MODEL = "openai/gpt-4o-mini";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 interface ChatMessage {
@@ -43,7 +43,11 @@ export async function callOpenRouter(
     }
 
     const body = await res.json();
-    return body.choices[0].message.content;
+    const content = body?.choices?.[0]?.message?.content;
+    if (typeof content !== "string") {
+      throw new Error(`OpenRouter returned unexpected response: ${JSON.stringify(body).slice(0, 200)}`);
+    }
+    return content;
   } finally {
     clearTimeout(timeout);
   }

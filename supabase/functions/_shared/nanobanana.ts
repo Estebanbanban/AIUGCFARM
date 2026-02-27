@@ -1,166 +1,140 @@
 /**
- * NanoBanana API helper.
+ * NanoBanana (Google Gemini image generation) helper.
  *
- * Handles both synchronous responses ({ images: [{ url }] })
- * and asynchronous job responses ({ taskId }) with polling.
- *
- * Base URL env: NANOBANANA_BASE_URL (default: https://api.nanobanana.com/v1)
- * Auth env:     NANOBANANA_API_KEY
+ * NanoBanana 2 = gemini-3.1-flash-image-preview
+ * API key env:  NANOBANANA_API_KEY (Google Gemini API key)
+ * API docs:     https://ai.google.dev/gemini-api/docs/image-generation
  */
 
-const NANOBANANA_API_KEY = Deno.env.get("NANOBANANA_API_KEY");
-const NANOBANANA_BASE_URL =
-  Deno.env.get("NANOBANANA_BASE_URL") || "https://api.nanobanana.com/v1";
-
-/** Poll interval and max wait */
-const POLL_INTERVAL_MS = 4000;
-const MAX_POLL_ATTEMPTS = 30; // ~2 minutes
-
-function authHeaders(): Record<string, string> {
-  if (!NANOBANANA_API_KEY) throw new Error("NANOBANANA_API_KEY is not configured");
-  return {
-    Authorization: `Bearer ${NANOBANANA_API_KEY}`,
-    "Content-Type": "application/json",
-  };
+/** Safely convert a large Uint8Array to base64 without hitting call-stack limits. */
+function uint8ArrayToBase64(buf: Uint8Array): string {
+  const chunkSize = 8192;
+  const chunks: string[] = [];
+  for (let i = 0; i < buf.length; i += chunkSize) {
+    chunks.push(String.fromCharCode(...buf.subarray(i, i + chunkSize)));
+  }
+  return btoa(chunks.join(""));
 }
 
-/** Poll /record-info (or /generate/status) until done, return image URLs. */
-async function pollForImages(taskId: string): Promise<string[]> {
-  // Try both common polling endpoint patterns
-  const pollUrl = `${NANOBANANA_BASE_URL}/generate/status?taskId=${taskId}`;
-  const altPollUrl = `${NANOBANANA_BASE_URL.replace(/\/v1$/, "")}/api/v1/nanobanana/record-info?taskId=${taskId}`;
+const GEMINI_API_KEY = Deno.env.get("NANOBANANA_API_KEY");
+// NanoBanana 2 image generation model (Gemini API)
+// Docs: https://ai.google.dev/gemini-api/docs/image-generation
+const GEMINI_MODEL = "gemini-3.1-flash-image-preview";
+const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
-  for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {
-    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-
-    // Try primary poll URL
-    const res = await fetch(pollUrl, {
-      headers: { Authorization: `Bearer ${NANOBANANA_API_KEY}` },
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-
-      // successFlag: 1 = done, 2/3 = failed
-      if (data.successFlag === 1) {
-        const urls: string[] = data.imageUrls ?? data.images?.map((img: { url: string }) => img.url) ?? [];
-        if (urls.length > 0) return urls;
-      }
-      if (data.successFlag === 2 || data.successFlag === 3) {
-        throw new Error(`NanoBanana generation failed: ${JSON.stringify(data).slice(0, 200)}`);
-      }
-
-      // status-based response (status: "completed" / "pending")
-      if (data.status === "completed") {
-        const urls: string[] = data.imageUrls ?? data.images?.map((img: { url: string }) => img.url) ?? [];
-        if (urls.length > 0) return urls;
-      }
-      if (data.status === "failed") {
-        throw new Error(`NanoBanana generation failed: ${JSON.stringify(data).slice(0, 200)}`);
-      }
-      // Still pending → keep polling
-    } else {
-      // Try alt URL on next iteration if primary fails
-      const altRes = await fetch(altPollUrl, {
-        headers: { Authorization: `Bearer ${NANOBANANA_API_KEY}` },
-      });
-      if (altRes.ok) {
-        const data = await altRes.json();
-        if (data.successFlag === 1) {
-          const urls: string[] = data.imageUrls ?? [];
-          if (urls.length > 0) return urls;
-        }
-      }
-    }
-  }
-  throw new Error(`NanoBanana timed out after ${(MAX_POLL_ATTEMPTS * POLL_INTERVAL_MS) / 1000}s`);
+export interface GeneratedImage {
+  data: Uint8Array;
+  mimeType: string; // e.g. "image/png"
 }
 
-/**
- * Resolve a NanoBanana response to image URLs.
- * Handles sync ({ images }) and async ({ taskId }) responses.
- */
-async function resolveImages(data: Record<string, unknown>): Promise<string[]> {
-  // Synchronous response: images returned directly
-  if (Array.isArray(data.images) && (data.images as unknown[]).length > 0) {
-    return (data.images as { url: string }[]).map((img) => img.url);
-  }
-  if (Array.isArray(data.imageUrls) && (data.imageUrls as unknown[]).length > 0) {
-    return data.imageUrls as string[];
-  }
-
-  // Async response: poll for result
-  const taskId = (data.taskId ?? data.task_id) as string | undefined;
-  if (taskId) return pollForImages(taskId);
-
-  throw new Error(`NanoBanana returned no images or taskId: ${JSON.stringify(data).slice(0, 200)}`);
+function endpoint(): string {
+  if (!GEMINI_API_KEY) throw new Error("NANOBANANA_API_KEY (Gemini API key) is not configured");
+  return `${GEMINI_BASE}/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 }
 
-/**
- * Generate N images from a text prompt.
- */
-export async function generateImagesFromPrompt(
-  prompt: string,
-  imageCount = 4,
-): Promise<string[]> {
-  const res = await fetch(`${NANOBANANA_BASE_URL}/images/generate`, {
+/** Call Gemini with a text prompt, return a single generated image. */
+async function generateSingleImage(prompt: string): Promise<GeneratedImage> {
+  const res = await fetch(endpoint(), {
     method: "POST",
-    headers: authHeaders(),
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      prompt,
-      num_images: imageCount,
-      // Also include async-style params in case the API uses them
-      generationType: "TEXTTOIMAGE",
-      imageCount,
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseModalities: ["IMAGE"] },
     }),
   });
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`NanoBanana generate failed (${res.status}): ${err.slice(0, 300)}`);
+    throw new Error(`Gemini image generation failed (${res.status}): ${err.slice(0, 300)}`);
   }
 
-  return resolveImages(await res.json());
+  const data = await res.json();
+  const parts: { text?: string; inlineData?: { mimeType: string; data: string } }[] =
+    data.candidates?.[0]?.content?.parts ?? [];
+
+  const imagePart = parts.find((p) => p.inlineData);
+  if (!imagePart?.inlineData) {
+    throw new Error(`Gemini returned no image. Response: ${JSON.stringify(data).slice(0, 300)}`);
+  }
+
+  const { mimeType, data: b64 } = imagePart.inlineData;
+  const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  return { data: binary, mimeType };
 }
 
 /**
- * Generate a composite image: persona + product.
+ * Generate `count` images from a text prompt in parallel.
+ * Returns raw image buffers — caller uploads to storage.
+ */
+export async function generateImagesFromPrompt(
+  prompt: string,
+  count = 4,
+): Promise<GeneratedImage[]> {
+  return Promise.all(Array.from({ length: count }, () => generateSingleImage(prompt)));
+}
+
+/**
+ * Generate a composite image (persona + product) for video generation.
+ * Downloads both source images, sends to Gemini as multimodal input.
+ * Returns raw image buffer.
  */
 export async function generateCompositeFromImages(
   personImageUrl: string,
   productImageUrl: string,
-  prompt?: string,
-): Promise<string> {
-  const compositePrompt = prompt ??
-    "Person naturally holding and showcasing the product, UGC-style talking-to-camera selfie, authentic, natural lighting";
+  scenePrompt?: string,
+): Promise<GeneratedImage> {
+  const [personRes, productRes] = await Promise.all([
+    fetch(personImageUrl),
+    fetch(productImageUrl),
+  ]);
 
-  const res = await fetch(`${NANOBANANA_BASE_URL}/images/composite`, {
+  if (!personRes.ok) throw new Error(`Failed to download persona image: ${personRes.status}`);
+  if (!productRes.ok) throw new Error(`Failed to download product image: ${productRes.status}`);
+
+  const [personBuf, productBuf] = await Promise.all([
+    personRes.arrayBuffer(),
+    productRes.arrayBuffer(),
+  ]);
+
+  const personB64 = uint8ArrayToBase64(new Uint8Array(personBuf));
+  const productB64 = uint8ArrayToBase64(new Uint8Array(productBuf));
+  const personMime = personRes.headers.get("content-type") || "image/jpeg";
+  const productMime = productRes.headers.get("content-type") || "image/jpeg";
+
+  const compositePrompt = scenePrompt
+    ? `${scenePrompt} The person is naturally holding and showcasing the product, which is clearly visible in frame. Composite the person and product naturally in a UGC selfie-style image.`
+    : "Create a UGC-style composite image of this person naturally holding and using this product while talking to camera. Natural lighting, authentic, selfie aesthetic.";
+
+  const res = await fetch(endpoint(), {
     method: "POST",
-    headers: authHeaders(),
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      person_image_url: personImageUrl,
-      product_image_url: productImageUrl,
-      prompt: compositePrompt,
-      style: "ugc_natural",
-      // Async-style params
-      generationType: "IMAGETOIMAGE",
-      imageCount: 1,
-      personImage: personImageUrl,
-      productImage: productImageUrl,
+      contents: [{
+        parts: [
+          { text: compositePrompt },
+          { inlineData: { mimeType: personMime, data: personB64 } },
+          { inlineData: { mimeType: productMime, data: productB64 } },
+        ],
+      }],
+      generationConfig: { responseModalities: ["IMAGE"] },
     }),
   });
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`NanoBanana composite failed (${res.status}): ${err.slice(0, 300)}`);
+    throw new Error(`Gemini composite generation failed (${res.status}): ${err.slice(0, 300)}`);
   }
 
   const data = await res.json();
+  const parts: { text?: string; inlineData?: { mimeType: string; data: string } }[] =
+    data.candidates?.[0]?.content?.parts ?? [];
 
-  // Sync: { image_url: string }
-  if (typeof data.image_url === "string") return data.image_url;
+  const imagePart = parts.find((p) => p.inlineData);
+  if (!imagePart?.inlineData) {
+    throw new Error(`Gemini returned no composite image. Response: ${JSON.stringify(data).slice(0, 300)}`);
+  }
 
-  const urls = await resolveImages(data);
-  if (!urls[0]) throw new Error("NanoBanana returned no composite image URL");
-  return urls[0];
+  const { mimeType, data: b64 } = imagePart.inlineData;
+  const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  return { data: binary, mimeType };
 }
