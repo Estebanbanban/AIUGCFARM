@@ -3,6 +3,7 @@
 import { Link, Upload, Clapperboard } from "lucide-react";
 import { FadeInUp, StaggerContainer, staggerItem } from "@/lib/motion";
 import { motion } from "framer-motion";
+import Image from "next/image";
 
 const steps = [
   {
@@ -11,6 +12,10 @@ const steps = [
     title: "Paste URL",
     description:
       "Drop any product or store URL. We import everything — name, images, price, description — in seconds.",
+    mediaType: "image" as const,
+    mediaSrc:
+      "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&w=1200&q=80",
+    mediaAlt: "Online fashion store products",
   },
   {
     number: "02",
@@ -18,6 +23,10 @@ const steps = [
     title: "Build Persona",
     description:
       "Define your AI spokesperson with 9 brand attributes. Tone, energy, style — saved and reused forever.",
+    mediaType: "image" as const,
+    mediaSrc:
+      "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=1200&q=80",
+    mediaAlt: "Creator portrait for persona generation",
   },
   {
     number: "03",
@@ -25,6 +34,10 @@ const steps = [
     title: "Generate & Mix",
     description:
       "AI writes Hook/Body/CTA scripts and generates video. Mix 3 segments into 27 unique combinations. Download MP4s.",
+    mediaType: "video" as const,
+    mediaSrc:
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+    mediaAlt: "Generated video ad preview",
   },
 ];
 
@@ -53,6 +66,29 @@ export function HowItWorksSection() {
                 {/* Step number circle */}
                 <div className="flex items-center justify-center w-10 h-10 rounded-full border border-primary/30 mb-5">
                   <span className="text-primary font-mono text-xs font-bold">{step.number}</span>
+                </div>
+
+                <div className="relative w-full max-w-[280px] md:max-w-none aspect-[16/10] rounded-xl border border-[#1f1f1f] overflow-hidden mb-5 bg-[#0f0f0f]">
+                  {step.mediaType === "image" ? (
+                    <Image
+                      src={step.mediaSrc}
+                      alt={step.mediaAlt}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 90vw, 28vw"
+                    />
+                  ) : (
+                    <video
+                      className="h-full w-full object-cover"
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      preload="none"
+                    >
+                      <source src={step.mediaSrc} type="video/mp4" />
+                    </video>
+                  )}
                 </div>
 
                 {/* Icon */}
