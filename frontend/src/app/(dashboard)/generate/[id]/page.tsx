@@ -46,6 +46,10 @@ const statusConfig: Record<
   GenerationStatus,
   { label: string; badgeClass: string }
 > = {
+  pending: {
+    label: "Starting...",
+    badgeClass: "bg-zinc-500/10 text-zinc-400",
+  },
   scripting: {
     label: "Writing scripts...",
     badgeClass: "bg-amber-500/10 text-amber-400",
