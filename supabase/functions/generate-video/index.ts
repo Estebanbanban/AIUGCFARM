@@ -11,7 +11,8 @@ const NANOBANANA_API_KEY = Deno.env.get("NANOBANANA_API_KEY")!;
 const NANOBANANA_BASE_URL =
   Deno.env.get("NANOBANANA_BASE_URL") || "https://api.nanobanana.com/v1";
 
-const BATCH_COST = 9; // 3 hooks + 3 bodies + 3 CTAs
+const SINGLE_COST = 3; // 1 hook + 1 body + 1 CTA
+const BATCH_COST = 9;  // 3 hooks + 3 bodies + 3 CTAs
 
 // ── Script types ──────────────────────────────────────────────────────
 
@@ -29,21 +30,24 @@ interface GeneratedScript {
 
 // ── Script generation via OpenRouter ──────────────────────────────────
 
-const SCRIPT_SYSTEM_PROMPT = `You are an expert UGC (User-Generated Content) ad scriptwriter for e-commerce brands.
+function buildSystemPrompt(count: number): string {
+  const plural = count > 1 ? "s" : "";
+  return `You are an expert UGC (User-Generated Content) ad scriptwriter for e-commerce brands.
 Write scripts in first-person, casual, authentic tone — as if a real person is speaking directly to camera.
 Write SPOKEN DIALOGUE ONLY. No stage directions, no camera notes.
 
 Generate:
-- 3 HOOK variants (3-5 seconds each, ~2.5 words/second): Opening lines that stop the scroll. Each uses a DIFFERENT persuasion angle.
-- 3 BODY variants (5-10 seconds each): Product benefits and proof. Each uses a DIFFERENT angle.
-- 3 CTA variants (3-5 seconds each): Urgency-driven close. Each uses a DIFFERENT angle.
+- ${count} HOOK variant${plural} (3-5 seconds each, ~2.5 words/second): Opening line${plural} that stop the scroll.${count > 1 ? " Each uses a DIFFERENT persuasion angle." : ""}
+- ${count} BODY variant${plural} (5-10 seconds each): Product benefits and proof.${count > 1 ? " Each uses a DIFFERENT angle." : ""}
+- ${count} CTA variant${plural} (3-5 seconds each): Urgency-driven close.${count > 1 ? " Each uses a DIFFERENT angle." : ""}
 
-Return ONLY valid JSON matching this exact structure:
+Return ONLY valid JSON matching this exact structure (exactly ${count} item${plural} in each array):
 {
-  "hooks": [{ "text": "...", "duration_seconds": 5, "variant_label": "curiosity" }, ...],
-  "bodies": [{ "text": "...", "duration_seconds": 8, "variant_label": "benefits" }, ...],
-  "ctas": [{ "text": "...", "duration_seconds": 4, "variant_label": "urgency" }, ...]
+  "hooks": [{ "text": "...", "duration_seconds": 5, "variant_label": "curiosity" }${count > 1 ? ", ..." : ""}],
+  "bodies": [{ "text": "...", "duration_seconds": 8, "variant_label": "benefits" }${count > 1 ? ", ..." : ""}],
+  "ctas": [{ "text": "...", "duration_seconds": 4, "variant_label": "urgency" }${count > 1 ? ", ..." : ""}]
 }`;
+}
 
 function buildUserPrompt(product: Record<string, unknown>): string {
   const brandSummary = (product.brand_summary ?? {}) as Record<string, unknown>;
@@ -61,7 +65,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /** Validate and normalize the script structure returned by OpenRouter. */
-function validateScript(raw: unknown): GeneratedScript {
+function validateScript(raw: unknown, expectedCount: number): GeneratedScript {
   const obj = raw as Record<string, unknown>;
 
   if (
@@ -73,9 +77,13 @@ function validateScript(raw: unknown): GeneratedScript {
     throw new Error("Invalid script structure: missing hooks, bodies, or ctas array");
   }
 
-  if (obj.hooks.length !== 3 || obj.bodies.length !== 3 || obj.ctas.length !== 3) {
+  if (
+    obj.hooks.length !== expectedCount ||
+    obj.bodies.length !== expectedCount ||
+    obj.ctas.length !== expectedCount
+  ) {
     throw new Error(
-      "Invalid script structure: expected exactly 3 hooks, 3 bodies, and 3 ctas",
+      `Invalid script structure: expected exactly ${expectedCount} hooks, bodies, and ctas`,
     );
   }
 
@@ -109,14 +117,15 @@ function validateScript(raw: unknown): GeneratedScript {
 
 async function generateScript(
   product: Record<string, unknown>,
+  variantCount: number,
 ): Promise<GeneratedScript> {
   const rawContent = await withRetry(() =>
     callOpenRouter(
       [
-        { role: "system", content: SCRIPT_SYSTEM_PROMPT },
+        { role: "system", content: buildSystemPrompt(variantCount) },
         { role: "user", content: buildUserPrompt(product) },
       ],
-      { maxTokens: 1500, timeoutMs: 30000 },
+      { maxTokens: variantCount === 1 ? 600 : 1500, timeoutMs: 30000 },
     ),
   );
 
@@ -127,7 +136,7 @@ async function generateScript(
   }
 
   const parsed = JSON.parse(cleaned);
-  return validateScript(parsed);
+  return validateScript(parsed, variantCount);
 }
 
 // ── Composite image via NanoBanana ───────────────────────────────────
@@ -181,10 +190,12 @@ Deno.serve(async (req: Request) => {
     if (!product_id) return json({ detail: "product_id is required" }, cors, 400);
     if (!persona_id) return json({ detail: "persona_id is required" }, cors, 400);
 
-    const resolvedMode = mode || "easy";
-    if (resolvedMode !== "easy") {
-      return json({ detail: "Only 'easy' mode is supported" }, cors, 400);
+    const resolvedMode = mode || "single";
+    if (resolvedMode !== "single" && resolvedMode !== "triple") {
+      return json({ detail: "mode must be 'single' or 'triple'" }, cors, 400);
     }
+    const variantCount = resolvedMode === "single" ? 1 : 3;
+    const creditCost = resolvedMode === "single" ? SINGLE_COST : BATCH_COST;
 
     // ── 2. Verify product ownership (confirmed = true) ────────────
 
@@ -220,13 +231,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // ── 4. Check credits >= BATCH_COST ─────────────────────────────
+    // ── 4. Check credits ───────────────────────────────────────────
 
     const remaining = await checkCredits(userId);
-    if (remaining < BATCH_COST) {
+    if (remaining < creditCost) {
       return json(
         {
-          detail: `Insufficient credits. You need ${BATCH_COST} credits but have ${remaining}. Purchase more or upgrade your plan.`,
+          detail: `Insufficient credits. You need ${creditCost} credits but have ${remaining}. Purchase more or upgrade your plan.`,
         },
         cors,
         402,
@@ -255,7 +266,7 @@ Deno.serve(async (req: Request) => {
 
     // ── 6. Debit credits atomically ────────────────────────────────
 
-    await debitCredits(userId, BATCH_COST, generationId);
+    await debitCredits(userId, creditCost, generationId);
 
     try {
       // ── 7. Generate persona signed URL (storage path -> signed URL)
@@ -299,7 +310,7 @@ Deno.serve(async (req: Request) => {
       // ── 9. Run script + composite in parallel ────────────────────
 
       const [script, compositeExternalUrl] = await Promise.all([
-        generateScript(product),
+        generateScript(product, variantCount),
         withRetry(() =>
           generateCompositeImage(personaSignedUrl, resolvedProductImageUrl),
         ),
@@ -377,8 +388,7 @@ Deno.serve(async (req: Request) => {
               image_url: klingCompositeUrl.signedUrl,
               script: segment.text,
               duration: segment.duration_seconds,
-              aspect_ratio: "9:16",
-              mode: "standard",
+              mode: "std",
             })
           ).then((result) => [jobKey, result.job_id] as [string, string]);
         })
@@ -422,7 +432,7 @@ Deno.serve(async (req: Request) => {
 
       // Refund credits
       try {
-        await refundCredits(userId, BATCH_COST, generationId);
+        await refundCredits(userId, creditCost, generationId);
       } catch (refundErr) {
         console.error("Credit refund failed:", refundErr);
       }

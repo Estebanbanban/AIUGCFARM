@@ -13,7 +13,7 @@ import type {
 interface GenerationInput {
   product_id: string;
   persona_id: string;
-  mode: "easy" | "expert";
+  mode: "single" | "triple";
 }
 
 export function useGenerations() {

@@ -142,7 +142,7 @@ export interface Generation {
   owner_id: string;
   product_id: string;
   persona_id: string;
-  mode: "easy" | "expert";
+  mode: "single" | "triple";
   status: GenerationStatus;
   script: GenerationScript | null;
   composite_image_url: string | null;

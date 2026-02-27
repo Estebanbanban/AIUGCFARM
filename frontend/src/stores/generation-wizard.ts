@@ -5,11 +5,11 @@ interface GenerationWizardState {
   step: number;
   productId: string | null;
   personaId: string | null;
-  mode: "easy" | "expert";
+  mode: "single" | "triple";
   setStep: (step: number) => void;
   setProductId: (id: string) => void;
   setPersonaId: (id: string) => void;
-  setMode: (mode: "easy" | "expert") => void;
+  setMode: (mode: "single" | "triple") => void;
   reset: () => void;
 }
 
@@ -18,7 +18,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
     step: 1,
     productId: null,
     personaId: null,
-    mode: "easy",
+    mode: "single",
     setStep: (step) =>
       set((state) => {
         state.step = step;
@@ -40,7 +40,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
         step: 1,
         productId: null,
         personaId: null,
-        mode: "easy" as const,
+        mode: "single" as const,
       })),
   }))
 );
