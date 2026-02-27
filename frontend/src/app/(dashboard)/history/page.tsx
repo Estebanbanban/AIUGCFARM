@@ -47,7 +47,7 @@ function ResolvedImage({ path, alt, className }: { path: string; alt: string; cl
 
 const statusColors: Record<GenerationStatus, string> = {
   scripting: "bg-amber-500/10 text-amber-400",
-  submitting_jobs: "bg-violet-500/10 text-violet-400",
+  submitting_jobs: "bg-primary/10 text-primary",
   generating_segments: "bg-blue-500/10 text-blue-400",
   completed: "bg-emerald-500/10 text-emerald-400",
   failed: "bg-red-500/10 text-red-400",
@@ -120,8 +120,8 @@ export default function HistoryPage() {
       {!isLoading && !error && generations.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-12">
-            <div className="flex size-14 items-center justify-center rounded-full bg-violet-500/10">
-              <Sparkles className="size-7 text-violet-500" />
+            <div className="flex size-14 items-center justify-center rounded-full bg-primary/10">
+              <Sparkles className="size-7 text-primary" />
             </div>
             <div className="text-center">
               <h3 className="font-semibold text-foreground">
@@ -131,7 +131,7 @@ export default function HistoryPage() {
                 Start creating AI-powered video ads for your products.
               </p>
             </div>
-            <Button asChild className="bg-violet-600 hover:bg-violet-700">
+            <Button asChild className="bg-primary hover:bg-primary/90">
               <Link href="/generate">
                 <Sparkles className="size-4" />
                 Create Your First Video
@@ -151,7 +151,7 @@ export default function HistoryPage() {
                 href={`/generate/${gen.id}`}
                 className="group"
               >
-                <Card className="h-full transition-colors hover:border-violet-500/30">
+                <Card className="h-full transition-colors hover:border-primary/30">
                   <CardContent className="flex flex-col gap-3 py-5">
                     {/* Product & persona names */}
                     <div className="flex items-start gap-3">

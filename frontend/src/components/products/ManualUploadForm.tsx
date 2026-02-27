@@ -248,7 +248,7 @@ export function ManualUploadForm({ onSuccess }: ManualUploadFormProps) {
           onClick={() => fileInputRef.current?.click()}
           className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6 transition-colors ${
             isDragging
-              ? 'border-violet-500 bg-violet-500/5'
+              ? 'border-primary bg-primary/5'
               : 'border-muted-foreground/25 hover:border-muted-foreground/50'
           }`}
         >
@@ -299,7 +299,7 @@ export function ManualUploadForm({ onSuccess }: ManualUploadFormProps) {
       <Button
         type="submit"
         disabled={!name.trim() || isSubmitting}
-        className="bg-violet-600 hover:bg-violet-700"
+        className="bg-primary hover:bg-primary/90"
       >
         {isSubmitting ? (
           <>

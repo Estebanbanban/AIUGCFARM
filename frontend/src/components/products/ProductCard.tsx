@@ -56,7 +56,7 @@ export function ProductCard({ product, onDelete }: ProductCardProps) {
   return (
     <>
       <Link href={`/products/${product.id}`} className="group/card block">
-        <Card className="group h-full transition-colors hover:border-violet-500/30">
+        <Card className="group h-full transition-colors hover:border-primary/30">
           <CardContent className="flex flex-col gap-3">
             {/* Product Image */}
             <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-muted">

@@ -240,7 +240,7 @@ export default function ProductDetailPage({
               </Button>
               <Button
                 size="sm"
-                className="bg-violet-600 hover:bg-violet-700"
+                className="bg-primary hover:bg-primary/90"
                 onClick={handleSave}
                 disabled={updateProduct.isPending || !editName.trim()}
               >
@@ -319,7 +319,7 @@ export default function ProductDetailPage({
                   onClick={() => setSelectedImageIndex(i)}
                   className={`flex size-16 shrink-0 items-center justify-center rounded-md border-2 bg-muted overflow-hidden transition-colors ${
                     i === selectedImageIndex
-                      ? "border-violet-500"
+                      ? "border-primary"
                       : "border-transparent hover:border-muted-foreground/30"
                   }`}
                 >
@@ -415,7 +415,7 @@ export default function ProductDetailPage({
                 href={product.store_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-violet-500 hover:text-violet-400 transition-colors"
+                className="inline-flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
               >
                 <ExternalLink className="size-4" />
                 View in store

@@ -52,7 +52,7 @@ const statusConfig: Record<
   },
   submitting_jobs: {
     label: "Submitting video jobs...",
-    badgeClass: "bg-violet-500/10 text-violet-400",
+    badgeClass: "bg-primary/10 text-primary",
   },
   generating_segments: {
     label: "Generating segments...",
