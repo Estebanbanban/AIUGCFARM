@@ -323,7 +323,7 @@ function optionHumanPhotoUri(key: string) {
   return optionImageDataUri(key);
 }
 
-// Ethnicity placeholder styles and Unsplash reference photos
+// Ethnicity placeholder styles and local reference photos
 const ethnicityPlaceholderStyle: Record<string, React.CSSProperties> = {
   'White / Caucasian':   { background: 'linear-gradient(135deg,#fde8d8 0%,#f5c6a0 100%)' },
   'Black / African':     { background: 'linear-gradient(135deg,#3b1f0a 0%,#1c0f05 100%)' },
@@ -336,14 +336,14 @@ const ethnicityPlaceholderStyle: Record<string, React.CSSProperties> = {
 };
 
 const ethnicityImageSrc: Record<string, string> = {
-  'White / Caucasian':   'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=900&q=80',
-  'Black / African':     'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=900&q=80',
-  'East Asian':          'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=900&q=80',
-  'South Asian':         'https://images.unsplash.com/photo-1618641986557-1ecd230959aa?auto=format&fit=crop&w=900&q=80',
-  'Southeast Asian':     'https://images.unsplash.com/photo-1554151228-14d9def656e4?auto=format&fit=crop&w=900&q=80',
-  'Latino / Hispanic':   'https://images.unsplash.com/photo-1597223557154-721c1cecc4b0?auto=format&fit=crop&w=900&q=80',
-  'Middle Eastern':      'https://images.unsplash.com/photo-1607746882042-944635dfe10e?auto=format&fit=crop&w=900&q=80',
-  'Mixed / Multiracial': 'https://images.unsplash.com/photo-1554151228-14d9def656e4?auto=format&fit=crop&w=900&q=80',
+  'White / Caucasian':   '/img/ethnicity-white-caucasian.jpg',
+  'Black / African':     '/img/ethnicity-black-african.jpg',
+  'East Asian':          '/img/ethnicity-east-asian.jpg',
+  'South Asian':         '/img/ethnicity-south-asian.jpg',
+  'Southeast Asian':     '/img/ethnicity-southeast-asian.jpg',
+  'Latino / Hispanic':   '/img/ethnicity-latino-hispanic.jpg',
+  'Middle Eastern':      '/img/ethnicity-middle-eastern.jpg',
+  'Mixed / Multiracial': '/img/ethnicity-mixed-multiracial.jpg',
 };
 
 // Color-tinted placeholder gradients for hair/eye options.
