@@ -322,8 +322,14 @@ Deno.serve(async (req: Request) => {
           : COSTS[quality].batch;
         try {
           await refundCredits(userId, creditCost, generationId);
+          console.log(`Credits refunded: ${creditCost} → user ${userId} for generation ${generationId}`);
         } catch (refundErr) {
-          console.error("Credit refund failed:", refundErr);
+          // Log prominently — user loses credits if this fails
+          console.error(`CRITICAL: Credit refund failed for generation ${generationId} (user ${userId}, ${creditCost} credits):`, refundErr);
+          // Update the generation error_message to include refund failure so it's traceable
+          await sb.from("generations")
+            .update({ error_message: `${failedMessage || "Generation failed"} | REFUND FAILED: ${refundErr instanceof Error ? refundErr.message : String(refundErr)}` })
+            .eq("id", generationId);
         }
 
         return json({
