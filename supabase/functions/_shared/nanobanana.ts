@@ -106,9 +106,12 @@ export async function generateCompositeFromImages(
     ? "Vertical 9:16 portrait format for mobile/phone screen."
     : "Horizontal 16:9 landscape format for widescreen.";
 
+  // CRITICAL FRAMING RULE: head-and-shoulders POV selfie ONLY — no waist, legs, or feet.
+  const framingRule = "IMPORTANT: Tight upper-body frame — show ONLY the person's head, neck, shoulders, and upper chest. NO waist, legs, or feet. The bottom edge of the image must cut off at the chest/collarbone level. This is a close-up phone selfie, not a full-body photo.";
+
   const compositePrompt = scenePrompt
-    ? `${scenePrompt} The person is filming themselves POV-style (arm extended, front-camera angle, slight wide-angle distortion), naturally holding and showcasing the product which is clearly visible in frame. iPhone selfie aesthetic, talking-to-camera energy. ${formatHint}`
-    : `UGC selfie-style image: POV from the phone front-camera, arm extended at selfie length, slight wide-angle distortion. The person is looking directly into the camera lens while naturally holding and showcasing the product, which is clearly visible in frame. Natural window lighting, authentic imperfections, talking-to-camera energy. ${formatHint}`;
+    ? `${framingRule} ${scenePrompt} The person is filming themselves POV-style (arm extended, front-camera angle, slight wide-angle distortion), naturally holding and showcasing the product which is clearly visible in frame. iPhone selfie aesthetic, talking-to-camera energy. ${formatHint}`
+    : `${framingRule} UGC phone selfie: extreme close-up POV, front-camera angle, arm extended at selfie distance, slight wide-angle distortion. The person looks directly into the lens while naturally holding the product near their upper chest — the product is clearly visible in frame. Natural window lighting, authentic imperfections, talking-to-camera energy. ${formatHint}`;
 
   const res = await fetch(endpoint(), {
     method: "POST",
