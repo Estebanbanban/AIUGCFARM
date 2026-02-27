@@ -120,6 +120,12 @@ export default function GeneratePage() {
   const store = useGenerationWizardStore();
   const [showPaywall, setShowPaywall] = useState(false);
 
+  // Reset wizard on mount so stale state from a previous session doesn't leak
+  useEffect(() => {
+    store.reset();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Step 1 — product add state
   const [addingProduct, setAddingProduct] = useState(false);
   const [importUrl, setImportUrl] = useState("");
@@ -198,8 +204,9 @@ export default function GeneratePage() {
         );
       }
       if (result.save_failed) {
+        const detail = result.save_error ? ` (${result.save_error})` : "";
         throw new Error(
-          "We scraped this page but could not save products to your account. Please try again.",
+          `We scraped this page but could not save products to your account. Please try again.${detail}`,
         );
       }
       const scraped: Product[] = result.products
@@ -694,7 +701,7 @@ export default function GeneratePage() {
                             Single
                           </p>
                           <p className="text-sm font-bold text-primary">
-                            {CREDITS_PER_SINGLE} credits
+                            {store.quality === "hd" ? CREDITS_PER_SINGLE_HD : CREDITS_PER_SINGLE} credits
                           </p>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -716,7 +723,7 @@ export default function GeneratePage() {
                             3x
                           </p>
                           <p className="text-sm font-bold text-primary">
-                            {CREDITS_PER_BATCH} credits
+                            {store.quality === "hd" ? CREDITS_PER_BATCH_HD : CREDITS_PER_BATCH} credits
                           </p>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">

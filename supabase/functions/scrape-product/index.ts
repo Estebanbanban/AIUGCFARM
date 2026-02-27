@@ -1,5 +1,5 @@
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { optionalUserId } from "../_shared/auth.ts";
+import { requireUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
 import { validateUrl } from "../_shared/ssrf.ts";
@@ -20,6 +20,45 @@ interface BrandSummary {
   tone: string;
   demographic: string;
   selling_points: string[];
+}
+
+async function ensureProfileExists(userId: string): Promise<void> {
+  const sb = getAdminClient();
+
+  const { data: existing, error: existingErr } = await sb
+    .from("profiles")
+    .select("id")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (existingErr) {
+    throw new Error(`Failed to check profile: ${existingErr.message}`);
+  }
+  if (existing) return;
+
+  let email = `${userId}@local.invalid`;
+  const { data: authUser, error: authUserErr } = await sb.auth.admin.getUserById(
+    userId,
+  );
+  if (!authUserErr && authUser.user?.email) {
+    email = authUser.user.email;
+  }
+
+  const { error: profileErr } = await sb
+    .from("profiles")
+    .upsert(
+      {
+        id: userId,
+        email,
+        full_name: "",
+        avatar_url: "",
+      },
+      { onConflict: "id" },
+    );
+
+  if (profileErr) {
+    throw new Error(`Failed to create missing profile: ${profileErr.message}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -313,8 +352,11 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "Method not allowed" }, cors, 405);
     }
 
-    // Auth is optional for scraping, but affects rate limits and saving
-    const userId = await optionalUserId(req);
+    // Auth is optional for scraping, but affects rate limits and saving.
+    // If Authorization is present, enforce it strictly so invalid sessions
+    // return 401 instead of silently downgrading to anonymous mode.
+    const authHeader = req.headers.get("Authorization");
+    const userId = authHeader ? await requireUserId(req) : null;
 
     const rateLimitKey =
       (userId ?? req.headers.get("x-forwarded-for")) || "anon";
@@ -372,6 +414,7 @@ Deno.serve(async (req: Request) => {
     // Save to DB if authenticated and requested
     let savedIds: string[] = [];
     let saveFailed = false;
+    let saveError: string | null = null;
     if (userId && save !== false && products.length > 0) {
       const sb = getAdminClient();
       const rows = products.map((p) => ({
@@ -388,13 +431,45 @@ Deno.serve(async (req: Request) => {
         confirmed: false,
       }));
 
-      const { data: inserted, error } = await sb
+      let { data: inserted, error } = await sb
         .from("products")
         .insert(rows)
         .select("id");
+
+      // Self-heal users missing a profiles row (legacy trigger/migration drift),
+      // then retry once.
+      if (
+        error &&
+        error.code === "23503" &&
+        error.message.includes("products_owner_id_fkey")
+      ) {
+        try {
+          await ensureProfileExists(userId);
+          const retry = await sb.from("products").insert(rows).select("id");
+          inserted = retry.data;
+          error = retry.error;
+        } catch (bootstrapErr) {
+          const msg = bootstrapErr instanceof Error
+            ? bootstrapErr.message
+            : String(bootstrapErr);
+          error = {
+            code: "PROFILE_BOOTSTRAP_FAILED",
+            message: msg,
+            details: null,
+            hint: null,
+          };
+        }
+      }
+
       if (error) {
         saveFailed = true;
-        console.error("DB insert failed (non-fatal):", error.message);
+        saveError = `${error.code ?? "unknown"}: ${error.message}`;
+        console.error("DB insert failed (non-fatal):", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        });
       } else {
         savedIds = (inserted ?? []).map((r: { id: string }) => r.id);
       }
@@ -416,6 +491,7 @@ Deno.serve(async (req: Request) => {
           fallback_available: fallbackAvailable,
           saved: savedIds.length > 0,
           save_failed: saveFailed,
+          save_error: saveError,
         },
       },
       cors,

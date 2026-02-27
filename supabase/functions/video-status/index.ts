@@ -5,8 +5,10 @@ import { getAdminClient } from "../_shared/supabase.ts";
 import { checkKlingJob } from "../_shared/kling.ts";
 import { refundCredits } from "../_shared/credits.ts";
 
-const SINGLE_COST = 3;
-const BATCH_COST = 9;
+const COSTS = {
+  standard: { single: 3, batch: 9 },
+  hd:       { single: 6, batch: 18 },
+} as const;
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -310,8 +312,11 @@ Deno.serve(async (req: Request) => {
           })
           .eq("id", generationId);
 
-        // Refund credits — use actual cost based on mode
-        const creditCost = gen.mode === "single" ? SINGLE_COST : BATCH_COST;
+        // Refund credits — use actual cost based on mode + quality
+        const quality = (gen.video_quality ?? "standard") as keyof typeof COSTS;
+        const creditCost = gen.mode === "single"
+          ? COSTS[quality].single
+          : COSTS[quality].batch;
         try {
           await refundCredits(userId, creditCost, generationId);
         } catch (refundErr) {

@@ -36,6 +36,7 @@ export interface ScrapeResponseData {
   fallback_available?: boolean;
   saved: boolean;
   save_failed?: boolean;
+  save_error?: string | null;
 }
 
 export interface ScrapeResponse {
