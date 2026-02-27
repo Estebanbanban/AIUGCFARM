@@ -20,29 +20,29 @@ const links = {
 
 export function Footer() {
   return (
-    <footer className="bg-[#050505] border-t border-[#1a1a1a] py-16 px-4 sm:px-6">
-      <div className="max-w-5xl mx-auto">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
-          {/* Brand */}
+    <footer className="border-t border-border bg-background-secondary px-4 py-16 sm:px-6">
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-12 grid grid-cols-2 gap-8 md:grid-cols-4">
           <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="text-lg font-bold text-white tracking-tight">
+            <Link href="/" className="text-lg font-semibold tracking-tight text-foreground">
               CineRads
             </Link>
-            <p className="text-sm text-[#555] leading-relaxed mt-2">
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               AI-generated UGC video ads for e-commerce brands.
             </p>
           </div>
 
-          {/* Link columns */}
           {Object.entries(links).map(([col, items]) => (
             <div key={col}>
-              <p className="text-xs uppercase tracking-widest text-[#444] mb-4">{col}</p>
+              <p className="mb-4 text-xs uppercase tracking-widest text-muted-foreground">
+                {col}
+              </p>
               <ul className="space-y-2.5">
                 {items.map((item) => (
                   <li key={item.label}>
                     <Link
                       href={item.href}
-                      className="text-sm text-[#666] hover:text-white transition-colors duration-200"
+                      className="text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
                     >
                       {item.label}
                     </Link>
@@ -53,8 +53,8 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="border-t border-[#111] pt-8">
-          <p className="text-xs text-[#444]">
+        <div className="border-t border-border pt-8">
+          <p className="text-xs text-muted-foreground">
             &copy; {new Date().getFullYear()} CineRads. All rights reserved.
           </p>
         </div>
