@@ -3,7 +3,7 @@
 interface LogoProps {
   variant?: "full" | "icon" | "wordmark";
   size?: "sm" | "md" | "lg" | "xl";
-  theme?: "dark" | "light";
+  theme?: "dark" | "light" | "auto";
   className?: string;
 }
 
@@ -75,7 +75,12 @@ export function Logo({
   className = "",
 }: LogoProps) {
   const { icon, text, gap } = sizeMap[size];
-  const textColor = theme === "dark" ? "text-white" : "text-black";
+  const textColor =
+    theme === "auto"
+      ? "text-foreground"
+      : theme === "dark"
+        ? "text-white"
+        : "text-black";
 
   if (variant === "icon") {
     return <ClapIcon size={icon} />;

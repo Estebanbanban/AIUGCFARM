@@ -167,7 +167,7 @@ export function MarketingHeader() {
           <div className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-b from-white/40 via-white/10 to-transparent dark:from-white/10 dark:via-white/[0.03]" />
 
           <Link href="/" className="relative z-10">
-            <Logo variant="full" size="md" theme="dark" />
+            <Logo variant="full" size="md" theme="auto" />
           </Link>
 
           <nav className="relative z-10 hidden items-center gap-8 md:flex">
@@ -227,7 +227,7 @@ export function MarketingHeader() {
             className="fixed inset-0 z-[100] flex flex-col bg-background"
           >
             <div className="flex h-16 items-center justify-between border-b border-border px-4">
-              <Logo variant="full" size="md" theme="dark" />
+              <Logo variant="full" size="md" theme="auto" />
               <button
                 onClick={() => setMobileOpen(false)}
                 className="text-foreground"
