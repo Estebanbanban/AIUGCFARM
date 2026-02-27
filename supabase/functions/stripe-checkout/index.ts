@@ -38,6 +38,13 @@ const PACK_NAMES: Record<string, string> = {
   pack_100: "100 Credits — Pro Pack ($95)",
 };
 
+/**
+ * Allowlist of Stripe coupon IDs accepted from the client.
+ * t9QmsQTe = NewUsers (30% off once) — first-paywall 30-min offer
+ * yGuI3xvT = 50percent (50% off once, Starter only) — first-video offer
+ */
+const ALLOWED_COUPONS = new Set(["t9QmsQTe", "yGuI3xvT"]);
+
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -51,11 +58,17 @@ Deno.serve(async (req: Request) => {
     const sb = getAdminClient();
 
     const body = await req.json();
-    const { plan, pack } = body;
+    const { plan, pack, couponId } = body;
 
     if (!plan && !pack) {
       return json({ detail: "Provide either 'plan' or 'pack'" }, cors, 400);
     }
+
+    // Validate coupon if provided
+    const validatedCoupon =
+      couponId && typeof couponId === "string" && ALLOWED_COUPONS.has(couponId)
+        ? couponId
+        : null;
 
     // Get user profile for email
     const { data: profile } = await sb
@@ -99,7 +112,7 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      const session = await stripe.checkout.sessions.create({
+      const sessionParams: Stripe.Checkout.SessionCreateParams = {
         customer: stripeCustomerId,
         mode: "payment",
         line_items: [{ price: priceId, quantity: 1 }],
@@ -109,8 +122,13 @@ Deno.serve(async (req: Request) => {
           supabase_user_id: userId,
           pack,
         },
-      });
+      };
 
+      if (validatedCoupon) {
+        sessionParams.discounts = [{ coupon: validatedCoupon }];
+      }
+
+      const session = await stripe.checkout.sessions.create(sessionParams);
       return json({ data: { url: session.url } }, cors);
     }
 
@@ -125,7 +143,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const session = await stripe.checkout.sessions.create({
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       customer: stripeCustomerId,
       mode: "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
@@ -138,8 +156,13 @@ Deno.serve(async (req: Request) => {
         supabase_user_id: userId,
         plan,
       },
-    });
+    };
 
+    if (validatedCoupon) {
+      sessionParams.discounts = [{ coupon: validatedCoupon }];
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
     return json({ data: { url: session.url } }, cors);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

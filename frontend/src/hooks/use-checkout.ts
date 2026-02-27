@@ -8,13 +8,23 @@ interface CheckoutResponse {
   data: { url: string };
 }
 
+interface CheckoutPlanArgs {
+  plan: PlanTier;
+  couponId?: string;
+}
+
+interface CheckoutPackArgs {
+  pack: CreditPackKey;
+  couponId?: string;
+}
+
 export function useCheckout() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (plan: PlanTier) => {
+    mutationFn: async ({ plan, couponId }: CheckoutPlanArgs) => {
       const res = await callEdge<CheckoutResponse>("stripe-checkout", {
-        body: { plan },
+        body: { plan, ...(couponId ? { couponId } : {}) },
       });
       return res.data.url;
     },
@@ -28,9 +38,9 @@ export function useCheckout() {
 /** One-time credit pack purchase. Redirects to Stripe Checkout. */
 export function useBuyCredits() {
   return useMutation({
-    mutationFn: async (pack: CreditPackKey) => {
+    mutationFn: async ({ pack, couponId }: CheckoutPackArgs) => {
       const res = await callEdge<CheckoutResponse>("stripe-checkout", {
-        body: { pack },
+        body: { pack, ...(couponId ? { couponId } : {}) },
       });
       return res.data.url;
     },

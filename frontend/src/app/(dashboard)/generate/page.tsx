@@ -24,7 +24,10 @@ import {
   Sparkles,
   TrendingUp,
   Star,
+  Clock,
+  Flame,
 } from "lucide-react";
+import { useFirstPurchaseOffer, COUPON_30_OFF } from "@/hooks/use-first-purchase-offer";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -231,6 +234,7 @@ export default function GeneratePage() {
   const approveAndGenerate = useApproveAndGenerate();
   const checkout = useCheckout();
   const buyCredits = useBuyCredits();
+  const offer = useFirstPurchaseOffer();
 
   const confirmedProducts = products?.filter((p) => p.confirmed) ?? [];
   const activePersonas = personas ?? [];
@@ -457,6 +461,7 @@ export default function GeneratePage() {
   async function handleGenerateScript() {
     if (!hasEnoughCredits) {
       trackPaywallShown("insufficient_credits");
+      offer.startOffer();
       setShowPaywall(true);
       return;
     }
@@ -504,6 +509,7 @@ export default function GeneratePage() {
     if (!store.pendingGenerationId || !store.pendingScript) return;
     if (!hasEnoughCredits) {
       trackPaywallShown("insufficient_credits");
+      offer.startOffer();
       setShowPaywall(true);
       return;
     }
@@ -532,6 +538,7 @@ export default function GeneratePage() {
 
   async function handleGenerate() {
     if (!hasEnoughCredits) {
+      offer.startOffer();
       setShowPaywall(true);
       return;
     }
@@ -653,9 +660,11 @@ export default function GeneratePage() {
   }
 
   async function handleCheckout(plan: PlanTier) {
-    checkout.mutate(plan, {
+    const couponId = offer.isActive ? COUPON_30_OFF : undefined;
+    checkout.mutate({ plan, couponId }, {
       onSuccess: (url) => {
         trackCheckoutStarted(plan);
+        if (couponId) offer.markUsed();
         window.location.href = url;
       },
       onError: (err) => { toast.error(err.message || "Failed to start checkout"); },
@@ -663,9 +672,11 @@ export default function GeneratePage() {
   }
 
   async function handleBuyPack(pack: CreditPackKey) {
-    buyCredits.mutate(pack, {
+    const couponId = offer.isActive ? COUPON_30_OFF : undefined;
+    buyCredits.mutate({ pack, couponId }, {
       onSuccess: (url) => {
         trackCreditsPurchased(pack);
+        if (couponId) offer.markUsed();
         window.location.href = url;
       },
       onError: (err) => { toast.error(err.message || "Failed to start checkout"); },
@@ -1535,6 +1546,11 @@ export default function GeneratePage() {
               </Card>
             </div>
             )}
+          </div>
+        )}
+
+        {/* ── Step 5: Review Script ──────────────────────────────────────── */}
+        {store.step === 5 && store.pendingScript && (
           <div className="flex flex-col gap-6">
             <h2 className="text-lg font-semibold">Review Script</h2>
 
@@ -1700,8 +1716,6 @@ export default function GeneratePage() {
           </div>
         )}
 
-        {/* ── Step 5: Review Script ──────────────────────────────────────── */}
-        {store.step === 5 && store.pendingScript && (
       </div>
 
       {/* Navigation buttons */}
@@ -1728,8 +1742,27 @@ export default function GeneratePage() {
       {/* Paywall dialog */}
       <Dialog open={showPaywall} onOpenChange={setShowPaywall}>
         <DialogContent className="sm:max-w-lg p-0 overflow-hidden">
-          {/* Hero */}
-          <div className="bg-gradient-to-br from-primary/15 via-primary/5 to-background px-6 pt-6 pb-5">
+
+          {/* ── Countdown banner (first-paywall offer) ───────────────────── */}
+          {offer.isActive && (
+            <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-primary to-orange-500 px-5 py-3">
+              <div className="flex items-center gap-2">
+                <Flame className="size-4 text-white shrink-0" />
+                <p className="text-sm font-semibold text-white">
+                  New user offer — 30% off everything
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 bg-black/20 rounded-md px-2.5 py-1 shrink-0">
+                <Clock className="size-3 text-white/80" />
+                <span className="font-mono text-sm font-bold text-white tabular-nums">
+                  {offer.timeDisplay}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* ── Hero ─────────────────────────────────────────────────────── */}
+          <div className="bg-gradient-to-br from-primary/15 via-primary/5 to-background px-6 pt-5 pb-4">
             <div className="flex items-start gap-3 mb-4">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/20">
                 <TrendingUp className="size-5 text-primary" />
@@ -1748,14 +1781,14 @@ export default function GeneratePage() {
               </div>
             </div>
 
-            {/* First-video deal */}
+            {/* First-video credit discount (backend reduction — separate from price offer) */}
             {isFirstVideo && (
               <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-3 flex items-start gap-2.5">
                 <Star className="size-4 text-amber-400 shrink-0 mt-0.5" fill="currentColor" />
                 <div>
-                  <p className="text-sm font-semibold text-amber-300">First video — 50% off</p>
+                  <p className="text-sm font-semibold text-amber-300">First video — 50% off credits</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    One-time discount. Applies automatically on your first generation.
+                    Your first generation costs half the credits. Applies automatically.
                   </p>
                 </div>
               </div>
@@ -1763,7 +1796,7 @@ export default function GeneratePage() {
           </div>
 
           <div className="flex flex-col gap-5 px-6 py-5">
-            {/* Subscription plans — lead with recurring value */}
+            {/* Subscription plans */}
             <div>
               <div className="flex items-center justify-between mb-2.5">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1774,7 +1807,7 @@ export default function GeneratePage() {
               <div className="flex flex-col gap-2">
                 {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
                   const isGrowth = key === "growth";
-                  const costPerVideo = (plan.price / (plan.credits / (key === "starter" ? 5 : 5))).toFixed(2);
+                  const discountedMonthly = offer.isActive ? offer.discountedPrice(plan.price) : null;
                   return (
                     <div
                       key={key}
@@ -1805,8 +1838,22 @@ export default function GeneratePage() {
                       </div>
                       <div className="flex items-center gap-3 ml-4">
                         <div className="text-right">
-                          <p className="text-sm font-bold">${plan.price}</p>
-                          <p className="text-[10px] text-muted-foreground">/mo</p>
+                          {discountedMonthly !== null ? (
+                            <>
+                              <div className="flex items-baseline gap-1 justify-end">
+                                <p className="text-base font-bold text-primary">${discountedMonthly}</p>
+                                <p className="text-[10px] text-muted-foreground">/mo</p>
+                              </div>
+                              <p className="text-[10px] line-through text-muted-foreground/60">
+                                ${plan.price}/mo
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-sm font-bold">${plan.price}</p>
+                              <p className="text-[10px] text-muted-foreground">/mo</p>
+                            </>
+                          )}
                         </div>
                         <Button
                           size="sm"
@@ -1834,38 +1881,50 @@ export default function GeneratePage() {
               <div className="flex-1 border-t border-border" />
             </div>
 
-            {/* Credit packs — secondary option */}
+            {/* Credit packs */}
             <div className="flex flex-col gap-1.5">
-              {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => (
-                <div
-                  key={key}
-                  className="flex items-center justify-between rounded-lg border border-border px-4 py-2.5 hover:border-primary/30 transition-colors"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium">{pack.credits} credits</p>
-                      {"badge" in pack && pack.badge && (
-                        <Badge variant="secondary" className="text-[10px]">{pack.badge}</Badge>
-                      )}
+              {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => {
+                const discountedPackPrice = offer.isActive ? offer.discountedPrice(pack.price) : null;
+                return (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between rounded-lg border border-border px-4 py-2.5 hover:border-primary/30 transition-colors"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">{pack.credits} credits</p>
+                        {"badge" in pack && pack.badge && (
+                          <Badge variant="secondary" className="text-[10px]">{pack.badge}</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {pack.description}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {pack.description} · ${pack.pricePerCredit.toFixed(2)}/cr
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        {discountedPackPrice !== null ? (
+                          <>
+                            <p className="text-sm font-bold text-primary">${discountedPackPrice}</p>
+                            <p className="text-[10px] line-through text-muted-foreground/60">${pack.price}</p>
+                          </>
+                        ) : (
+                          <p className="text-sm font-semibold">${pack.price}</p>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleBuyPack(key)}
+                        disabled={buyCredits.isPending}
+                        className="border border-border"
+                      >
+                        {buyCredits.isPending ? <Loader2 className="size-3 animate-spin" /> : "Buy"}
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold">${pack.price}</span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleBuyPack(key)}
-                      disabled={buyCredits.isPending}
-                      className="border border-border"
-                    >
-                      {buyCredits.isPending ? <Loader2 className="size-3 animate-spin" /> : "Buy"}
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <p className="text-center text-[11px] text-muted-foreground -mt-1">
