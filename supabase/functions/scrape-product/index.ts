@@ -21,7 +21,7 @@ interface ProductData {
 async function tryShopify(origin: string): Promise<ProductData[] | null> {
   try {
     const res = await fetch(`${origin}/products.json?limit=10`, {
-      headers: { "User-Agent": "UGCFarmAI/1.0" },
+      headers: { "User-Agent": "CineRads/1.0" },
     });
     if (!res.ok) return null;
 
@@ -54,7 +54,7 @@ async function tryShopify(origin: string): Promise<ProductData[] | null> {
 /** Scrape a generic page via HTML and use regex heuristics for product data. */
 async function scrapeGeneric(url: string): Promise<ProductData> {
   const res = await fetch(url, {
-    headers: { "User-Agent": "UGCFarmAI/1.0" },
+    headers: { "User-Agent": "CineRads/1.0" },
     redirect: "follow",
   });
   if (!res.ok) throw new Error(`Failed to fetch URL: ${res.status}`);

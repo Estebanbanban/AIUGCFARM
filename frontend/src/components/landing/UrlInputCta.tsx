@@ -27,7 +27,7 @@ export function UrlInputCta({ className }: UrlInputCtaProps) {
     }
 
     localStorage.setItem("pendingScrapeUrl", url);
-    router.push("/sign-up");
+    router.push("/signup");
   }
 
   return (
