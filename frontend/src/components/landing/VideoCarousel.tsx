@@ -14,20 +14,11 @@ const phones = [
   { product: "Smart Watch Pro", price: "$199", category: "tech", pov: "POV: this watch is on another level", gradient: "from-[#0a0014] via-[#14001f] to-[#0a0014]" },
 ];
 
-// Arc: center=0px, outward increases
-const arcOffsets = [45, 25, 10, 0, 0, 10, 25, 45];
-const arcRotations = [-3, -2, -1, 0, 0, 1, 2, 3];
-
-function PhoneCard({ phone, arcOffset, arcRotation }: {
+function PhoneCard({ phone }: {
   phone: typeof phones[number];
-  arcOffset: number;
-  arcRotation: number;
 }) {
   return (
-    <div
-      className="flex-shrink-0 px-[10px]"
-      style={{ transform: `translateY(${arcOffset}px) rotate(${arcRotation}deg)` }}
-    >
+    <div className="flex-shrink-0 px-[10px]">
       <div className="relative w-[130px] md:w-[160px] transition-all duration-300 hover:scale-[1.08] hover:z-10 cursor-pointer group">
         {/* Phone shell */}
         <div className="w-full aspect-[9/16] rounded-[28px] border-2 border-[#2A2A2A] bg-[#0A0A0A] p-2 shadow-2xl group-hover:border-[#444] group-hover:shadow-[0_0_30px_rgba(255,255,255,0.05)] transition-all duration-300">
@@ -105,8 +96,6 @@ export function VideoCarousel() {
             <PhoneCard
               key={i}
               phone={phone}
-              arcOffset={arcOffsets[i % 8]}
-              arcRotation={arcRotations[i % 8]}
             />
           ))}
         </div>
