@@ -3,7 +3,7 @@ import { Check, X } from "lucide-react";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Pricing — AI UGC Generator",
+  title: "Pricing — CineRads",
   description:
     "Simple, transparent pricing for AI-powered UGC video ad generation. Start free, scale as you grow.",
 };

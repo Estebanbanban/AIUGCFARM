@@ -35,7 +35,7 @@ export function MarketingHeader() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
           <span className="text-xl font-bold tracking-tight text-white">
-            AIUGC
+            CineRads
           </span>
         </Link>
 
@@ -55,13 +55,13 @@ export function MarketingHeader() {
         {/* Desktop Auth */}
         <div className="hidden items-center gap-3 md:flex">
           <Link
-            href="/sign-in"
+            href="/login"
             className="text-sm text-zinc-400 transition-colors hover:text-white"
           >
             Sign In
           </Link>
           <Button asChild size="sm" className="bg-violet-600 text-white hover:bg-violet-500">
-            <Link href="/sign-up">Get Started</Link>
+            <Link href="/signup">Get Started</Link>
           </Button>
         </div>
 
@@ -91,14 +91,14 @@ export function MarketingHeader() {
             ))}
             <div className="flex flex-col gap-3 pt-4 border-t border-white/5">
               <Link
-                href="/sign-in"
+                href="/login"
                 className="text-sm text-zinc-400 transition-colors hover:text-white"
                 onClick={() => setMobileOpen(false)}
               >
                 Sign In
               </Link>
               <Button asChild size="sm" className="bg-violet-600 text-white hover:bg-violet-500 w-full">
-                <Link href="/sign-up">Get Started</Link>
+                <Link href="/signup">Get Started</Link>
               </Button>
             </div>
           </div>

@@ -3,7 +3,7 @@ import Link from "next/link";
 const footerLinks = [
   { label: "Terms", href: "/terms" },
   { label: "Privacy", href: "/privacy" },
-  { label: "Contact", href: "mailto:support@aiugc.com" },
+  { label: "Contact", href: "mailto:support@cinerads.com" },
 ];
 
 export function Footer() {
@@ -13,7 +13,7 @@ export function Footer() {
         {/* Logo + tagline */}
         <div className="flex flex-col items-center gap-2 md:items-start">
           <Link href="/" className="text-lg font-bold tracking-tight text-white">
-            AIUGC
+            CineRads
           </Link>
           <p className="text-xs text-zinc-500">
             Built with AI. Designed for conversion.
@@ -35,7 +35,7 @@ export function Footer() {
 
         {/* Copyright */}
         <p className="text-xs text-zinc-600">
-          &copy; {new Date().getFullYear()} AIUGC. All rights reserved.
+          &copy; {new Date().getFullYear()} CineRads. All rights reserved.
         </p>
       </div>
     </footer>
