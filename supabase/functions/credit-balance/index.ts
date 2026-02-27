@@ -2,6 +2,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
+import { ADMIN_UNLIMITED_CREDITS } from "../_shared/credits.ts";
 
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req);
@@ -15,24 +16,28 @@ Deno.serve(async (req: Request) => {
     const userId = await requireUserId(req);
     const sb = getAdminClient();
 
-    // Fetch credit balance (maybeSingle in case row doesn't exist yet)
-    const { data: balance } = await sb
-      .from("credit_balances")
-      .select("remaining")
-      .eq("owner_id", userId)
-      .maybeSingle();
+    const [{ data: balance }, { data: profile }] = await Promise.all([
+      sb
+        .from("credit_balances")
+        .select("remaining")
+        .eq("owner_id", userId)
+        .maybeSingle(),
+      sb
+        .from("profiles")
+        .select("plan, role")
+        .eq("id", userId)
+        .maybeSingle(),
+    ]);
 
-    // Fetch profile plan
-    const { data: profile } = await sb
-      .from("profiles")
-      .select("plan")
-      .eq("id", userId)
-      .single();
+    const isUnlimited = profile?.role === "admin";
 
     return json({
       data: {
-        remaining: balance?.remaining ?? 0,
+        remaining: isUnlimited
+          ? ADMIN_UNLIMITED_CREDITS
+          : (balance?.remaining ?? 0),
         plan: profile?.plan ?? "free",
+        is_unlimited: isUnlimited,
       },
     }, cors);
   } catch (e: unknown) {

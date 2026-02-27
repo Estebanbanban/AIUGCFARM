@@ -1,14 +1,35 @@
 import { getAdminClient } from "./supabase.ts";
 
+export const ADMIN_UNLIMITED_CREDITS = 2_147_483_647;
+
+async function isAdminUser(userId: string): Promise<boolean> {
+  const sb = getAdminClient();
+  const { data } = await sb
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+  return data?.role === "admin";
+}
+
 /** Return the remaining credit count for a user (0 if no row). */
 export async function checkCredits(userId: string): Promise<number> {
   const sb = getAdminClient();
-  const { data } = await sb
-    .from("credit_balances")
-    .select("remaining")
-    .eq("owner_id", userId)
-    .single();
-  return data?.remaining ?? 0;
+  const [{ data: profile }, { data: balance }] = await Promise.all([
+    sb
+      .from("profiles")
+      .select("role")
+      .eq("id", userId)
+      .maybeSingle(),
+    sb
+      .from("credit_balances")
+      .select("remaining")
+      .eq("owner_id", userId)
+      .maybeSingle(),
+  ]);
+
+  if (profile?.role === "admin") return ADMIN_UNLIMITED_CREDITS;
+  return balance?.remaining ?? 0;
 }
 
 /** Debit 1 credit from a user. Inserts a ledger entry and decrements the balance. */
@@ -16,6 +37,8 @@ export async function debitCredit(
   userId: string,
   referenceId: string,
 ): Promise<void> {
+  if (await isAdminUser(userId)) return;
+
   const sb = getAdminClient();
 
   // Insert ledger entry
@@ -41,6 +64,8 @@ export async function debitCredits(
   amount: number,
   referenceId: string,
 ): Promise<void> {
+  if (await isAdminUser(userId)) return;
+
   const sb = getAdminClient();
 
   // Insert ledger entry
@@ -66,6 +91,8 @@ export async function refundCredits(
   amount: number,
   referenceId: string,
 ): Promise<void> {
+  if (await isAdminUser(userId)) return;
+
   const sb = getAdminClient();
 
   // Insert ledger entry (positive amount for refund)

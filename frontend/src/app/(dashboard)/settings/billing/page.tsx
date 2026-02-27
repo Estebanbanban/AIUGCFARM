@@ -74,9 +74,11 @@ export default function BillingPage() {
   const plan = profile?.plan ?? "free";
   const planConfig = plan !== "free" ? PLANS[plan as keyof typeof PLANS] : null;
   const creditsRemaining = credits?.remaining ?? 0;
+  const isUnlimitedCredits = credits?.is_unlimited === true;
   const creditsTotal = planConfig?.credits ?? 9;
-  const creditPercent =
-    creditsTotal > 0
+  const creditPercent = isUnlimitedCredits
+    ? 100
+    : creditsTotal > 0
       ? Math.round((creditsRemaining / creditsTotal) * 100)
       : 0;
 
@@ -204,7 +206,9 @@ export default function BillingPage() {
         <CardHeader>
           <CardTitle>Credit Usage</CardTitle>
           <CardDescription>
-            {creditsRemaining} of {creditsTotal} credits remaining this month
+            {isUnlimitedCredits
+              ? "Unlimited credits (admin access)"
+              : `${creditsRemaining} of ${creditsTotal} credits remaining this month`}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -214,9 +218,13 @@ export default function BillingPage() {
           />
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
-              {creditsTotal - creditsRemaining} used
+              {isUnlimitedCredits
+                ? "Usage is not capped for admin accounts"
+                : `${creditsTotal - creditsRemaining} used`}
             </span>
-            <span className="font-medium text-foreground">{creditPercent}%</span>
+            <span className="font-medium text-foreground">
+              {isUnlimitedCredits ? "Unlimited" : `${creditPercent}%`}
+            </span>
           </div>
         </CardContent>
       </Card>
