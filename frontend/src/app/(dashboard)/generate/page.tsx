@@ -167,6 +167,7 @@ export default function GeneratePage() {
   const selectedPersona = activePersonas.find((p) => p.id === store.personaId);
 
   const creditsRemaining = credits?.remaining ?? 0;
+  const isUnlimitedCredits = credits?.is_unlimited === true;
   const creditCost =
     store.quality === "hd"
       ? store.mode === "single"
@@ -175,7 +176,7 @@ export default function GeneratePage() {
       : store.mode === "single"
         ? CREDITS_PER_SINGLE
         : CREDITS_PER_BATCH;
-  const hasEnoughCredits = creditsRemaining >= creditCost;
+  const hasEnoughCredits = isUnlimitedCredits || creditsRemaining >= creditCost;
 
   // Derived view states, no effects needed
   const showAddProductForm =
@@ -385,7 +386,9 @@ export default function GeneratePage() {
             Create AI-powered video ads in a few simple steps.
             {!creditsLoading && (
               <span className="ml-2 font-medium text-foreground">
-                {creditsRemaining} credits remaining
+                {isUnlimitedCredits
+                  ? "Unlimited credits"
+                  : `${creditsRemaining} credits remaining`}
               </span>
             )}
           </p>

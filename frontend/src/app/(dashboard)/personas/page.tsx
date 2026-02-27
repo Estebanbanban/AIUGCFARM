@@ -70,9 +70,10 @@ export default function PersonasPage() {
 
   const isLoading = personasLoading || profileLoading;
   const plan = profile?.plan ?? "free";
+  const isAdmin = profile?.role === "admin";
   const slotLimit = PERSONA_SLOT_LIMITS[plan];
   const slotsUsed = personas?.length ?? 0;
-  const atLimit = slotsUsed >= slotLimit;
+  const atLimit = !isAdmin && slotsUsed >= slotLimit;
   const hasPersonas = (personas?.length ?? 0) > 0;
 
   return (
@@ -85,7 +86,9 @@ export default function PersonasPage() {
             {isLoading ? (
               <Skeleton className="inline-block h-4 w-32" />
             ) : (
-              `${slotsUsed}/${slotLimit} persona slots used`
+              isAdmin
+                ? `${slotsUsed} personas created · unlimited slots (admin)`
+                : `${slotsUsed}/${slotLimit} persona slots used`
             )}
           </p>
         </div>

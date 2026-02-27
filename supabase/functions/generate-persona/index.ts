@@ -172,27 +172,28 @@ function buildFallbackPrompt(attributes: PersonaAttributes): string {
 
 const SCENE_PROMPT_SYSTEM = `You are an expert AI image prompt writer specializing in authentic UGC (user-generated content) style photography for social media ads.
 
-Given a persona's physical attributes, write a single image generation prompt that creates a realistic "talking-to-camera" selfie scene for use with an AI image generator.
+Given a persona's attributes, write a scene description for an AI image generator. Your job is to describe ONLY the setting, background, lighting, and vibe — NOT the person's appearance. Physical traits are provided separately and will be prepended to your output.
 
-The prompt must:
+Your scene description must:
 - Describe a casual handheld iPhone front-camera selfie vlog aesthetic
 - Set a believable background/setting that fits the persona's demographic and clothing style
-- Weave the person's appearance naturally into the scene (do NOT list traits as bullet points)
 - Include authentic imperfections: slight hand shake, imperfect framing, natural lighting variance
 - Feel like a real person filming a quick social media update, NOT a professional shoot
-- Be 3–5 sentences, vivid and specific
+- Be 2–3 sentences focused purely on scene, setting, and mood
 
 Scene rules:
 - Camera: arm's-length iPhone front camera, slight wide-angle distortion
 - Lighting: natural window light or soft warm indoor light
-- Background: hints at personality (modern apartment, cozy café, outdoors, home office)  -  match the clothing style
-- Expression: candid "talking to camera", warm approachable energy
+- Background: hints at personality (modern apartment, cozy café, outdoors, home office) — match the clothing style
+- Expression hint: candid "talking to camera", warm approachable energy
 - Props: 1–2 natural props max (coffee cup, phone, earbuds, etc.)
 
-Example of a great output:
-"A casual handheld iPhone front-camera selfie vlog. A young woman sits at a tidy desk, filming herself at arm's length (slight wide-angle distortion), natural window light, small imperfections like tiny hand shake and imperfect framing. Modern NYC penthouse apartment vibe in the background (clean lines, big windows, soft daylight, skyline hints), minimal makeup, relaxed hair, comfy-but-stylish outfit. Realistic, candid, 'talking to camera' expression, warm approachable energy  -  looks like a real creator filming a quick update, not a professional shoot. Coffee cup in hand."
+CRITICAL: Do NOT mention hair color, eye color, skin tone, or any specific physical appearance in your output. Those are handled separately.
 
-Return ONLY the prompt text. No explanation, no surrounding quotes, no prefix.`;
+Example of a great output:
+"Casual handheld iPhone front-camera selfie, filming at arm's length with slight wide-angle distortion and natural window light. Modern apartment in the background — clean lines, soft daylight, lived-in feel. Candid talking-to-camera energy, slight hand shake, looks like a real creator filming a quick update."
+
+Return ONLY the scene description. No explanation, no surrounding quotes, no prefix.`;
 
 /**
  * Build a human-readable attribute summary to feed into OpenRouter.
@@ -330,26 +331,29 @@ Deno.serve(async (req: Request) => {
     if (!isRegeneration) {
       const { data: profile } = await sb
         .from("profiles")
-        .select("plan")
+        .select("plan, role")
         .eq("id", userId)
         .single();
       const plan = profile?.plan ?? "free";
+      const isAdmin = profile?.role === "admin";
       const maxPersonas = PERSONA_LIMITS[plan] ?? 0;
 
-      const { count: currentCount } = await sb
-        .from("personas")
-        .select("id", { count: "exact", head: true })
-        .eq("owner_id", userId)
-        .eq("is_active", true);
+      if (!isAdmin) {
+        const { count: currentCount } = await sb
+          .from("personas")
+          .select("id", { count: "exact", head: true })
+          .eq("owner_id", userId)
+          .eq("is_active", true);
 
-      if ((currentCount ?? 0) >= maxPersonas) {
-        return json(
-          {
-            detail: `Your ${plan} plan allows up to ${maxPersonas} persona(s). Upgrade to add more.`,
-          },
-          cors,
-          403,
-        );
+        if ((currentCount ?? 0) >= maxPersonas) {
+          return json(
+            {
+              detail: `Your ${plan} plan allows up to ${maxPersonas} persona(s). Upgrade to add more.`,
+            },
+            cors,
+            403,
+          );
+        }
       }
     }
 

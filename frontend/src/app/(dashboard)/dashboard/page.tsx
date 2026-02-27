@@ -86,6 +86,7 @@ export default function DashboardPage() {
   const plan = profile?.plan ?? "free";
   const planConfig = plan !== "free" ? PLANS[plan as keyof typeof PLANS] : null;
   const creditsRemaining = credits?.remaining ?? 0;
+  const isUnlimitedCredits = credits?.is_unlimited === true;
   const creditsTotal = planConfig?.credits ?? 9;
 
   const recentGenerations = (generations ?? []).slice(0, 5);
@@ -106,8 +107,11 @@ export default function DashboardPage() {
     });
   }, []);
 
-  const creditPercent =
-    creditsTotal > 0 ? Math.round((creditsRemaining / creditsTotal) * 100) : 0;
+  const creditPercent = isUnlimitedCredits
+    ? 100
+    : creditsTotal > 0
+      ? Math.round((creditsRemaining / creditsTotal) * 100)
+      : 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -163,8 +167,14 @@ export default function DashboardPage() {
                 <Loader2 className="size-5 animate-spin" />
               ) : (
                 <>
-                  {creditsRemaining}
-                  <span className="text-lg text-muted-foreground">/{creditsTotal}</span>
+                  {isUnlimitedCredits ? (
+                    "Unlimited"
+                  ) : (
+                    <>
+                      {creditsRemaining}
+                      <span className="text-lg text-muted-foreground">/{creditsTotal}</span>
+                    </>
+                  )}
                 </>
               )}
             </p>

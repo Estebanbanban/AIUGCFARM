@@ -6,6 +6,7 @@ import { callEdge } from "@/lib/api";
 interface CreditInfo {
   remaining: number;
   plan: string;
+  is_unlimited?: boolean;
 }
 
 interface CreditBalanceResponse {
