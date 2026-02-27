@@ -55,8 +55,9 @@ function SidebarContent({
   const plan = profile?.plan ?? "free";
   const creditsTotal =
     plan !== "free" ? (PLANS[plan as keyof typeof PLANS]?.credits ?? 0) : 9;
+  // Cap at 100% — remaining can exceed plan allocation when trial + subscription credits stack
   const creditPercent =
-    creditsTotal > 0 ? Math.round((creditsRemaining / creditsTotal) * 100) : 0;
+    creditsTotal > 0 ? Math.min(100, Math.round((creditsRemaining / creditsTotal) * 100)) : 0;
   const userEmail = profile?.email ?? "";
 
   async function handleSignOut() {
@@ -108,7 +109,9 @@ function SidebarContent({
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Credits</span>
             <span className="font-mono font-medium text-foreground">
-              {creditsRemaining}/{creditsTotal}
+              {creditsRemaining > creditsTotal
+                ? creditsRemaining
+                : `${creditsRemaining}/${creditsTotal}`}
             </span>
           </div>
           <Progress
