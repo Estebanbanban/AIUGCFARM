@@ -4,14 +4,14 @@ import { useState } from "react";
 import { Heart, MessageCircle, Share2, Bookmark } from "lucide-react";
 
 const phones = [
-  { product: "Vitamin C Serum", price: "$34", category: "skincare", pov: "POV: I found the best skincare routine", gradient: "from-[#1a0a00] via-[#2d1500] to-[#1a0a00]" },
-  { product: "Air Max Pulse", price: "$149", category: "sneakers", pov: "POV: these sneakers changed everything", gradient: "from-[#000d1a] via-[#001529] to-[#000d1a]" },
-  { product: "Gold Chain Necklace", price: "$59", category: "jewelry", pov: "POV: found the perfect gift for myself", gradient: "from-[#0f0a00] via-[#1a1000] to-[#0f0a00]" },
-  { product: "Wireless Earbuds", price: "$79", category: "tech", pov: "POV: best $79 I ever spent", gradient: "from-[#050514] via-[#0a0a1f] to-[#050514]" },
-  { product: "Hydrating Face Cream", price: "$42", category: "beauty", pov: "POV: my skin has never looked better", gradient: "from-[#0d0014] via-[#180020] to-[#0d0014]" },
-  { product: "Oversized Hoodie", price: "$65", category: "fashion", pov: "POV: the most comfortable hoodie ever", gradient: "from-[#0a0a0a] via-[#141414] to-[#0a0a0a]" },
-  { product: "Whey Protein", price: "$49", category: "health", pov: "POV: finally found my perfect protein", gradient: "from-[#001a0a] via-[#002914] to-[#001a0a]" },
-  { product: "Smart Watch Pro", price: "$199", category: "tech", pov: "POV: this watch is on another level", gradient: "from-[#0a0014] via-[#14001f] to-[#0a0014]" },
+  { product: "Vitamin C Serum", price: "$34", category: "skincare", pov: "POV: I found the best skincare routine", gradient: "from-[#1a0a00] via-[#2d1500] to-[#1a0a00]", videoSrc: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4" },
+  { product: "Air Max Pulse", price: "$149", category: "sneakers", pov: "POV: these sneakers changed everything", gradient: "from-[#000d1a] via-[#001529] to-[#000d1a]", videoSrc: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4" },
+  { product: "Gold Chain Necklace", price: "$59", category: "jewelry", pov: "POV: found the perfect gift for myself", gradient: "from-[#0f0a00] via-[#1a1000] to-[#0f0a00]", videoSrc: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4" },
+  { product: "Wireless Earbuds", price: "$79", category: "tech", pov: "POV: best $79 I ever spent", gradient: "from-[#050514] via-[#0a0a1f] to-[#050514]", videoSrc: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" },
+  { product: "Hydrating Face Cream", price: "$42", category: "beauty", pov: "POV: my skin has never looked better", gradient: "from-[#0d0014] via-[#180020] to-[#0d0014]", videoSrc: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4" },
+  { product: "Oversized Hoodie", price: "$65", category: "fashion", pov: "POV: the most comfortable hoodie ever", gradient: "from-[#0a0a0a] via-[#141414] to-[#0a0a0a]", videoSrc: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" },
+  { product: "Whey Protein", price: "$49", category: "health", pov: "POV: finally found my perfect protein", gradient: "from-[#001a0a] via-[#002914] to-[#001a0a]", videoSrc: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4" },
+  { product: "Smart Watch Pro", price: "$199", category: "tech", pov: "POV: this watch is on another level", gradient: "from-[#0a0014] via-[#14001f] to-[#0a0014]", videoSrc: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4" },
 ];
 
 function PhoneCard({ phone }: {
@@ -24,6 +24,17 @@ function PhoneCard({ phone }: {
         <div className="w-full aspect-[9/16] rounded-[28px] border-2 border-[#2A2A2A] bg-[#0A0A0A] p-2 shadow-2xl group-hover:border-[#444] group-hover:shadow-[0_0_30px_rgba(255,255,255,0.05)] transition-all duration-300">
           {/* Screen */}
           <div className={`relative w-full h-full rounded-[20px] overflow-hidden bg-gradient-to-b ${phone.gradient}`}>
+            <video
+              className="absolute inset-0 h-full w-full object-cover opacity-55"
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="none"
+            >
+              <source src={phone.videoSrc} type="video/mp4" />
+            </video>
+            <div className="absolute inset-0 bg-black/35" />
 
             {/* Notch */}
             <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-3 bg-black rounded-full z-20" />

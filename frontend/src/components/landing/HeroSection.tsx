@@ -1,33 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import Image from "next/image";
 import { UrlInputCta } from "./UrlInputCta";
-
-const heroMedia = [
-  {
-    type: "image" as const,
-    src: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=80",
-    alt: "Fashion ecommerce product shoot",
-    label: "Fashion",
-  },
-  {
-    type: "video" as const,
-    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
-    label: "UGC Reel",
-  },
-  {
-    type: "image" as const,
-    src: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=900&q=80",
-    alt: "Skincare closeup product image",
-    label: "Beauty",
-  },
-  {
-    type: "video" as const,
-    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-    label: "Product Demo",
-  },
-];
 
 export function HeroSection() {
   return (
@@ -95,41 +69,6 @@ export function HeroSection() {
         >
           No credit card required &middot; Free trial included &middot; 30-second setup
         </motion.p>
-
-        <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.65, delay: 1.2, ease: [0.25, 0.4, 0.25, 1] }}
-          className="mt-9 grid grid-cols-2 md:grid-cols-4 gap-3"
-        >
-          {heroMedia.map((media, i) => (
-            <div key={`${media.label}-${i}`} className="relative aspect-[3/4] rounded-2xl overflow-hidden border border-[#1f1f1f] bg-[#0f0f0f]">
-              {media.type === "image" ? (
-                <Image
-                  src={media.src}
-                  alt={media.alt}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 768px) 45vw, 20vw"
-                />
-              ) : (
-                <video
-                  className="h-full w-full object-cover"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  preload="none"
-                >
-                  <source src={media.src} type="video/mp4" />
-                </video>
-              )}
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/45 to-transparent px-3 pb-2.5 pt-8">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-white/85">{media.label}</p>
-              </div>
-            </div>
-          ))}
-        </motion.div>
       </div>
     </section>
   );
