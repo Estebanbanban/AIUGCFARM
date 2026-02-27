@@ -25,6 +25,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { Logo } from "@/components/ui/Logo";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -74,12 +75,8 @@ function SidebarContent({
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center px-6">
-        <Link
-          href="/"
-          className="text-xl font-semibold tracking-tight text-foreground"
-          onClick={onNavigate}
-        >
-          CineRads
+        <Link href="/" onClick={onNavigate}>
+          <Logo variant="full" size="sm" theme="dark" />
         </Link>
       </div>
 
