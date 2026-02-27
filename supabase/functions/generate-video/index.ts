@@ -6,10 +6,7 @@ import { checkCredits, debitCredits, refundCredits } from "../_shared/credits.ts
 import { callOpenRouter } from "../_shared/openrouter.ts";
 import { withRetry } from "../_shared/retry.ts";
 import { submitKlingJob } from "../_shared/kling.ts";
-
-const NANOBANANA_API_KEY = Deno.env.get("NANOBANANA_API_KEY")!;
-const NANOBANANA_BASE_URL =
-  Deno.env.get("NANOBANANA_BASE_URL") || "https://api.nanobanana.com/v1";
+import { generateCompositeFromImages } from "../_shared/nanobanana.ts";
 
 // Credits per segment set — HD (kling-v3) costs 2× standard (kling-v2-6)
 const COSTS = {
@@ -150,32 +147,15 @@ async function generateScript(
 
 // ── Composite image via NanoBanana ───────────────────────────────────
 
-async function generateCompositeImage(
+function generateCompositeImage(
   personaImageUrl: string,
   productImageUrl: string,
+  scenePrompt?: string,
 ): Promise<string> {
-  const res = await fetch(`${NANOBANANA_BASE_URL}/images/composite`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${NANOBANANA_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      person_image_url: personaImageUrl,
-      product_image_url: productImageUrl,
-      style: "ugc_natural",
-      width: 768,
-      height: 1024,
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Composite image generation failed: ${err}`);
-  }
-
-  const body = await res.json();
-  return body.image_url;
+  const compositePrompt = scenePrompt
+    ? `${scenePrompt} The person is naturally holding and using the product, which is clearly visible in frame.`
+    : undefined;
+  return withRetry(() => generateCompositeFromImages(personaImageUrl, productImageUrl, compositePrompt));
 }
 
 // ── Main handler ─────────────────────────────────────────────────────
@@ -328,11 +308,13 @@ Deno.serve(async (req: Request) => {
 
       // ── 9. Run script + composite in parallel ────────────────────
 
+      // Use the scene prompt saved at persona creation time (if available)
+      const scenePrompt = (persona.attributes as Record<string, unknown>)
+        ?.scene_prompt as string | undefined;
+
       const [script, compositeExternalUrl] = await Promise.all([
         generateScript(product, variantCount),
-        withRetry(() =>
-          generateCompositeImage(personaSignedUrl, resolvedProductImageUrl),
-        ),
+        generateCompositeImage(personaSignedUrl, resolvedProductImageUrl, scenePrompt),
       ]);
 
       // ── 10. Upload composite image to Supabase Storage ───────────

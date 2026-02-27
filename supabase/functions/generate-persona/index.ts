@@ -3,10 +3,8 @@ import { requireUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
 import { withRetry } from "../_shared/retry.ts";
-
-const NANOBANANA_API_KEY = Deno.env.get("NANOBANANA_API_KEY")!;
-const NANOBANANA_BASE_URL =
-  Deno.env.get("NANOBANANA_BASE_URL") || "https://api.nanobanana.com/v1";
+import { callOpenRouter } from "../_shared/openrouter.ts";
+import { generateImagesFromPrompt } from "../_shared/nanobanana.ts";
 
 const PERSONA_LIMITS: Record<string, number> = {
   free: 0,
@@ -141,51 +139,103 @@ function hexToSkinToneLabel(hex: string): string {
 }
 
 /**
- * Build a rich, descriptive prompt from validated persona attributes.
- * Produces a UGC-style portrait suitable for video ad generation.
+ * Fallback: build a basic attribute-list prompt when OpenRouter is unavailable.
  */
-function buildPrompt(attributes: PersonaAttributes): string {
-  const parts: string[] = [
-    "Professional UGC creator portrait photo, looking directly at camera",
-  ];
-
-  // Demographics
+function buildFallbackPrompt(attributes: PersonaAttributes): string {
   const genderLabel = GENDER_LABEL[attributes.gender] ?? attributes.gender;
   const ageLabel = AGE_LABEL[attributes.age] ?? attributes.age;
-  parts.push(`${genderLabel} person`);
-  parts.push(ageLabel);
-
-  // Body type
   const bodyLabel = BODY_TYPE_LABEL[attributes.body_type] ?? attributes.body_type;
-  parts.push(bodyLabel);
-
-  // Hair
-  parts.push(`${attributes.hair_color} ${attributes.hair_style.toLowerCase()} hair`);
-
-  // Eyes
-  parts.push(`${attributes.eye_color.toLowerCase()} eyes`);
-
-  // Skin tone — map hex to descriptive label
   const skinToneLabel = hexToSkinToneLabel(attributes.skin_tone);
-  parts.push(`${skinToneLabel} skin tone`);
-
-  // Clothing
-  parts.push(`wearing ${attributes.clothing_style.toLowerCase()} clothing`);
-
-  // Accessories
   const realAccessories = attributes.accessories.filter(
     (a) => a.toLowerCase() !== "none",
   );
-  if (realAccessories.length > 0) {
-    parts.push(`with ${realAccessories.join(", ").toLowerCase()}`);
-  }
 
-  // Quality / style directives
-  parts.push(
-    "natural lighting, high quality, realistic, 4K, upper body shot, neutral background, social media style",
-  );
+  const parts = [
+    "Casual iPhone front-camera selfie vlog, talking to camera, UGC creator style",
+    `${genderLabel} person`,
+    ageLabel,
+    bodyLabel,
+    `${attributes.hair_color} ${attributes.hair_style.toLowerCase()} hair`,
+    `${attributes.eye_color.toLowerCase()} eyes`,
+    `${skinToneLabel} skin tone`,
+    `wearing ${attributes.clothing_style.toLowerCase()} clothing`,
+    ...(realAccessories.length > 0 ? [`with ${realAccessories.join(", ").toLowerCase()}`] : []),
+    "natural window light, authentic imperfections, realistic, 4K, upper body shot",
+  ];
 
   return parts.join(", ");
+}
+
+/* ------------------------------------------------------------------ */
+/*  Scene prompt generation via OpenRouter                            */
+/* ------------------------------------------------------------------ */
+
+const SCENE_PROMPT_SYSTEM = `You are an expert AI image prompt writer specializing in authentic UGC (user-generated content) style photography for social media ads.
+
+Given a persona's physical attributes, write a single image generation prompt that creates a realistic "talking-to-camera" selfie scene for use with an AI image generator.
+
+The prompt must:
+- Describe a casual handheld iPhone front-camera selfie vlog aesthetic
+- Set a believable background/setting that fits the persona's demographic and clothing style
+- Weave the person's appearance naturally into the scene (do NOT list traits as bullet points)
+- Include authentic imperfections: slight hand shake, imperfect framing, natural lighting variance
+- Feel like a real person filming a quick social media update, NOT a professional shoot
+- Be 3–5 sentences, vivid and specific
+
+Scene rules:
+- Camera: arm's-length iPhone front camera, slight wide-angle distortion
+- Lighting: natural window light or soft warm indoor light
+- Background: hints at personality (modern apartment, cozy café, outdoors, home office) — match the clothing style
+- Expression: candid "talking to camera", warm approachable energy
+- Props: 1–2 natural props max (coffee cup, phone, earbuds, etc.)
+
+Example of a great output:
+"A casual handheld iPhone front-camera selfie vlog. A young woman sits at a tidy desk, filming herself at arm's length (slight wide-angle distortion), natural window light, small imperfections like tiny hand shake and imperfect framing. Modern NYC penthouse apartment vibe in the background (clean lines, big windows, soft daylight, skyline hints), minimal makeup, relaxed hair, comfy-but-stylish outfit. Realistic, candid, 'talking to camera' expression, warm approachable energy — looks like a real creator filming a quick update, not a professional shoot. Coffee cup in hand."
+
+Return ONLY the prompt text. No explanation, no surrounding quotes, no prefix.`;
+
+/**
+ * Build a human-readable attribute summary to feed into OpenRouter.
+ */
+function buildAttributeSummary(attributes: PersonaAttributes): string {
+  const skinLabel = hexToSkinToneLabel(attributes.skin_tone);
+  const realAccessories = attributes.accessories.filter(
+    (a) => a.toLowerCase() !== "none",
+  );
+  return [
+    `Gender: ${GENDER_LABEL[attributes.gender] ?? attributes.gender}`,
+    `Age: ${AGE_LABEL[attributes.age] ?? attributes.age}`,
+    `Skin tone: ${skinLabel}`,
+    `Hair: ${attributes.hair_color} ${attributes.hair_style}`,
+    `Eyes: ${attributes.eye_color}`,
+    `Body type: ${BODY_TYPE_LABEL[attributes.body_type] ?? attributes.body_type}`,
+    `Clothing style: ${attributes.clothing_style}`,
+    realAccessories.length > 0 ? `Accessories: ${realAccessories.join(", ")}` : null,
+  ].filter(Boolean).join("\n");
+}
+
+/**
+ * Use OpenRouter to generate a rich UGC scene prompt from persona attributes.
+ * Falls back to buildFallbackPrompt() if the LLM call fails.
+ */
+async function generateScenePrompt(
+  attributes: PersonaAttributes,
+): Promise<{ prompt: string; generated: boolean }> {
+  try {
+    const summary = buildAttributeSummary(attributes);
+    const prompt = await callOpenRouter(
+      [
+        { role: "system", content: SCENE_PROMPT_SYSTEM },
+        { role: "user", content: `Generate a UGC selfie scene prompt for this persona:\n\n${summary}` },
+      ],
+      { maxTokens: 300, timeoutMs: 20000 },
+    );
+    // Strip any accidental surrounding quotes the model might add
+    return { prompt: prompt.trim().replace(/^["']|["']$/g, ""), generated: true };
+  } catch (err) {
+    console.error("Scene prompt generation failed, using fallback:", err);
+    return { prompt: buildFallbackPrompt(attributes), generated: false };
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -193,36 +243,8 @@ function buildPrompt(attributes: PersonaAttributes): string {
 /* ------------------------------------------------------------------ */
 
 /** Call NanoBanana API to generate persona images (with retry). */
-async function generateImages(prompt: string): Promise<string[]> {
-  return withRetry(async () => {
-    const res = await fetch(`${NANOBANANA_BASE_URL}/images/generate`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${NANOBANANA_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        prompt,
-        num_images: 4,
-        width: 768,
-        height: 1024,
-        guidance_scale: 7.5,
-      }),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`NanoBanana image generation failed (${res.status}): ${errText}`);
-    }
-
-    const body = await res.json();
-    // Expected response: { images: [{ url: "..." }, ...] }
-    const urls = (body.images ?? []).map((img: { url: string }) => img.url);
-    if (urls.length === 0) {
-      throw new Error("NanoBanana returned no images");
-    }
-    return urls;
-  }, 3, 500);
+function generateImages(prompt: string): Promise<string[]> {
+  return withRetry(() => generateImagesFromPrompt(prompt, 4), 3, 500);
 }
 
 /* ------------------------------------------------------------------ */
@@ -298,8 +320,11 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Generate rich UGC scene prompt via OpenRouter (falls back to basic descriptor)
+    const { prompt, generated: promptGenerated } = await generateScenePrompt(validAttrs);
+    console.log(`Scene prompt (${promptGenerated ? "LLM" : "fallback"}):`, prompt);
+
     // Generate images via NanoBanana (with retry)
-    const prompt = buildPrompt(validAttrs);
     const imageUrls = await generateImages(prompt);
 
     // Upload generated images to persona-images bucket (private)
@@ -341,6 +366,9 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Persist scene_prompt alongside attributes so generate-video can reuse it
+    const attributesToSave = { ...validAttrs, scene_prompt: prompt };
+
     // Save persona record — UPDATE on regeneration, INSERT on new creation
     let persona;
     if (isRegeneration) {
@@ -348,7 +376,7 @@ Deno.serve(async (req: Request) => {
         .from("personas")
         .update({
           name,
-          attributes,
+          attributes: attributesToSave,
           generated_images: storagePaths,
           selected_image_url: null, // reset selection on regeneration
         })
@@ -364,7 +392,7 @@ Deno.serve(async (req: Request) => {
         .insert({
           owner_id: userId,
           name,
-          attributes,
+          attributes: attributesToSave,
           generated_images: storagePaths,
           selected_image_url: null,
           is_active: true,
@@ -391,7 +419,19 @@ Deno.serve(async (req: Request) => {
     if (msg === "Unauthorized") {
       return json({ detail: "Authentication required" }, cors, 401);
     }
+
+    // Return actionable messages for known upstream/config failures so the UI
+    // can show the real cause instead of a generic 500.
+    if (
+      msg.includes("NANOBANANA_API_KEY") ||
+      msg.includes("NanoBanana") ||
+      msg.includes("OpenRouter")
+    ) {
+      console.error("generate-persona upstream/config error:", e);
+      return json({ detail: msg }, cors, 502);
+    }
+
     console.error("generate-persona error:", e);
-    return json({ detail: "Failed to generate persona. Please try again." }, cors, 500);
+    return json({ detail: msg || "Failed to generate persona. Please try again." }, cors, 500);
   }
 });

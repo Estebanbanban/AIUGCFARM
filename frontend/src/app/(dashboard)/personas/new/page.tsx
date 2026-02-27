@@ -6,22 +6,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Loader2, Sparkles, Check, User, ImageIcon } from "lucide-react";
+import {
+  ArrowLeft, Loader2, Sparkles, Check, User, ImageIcon,
+  ChevronDown, ChevronUp, Eye, Palette, Clock, Shirt, Watch,
+} from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { callEdge } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePersonaBuilderStore } from "@/stores/persona-builder";
 import {
   skinTones,
@@ -35,11 +31,13 @@ import {
   personaGenders,
 } from "@/schemas/persona";
 
+// ── Label maps ──────────────────────────────────────────────────────────────
+
 const ageRangeLabels: Record<string, string> = {
-  "18_25": "18-25",
-  "25_35": "25-35",
-  "35_45": "35-45",
-  "45_55": "45-55",
+  "18_25": "18–25",
+  "25_35": "25–35",
+  "35_45": "35–45",
+  "45_55": "45–55",
   "55_plus": "55+",
 };
 
@@ -57,10 +55,140 @@ const bodyTypeLabels: Record<string, string> = {
   plus_size: "Plus Size",
 };
 
+const hairPlaceholderStyle: Record<string, React.CSSProperties> = {
+  Black:       { background: "linear-gradient(135deg,#18181b 0%,#09090b 100%)" },
+  "Dark Brown":  { background: "linear-gradient(135deg,#3b1f0a 0%,#1c0f05 100%)" },
+  "Light Brown": { background: "linear-gradient(135deg,#92400e 0%,#451a03 100%)" },
+  Blonde:      { background: "linear-gradient(135deg,#fde68a 0%,#d97706 100%)" },
+  Red:         { background: "linear-gradient(135deg,#dc2626 0%,#7f1d1d 100%)" },
+  Auburn:      { background: "linear-gradient(135deg,#c2410c 0%,#431407 100%)" },
+  Gray:        { background: "linear-gradient(135deg,#71717a 0%,#3f3f46 100%)" },
+  White:       { background: "linear-gradient(135deg,#e4e4e7 0%,#a1a1aa 100%)" },
+  Pink:        { background: "linear-gradient(135deg,#f472b6 0%,#9d174d 100%)" },
+  Blue:        { background: "linear-gradient(135deg,#3b82f6 0%,#1e3a8a 100%)" },
+};
+
+const eyePlaceholderStyle: Record<string, React.CSSProperties> = {
+  Brown: { background: "linear-gradient(135deg,#92400e 0%,#451a03 100%)" },
+  Blue:  { background: "linear-gradient(135deg,#3b82f6 0%,#1e3a8a 100%)" },
+  Green: { background: "linear-gradient(135deg,#16a34a 0%,#14532d 100%)" },
+  Hazel: { background: "linear-gradient(135deg,#d97706 0%,#78350f 100%)" },
+  Gray:  { background: "linear-gradient(135deg,#71717a 0%,#3f3f46 100%)" },
+  Amber: { background: "linear-gradient(135deg,#f59e0b 0%,#b45309 100%)" },
+};
+
+// ── Shared sub-components ───────────────────────────────────────────────────
+
+function Section({
+  icon,
+  label,
+  count,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  count?: number;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="flex flex-col gap-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 py-0.5"
+      >
+        <span className="flex-shrink-0 text-primary">{icon}</span>
+        <span className="flex-1 text-left text-sm font-semibold text-foreground">
+          {label}
+          {count !== undefined && (
+            <span className="ml-1.5 font-normal text-muted-foreground">· {count}</span>
+          )}
+        </span>
+        {open
+          ? <ChevronUp className="size-4 text-muted-foreground" />
+          : <ChevronDown className="size-4 text-muted-foreground" />}
+      </button>
+      {open && (
+        <div className="rounded-xl border border-border bg-muted/50 p-3">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ImageCard({
+  label,
+  selected,
+  onClick,
+  placeholderStyle,
+  aspect = "aspect-[3/4]",
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+  placeholderStyle?: React.CSSProperties;
+  aspect?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "relative overflow-hidden rounded-xl transition-all duration-150",
+        aspect,
+        selected
+          ? "ring-2 ring-primary ring-offset-1 ring-offset-background"
+          : "ring-1 ring-border hover:ring-primary/40",
+      )}
+    >
+      <div className="absolute inset-0 bg-muted" style={placeholderStyle} />
+      <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/70 to-transparent" />
+      <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5">
+        {selected && (
+          <div className="flex size-5 flex-shrink-0 items-center justify-center rounded-full bg-primary">
+            <Check className="size-3 text-primary-foreground" strokeWidth={3} />
+          </div>
+        )}
+        <span className="text-sm font-semibold leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.9)]">
+          {label}
+        </span>
+      </div>
+    </button>
+  );
+}
+
+function TextCard({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-xl border py-3 text-sm font-medium transition-all",
+        selected
+          ? "border-primary bg-primary/10 text-primary"
+          : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+// ── Page ────────────────────────────────────────────────────────────────────
+
 export default function NewPersonaPage() {
   const router = useRouter();
   const store = usePersonaBuilderStore();
-
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<number>>(new Set());
 
   async function handleGenerate() {
@@ -92,21 +220,16 @@ export default function NewPersonaPage() {
         body: {
           name: store.name,
           attributes,
-          // Pass persona_id on regeneration so the backend updates instead of inserting
           ...(store.personaId ? { persona_id: store.personaId } : {}),
         },
       });
 
-      // Use signed URLs for display, NOT storage paths
       const displayUrls = result.data.generated_image_urls ?? result.data.generated_images;
       store.setPersonaId(result.data.id);
       store.setGeneratedImages(displayUrls);
-      toast.success(
-        `${displayUrls.length} persona images generated!`
-      );
+      toast.success(`${displayUrls.length} persona images generated!`);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to generate persona";
+      const message = error instanceof Error ? error.message : "Failed to generate persona";
       toast.error(message);
     } finally {
       store.setIsGenerating(false);
@@ -128,8 +251,7 @@ export default function NewPersonaPage() {
       router.push("/personas");
       store.reset();
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to save persona";
+      const message = error instanceof Error ? error.message : "Failed to save persona";
       toast.error(message);
     } finally {
       store.setIsSaving(false);
@@ -154,451 +276,281 @@ export default function NewPersonaPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        {/* Left Panel -- Attribute Controls */}
-        <ScrollArea className="h-[calc(100vh-180px)] pr-4 lg:h-auto lg:pr-0">
-          <fieldset disabled={store.isGenerating || store.isSaving}>
+
+        {/* ── Left: Sims-style criteria builder ────────────────────────── */}
+        <fieldset disabled={store.isGenerating || store.isSaving} className="min-w-0">
           <div className={cn(
-            "flex flex-col gap-6 transition-opacity",
-            (store.isGenerating || store.isSaving) && "pointer-events-none opacity-60"
+            "flex flex-col gap-5 transition-opacity",
+            (store.isGenerating || store.isSaving) && "pointer-events-none opacity-50",
           )}>
+
             {/* Name */}
-            <Card>
-              <CardContent className="flex flex-col gap-3 p-5">
-                <Label htmlFor="persona-name" className="text-sm font-medium">
-                  Persona Name
-                </Label>
-                <Input
-                  id="persona-name"
-                  placeholder="e.g. Sophie, Marcus"
-                  value={store.name}
-                  onChange={(e) => store.setField("name", e.target.value)}
-                />
-              </CardContent>
-            </Card>
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Persona Name
+              </Label>
+              <Input
+                id="persona-name"
+                placeholder="e.g. Sophie, Marcus"
+                value={store.name}
+                onChange={(e) => store.setField("name", e.target.value)}
+              />
+            </div>
 
             {/* Gender */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Gender</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-2">
-                  {personaGenders.map((g) => (
-                    <button
-                      key={g}
-                      onClick={() => store.setField("gender", g)}
-                      className={cn(
-                        "rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors",
-                        store.gender === g
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border bg-card text-muted-foreground hover:border-muted-foreground/30"
-                      )}
-                    >
-                      {genderLabels[g]}
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <Section icon={<User className="size-4" />} label="Gender" count={1}>
+              <div className="grid grid-cols-3 gap-2">
+                {personaGenders.map((g) => (
+                  <ImageCard
+                    key={g}
+                    label={genderLabels[g]}
+                    selected={store.gender === g}
+                    onClick={() => store.setField("gender", g)}
+                  />
+                ))}
+              </div>
+            </Section>
 
             {/* Skin Tone */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Skin Tone</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-3">
-                  {skinTones.map((tone) => (
-                    <button
-                      key={tone}
-                      onClick={() => store.setField("skinTone", tone)}
-                      className={cn(
-                        "size-10 rounded-full border-2 transition-all",
-                        store.skinTone === tone
-                          ? "border-primary ring-2 ring-primary/30 scale-110"
-                          : "border-transparent hover:scale-105"
-                      )}
-                      style={{ backgroundColor: tone }}
-                      title={tone}
-                    />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <Section icon={<Palette className="size-4" />} label="Skin Tone" count={1}>
+              <div className="grid grid-cols-6 gap-2">
+                {skinTones.map((tone) => (
+                  <button
+                    key={tone}
+                    type="button"
+                    onClick={() => store.setField("skinTone", tone)}
+                    className={cn(
+                      "aspect-square rounded-xl transition-all duration-150",
+                      store.skinTone === tone
+                        ? "scale-105 ring-2 ring-primary ring-offset-1 ring-offset-background"
+                        : "ring-1 ring-border hover:scale-105 hover:ring-primary/40",
+                    )}
+                    style={{ backgroundColor: tone }}
+                  />
+                ))}
+              </div>
+            </Section>
 
             {/* Age Range */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Age Range</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {personaAgeRanges.map((range) => (
-                    <button
-                      key={range}
-                      onClick={() => store.setField("ageRange", range)}
-                      className={cn(
-                        "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
-                        store.ageRange === range
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground hover:border-muted-foreground/30"
-                      )}
-                    >
-                      {ageRangeLabels[range]}
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <Section icon={<Clock className="size-4" />} label="Age Range" count={1}>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                {personaAgeRanges.map((range) => (
+                  <TextCard
+                    key={range}
+                    label={ageRangeLabels[range]}
+                    selected={store.ageRange === range}
+                    onClick={() => store.setField("ageRange", range)}
+                  />
+                ))}
+              </div>
+            </Section>
 
             {/* Hair Color */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">
-                  Hair Color
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {hairColors.map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => store.setField("hairColor", color)}
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                        store.hairColor === color
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground hover:border-muted-foreground/30"
-                      )}
-                    >
-                      {color}
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <Section icon={<Palette className="size-4" />} label="Hair Color" count={1}>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                {hairColors.map((color) => (
+                  <ImageCard
+                    key={color}
+                    label={color}
+                    selected={store.hairColor === color}
+                    onClick={() => store.setField("hairColor", color)}
+                    placeholderStyle={hairPlaceholderStyle[color]}
+                    aspect="aspect-square"
+                  />
+                ))}
+              </div>
+            </Section>
 
             {/* Hair Style */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">
-                  Hair Style
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                  {hairStyles.map((style) => (
-                    <button
-                      key={style}
-                      onClick={() => store.setField("hairStyle", style)}
-                      className={cn(
-                        "rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
-                        store.hairStyle === style
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground hover:border-muted-foreground/30"
-                      )}
-                    >
-                      {style}
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <Section icon={<User className="size-4" />} label="Hair Style" count={1}>
+              <div className="grid grid-cols-3 gap-2">
+                {hairStyles.map((style) => (
+                  <ImageCard
+                    key={style}
+                    label={style}
+                    selected={store.hairStyle === style}
+                    onClick={() => store.setField("hairStyle", style)}
+                  />
+                ))}
+              </div>
+            </Section>
 
             {/* Eye Color */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">
-                  Eye Color
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {eyeColors.map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => store.setField("eyeColor", color)}
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                        store.eyeColor === color
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground hover:border-muted-foreground/30"
-                      )}
-                    >
-                      {color}
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <Section icon={<Eye className="size-4" />} label="Eye Color" count={1}>
+              <div className="grid grid-cols-3 gap-2">
+                {eyeColors.map((color) => (
+                  <ImageCard
+                    key={color}
+                    label={color}
+                    selected={store.eyeColor === color}
+                    onClick={() => store.setField("eyeColor", color)}
+                    placeholderStyle={eyePlaceholderStyle[color]}
+                    aspect="aspect-square"
+                  />
+                ))}
+              </div>
+            </Section>
 
             {/* Body Type */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">
-                  Body Type
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {personaBodyTypes.map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => store.setField("bodyType", type)}
-                      className={cn(
-                        "rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
-                        store.bodyType === type
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground hover:border-muted-foreground/30"
-                      )}
-                    >
-                      {bodyTypeLabels[type]}
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <Section icon={<User className="size-4" />} label="Body Type" count={1}>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                {personaBodyTypes.map((type) => (
+                  <TextCard
+                    key={type}
+                    label={bodyTypeLabels[type]}
+                    selected={store.bodyType === type}
+                    onClick={() => store.setField("bodyType", type)}
+                  />
+                ))}
+              </div>
+            </Section>
 
             {/* Clothing Style */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">
-                  Clothing Style
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                  {clothingStyles.map((style) => (
+            <Section icon={<Shirt className="size-4" />} label="Clothing Style" count={1}>
+              <div className="grid grid-cols-3 gap-2">
+                {clothingStyles.map((style) => (
+                  <ImageCard
+                    key={style}
+                    label={style}
+                    selected={store.clothingStyle === style}
+                    onClick={() => store.setField("clothingStyle", style)}
+                  />
+                ))}
+              </div>
+            </Section>
+
+            {/* Accessories — multi-select */}
+            <Section
+              icon={<Watch className="size-4" />}
+              label="Accessories"
+              count={store.accessories.length}
+            >
+              <p className="mb-2 text-xs text-muted-foreground">Select up to 5</p>
+              <div className="flex flex-wrap gap-2">
+                {accessoryOptions.map((acc) => {
+                  const isSelected = store.accessories.includes(acc);
+                  return (
                     <button
-                      key={style}
-                      onClick={() => store.setField("clothingStyle", style)}
+                      key={acc}
+                      type="button"
+                      onClick={() => store.toggleAccessory(acc)}
                       className={cn(
-                        "rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
-                        store.clothingStyle === style
+                        "rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+                        isSelected
                           ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground hover:border-muted-foreground/30"
+                          : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
                       )}
                     >
-                      {style}
+                      {isSelected && <Check className="mr-1 inline size-3" strokeWidth={3} />}
+                      {acc}
+                    </button>
+                  );
+                })}
+              </div>
+            </Section>
+
+          </div>
+        </fieldset>
+
+        {/* ── Right: preview + generate ───────────────────────────────── */}
+        <div className="flex flex-col gap-4">
+          <div className="sticky top-6">
+
+            {/* Generating skeleton */}
+            {store.isGenerating && store.generatedImages.length === 0 && (
+              <div className="rounded-xl border border-border bg-card p-4">
+                <p className="mb-3 text-sm font-medium text-foreground">Generating Persona...</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="aspect-square animate-pulse rounded-xl bg-muted" />
+                  ))}
+                </div>
+                <p className="mt-3 text-center text-xs text-muted-foreground">
+                  This may take up to 30 seconds...
+                </p>
+              </div>
+            )}
+
+            {/* Attribute summary (before generating) */}
+            {store.generatedImages.length === 0 && !store.isGenerating && (
+              <div className="rounded-xl border border-border bg-card p-4">
+                <p className="mb-3 text-sm font-semibold text-foreground">Persona Preview</p>
+                <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-primary/10">
+                  <User className="size-6 text-primary" />
+                </div>
+                <Separator className="mb-3" />
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                  {[
+                    { label: "Name",   value: store.name || "Not set" },
+                    { label: "Gender", value: genderLabels[store.gender] },
+                    { label: "Age",    value: ageRangeLabels[store.ageRange] },
+                    { label: "Hair",   value: `${store.hairColor}, ${store.hairStyle}` },
+                    { label: "Eyes",   value: store.eyeColor },
+                    { label: "Body",   value: bodyTypeLabels[store.bodyType] },
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <p className="text-xs text-muted-foreground">{label}</p>
+                      <p className="truncate font-medium text-foreground">{value}</p>
+                    </div>
+                  ))}
+                </div>
+                {store.accessories.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1 border-t border-border pt-3">
+                    {store.accessories.map((acc) => (
+                      <Badge key={acc} variant="secondary" className="text-xs">
+                        {acc}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Generated image picker */}
+            {store.generatedImages.length > 0 && (
+              <div className="rounded-xl border border-border bg-card p-4">
+                <p className="mb-3 text-sm font-semibold text-foreground">Choose Your Persona</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {store.generatedImages.map((url, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => store.selectImage(index)}
+                      className={cn(
+                        "relative aspect-square overflow-hidden rounded-xl transition-all",
+                        store.selectedImageIndex === index
+                          ? "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                          : "ring-1 ring-border hover:ring-primary/40",
+                      )}
+                    >
+                      {imageLoadErrors.has(index) ? (
+                        <div className="flex size-full items-center justify-center bg-muted">
+                          <ImageIcon className="size-8 text-muted-foreground" />
+                        </div>
+                      ) : (
+                        <Image
+                          src={url}
+                          alt={`Persona option ${index + 1}`}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 50vw, 190px"
+                          onError={() =>
+                            setImageLoadErrors((prev) => new Set(prev).add(index))
+                          }
+                        />
+                      )}
+                      {store.selectedImageIndex === index && (
+                        <div className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-primary">
+                          <Check className="size-3 text-primary-foreground" strokeWidth={3} />
+                        </div>
+                      )}
                     </button>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Accessories */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">
-                  Accessories{" "}
-                  <span className="text-xs font-normal text-muted-foreground">
-                    (max 5)
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {accessoryOptions.map((acc) => {
-                    const isSelected = store.accessories.includes(acc);
-                    return (
-                      <button
-                        key={acc}
-                        onClick={() => store.toggleAccessory(acc)}
-                        className={cn(
-                          "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                          isSelected
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border text-muted-foreground hover:border-muted-foreground/30"
-                        )}
-                      >
-                        {isSelected && <Check className="mr-1 inline size-3" />}
-                        {acc}
-                      </button>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          </fieldset>
-        </ScrollArea>
-
-        {/* Right Panel -- Preview & Generation */}
-        <div className="flex flex-col gap-4">
-          <div className="sticky top-6">
-            {/* Loading Skeleton -- shown while generating */}
-            {store.isGenerating && store.generatedImages.length === 0 && (
-              <Card className="mb-4">
-                <CardHeader>
-                  <CardTitle className="text-sm font-medium text-foreground">
-                    Generating Persona...
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    {[0, 1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className="aspect-square animate-pulse rounded-lg bg-muted"
-                      />
-                    ))}
-                  </div>
-                  <p className="text-center text-xs text-muted-foreground">
-                    This may take up to 30 seconds...
-                  </p>
-                </CardContent>
-              </Card>
+              </div>
             )}
 
-            {/* Attribute Summary */}
-            {store.generatedImages.length === 0 && !store.isGenerating && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm font-medium">
-                    Persona Summary
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-3">
-                  <div className="flex size-20 items-center justify-center self-center rounded-full bg-muted">
-                    <User className="size-8 text-muted-foreground" />
-                  </div>
-
-                  <Separator />
-
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-xs text-muted-foreground">
-                        Name
-                      </span>
-                      <p className="font-medium">{store.name || "Not set"}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">
-                        Gender
-                      </span>
-                      <p className="font-medium">{genderLabels[store.gender]}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">Age</span>
-                      <p className="font-medium">
-                        {ageRangeLabels[store.ageRange]}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">
-                        Body Type
-                      </span>
-                      <p className="font-medium capitalize">
-                        {bodyTypeLabels[store.bodyType]}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">Hair</span>
-                      <p className="font-medium">
-                        {store.hairColor}, {store.hairStyle}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">Eyes</span>
-                      <p className="font-medium">{store.eyeColor}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">
-                        Skin Tone
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="size-4 rounded-full border"
-                          style={{ backgroundColor: store.skinTone }}
-                        />
-                        <span className="text-xs font-medium">
-                          {store.skinTone}
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">
-                        Style
-                      </span>
-                      <p className="font-medium">{store.clothingStyle}</p>
-                    </div>
-                  </div>
-
-                  {store.accessories.length > 0 && (
-                    <>
-                      <Separator />
-                      <div>
-                        <span className="text-xs text-muted-foreground">
-                          Accessories
-                        </span>
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {store.accessories.map((acc) => (
-                            <Badge
-                              key={acc}
-                              variant="secondary"
-                              className="text-xs"
-                            >
-                              {acc}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Generated Images */}
-            {store.generatedImages.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm font-medium">
-                    Choose Your Persona
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    {store.generatedImages.map((url, index) => (
-                      <button
-                        key={index}
-                        onClick={() => store.selectImage(index)}
-                        className={cn(
-                          "relative aspect-square overflow-hidden rounded-lg border-2 bg-muted transition-all",
-                          store.selectedImageIndex === index
-                            ? "border-primary ring-2 ring-primary/30"
-                            : "border-transparent hover:border-muted-foreground/30"
-                        )}
-                      >
-                        {imageLoadErrors.has(index) ? (
-                          <div className="flex size-full items-center justify-center">
-                            <ImageIcon className="size-12 text-muted-foreground" />
-                          </div>
-                        ) : (
-                          <Image
-                            src={url}
-                            alt={`Persona option ${index + 1}`}
-                            fill
-                            className="object-cover"
-                            sizes="(max-width: 768px) 50vw, 190px"
-                            onError={() =>
-                              setImageLoadErrors((prev) => new Set(prev).add(index))
-                            }
-                          />
-                        )}
-                        {store.selectedImageIndex === index && (
-                          <div className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-primary">
-                            <Check className="size-3.5 text-white" />
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Action Buttons */}
+            {/* Action buttons */}
             <div className="mt-4 flex flex-col gap-3">
               {store.generatedImages.length === 0 ? (
                 <Button
@@ -664,8 +616,10 @@ export default function NewPersonaPage() {
                 </>
               )}
             </div>
+
           </div>
         </div>
+
       </div>
     </div>
   );
