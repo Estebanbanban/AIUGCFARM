@@ -94,6 +94,7 @@ export interface GenerationHistoryItem {
   product_id: string;
   persona_id: string;
   mode: string;
+  video_quality: Generation["video_quality"];
   status: GenerationStatus;
   script: GenerationScript | null;
   composite_image_url: string | null;
