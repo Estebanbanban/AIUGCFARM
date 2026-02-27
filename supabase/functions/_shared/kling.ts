@@ -79,6 +79,7 @@ export async function submitKlingJob(params: {
       prompt: params.script,
       duration: String(params.duration),
       mode: params.mode || "std",
+      enable_audio: true,
     }),
   });
 
