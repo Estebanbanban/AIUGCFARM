@@ -23,7 +23,6 @@ const VALID_BODY_TYPES = new Set(["slim", "average", "athletic", "curvy", "plus_
 
 const REQUIRED_ATTRIBUTE_KEYS = [
   "gender",
-  "skin_tone",
   "age",
   "hair_color",
   "hair_style",
@@ -32,10 +31,12 @@ const REQUIRED_ATTRIBUTE_KEYS = [
   "clothing_style",
   "accessories",
 ] as const;
+// ethnicity is preferred; skin_tone is the legacy fallback — at least one must be present
 
 interface PersonaAttributes {
   gender: string;
-  skin_tone: string;
+  ethnicity?: string; // preferred — descriptive label like "East Asian", "Black / African"
+  skin_tone?: string; // legacy — hex colour (#C68642) or free-text; used when ethnicity absent
   age: string;
   hair_color: string;
   hair_style: string;
@@ -69,8 +70,11 @@ function validateAttributes(
     return `Invalid body type. Expected one of: ${[...VALID_BODY_TYPES].join(", ")}`;
   }
 
-  if (typeof attrs.skin_tone !== "string" || !attrs.skin_tone) {
-    return "skin_tone must be a non-empty string";
+  // Require either ethnicity (new) or skin_tone (legacy)
+  const hasEthnicity = typeof attrs.ethnicity === "string" && !!attrs.ethnicity;
+  const hasSkinTone = typeof attrs.skin_tone === "string" && !!attrs.skin_tone;
+  if (!hasEthnicity && !hasSkinTone) {
+    return "Either ethnicity or skin_tone is required";
   }
   if (typeof attrs.hair_color !== "string" || !attrs.hair_color) {
     return "hair_color must be a non-empty string";
@@ -145,19 +149,18 @@ function buildFallbackPrompt(attributes: PersonaAttributes): string {
   const genderLabel = GENDER_LABEL[attributes.gender] ?? attributes.gender;
   const ageLabel = AGE_LABEL[attributes.age] ?? attributes.age;
   const bodyLabel = BODY_TYPE_LABEL[attributes.body_type] ?? attributes.body_type;
-  const skinToneLabel = hexToSkinToneLabel(attributes.skin_tone);
+  const ethnicityLabel = resolveEthnicityLabel(attributes);
   const realAccessories = attributes.accessories.filter(
     (a) => a.toLowerCase() !== "none",
   );
 
   const parts = [
     "Casual iPhone front-camera selfie vlog, talking to camera, UGC creator style",
-    `${genderLabel} person`,
+    `${genderLabel} person of ${ethnicityLabel} ethnicity`,
     ageLabel,
     bodyLabel,
     `${attributes.hair_color} ${attributes.hair_style.toLowerCase()} hair`,
     `${attributes.eye_color.toLowerCase()} eyes`,
-    `${skinToneLabel} skin tone`,
     `wearing ${attributes.clothing_style.toLowerCase()} clothing`,
     ...(realAccessories.length > 0 ? [`with ${realAccessories.join(", ").toLowerCase()}`] : []),
     "natural window light, authentic imperfections, realistic, 4K, upper body shot",
@@ -195,18 +198,25 @@ Example of a great output:
 
 Return ONLY the scene description. No explanation, no surrounding quotes, no prefix.`;
 
+/** Resolve the best ethnicity/skin description from attributes. */
+function resolveEthnicityLabel(attributes: PersonaAttributes): string {
+  if (attributes.ethnicity) return attributes.ethnicity;
+  if (attributes.skin_tone) return hexToSkinToneLabel(attributes.skin_tone) + " skin tone";
+  return "natural skin tone";
+}
+
 /**
  * Build a human-readable attribute summary to feed into OpenRouter.
  */
 function buildAttributeSummary(attributes: PersonaAttributes): string {
-  const skinLabel = hexToSkinToneLabel(attributes.skin_tone);
+  const ethnicityLabel = resolveEthnicityLabel(attributes);
   const realAccessories = attributes.accessories.filter(
     (a) => a.toLowerCase() !== "none",
   );
   return [
     `Gender: ${GENDER_LABEL[attributes.gender] ?? attributes.gender}`,
     `Age: ${AGE_LABEL[attributes.age] ?? attributes.age}`,
-    `Skin tone: ${skinLabel}`,
+    `Ethnicity: ${ethnicityLabel}`,
     `Hair: ${attributes.hair_color} ${attributes.hair_style}`,
     `Eyes: ${attributes.eye_color}`,
     `Body type: ${BODY_TYPE_LABEL[attributes.body_type] ?? attributes.body_type}`,
@@ -251,7 +261,6 @@ async function generateScenePrompt(
  * scene description, which only sets background/lighting/vibe.
  */
 function buildImagePrompt(attributes: PersonaAttributes, scenePrompt: string): string {
-  const skinLabel = hexToSkinToneLabel(attributes.skin_tone);
   const genderLabel = GENDER_LABEL[attributes.gender] ?? attributes.gender;
   const ageLabel = AGE_LABEL[attributes.age] ?? attributes.age;
   const bodyLabel = BODY_TYPE_LABEL[attributes.body_type] ?? attributes.body_type;
@@ -259,12 +268,14 @@ function buildImagePrompt(attributes: PersonaAttributes, scenePrompt: string): s
     (a) => a.toLowerCase() !== "none",
   );
 
+  const ethnicityLabel = resolveEthnicityLabel(attributes);
+
   // Physical appearance block — listed first so Gemini weights it highest.
   const appearanceBlock = [
     `MANDATORY SUBJECT APPEARANCE — render EXACTLY as specified below. Every attribute is NON-NEGOTIABLE. Do NOT substitute, alter, or omit any trait:`,
     `• Gender: ${genderLabel.toUpperCase()}`,
     `• Age: ${ageLabel}`,
-    `• Skin tone: ${skinLabel.toUpperCase()} skin`,
+    `• Ethnicity: ${ethnicityLabel.toUpperCase()} — REQUIRED, render with correct facial features and skin tone for this ethnicity`,
     `• Body: ${bodyLabel}`,
     `• Hair: ${attributes.hair_color.toUpperCase()} ${attributes.hair_style} hair — this colour is REQUIRED`,
     `• Eyes: ${attributes.eye_color.toUpperCase()} eyes — this colour is REQUIRED`,

@@ -5,7 +5,8 @@ interface PersonaBuilderState {
   name: string;
   gender: string;
   ageRange: string;
-  skinTone: string;
+  ethnicity: string;
+  skinTone: string; // kept for backward-compat when loading old personas
   hairColor: string;
   hairStyle: string;
   eyeColor: string;
@@ -30,6 +31,7 @@ interface PersonaBuilderState {
     attributes: {
       gender?: string;
       age?: string;
+      ethnicity?: string;
       skin_tone?: string;
       hair_color?: string;
       hair_style?: string;
@@ -46,7 +48,8 @@ const initialState = {
   name: "",
   gender: "female",
   ageRange: "25_35",
-  skinTone: "#F1C27D",
+  ethnicity: "White / Caucasian",
+  skinTone: "#F1C27D", // legacy, kept for old persona compatibility
   hairColor: "Dark Brown",
   hairStyle: "Medium Straight",
   eyeColor: "Brown",
@@ -101,6 +104,7 @@ export const usePersonaBuilderStore = create<PersonaBuilderState>()(
         name: persona.name,
         gender: persona.attributes.gender ?? initialState.gender,
         ageRange: persona.attributes.age ?? initialState.ageRange,
+        ethnicity: persona.attributes.ethnicity ?? initialState.ethnicity,
         skinTone: persona.attributes.skin_tone ?? initialState.skinTone,
         hairColor: persona.attributes.hair_color ?? initialState.hairColor,
         hairStyle: persona.attributes.hair_style ?? initialState.hairStyle,

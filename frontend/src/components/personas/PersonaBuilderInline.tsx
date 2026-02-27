@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { usePersonaBuilderStore } from '@/stores/persona-builder';
 import {
-  skinTones,
+  ethnicities,
   hairColors,
   hairStyles,
   eyeColors,
@@ -323,6 +323,29 @@ function optionHumanPhotoUri(key: string) {
   return optionImageDataUri(key);
 }
 
+// Ethnicity placeholder styles and Unsplash reference photos
+const ethnicityPlaceholderStyle: Record<string, React.CSSProperties> = {
+  'White / Caucasian':   { background: 'linear-gradient(135deg,#fde8d8 0%,#f5c6a0 100%)' },
+  'Black / African':     { background: 'linear-gradient(135deg,#3b1f0a 0%,#1c0f05 100%)' },
+  'East Asian':          { background: 'linear-gradient(135deg,#fef3e2 0%,#f5d9a8 100%)' },
+  'South Asian':         { background: 'linear-gradient(135deg,#c68642 0%,#7d4c1e 100%)' },
+  'Southeast Asian':     { background: 'linear-gradient(135deg,#e0ac69 0%,#a07040 100%)' },
+  'Latino / Hispanic':   { background: 'linear-gradient(135deg,#d4956a 0%,#8b5e3c 100%)' },
+  'Middle Eastern':      { background: 'linear-gradient(135deg,#c8a97a 0%,#8b6b42 100%)' },
+  'Mixed / Multiracial': { background: 'linear-gradient(135deg,#d4a76a 0%,#9b7040 100%)' },
+};
+
+const ethnicityImageSrc: Record<string, string> = {
+  'White / Caucasian':   'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=900&q=80',
+  'Black / African':     'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=900&q=80',
+  'East Asian':          'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=900&q=80',
+  'South Asian':         'https://images.unsplash.com/photo-1618641986557-1ecd230959aa?auto=format&fit=crop&w=900&q=80',
+  'Southeast Asian':     'https://images.unsplash.com/photo-1554151228-14d9def656e4?auto=format&fit=crop&w=900&q=80',
+  'Latino / Hispanic':   'https://images.unsplash.com/photo-1597223557154-721c1cecc4b0?auto=format&fit=crop&w=900&q=80',
+  'Middle Eastern':      'https://images.unsplash.com/photo-1607746882042-944635dfe10e?auto=format&fit=crop&w=900&q=80',
+  'Mixed / Multiracial': 'https://images.unsplash.com/photo-1554151228-14d9def656e4?auto=format&fit=crop&w=900&q=80',
+};
+
 // Color-tinted placeholder gradients for hair/eye options.
 // Swap the placeholder <div> for <Image fill .../> per option when photos are ready.
 const hairPlaceholderStyle: Record<string, React.CSSProperties> = {
@@ -521,7 +544,8 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
     try {
       const attributes = {
         gender: store.gender,
-        skin_tone: store.skinTone,
+        ethnicity: store.ethnicity,
+        skin_tone: store.skinTone, // legacy fallback kept for compat
         age: store.ageRange,
         hair_color: store.hairColor,
         hair_style: store.hairStyle,
@@ -619,21 +643,17 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
               </div>
             </Section>
 
-            {/* Skin Tone */}
-            <Section icon={<Palette className="size-4" />} label="Skin Tone" count={1}>
-              <div className="grid grid-cols-6 gap-2">
-                {skinTones.map((tone) => (
-                  <button
-                    key={tone}
-                    type="button"
-                    onClick={() => store.setField('skinTone', tone)}
-                    className={cn(
-                      'aspect-square rounded-xl transition-all duration-150',
-                      store.skinTone === tone
-                        ? 'scale-105 ring-2 ring-primary ring-offset-1 ring-offset-background'
-                        : 'ring-1 ring-border hover:scale-105 hover:ring-primary/40',
-                    )}
-                    style={{ backgroundColor: tone }}
+            {/* Ethnicity */}
+            <Section icon={<Palette className="size-4" />} label="Ethnicity" count={1}>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {ethnicities.map((eth) => (
+                  <ImageCard
+                    key={eth}
+                    label={eth}
+                    selected={store.ethnicity === eth}
+                    onClick={() => store.setField('ethnicity', eth)}
+                    imageSrc={ethnicityImageSrc[eth]}
+                    placeholderStyle={ethnicityPlaceholderStyle[eth]}
                   />
                 ))}
               </div>
@@ -791,12 +811,13 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                 <Separator className="mb-3" />
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   {[
-                    { label: 'Name',   value: store.name || 'Not set' },
-                    { label: 'Gender', value: genderLabels[store.gender] },
-                    { label: 'Age',    value: ageRangeLabels[store.ageRange] },
-                    { label: 'Hair',   value: `${store.hairColor}, ${store.hairStyle}` },
-                    { label: 'Eyes',   value: store.eyeColor },
-                    { label: 'Body',   value: bodyTypeLabels[store.bodyType] },
+                    { label: 'Name',      value: store.name || 'Not set' },
+                    { label: 'Gender',    value: genderLabels[store.gender] },
+                    { label: 'Age',       value: ageRangeLabels[store.ageRange] },
+                    { label: 'Ethnicity', value: store.ethnicity },
+                    { label: 'Hair',      value: `${store.hairColor}, ${store.hairStyle}` },
+                    { label: 'Eyes',      value: store.eyeColor },
+                    { label: 'Body',      value: bodyTypeLabels[store.bodyType] },
                   ].map(({ label, value }) => (
                     <div key={label}>
                       <p className="text-xs text-muted-foreground">{label}</p>
