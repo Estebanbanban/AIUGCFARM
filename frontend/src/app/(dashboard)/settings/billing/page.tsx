@@ -10,6 +10,9 @@ import {
   CreditCard,
   Loader2,
   Check,
+  Zap,
+  Film,
+  Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -33,15 +36,17 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
-import { PLANS, type PlanTier } from "@/lib/stripe";
+import { PLANS, CREDIT_PACKS, type PlanTier, type CreditPackKey } from "@/lib/stripe";
 import { useCredits } from "@/hooks/use-credits";
 import { useProfile } from "@/hooks/use-profile";
 import { useSubscription, useCreditLedger } from "@/hooks/use-billing";
-import { useBillingPortal, useCheckout } from "@/hooks/use-checkout";
+import { useBillingPortal, useCheckout, useBuyCredits } from "@/hooks/use-checkout";
 
 const reasonLabels: Record<string, { label: string; color: string }> = {
   generation: { label: "Generation", color: "text-red-400" },
   subscription_renewal: { label: "Credit Grant", color: "text-emerald-400" },
+  subscription_purchase: { label: "Credit Grant", color: "text-emerald-400" },
+  credit_pack_purchase: { label: "Pack Purchase", color: "text-emerald-400" },
   refund: { label: "Refund", color: "text-primary" },
   bonus: { label: "Bonus", color: "text-primary" },
   free_trial: { label: "Free Trial", color: "text-amber-400" },
@@ -63,9 +68,17 @@ export default function BillingPage() {
   const { data: ledger, isLoading: ledgerLoading } = useCreditLedger();
   const billingPortal = useBillingPortal();
   const checkout = useCheckout();
+  const buyCredits = useBuyCredits();
 
   function handleSwitchPlan(planKey: PlanTier) {
     checkout.mutate(planKey, {
+      onSuccess: (url) => { window.location.href = url; },
+      onError: (err) => toast.error(err.message || "Failed to start checkout"),
+    });
+  }
+
+  function handleBuyPack(pack: CreditPackKey) {
+    buyCredits.mutate(pack, {
       onSuccess: (url) => { window.location.href = url; },
       onError: (err) => toast.error(err.message || "Failed to start checkout"),
     });
@@ -75,23 +88,19 @@ export default function BillingPage() {
   const planConfig = plan !== "free" ? PLANS[plan as keyof typeof PLANS] : null;
   const creditsRemaining = credits?.remaining ?? 0;
   const isUnlimitedCredits = credits?.is_unlimited === true;
-  const creditsTotal = planConfig?.credits ?? 9;
+  const creditsTotal = planConfig?.credits ?? 0;
   const creditPercent = isUnlimitedCredits
     ? 100
     : creditsTotal > 0
-      ? Math.round((creditsRemaining / creditsTotal) * 100)
+      ? Math.min(100, Math.round((creditsRemaining / creditsTotal) * 100))
       : 0;
 
   const isLoading = creditsLoading || profileLoading || subLoading;
 
   function handleManageBilling() {
     billingPortal.mutate(undefined, {
-      onSuccess: (url) => {
-        window.location.href = url;
-      },
-      onError: (err) => {
-        toast.error(err.message || "Failed to open billing portal");
-      },
+      onSuccess: (url) => { window.location.href = url; },
+      onError: (err) => { toast.error(err.message || "Failed to open billing portal"); },
     });
   }
 
@@ -106,7 +115,7 @@ export default function BillingPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Billing & Subscription
+              Billing & Credits
             </h1>
           </div>
         </div>
@@ -120,7 +129,7 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button asChild variant="ghost" size="icon">
@@ -130,7 +139,7 @@ export default function BillingPage() {
         </Button>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Billing & Subscription
+            Billing & Credits
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
             Manage your plan, credits, and payment history.
@@ -148,7 +157,7 @@ export default function BillingPage() {
                 {subscription?.current_period_end
                   ? `Next billing date: ${formatDate(subscription.current_period_end)}`
                   : plan === "free"
-                    ? "Free plan, no billing"
+                    ? "No active subscription — buy credits to start generating"
                     : "No active subscription"}
               </CardDescription>
             </div>
@@ -193,7 +202,7 @@ export default function BillingPage() {
                 </Button>
               ) : (
                 <Button asChild size="sm">
-                  <Link href="/pricing">Choose a Plan</Link>
+                  <Link href="/pricing">View Plans</Link>
                 </Button>
               )}
             </div>
@@ -204,37 +213,179 @@ export default function BillingPage() {
       {/* Credit Usage */}
       <Card>
         <CardHeader>
-          <CardTitle>Credit Usage</CardTitle>
+          <CardTitle>Credit Balance</CardTitle>
           <CardDescription>
             {isUnlimitedCredits
               ? "Unlimited credits (admin access)"
-              : `${creditsRemaining} of ${creditsTotal} credits remaining this month`}
+              : plan !== "free"
+                ? `${creditsRemaining} of ${creditsTotal} credits remaining this month`
+                : `${creditsRemaining} credits remaining`}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <Progress
-            value={creditPercent}
-            className="h-3 bg-muted [&>[data-slot=progress-indicator]]:bg-primary"
-          />
+          {plan !== "free" && (
+            <Progress
+              value={creditPercent}
+              className="h-3 bg-muted [&>[data-slot=progress-indicator]]:bg-primary"
+            />
+          )}
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
               {isUnlimitedCredits
                 ? "Usage is not capped for admin accounts"
-                : `${creditsTotal - creditsRemaining} used`}
+                : plan !== "free"
+                  ? `${creditsTotal - creditsRemaining} used`
+                  : "1 credit = $1 value"}
             </span>
             <span className="font-medium text-foreground">
-              {isUnlimitedCredits ? "Unlimited" : `${creditPercent}%`}
+              {isUnlimitedCredits ? "Unlimited" : plan !== "free" ? `${creditPercent}%` : `${creditsRemaining} cr`}
             </span>
           </div>
         </CardContent>
       </Card>
 
+      {/* How credits work */}
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h2 className="mb-3 text-base font-semibold">How credits work</h2>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+                <Film className="size-4 text-primary" />
+              </div>
+              <span className="text-sm font-medium">Standard video</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              5 credits = 1 complete ad (hook + body + CTA) using Kling v2.6.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+                <Zap className="size-4 text-primary" />
+              </div>
+              <span className="text-sm font-medium">HD video</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              10 credits = 1 complete HD ad using Kling v3 (sharper, more cinematic).
+            </p>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-500/10">
+                <Layers className="size-4 text-emerald-400" />
+              </div>
+              <span className="text-sm font-medium">Triple mode</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              15 credits = 3 hooks × 3 bodies × 3 CTAs = <strong className="text-foreground">27 unique ad combos</strong>.
+              That&apos;s $0.56/combo — same creative budget, 27× the A/B testing power.
+            </p>
+          </div>
+        </div>
+
+        {/* Triple mode explainer */}
+        <div className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
+          <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wide mb-1">
+            Why Triple Mode is the smart choice
+          </p>
+          <p className="text-sm text-muted-foreground">
+            One 15-credit Triple batch generates 3 different hooks, 3 different bodies, and 3 different CTAs.
+            Export them all — you get <strong className="text-foreground">27 mix-and-match video combinations</strong> from a single generation.
+            Run them across TikTok, Reels, and Shorts to find your winning creative in days, not weeks.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
+            <span className="rounded-md bg-card px-2 py-1 border border-border">15 cr → 27 combos</span>
+            <span className="rounded-md bg-card px-2 py-1 border border-border">$0.56/combo (standard)</span>
+            <span className="rounded-md bg-card px-2 py-1 border border-border">vs $5/single video</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Buy Credits (one-time packs) */}
+      <div className="flex flex-col gap-4">
+        <div>
+          <h2 className="text-lg font-semibold">Buy Credits</h2>
+          <p className="text-sm text-muted-foreground">
+            One-time top-up, no subscription required. Credits never expire.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => {
+            const videosStandard = Math.floor(pack.credits / 5);
+            const videosHd = Math.floor(pack.credits / 10);
+            const tripleStandard = Math.floor(pack.credits / 15);
+            const combosTriple = tripleStandard * 27;
+            return (
+              <Card key={key} className={cn("badge" in pack && pack.badge === "Best value" && "border-primary/40 ring-1 ring-primary/20")}>
+                <CardContent className="flex flex-col gap-4 p-5">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">{pack.name}</h3>
+                      {"badge" in pack && pack.badge && (
+                        <Badge variant="secondary" className={cn("text-xs", pack.badge === "Best value" && "bg-primary/10 text-primary")}>
+                          {pack.badge}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="mt-1 text-3xl font-bold">${pack.price}</p>
+                    <p className="text-xs text-muted-foreground">${pack.pricePerCredit}/credit</p>
+                  </div>
+                  <ul className="flex flex-col gap-1.5 text-sm text-muted-foreground">
+                    <li className="flex items-center gap-2">
+                      <Check className="size-3.5 shrink-0 text-primary" />
+                      {pack.credits} credits
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="size-3.5 shrink-0 text-primary" />
+                      {videosStandard} standard videos or {videosHd} HD videos
+                    </li>
+                    {tripleStandard > 0 && (
+                      <li className="flex items-center gap-2">
+                        <Check className="size-3.5 shrink-0 text-emerald-400" />
+                        <span>
+                          {tripleStandard} Triple batch{tripleStandard > 1 ? "es" : ""} = <strong className="text-foreground">{combosTriple} ad combos</strong>
+                        </span>
+                      </li>
+                    )}
+                    <li className="flex items-center gap-2">
+                      <Check className="size-3.5 shrink-0 text-primary" />
+                      Credits never expire
+                    </li>
+                  </ul>
+                  <Button
+                    variant={("badge" in pack && pack.badge === "Best value") ? "default" : "outline"}
+                    size="sm"
+                    className="mt-auto"
+                    onClick={() => handleBuyPack(key)}
+                    disabled={buyCredits.isPending}
+                  >
+                    {buyCredits.isPending ? <Loader2 className="size-4 animate-spin" /> : "Buy Now"}
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      <Separator />
+
       {/* Plan Comparison */}
       <div className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold">Available Plans</h2>
+        <div>
+          <h2 className="text-lg font-semibold">Monthly Plans</h2>
+          <p className="text-sm text-muted-foreground">
+            Subscribe for the best per-credit rate — always cheaper than packs.
+          </p>
+        </div>
         <div className="grid gap-4 sm:grid-cols-3">
           {(Object.entries(PLANS) as [PlanTier, typeof PLANS[PlanTier]][]).map(([key, p]) => {
             const isCurrent = plan === key;
+            const videosStandard = Math.floor(p.credits / 5);
+            const videosHd = Math.floor(p.credits / 10);
+            const tripleStandard = Math.floor(p.credits / 15);
+            const combosTriple = tripleStandard * 27;
             return (
               <Card
                 key={key}
@@ -248,12 +399,27 @@ export default function BillingPage() {
                         <Badge variant="secondary" className="text-xs">Current</Badge>
                       )}
                     </div>
-                    <p className="mt-1 text-2xl font-bold">${p.price}/mo</p>
+                    <p className="mt-1 text-2xl font-bold">${p.price}<span className="text-sm font-normal text-muted-foreground">/mo</span></p>
+                    <p className="text-xs text-muted-foreground">${(p.price / p.credits).toFixed(2)}/credit</p>
                   </div>
-                  <ul className="flex flex-col gap-2">
-                    {p.features.map((feature) => (
+                  <ul className="flex flex-col gap-1.5">
+                    <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Check className="size-3.5 shrink-0 text-primary" />
+                      {p.credits} credits/month
+                    </li>
+                    <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Check className="size-3.5 shrink-0 text-primary" />
+                      {videosStandard} standard or {videosHd} HD videos
+                    </li>
+                    {tripleStandard > 0 && (
+                      <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Check className="size-3.5 shrink-0 text-emerald-400" />
+                        <span>Up to <strong className="text-foreground">{combosTriple} ad combos</strong> via Triple mode</span>
+                      </li>
+                    )}
+                    {p.features.slice(2).map((feature) => (
                       <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Check className="size-3.5 text-primary" />
+                        <Check className="size-3.5 shrink-0 text-primary" />
                         {feature}
                       </li>
                     ))}

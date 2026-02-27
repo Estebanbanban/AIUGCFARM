@@ -5,6 +5,7 @@ export interface Profile {
   avatar_url: string | null;
   plan: "free" | "starter" | "growth" | "scale";
   role: "user" | "admin";
+  first_video_discount_used: boolean;
   created_at: string;
   updated_at: string;
 }

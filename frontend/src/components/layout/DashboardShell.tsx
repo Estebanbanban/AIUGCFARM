@@ -112,13 +112,24 @@ function SidebarContent({
         <div className="rounded-lg border border-sidebar-border bg-card p-3">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Credits</span>
-            <span className="font-mono font-medium text-foreground">
-              {isUnlimitedCredits
-                ? "Unlimited"
-                : creditsRemaining > creditsTotal
-                ? creditsRemaining
-                : `${creditsRemaining}/${creditsTotal}`}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono font-medium text-foreground">
+                {isUnlimitedCredits
+                  ? "Unlimited"
+                  : creditsRemaining > creditsTotal
+                  ? creditsRemaining
+                  : `${creditsRemaining}/${creditsTotal}`}
+              </span>
+              <Link
+                href="/settings/billing"
+                onClick={onNavigate}
+                className="flex size-4 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
+                aria-label="Buy credits"
+                title="Buy credits"
+              >
+                <Plus className="size-2.5" />
+              </Link>
+            </div>
           </div>
           <Progress
             value={creditPercent}

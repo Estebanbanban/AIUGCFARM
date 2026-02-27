@@ -10,11 +10,18 @@ const stripe = new Stripe(STRIPE_SECRET_KEY, {
   httpClient: Stripe.createFetchHttpClient(),
 });
 
-/** Credit amounts per plan when a subscription renews. */
+/** Credit amounts per plan when a subscription is purchased or renews. */
 const PLAN_CREDITS: Record<string, number> = {
-  starter: 27,
-  growth: 90,
-  scale: 270,
+  starter: 30,
+  growth: 100,
+  scale: 250,
+};
+
+/** Credit amounts per one-time pack purchase (matches CREDIT_PACKS in lib/stripe.ts). */
+const PACK_CREDITS: Record<string, number> = {
+  pack_10: 10,   // $12
+  pack_30: 30,   // $33
+  pack_100: 100, // $95
 };
 
 /** NOTE: No auth middleware  -  this endpoint uses Stripe webhook signature verification. */
@@ -66,10 +73,50 @@ Deno.serve(async (req: Request) => {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
         const userId = session.metadata?.supabase_user_id;
-        const plan = session.metadata?.plan;
 
-        if (!userId || !plan) {
-          console.error("checkout.session.completed missing metadata:", session.id);
+        if (!userId) {
+          console.error("checkout.session.completed missing supabase_user_id:", session.id);
+          break;
+        }
+
+        // ── One-time credit pack purchase ──────────────────────────────────────
+        if (session.mode === "payment") {
+          const pack = session.metadata?.pack;
+          if (!pack) {
+            console.error("checkout: payment session missing pack metadata:", session.id);
+            break;
+          }
+
+          const credits = PACK_CREDITS[pack] ?? 0;
+          if (credits > 0) {
+            const { data: existing } = await sb
+              .from("credit_balances")
+              .select("remaining")
+              .eq("owner_id", userId)
+              .maybeSingle();
+
+            const newBalance = (existing?.remaining ?? 0) + credits;
+
+            const { error: balErr } = await sb.from("credit_balances").upsert(
+              { owner_id: userId, remaining: newBalance },
+              { onConflict: "owner_id" },
+            );
+            if (balErr) console.error("checkout: pack credit upsert failed:", balErr);
+
+            const { error: ledgerErr } = await sb.from("credit_ledger").insert({
+              owner_id: userId,
+              amount: credits,
+              reason: "credit_pack_purchase",
+            });
+            if (ledgerErr) console.error("checkout: pack ledger insert failed:", ledgerErr);
+          }
+          break;
+        }
+
+        // ── Subscription checkout ──────────────────────────────────────────────
+        const plan = session.metadata?.plan;
+        if (!plan) {
+          console.error("checkout.session.completed missing plan metadata:", session.id);
           break;
         }
 
@@ -106,7 +153,6 @@ Deno.serve(async (req: Request) => {
         // Grant initial credits for the plan (ADD to existing, don't overwrite)
         const credits = PLAN_CREDITS[plan] ?? 0;
         if (credits > 0) {
-          // Read current balance so we can increment rather than overwrite
           const { data: existing } = await sb
             .from("credit_balances")
             .select("remaining")
@@ -156,10 +202,9 @@ Deno.serve(async (req: Request) => {
           break;
         }
 
-        // Grant renewal credits
+        // Grant renewal credits (reset to plan amount)
         const credits = PLAN_CREDITS[sub.plan] ?? 0;
         if (credits > 0) {
-          // Reset credit balance to plan amount on renewal
           const { error: balErr } = await sb.from("credit_balances").upsert(
             { owner_id: sub.owner_id, remaining: credits },
             { onConflict: "owner_id" },
