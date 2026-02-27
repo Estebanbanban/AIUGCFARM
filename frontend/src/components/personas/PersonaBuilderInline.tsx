@@ -13,6 +13,8 @@ import { callEdge } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { usePersonaBuilderStore } from '@/stores/persona-builder';
 import {
   skinTones,
@@ -50,7 +52,8 @@ const bodyTypeLabels: Record<string, string> = {
   plus_size: 'Plus Size',
 };
 
-// Gradient placeholders — swap the inner div for <Image fill .../> per option once photos are ready
+// Color-tinted placeholder gradients for hair/eye options.
+// Swap the placeholder <div> for <Image fill .../> per option when photos are ready.
 const hairPlaceholderStyle: Record<string, React.CSSProperties> = {
   'Black':       { background: 'linear-gradient(135deg,#18181b 0%,#09090b 100%)' },
   'Dark Brown':  { background: 'linear-gradient(135deg,#3b1f0a 0%,#1c0f05 100%)' },
@@ -73,8 +76,6 @@ const eyePlaceholderStyle: Record<string, React.CSSProperties> = {
   'Amber': { background: 'linear-gradient(135deg,#f59e0b 0%,#b45309 100%)' },
 };
 
-const LIME = '#b5f23d';
-
 // ── Shared sub-components ───────────────────────────────────────────────────
 
 function Section({
@@ -96,19 +97,19 @@ function Section({
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-2 py-0.5"
       >
-        <span className="flex-shrink-0">{icon}</span>
-        <span className="flex-1 text-left text-sm font-medium text-white">
+        <span className="flex-shrink-0 text-primary">{icon}</span>
+        <span className="flex-1 text-left text-sm font-semibold text-foreground">
           {label}
           {count !== undefined && (
-            <span className="ml-1.5 text-zinc-500">· {count}</span>
+            <span className="ml-1.5 font-normal text-muted-foreground">· {count}</span>
           )}
         </span>
         {open
-          ? <ChevronUp className="size-4 text-zinc-600" />
-          : <ChevronDown className="size-4 text-zinc-600" />}
+          ? <ChevronUp className="size-4 text-muted-foreground" />
+          : <ChevronDown className="size-4 text-muted-foreground" />}
       </button>
       {open && (
-        <div className="rounded-2xl bg-zinc-900 p-3">
+        <div className="rounded-xl border border-border bg-muted/50 p-3">
           {children}
         </div>
       )}
@@ -116,7 +117,7 @@ function Section({
   );
 }
 
-/** Full-image option card with label + selected lime ring */
+/** Full-image option card with label + primary-colour ring when selected */
 function ImageCard({
   label,
   selected,
@@ -138,27 +139,24 @@ function ImageCard({
         'relative overflow-hidden rounded-xl transition-all duration-150',
         aspect,
         selected
-          ? 'ring-2 ring-[#b5f23d]'
-          : 'ring-1 ring-white/5 hover:ring-white/15',
+          ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+          : 'ring-1 ring-border hover:ring-primary/40',
       )}
     >
-      {/* Placeholder — swap with <Image fill .../> when photo is ready */}
+      {/* Placeholder — swap with <Image fill .../> per option when photo is ready */}
       <div
-        className="absolute inset-0 bg-zinc-800"
+        className="absolute inset-0 bg-muted"
         style={placeholderStyle}
       />
 
       {/* Bottom gradient for label legibility */}
-      <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/75 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/70 to-transparent" />
 
       {/* Label row */}
       <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5">
         {selected && (
-          <div
-            className="flex size-5 flex-shrink-0 items-center justify-center rounded-full"
-            style={{ backgroundColor: LIME }}
-          >
-            <Check className="size-3 text-black" strokeWidth={3} />
+          <div className="flex size-5 flex-shrink-0 items-center justify-center rounded-full bg-primary">
+            <Check className="size-3 text-primary-foreground" strokeWidth={3} />
           </div>
         )}
         <span className="text-sm font-semibold leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.9)]">
@@ -186,8 +184,8 @@ function TextCard({
       className={cn(
         'rounded-xl border py-3 text-sm font-medium transition-all',
         selected
-          ? 'border-[#b5f23d] bg-[#b5f23d]/10 text-[#b5f23d]'
-          : 'border-white/10 text-zinc-400 hover:border-white/25 hover:text-white',
+          ? 'border-primary bg-primary/10 text-primary'
+          : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground',
       )}
     >
       {label}
@@ -287,23 +285,18 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
 
             {/* Name */}
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-medium uppercase tracking-wide text-zinc-400">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Persona Name
               </Label>
               <Input
                 placeholder="e.g. Sophie, Marcus"
                 value={store.name}
                 onChange={(e) => store.setField('name', e.target.value)}
-                className="border-white/10 bg-zinc-900 text-white placeholder:text-zinc-600"
               />
             </div>
 
             {/* Gender */}
-            <Section
-              icon={<User className="size-4 text-cyan-400" />}
-              label="Gender"
-              count={1}
-            >
+            <Section icon={<User className="size-4" />} label="Gender" count={1}>
               <div className="grid grid-cols-3 gap-2">
                 {personaGenders.map((g) => (
                   <ImageCard
@@ -317,11 +310,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
             </Section>
 
             {/* Skin Tone */}
-            <Section
-              icon={<Palette className="size-4 text-[#b5f23d]" />}
-              label="Skin Tone"
-              count={1}
-            >
+            <Section icon={<Palette className="size-4" />} label="Skin Tone" count={1}>
               <div className="grid grid-cols-6 gap-2">
                 {skinTones.map((tone) => (
                   <button
@@ -331,8 +320,8 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     className={cn(
                       'aspect-square rounded-xl transition-all duration-150',
                       store.skinTone === tone
-                        ? 'scale-105 ring-[3px] ring-[#b5f23d]'
-                        : 'ring-1 ring-white/5 hover:scale-105 hover:ring-white/20',
+                        ? 'scale-105 ring-2 ring-primary ring-offset-1 ring-offset-background'
+                        : 'ring-1 ring-border hover:scale-105 hover:ring-primary/40',
                     )}
                     style={{ backgroundColor: tone }}
                   />
@@ -341,11 +330,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
             </Section>
 
             {/* Age Range */}
-            <Section
-              icon={<Clock className="size-4 text-sky-400" />}
-              label="Age Range"
-              count={1}
-            >
+            <Section icon={<Clock className="size-4" />} label="Age Range" count={1}>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                 {personaAgeRanges.map((range) => (
                   <TextCard
@@ -359,11 +344,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
             </Section>
 
             {/* Hair Color */}
-            <Section
-              icon={<Palette className="size-4 text-amber-400" />}
-              label="Hair Color"
-              count={1}
-            >
+            <Section icon={<Palette className="size-4" />} label="Hair Color" count={1}>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                 {hairColors.map((color) => (
                   <ImageCard
@@ -379,11 +360,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
             </Section>
 
             {/* Hair Style */}
-            <Section
-              icon={<User className="size-4 text-orange-400" />}
-              label="Hair Style"
-              count={1}
-            >
+            <Section icon={<User className="size-4" />} label="Hair Style" count={1}>
               <div className="grid grid-cols-3 gap-2">
                 {hairStyles.map((style) => (
                   <ImageCard
@@ -397,11 +374,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
             </Section>
 
             {/* Eye Color */}
-            <Section
-              icon={<Eye className="size-4 text-purple-400" />}
-              label="Eye Color"
-              count={1}
-            >
+            <Section icon={<Eye className="size-4" />} label="Eye Color" count={1}>
               <div className="grid grid-cols-3 gap-2">
                 {eyeColors.map((color) => (
                   <ImageCard
@@ -417,11 +390,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
             </Section>
 
             {/* Body Type */}
-            <Section
-              icon={<User className="size-4 text-blue-400" />}
-              label="Body Type"
-              count={1}
-            >
+            <Section icon={<User className="size-4" />} label="Body Type" count={1}>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                 {personaBodyTypes.map((type) => (
                   <TextCard
@@ -435,11 +404,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
             </Section>
 
             {/* Clothing Style */}
-            <Section
-              icon={<Shirt className="size-4 text-rose-400" />}
-              label="Clothing Style"
-              count={1}
-            >
+            <Section icon={<Shirt className="size-4" />} label="Clothing Style" count={1}>
               <div className="grid grid-cols-3 gap-2">
                 {clothingStyles.map((style) => (
                   <ImageCard
@@ -454,11 +419,11 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
 
             {/* Accessories — multi-select */}
             <Section
-              icon={<Watch className="size-4 text-yellow-400" />}
+              icon={<Watch className="size-4" />}
               label="Accessories"
               count={store.accessories.length}
             >
-              <p className="mb-2 text-xs text-zinc-500">Select up to 5</p>
+              <p className="mb-2 text-xs text-muted-foreground">Select up to 5</p>
               <div className="flex flex-wrap gap-2">
                 {accessoryOptions.map((acc) => {
                   const isSelected = store.accessories.includes(acc);
@@ -470,8 +435,8 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                       className={cn(
                         'rounded-full border px-3 py-1.5 text-xs font-medium transition-all',
                         isSelected
-                          ? 'border-[#b5f23d] bg-[#b5f23d]/10 text-[#b5f23d]'
-                          : 'border-white/10 text-zinc-400 hover:border-white/25 hover:text-white',
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground',
                       )}
                     >
                       {isSelected && <Check className="mr-1 inline size-3" strokeWidth={3} />}
@@ -491,14 +456,14 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
 
             {/* Generating skeleton */}
             {store.isGenerating && store.generatedImages.length === 0 && (
-              <div className="rounded-2xl bg-zinc-900 p-4">
-                <p className="mb-3 text-sm font-medium text-white">Generating…</p>
+              <div className="rounded-xl border border-border bg-card p-4">
+                <p className="mb-3 text-sm font-medium text-foreground">Generating…</p>
                 <div className="grid grid-cols-2 gap-2">
                   {[0, 1, 2, 3].map((i) => (
-                    <div key={i} className="aspect-square animate-pulse rounded-xl bg-zinc-800" />
+                    <div key={i} className="aspect-square animate-pulse rounded-xl bg-muted" />
                   ))}
                 </div>
-                <p className="mt-3 text-center text-xs text-zinc-500">
+                <p className="mt-3 text-center text-xs text-muted-foreground">
                   May take up to 30 seconds
                 </p>
               </div>
@@ -506,11 +471,12 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
 
             {/* Attribute summary (before generating) */}
             {store.generatedImages.length === 0 && !store.isGenerating && (
-              <div className="rounded-2xl bg-zinc-900 p-4">
-                <p className="mb-3 text-sm font-medium text-white">Persona Preview</p>
-                <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-zinc-800">
-                  <User className="size-6 text-zinc-500" />
+              <div className="rounded-xl border border-border bg-card p-4">
+                <p className="mb-3 text-sm font-semibold text-foreground">Persona Preview</p>
+                <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-primary/10">
+                  <User className="size-6 text-primary" />
                 </div>
+                <Separator className="mb-3" />
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   {[
                     { label: 'Name',   value: store.name || 'Not set' },
@@ -521,20 +487,17 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     { label: 'Body',   value: bodyTypeLabels[store.bodyType] },
                   ].map(({ label, value }) => (
                     <div key={label}>
-                      <p className="text-xs text-zinc-500">{label}</p>
-                      <p className="truncate font-medium text-white">{value}</p>
+                      <p className="text-xs text-muted-foreground">{label}</p>
+                      <p className="truncate font-medium text-foreground">{value}</p>
                     </div>
                   ))}
                 </div>
                 {store.accessories.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1 border-t border-white/5 pt-3">
+                  <div className="mt-3 flex flex-wrap gap-1 border-t border-border pt-3">
                     {store.accessories.map((acc) => (
-                      <span
-                        key={acc}
-                        className="rounded-full border border-white/10 px-2 py-0.5 text-xs text-zinc-400"
-                      >
+                      <Badge key={acc} variant="secondary" className="text-xs">
                         {acc}
-                      </span>
+                      </Badge>
                     ))}
                   </div>
                 )}
@@ -543,8 +506,8 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
 
             {/* Generated image picker */}
             {store.generatedImages.length > 0 && (
-              <div className="rounded-2xl bg-zinc-900 p-4">
-                <p className="mb-3 text-sm font-medium text-white">Choose Your Persona</p>
+              <div className="rounded-xl border border-border bg-card p-4">
+                <p className="mb-3 text-sm font-semibold text-foreground">Choose Your Persona</p>
                 <div className="grid grid-cols-2 gap-2">
                   {store.generatedImages.map((url, index) => (
                     <button
@@ -554,13 +517,13 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                       className={cn(
                         'relative aspect-square overflow-hidden rounded-xl transition-all',
                         store.selectedImageIndex === index
-                          ? 'ring-2 ring-[#b5f23d]'
-                          : 'ring-1 ring-white/5 hover:ring-white/20',
+                          ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+                          : 'ring-1 ring-border hover:ring-primary/40',
                       )}
                     >
                       {imageLoadErrors.has(index) ? (
-                        <div className="flex size-full items-center justify-center bg-zinc-800">
-                          <ImageIcon className="size-8 text-zinc-600" />
+                        <div className="flex size-full items-center justify-center bg-muted">
+                          <ImageIcon className="size-8 text-muted-foreground" />
                         </div>
                       ) : (
                         <Image
@@ -575,11 +538,8 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                         />
                       )}
                       {store.selectedImageIndex === index && (
-                        <div
-                          className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full"
-                          style={{ backgroundColor: LIME }}
-                        >
-                          <Check className="size-3 text-black" strokeWidth={3} />
+                        <div className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-primary">
+                          <Check className="size-3 text-primary-foreground" strokeWidth={3} />
                         </div>
                       )}
                     </button>
@@ -594,7 +554,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                 <Button
                   onClick={handleGenerate}
                   disabled={!store.name.trim() || store.isGenerating}
-                  className="w-full bg-[#b5f23d] font-semibold text-black hover:bg-[#a0e030]"
+                  className="w-full"
                   size="lg"
                 >
                   {store.isGenerating ? (
@@ -614,7 +574,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                   <Button
                     onClick={handleSave}
                     disabled={store.selectedImageIndex === null || !store.personaId || store.isSaving}
-                    className="w-full bg-[#b5f23d] font-semibold text-black hover:bg-[#a0e030]"
+                    className="w-full"
                     size="lg"
                   >
                     {store.isSaving ? (
@@ -633,7 +593,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     onClick={handleGenerate}
                     variant="outline"
                     disabled={store.isGenerating || store.isSaving}
-                    className="w-full border-white/10 text-white hover:bg-white/5"
+                    className="w-full"
                   >
                     {store.isGenerating ? (
                       <>
