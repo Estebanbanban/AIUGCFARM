@@ -13,6 +13,45 @@ export interface KlingJobStatus {
 }
 
 /**
+ * Generate a short-lived JWT for Kling AI API auth.
+ * Kling uses HS256 JWT signed with the Secret Key, with `iss` set to the Access Key.
+ * Token is valid for 30 minutes (1800s).
+ */
+async function generateKlingToken(): Promise<string> {
+  const ak = Deno.env.get("KLING_ACCESS_KEY");
+  const sk = Deno.env.get("KLING_SECRET_KEY");
+  if (!ak || !sk) throw new Error("KLING_ACCESS_KEY and KLING_SECRET_KEY must be set");
+
+  const now = Math.floor(Date.now() / 1000);
+
+  const b64url = (obj: object) =>
+    btoa(JSON.stringify(obj))
+      .replace(/=/g, "")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_");
+
+  const header = b64url({ alg: "HS256", typ: "JWT" });
+  const payload = b64url({ iss: ak, iat: now, nbf: now - 5, exp: now + 1800 });
+  const signingInput = `${header}.${payload}`;
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(sk),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(signingInput));
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)))
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+
+  return `${signingInput}.${sigB64}`;
+}
+
+/**
  * Submit a video generation job to Kling AI.
  * Uses kling-v2-6 std (720p) for cost efficiency per architecture decision AD-KLING-01.
  * image2video endpoint infers aspect ratio from the input image — no aspect_ratio param.
@@ -23,14 +62,13 @@ export async function submitKlingJob(params: {
   duration: number;
   mode?: string;
 }): Promise<KlingSubmitResult> {
-  const apiKey = Deno.env.get("KLING_API_KEY");
-  if (!apiKey) throw new Error("KLING_API_KEY not configured");
+  const token = await generateKlingToken();
 
   const res = await fetch(`${KLING_BASE}/videos/image2video`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
       model_name: "kling-v2-6",
@@ -75,11 +113,10 @@ export async function submitKlingJob(params: {
  * Check the status of a Kling AI video generation job.
  */
 export async function checkKlingJob(jobId: string): Promise<KlingJobStatus> {
-  const apiKey = Deno.env.get("KLING_API_KEY");
-  if (!apiKey) throw new Error("KLING_API_KEY not configured");
+  const token = await generateKlingToken();
 
   const res = await fetch(`${KLING_BASE}/videos/image2video/${jobId}`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
+    headers: { Authorization: `Bearer ${token}` },
   });
 
   if (!res.ok) {
@@ -143,7 +180,9 @@ export async function checkKlingJob(jobId: string): Promise<KlingJobStatus> {
   // Extract error message if failed
   let errorMessage: string | undefined;
   if (status === "failed") {
-    errorMessage = (data.task_status_msg ?? data.error_message ?? data.message) as string | undefined;
+    errorMessage = (data.task_status_msg ?? data.error_message ?? data.message) as
+      | string
+      | undefined;
   }
 
   return {
