@@ -16,7 +16,8 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [code, setCode] = useState("");
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
@@ -28,7 +29,6 @@ export default function SignupPage() {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
         data: { full_name: fullName },
       },
     });
@@ -39,8 +39,35 @@ export default function SignupPage() {
       return;
     }
 
-    setSuccess(true);
+    setVerifying(true);
     setLoading(false);
+  }
+
+  async function handleVerify(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token: code.trim(),
+      type: "signup",
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+      return;
+    }
+
+    window.location.href = "/dashboard";
+  }
+
+  async function handleResend() {
+    setError(null);
+    const supabase = createClient();
+    await supabase.auth.resend({ type: "signup", email });
   }
 
   async function handleGoogleSignup() {
@@ -53,23 +80,57 @@ export default function SignupPage() {
     });
   }
 
-  if (success) {
+  if (verifying) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white px-4">
-        <motion.div {...fadeIn} className="w-full max-w-sm text-center">
-          <div className="mb-8">
+        <motion.div {...fadeIn} className="w-full max-w-sm">
+          <div className="mb-8 text-center">
             <Link href="/" className="inline-block text-2xl font-bold tracking-tight text-zinc-900">
               CineRads
             </Link>
           </div>
           <div className="rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
-            <h1 className="text-xl font-semibold text-zinc-900">Check your email</h1>
-            <p className="mt-3 text-sm text-zinc-500">
-              We sent a confirmation link to <strong className="text-zinc-700">{email}</strong>.
-              Click the link to activate your account.
+            <div className="mb-6 text-center">
+              <h1 className="text-xl font-semibold text-zinc-900">Check your email</h1>
+              <p className="mt-2 text-sm text-zinc-500">
+                We sent a 6-digit code to <strong className="text-zinc-700">{email}</strong>
+              </p>
+            </div>
+            <form onSubmit={handleVerify} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="code" className="text-sm font-medium text-zinc-700">
+                  Verification code
+                </Label>
+                <Input
+                  id="code"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="123456"
+                  maxLength={6}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                  required
+                  autoFocus
+                  className="border-zinc-200 bg-white text-center text-lg tracking-widest text-zinc-900 placeholder:text-zinc-400"
+                />
+              </div>
+              {error && <p className="text-sm text-red-600">{error}</p>}
+              <Button type="submit" className="w-full" disabled={loading || code.length !== 6}>
+                {loading ? "Verifying..." : "Confirm account"}
+              </Button>
+            </form>
+            <p className="mt-4 text-center text-sm text-zinc-500">
+              Didn&apos;t receive it?{" "}
+              <button
+                type="button"
+                onClick={handleResend}
+                className="font-medium text-primary hover:underline"
+              >
+                Resend code
+              </button>
             </p>
           </div>
-          <p className="mt-6 text-sm text-zinc-500">
+          <p className="mt-6 text-center text-sm text-zinc-500">
             <Link href="/login" className="font-medium text-primary hover:underline">
               Back to sign in
             </Link>

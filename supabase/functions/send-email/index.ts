@@ -1,25 +1,13 @@
 /**
  * Supabase Auth Hook  -  Send Email
  *
- * Configured in: Supabase Dashboard → Authentication → Hooks → Send Email Hook
- * URL: https://<project>.supabase.co/functions/v1/send-email
+ * Wired in: supabase/config.toml → [auth.hook.send_email]
  *
- * Intercepts all Supabase Auth emails (signup confirmation, magic link,
- * password reset, email change) and delivers them via Resend instead of
- * Supabase's built-in SMTP (which is rate-limited to 3/hour).
- *
- * Supabase calls this with a POST containing:
- * {
- *   user: { email: string; ... },
- *   email_data: {
- *     token: string;
- *     token_hash: string;
- *     redirect_to: string;
- *     email_action_type: "signup" | "recovery" | "magiclink" | "email_change_new" | "email_change_current";
- *     site_url: string;
- *     verification_link?: string;
- *   }
- * }
+ * Intercepts all Supabase Auth emails and delivers them via Resend.
+ * - signup      → 6-digit OTP code (user types it in the app)
+ * - recovery    → password reset link
+ * - magiclink   → magic link
+ * - email_change → confirmation link
  */
 
 import { sendEmail } from "../_shared/email.ts";
@@ -34,12 +22,11 @@ const HOOK_SECRET = Deno.env.get("SEND_EMAIL_HOOK_SECRET");
  * The secret in env is stored as "v1,whsec_<base64>"  -  we extract the base64 key part.
  */
 async function verifyHookSignature(req: Request, body: string): Promise<boolean> {
-  if (!HOOK_SECRET) return true; // Skip verification if secret not configured (dev)
+  if (!HOOK_SECRET) return true;
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) return false;
 
-  // Header format: "v1,<hex-signature>"
   const [version, signature] = authHeader.split(",");
   if (version !== "v1" || !signature) return false;
 
@@ -64,10 +51,7 @@ async function verifyHookSignature(req: Request, body: string): Promise<boolean>
 }
 
 interface AuthHookPayload {
-  user: {
-    email: string;
-    new_email?: string;
-  };
+  user: { email: string; new_email?: string };
   email_data: {
     token: string;
     token_hash: string;
@@ -83,7 +67,7 @@ interface AuthHookPayload {
   };
 }
 
-function confirmationEmail(confirmUrl: string): string {
+function otpEmail(code: string): string {
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -96,17 +80,14 @@ function confirmationEmail(confirmUrl: string): string {
         </td></tr>
         <tr><td style="padding:32px 40px">
           <h1 style="margin:0 0 12px;font-size:20px;font-weight:600;color:#111827">Confirm your email</h1>
-          <p style="margin:0 0 28px;font-size:15px;color:#6b7280;line-height:1.6">
-            Click the button below to confirm your email address and activate your CineRads account.
+          <p style="margin:0 0 24px;font-size:15px;color:#6b7280;line-height:1.6">
+            Enter this code in the app to activate your CineRads account:
           </p>
-          <a href="${confirmUrl}" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 28px;border-radius:8px">
-            Confirm your email
-          </a>
-          <p style="margin:28px 0 0;font-size:13px;color:#9ca3af">
-            Or copy this link: <a href="${confirmUrl}" style="color:#f97316;word-break:break-all">${confirmUrl}</a>
-          </p>
-          <p style="margin:20px 0 0;font-size:13px;color:#9ca3af">
-            This link expires in 24 hours. If you didn't sign up, you can safely ignore this email.
+          <div style="background:#f3f4f6;border-radius:10px;padding:24px;text-align:center;margin-bottom:24px">
+            <span style="font-size:40px;font-weight:700;color:#111827;letter-spacing:10px">${code}</span>
+          </div>
+          <p style="margin:0;font-size:13px;color:#9ca3af">
+            This code expires in 24 hours. If you didn't sign up, you can safely ignore this email.
           </p>
         </td></tr>
         <tr><td style="padding:20px 40px;background:#f9fafb;border-top:1px solid #f3f4f6">
@@ -133,13 +114,13 @@ function resetPasswordEmail(resetUrl: string): string {
         <tr><td style="padding:32px 40px">
           <h1 style="margin:0 0 12px;font-size:20px;font-weight:600;color:#111827">Reset your password</h1>
           <p style="margin:0 0 28px;font-size:15px;color:#6b7280;line-height:1.6">
-            We received a request to reset your password. Click the button below to choose a new one.
+            Click the button below to choose a new password.
           </p>
           <a href="${resetUrl}" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 28px;border-radius:8px">
             Reset password
           </a>
           <p style="margin:28px 0 0;font-size:13px;color:#9ca3af">
-            This link expires in 1 hour. If you didn't request a reset, you can safely ignore this email.
+            This link expires in 1 hour. If you didn't request a reset, ignore this email.
           </p>
         </td></tr>
         <tr><td style="padding:20px 40px;background:#f9fafb;border-top:1px solid #f3f4f6">
@@ -166,7 +147,7 @@ function magicLinkEmail(magicUrl: string): string {
         <tr><td style="padding:32px 40px">
           <h1 style="margin:0 0 12px;font-size:20px;font-weight:600;color:#111827">Your magic link</h1>
           <p style="margin:0 0 28px;font-size:15px;color:#6b7280;line-height:1.6">
-            Click the button below to sign in to CineRads. This link is single-use and expires in 1 hour.
+            Click below to sign in. Single-use, expires in 1 hour.
           </p>
           <a href="${magicUrl}" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 28px;border-radius:8px">
             Sign in to CineRads
@@ -183,7 +164,6 @@ function magicLinkEmail(magicUrl: string): string {
 }
 
 Deno.serve(async (req: Request) => {
-  // Supabase Auth Hooks use POST
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
@@ -201,9 +181,8 @@ Deno.serve(async (req: Request) => {
     const payload = JSON.parse(rawBody) as AuthHookPayload;
     const { user, email_data } = payload;
     const toEmail = user.email;
-    const { email_action_type, token_hash, redirect_to } = email_data;
+    const { email_action_type, token, token_hash, redirect_to } = email_data;
 
-    // Build the confirmation/action URL that routes through our callback
     const actionUrl =
       email_data.verification_link ||
       `${SITE_URL}/auth/callback?token_hash=${token_hash}&type=${email_action_type}&redirect_to=${encodeURIComponent(redirect_to || SITE_URL + "/dashboard")}`;
@@ -213,8 +192,8 @@ Deno.serve(async (req: Request) => {
 
     switch (email_action_type) {
       case "signup":
-        subject = "Confirm your CineRads account";
-        html = confirmationEmail(actionUrl);
+        subject = "Your CineRads verification code";
+        html = otpEmail(token);
         break;
 
       case "recovery":
@@ -230,7 +209,7 @@ Deno.serve(async (req: Request) => {
       case "email_change_new":
       case "email_change_current":
         subject = "Confirm your new email address";
-        html = confirmationEmail(actionUrl);
+        html = otpEmail(token);
         break;
 
       default:
@@ -243,7 +222,6 @@ Deno.serve(async (req: Request) => {
     await sendEmail({ to: toEmail, subject, html });
     console.log(`Auth email sent: ${email_action_type} → ${toEmail}`);
 
-    // Supabase Auth Hooks expect a 200 with empty or minimal JSON body
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -251,7 +229,6 @@ Deno.serve(async (req: Request) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("send-email hook error:", msg);
-    // Return 500 so Supabase knows the email failed and can retry/log
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
