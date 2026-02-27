@@ -22,7 +22,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import {
   PLANS,
   CREDITS_PER_SINGLE,
@@ -187,6 +187,7 @@ export default function GeneratePage() {
   >([]);
   const [selectedCompositeIdx, setSelectedCompositeIdx] = useState<number | null>(null);
   const [previewEditPrompt, setPreviewEditPrompt] = useState("");
+  const [showBatchValueCallout, setShowBatchValueCallout] = useState(false);
 
   const { data: products, isLoading: productsLoading } = useProducts();
   const productImageMap = useResolvedProductImages(products);
@@ -218,10 +219,47 @@ export default function GeneratePage() {
         ? CREDITS_PER_SINGLE
         : CREDITS_PER_BATCH;
   const hasEnoughCredits = isUnlimitedCredits || creditsRemaining >= creditCost;
+  const singleModeCredits =
+    store.quality === "hd" ? CREDITS_PER_SINGLE_HD : CREDITS_PER_SINGLE;
+  const tripleModeCredits =
+    store.quality === "hd" ? CREDITS_PER_BATCH_HD : CREDITS_PER_BATCH;
+  const tripleCombinations = 27;
+  const singleCostPerExportCredits = singleModeCredits;
+  const tripleCostPerExportCredits = tripleModeCredits / tripleCombinations;
+  const costReductionMultiplier = singleCostPerExportCredits / tripleCostPerExportCredits;
+  const costReductionPercent =
+    (1 - tripleCostPerExportCredits / singleCostPerExportCredits) * 100;
+  const planCostMath = (
+    Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]
+  ).map(([key, plan]) => {
+    const usdPerCredit = plan.price / plan.credits;
+    const singleExportUsd = singleModeCredits * usdPerCredit;
+    const tripleGenerationUsd = tripleModeCredits * usdPerCredit;
+    const tripleExportUsd = tripleGenerationUsd / tripleCombinations;
+    const singleExportsPerMonth = Math.floor(plan.credits / singleModeCredits);
+    const tripleExportCapacityPerMonth =
+      Math.floor(plan.credits / tripleModeCredits) * tripleCombinations;
+
+    return {
+      key,
+      name: plan.name,
+      singleExportUsd,
+      tripleGenerationUsd,
+      tripleExportUsd,
+      singleExportsPerMonth,
+      tripleExportCapacityPerMonth,
+    };
+  });
   const requiresCommentKeyword = store.ctaStyle === "comment_keyword";
   const commentKeyword = store.ctaCommentKeyword
     .trim()
     .replace(/[^a-zA-Z0-9 _-]/g, "");
+
+  useEffect(() => {
+    if (store.step === 4) {
+      setShowBatchValueCallout(true);
+    }
+  }, [store.step]);
 
   // Derived view states, no effects needed
   const showAddProductForm =
@@ -1056,7 +1094,81 @@ export default function GeneratePage() {
                     <p className="mb-2 text-sm text-muted-foreground">
                       Generation mode
                     </p>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="relative">
+                      {showBatchValueCallout && (
+                        <div className="mb-3 rounded-xl border-2 border-primary/40 bg-primary/5 p-3 md:absolute md:-top-72 md:right-0 md:z-20 md:mb-0 md:w-[28rem] md:bg-card/95 md:backdrop-blur-sm">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">
+                                Use 3x to unlock modular batch leverage
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                We generate 3 hooks + 3 bodies + 3 CTAs so you can mix and match
+                                into 27 exportable combinations from one generation.
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => setShowBatchValueCallout(false)}
+                            >
+                              Got it
+                            </Button>
+                          </div>
+
+                          <div className="mt-3 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-2 text-xs text-foreground">
+                            <span className="font-medium">Cost per final export (this quality):</span>{" "}
+                            Single = {singleCostPerExportCredits.toFixed(2)} credits vs 3x ={" "}
+                            {tripleCostPerExportCredits.toFixed(2)} credits
+                            {" · "}
+                            <span className="font-semibold">
+                              {costReductionMultiplier.toFixed(1)}x cheaper per export
+                            </span>{" "}
+                            ({costReductionPercent.toFixed(0)}% lower).
+                          </div>
+
+                          <div className="mt-2 space-y-1 text-[11px] text-muted-foreground">
+                            {planCostMath.map((plan) => (
+                              <p key={plan.key}>
+                                <span className="font-medium text-foreground">{plan.name}:</span>{" "}
+                                1 single export {formatCurrency(plan.singleExportUsd)} vs 3x export{" "}
+                                {formatCurrency(plan.tripleExportUsd)} ({formatCurrency(plan.tripleGenerationUsd)} total / 27) ·
+                                monthly capacity: {plan.singleExportsPerMonth} single exports vs{" "}
+                                {plan.tripleExportCapacityPerMonth} 3x combos.
+                              </p>
+                            ))}
+                          </div>
+
+                          <svg
+                            aria-hidden
+                            className="absolute -bottom-16 right-10 hidden h-16 w-28 md:block"
+                            viewBox="0 0 120 70"
+                          >
+                            <path
+                              d="M8 10 C 28 10, 42 26, 62 44 C 74 54, 90 61, 110 66"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                              className="text-primary/80"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            <path
+                              d="M12 7 C 30 12, 44 28, 63 46 C 76 56, 92 62, 112 68"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.4"
+                              className="text-primary/50"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
                         onClick={() => store.setMode("single")}
@@ -1101,6 +1213,7 @@ export default function GeneratePage() {
                           3 hooks · 3 bodies · 3 CTAs
                         </p>
                       </button>
+                      </div>
                     </div>
                   </div>
 
