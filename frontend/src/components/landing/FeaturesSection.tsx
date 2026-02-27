@@ -317,7 +317,7 @@ const features = [
   {
     title: "Zero-Input Product Import",
     description:
-      "Paste any store URL and we pull products, images, prices, and descriptions automatically. No CSV uploads, no data entry.",
+      "Paste any Shopify or e-commerce URL. CineRads extracts products, images, prices, and descriptions — then generates a complete brand profile with AI. No CSV uploads, no data entry.",
     subtext: "Works with Shopify, WooCommerce, and any public product page.",
     bullets: [
       "Auto-detect product data from any URL",
@@ -328,25 +328,25 @@ const features = [
     reversed: false,
   },
   {
-    title: "AI Persona Builder",
+    title: "Your AI Brand Spokesperson",
     description:
-      "Design a virtual spokesperson with 9 brand attributes. Tone, energy, style, age, saved and reused across every campaign.",
-    subtext: "Create unlimited personas per brand.",
+      "Design a virtual spokesperson with 9 customizable attributes — skin tone, hair, clothing, age, and more. Save once and reuse the same face across every campaign for brand consistency.",
+    subtext: "Create multiple personas per brand.",
     bullets: [
-      "9 configurable persona attributes",
-      "Consistent brand identity across ads",
+      "9 customizable persona attributes",
+      "Consistent brand identity across all ads",
       "Multiple personas per brand",
     ],
     mock: <AnimationPersonaBuilder />,
     reversed: true,
   },
   {
-    title: "Smart Video Generation",
+    title: "Hook-Body-CTA Scripts, Written For You",
     description:
-      "AI writes Hook/Body/CTA scripts tailored to your product and persona. Each segment is generated as a short, crisp video clip.",
+      "AI writes attention-grabbing hooks, benefit-driven bodies, and urgency CTAs — all tuned to your product data and brand voice. Each segment is generated as a short, crisp video clip. No copywriting skills needed.",
     subtext: "Under 10s per segment for perfect lip-sync.",
     bullets: [
-      "AI-generated scripts per product",
+      "AI-generated scripts tuned to your product",
       "Hook, Body & CTA structure built-in",
       "Single or 3x batch generation",
     ],
@@ -354,13 +354,13 @@ const features = [
     reversed: false,
   },
   {
-    title: "Segment Mixer",
+    title: "27 Ad Combos From 9 Segments",
     description:
-      "Mix and match 3 hooks, 3 bodies, and 3 CTAs to produce up to 27 unique video combinations from a single generation.",
-    subtext: "A/B test at scale without extra cost.",
+      "Generate 3 hooks, 3 bodies, and 3 CTAs. Mix and match any combination for 27 unique video ads from a single generation. Assembly is instant — no extra credits.",
+    subtext: "A/B test hooks, bodies, and CTAs at scale.",
     bullets: [
       "27 unique ad combinations per batch",
-      "Download individual segments",
+      "Download individual segments or full videos",
       "A/B test hooks, bodies, and CTAs",
     ],
     mock: <AnimationSegmentMixer />,
@@ -374,8 +374,11 @@ const features = [
 
 export function FeaturesSection() {
   return (
-    <section className="py-24 md:py-32">
+    <section id="features" className="py-24 md:py-32">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        <h2 className="text-[clamp(2rem,4vw,3rem)] font-semibold tracking-tight text-foreground text-center mb-20">
+          Everything You Need to Create UGC Video Ads at Scale
+        </h2>
         {features.map((feature, i) => (
           <div
             key={i}

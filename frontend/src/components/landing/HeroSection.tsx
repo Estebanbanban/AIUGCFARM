@@ -23,6 +23,28 @@ export function HeroSection() {
             </span>
           </motion.h1>
 
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.45, ease: [0.25, 0.4, 0.25, 1] }}
+            className="mt-6 text-lg md:text-xl text-[#999] max-w-2xl mx-auto text-center leading-relaxed"
+          >
+            The AI UGC video generator that turns your store URL into 27 ready-to-run
+            video ads in under 10 minutes. No creators. No editing. No $500 invoices.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4, delay: 0.6 }}
+            className="mt-4 flex justify-center"
+          >
+            <span className="border border-primary/30 bg-primary/5 text-primary text-xs rounded-full px-3 py-1 inline-flex items-center gap-1.5">
+              <span>🎁</span>
+              3 free video segments — no credit card needed
+            </span>
+          </motion.div>
+
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -32,13 +54,31 @@ export function HeroSection() {
             <UrlInputCta />
           </motion.div>
 
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, delay: 0.8 }}
+            className="mt-4 flex justify-center"
+          >
+            <button
+              onClick={() => {
+                const el = document.getElementById("how-it-works");
+                if (el) el.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="text-sm text-[#888] hover:text-white transition-colors flex items-center gap-2"
+            >
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-[#555]">▶</span>
+              Watch how it works
+            </button>
+          </motion.div>
+
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.45, delay: 0.65 }}
-            className="mt-4 text-sm text-muted-foreground"
+            className="mt-4 text-sm text-[#888]"
           >
-            No credit card required • Free trial included
+            No credit card required · <span className="text-primary font-medium">Free trial included</span> · Cancel anytime
           </motion.p>
         </div>
       </div>

@@ -63,7 +63,7 @@ export function MarketingHeader() {
               href="/signup"
               className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors duration-200 hover:bg-primary/90"
             >
-              Get Started
+              Start Free
             </Link>
           </div>
 
@@ -136,7 +136,7 @@ export function MarketingHeader() {
                   className="rounded-full bg-primary py-3 text-center text-sm font-medium text-primary-foreground"
                   onClick={() => setMobileOpen(false)}
                 >
-                  Get Started
+                  Start Free
                 </Link>
               </motion.div>
             </nav>

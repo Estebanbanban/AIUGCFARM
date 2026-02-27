@@ -9,9 +9,9 @@ const steps = [
   {
     number: "01",
     icon: Link,
-    title: "Paste URL",
+    title: "Paste Your Product URL",
     description:
-      "Drop any product or store URL. We import everything, name, images, price, description, in seconds.",
+      "Drop any Shopify or store URL. Our AI UGC video generator imports everything — name, images, price, description — in seconds.",
     mediaType: "image" as const,
     mediaSrc:
       "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&w=1200&q=80",
@@ -20,9 +20,9 @@ const steps = [
   {
     number: "02",
     icon: Upload,
-    title: "Build Persona",
+    title: "Design Your AI Spokesperson",
     description:
-      "Define your AI spokesperson with 9 brand attributes. Tone, energy, style, saved and reused forever.",
+      "Configure your virtual brand spokesperson with 9 attributes. Tone, energy, style, age — saved and reused across every campaign.",
     mediaType: "image" as const,
     mediaSrc:
       "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=1200&q=80",
@@ -31,9 +31,9 @@ const steps = [
   {
     number: "03",
     icon: Clapperboard,
-    title: "Generate & Mix",
+    title: "Get 27 Unique Video Ads",
     description:
-      "AI writes Hook/Body/CTA scripts and generates video. Mix 3 segments into 27 unique combinations. Download MP4s.",
+      "AI writes Hook, Body, and CTA scripts for your product. Generate 3 segments of each type, then mix any combination for 27 ready-to-run TikTok and Meta ad creatives.",
     mediaType: "video" as const,
     mediaSrc:
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
@@ -43,13 +43,13 @@ const steps = [
 
 export function HowItWorksSection() {
   return (
-    <section className="bg-background-secondary py-24 px-4 sm:px-6">
+    <section id="how-it-works" className="bg-background-secondary py-24 px-4 sm:px-6">
       <div className="max-w-5xl mx-auto">
         {/* Heading */}
         <FadeInUp className="text-center mb-16">
           <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground mb-3">Process</p>
           <h2 className="text-[clamp(2rem,4vw,3rem)] font-semibold tracking-tight text-foreground">
-            How It Works
+            How CineRads Generates Your UGC Video Ads
           </h2>
         </FadeInUp>
 

@@ -29,7 +29,7 @@ export function UrlInputCta() {
           type="submit"
           className="absolute right-1.5 h-11 rounded-full bg-primary px-6 text-sm font-medium text-white transition-colors hover:bg-orange-600"
         >
-          Get Started →
+          Generate My First Ad Free →
         </button>
       </div>
     </form>

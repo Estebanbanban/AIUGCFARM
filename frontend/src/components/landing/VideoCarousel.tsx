@@ -64,7 +64,7 @@ function ReelCard({ reel }: { reel: (typeof reels)[number] }) {
           loop
           muted
           playsInline
-          preload="metadata"
+          preload="none"
         >
           <source src={reel.videoSrc} type="video/mp4" />
         </video>

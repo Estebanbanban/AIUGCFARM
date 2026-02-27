@@ -3,6 +3,7 @@ import { VideoCarousel } from "@/components/landing/VideoCarousel";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
 import { FeaturesSection } from "@/components/landing/FeaturesSection";
 import { MetricsBar } from "@/components/landing/MetricsBar";
+import { TestimonialSection } from "@/components/landing/TestimonialSection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FaqSection } from "@/components/landing/FaqSection";
 import { FinalCtaSection } from "@/components/landing/FinalCtaSection";
@@ -11,19 +12,27 @@ const jsonLd = {
   "@context": "https://schema.org",
   "@graph": [
     {
+      "@type": "Organization",
+      name: "CineRads",
+      url: "https://cinerads.com",
+      description: "AI-powered UGC video ad generator for e-commerce brands",
+      sameAs: [],
+    },
+    {
       "@type": "SoftwareApplication",
       name: "CineRads",
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
       description:
-        "Turn any product URL into scroll-stopping UGC video ads in minutes. AI-powered personas, hook/body/CTA structure optimized for TikTok, Instagram Reels & Meta Ads.",
+        "The AI UGC video generator for e-commerce brands. Turn any Shopify or product URL into 27 unique TikTok and Meta ad creatives in under 10 minutes.",
       offers: [
         {
           "@type": "Offer",
           name: "Starter",
           price: "29",
           priceCurrency: "USD",
-          description: "5 video credits per month, 1 AI persona, 720p exports",
+          description:
+            "Up to 81 unique video ads per month, 1 AI persona, 720p exports, AI-Written Scripts",
         },
         {
           "@type": "Offer",
@@ -31,7 +40,15 @@ const jsonLd = {
           price: "79",
           priceCurrency: "USD",
           description:
-            "25 video credits per month, unlimited personas, 1080p exports",
+            "Up to 270 unique video ads per month, 3 AI personas, 1080p exports, Custom Script Editor",
+        },
+        {
+          "@type": "Offer",
+          name: "Agency",
+          price: "199",
+          priceCurrency: "USD",
+          description:
+            "Up to 810 unique video ads per month, 10 AI personas, unlimited brand profiles, API access, 5 team seats",
         },
       ],
     },
@@ -40,10 +57,10 @@ const jsonLd = {
       mainEntity: [
         {
           "@type": "Question",
-          name: "What is a video credit?",
+          name: "What is a segment credit?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "One credit generates one full video ad with 3 segments (Hook, Body, CTA). You can mix segments from a single credit into up to 27 unique combinations.",
+            text: "One segment credit generates one video clip — either a Hook (3–5s), Body (5–10s), or CTA (3–5s). With 9 segments (3 of each type), you can mix and match 27 unique full-length video ads. Combining segments is always free.",
           },
         },
         {
@@ -67,7 +84,7 @@ const jsonLd = {
           name: "Can I write my own scripts?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Yes. You can use our AI-generated scripts or write and upload your own. You have full control over the Hook, Body, and CTA copy.",
+            text: "Yes. All plans include AI-Written Scripts. Growth and Agency plans also include the Custom Script Editor — write or edit your own Hook, Body, and CTA copy before generation.",
           },
         },
         {
@@ -83,7 +100,7 @@ const jsonLd = {
           name: "Is there a free trial?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Yes. Every new account gets 1 free video credit, no credit card required. Generate a full video ad and see the quality before you commit.",
+            text: "Yes. Every new account gets 3 free segment credits — no credit card required. Generate your first video ad and see the quality before you commit.",
           },
         },
         {
@@ -100,6 +117,14 @@ const jsonLd = {
           acceptedAnswer: {
             "@type": "Answer",
             text: "You do. All videos generated on CineRads are yours to use commercially without restriction. We retain no rights to your content.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Do you offer a refund?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Yes — if your first generation isn't what you expected, we offer a 7-day money-back guarantee. No questions asked.",
           },
         },
       ],
@@ -119,6 +144,7 @@ export default function LandingPage() {
       <HowItWorksSection />
       <FeaturesSection />
       <MetricsBar />
+      <TestimonialSection />
       <PricingSection />
       <FaqSection />
       <FinalCtaSection />

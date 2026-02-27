@@ -8,31 +8,35 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "CineRads, AI UGC Video Ads for E-Commerce",
+  title: "CineRads — AI UGC Video Ad Generator for Shopify & DTC Brands",
   description:
-    "Turn any product URL into scroll-stopping UGC video ads in minutes. AI-powered personas, hook/body/CTA structure optimized for TikTok, Instagram Reels & Meta Ads.",
+    "The AI UGC video generator for e-commerce brands. Turn any Shopify or product URL into 27 unique TikTok and Meta ad creatives in under 10 minutes. No creators. No editing. Start free.",
   keywords: [
-    "UGC video ads",
-    "AI video generator",
-    "e-commerce ads",
-    "TikTok ads",
-    "Meta ads",
+    "UGC video generator",
+    "AI UGC video ad generator",
+    "UGC video maker online",
+    "AI ad maker for Shopify",
+    "TikTok ad creator AI",
+    "AI-generated video ads",
+    "e-commerce video ads",
+    "UGC creator tool",
+    "automated video ads",
+    "Meta ads generator",
     "product video ads",
-    "UGC creator",
-    "AI ad generator",
+    "AI video generator for DTC",
   ],
   openGraph: {
-    title: "CineRads, AI UGC Video Ads for E-Commerce",
+    title: "CineRads — AI UGC Video Ad Generator for Shopify & DTC Brands",
     description:
-      "Turn any product URL into scroll-stopping UGC video ads in minutes. AI-powered personas, hook/body/CTA structure optimized for TikTok, Instagram Reels & Meta Ads.",
+      "The AI UGC video generator for e-commerce brands. Turn any Shopify or product URL into 27 unique TikTok and Meta ad creatives in under 10 minutes. No creators. No editing. Start free.",
     type: "website",
     siteName: "CineRads",
   },
   twitter: {
     card: "summary_large_image",
-    title: "CineRads, AI UGC Video Ads for E-Commerce",
+    title: "CineRads — AI UGC Video Ad Generator for Shopify & DTC Brands",
     description:
-      "Turn any product URL into scroll-stopping UGC video ads in minutes. AI-powered personas, hook/body/CTA structure optimized for TikTok, Instagram Reels & Meta Ads.",
+      "The AI UGC video generator for e-commerce brands. Turn any Shopify or product URL into 27 unique TikTok and Meta ad creatives in under 10 minutes. No creators. No editing. Start free.",
   },
 };
 

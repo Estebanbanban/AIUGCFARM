@@ -1,26 +1,25 @@
 "use client";
 
-const logoNames = [
-  "zumper",
-  "kit.sch",
-  "drift",
-  "SCENTBIRD",
-  "BOMBAS",
-  "MaryRuth's",
-  "BIOMA",
-  "ELEVATE",
-  "BINANCE",
-  "Weee!",
-  "COMCAST",
-  "APPLOVIN",
-  "Alibaba.com",
-  "ByteDance",
+const categories = [
+  "Shopify Brands",
+  "DTC Startups",
+  "E-Commerce Agencies",
+  "Dropshippers",
+  "Performance Marketers",
+  "Fashion Brands",
+  "Beauty & Skincare",
+  "Health & Wellness",
+  "Home & Living",
+  "Sports & Fitness",
+  "Pet Products",
+  "Tech Accessories",
 ];
 
 const metrics = [
-  { value: "20M+", label: "Ads analyzed" },
-  { value: "10M+", label: "Ads created" },
-  { value: "$650M+", label: "Ad spend" },
+  { value: "500+", label: "Brands trust CineRads" },
+  { value: "< 10 min", label: "Average generation time" },
+  { value: "27", label: "Video combos per batch" },
+  { value: "$0.09", label: "Per unique video ad" },
 ];
 
 export function MetricsBar() {
@@ -28,19 +27,22 @@ export function MetricsBar() {
     <section className="bg-background pb-16 pt-8 md:pb-24 md:pt-10">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <p className="text-center text-[clamp(1.25rem,2.2vw,2rem)] font-medium tracking-tight text-foreground">
-          Trusted by growing ecommerce brands and performance teams
+          Built for performance-driven e-commerce teams
         </p>
 
-        <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-5 md:mt-10 md:grid-cols-7 md:gap-y-7">
-          {logoNames.map((name) => (
-            <div key={name} className="text-center text-sm font-semibold tracking-wide text-muted-foreground md:text-base">
-              {name}
-            </div>
+        <div className="mt-8 flex flex-wrap gap-3 justify-center">
+          {categories.map((cat) => (
+            <span
+              key={cat}
+              className="border border-[#333] rounded-full px-4 py-2 text-sm text-[#888]"
+            >
+              {cat}
+            </span>
           ))}
         </div>
 
         <div className="mt-10 overflow-hidden rounded-3xl border border-border bg-card shadow-[0_14px_36px_rgba(0,0,0,0.1)] dark:shadow-[0_14px_36px_rgba(0,0,0,0.3)] md:mt-14">
-          <div className="grid md:grid-cols-3">
+          <div className="grid md:grid-cols-4">
             {metrics.map((m, i) => (
               <div
                 key={m.label}

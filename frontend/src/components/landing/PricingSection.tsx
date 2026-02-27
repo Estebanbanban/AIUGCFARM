@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { ScaleIn, FadeInUp } from "@/lib/motion";
@@ -7,110 +8,196 @@ import { ScaleIn, FadeInUp } from "@/lib/motion";
 const plans = [
   {
     name: "Starter",
-    price: 29,
+    monthlyPrice: 29,
+    annualPrice: 23,
+    annualSavings: 72,
     description: "Perfect for testing and launching your first UGC campaigns.",
+    perVideo: "$0.36/video",
     features: [
-      "27 segment credits / mo",
+      "Up to 81 unique video ads/mo",
       "1 AI persona",
       "1 brand profile",
-      "Easy Mode",
+      "AI-Written Scripts",
       "720p MP4 export",
       "Free trial (3 segments)",
     ],
-    cta: "Get Started",
+    cta: "Start Free — No Card Required",
     href: "/signup",
     highlighted: false,
+    isAgency: false,
   },
   {
     name: "Growth",
-    price: 79,
+    monthlyPrice: 79,
+    annualPrice: 63,
+    annualSavings: 192,
     description: "For brands scaling their ad creative output seriously.",
+    perVideo: "$0.29/video",
     features: [
-      "90 segment credits / mo",
+      "Up to 270 unique video ads/mo",
       "3 AI personas",
       "3 brand profiles",
-      "Easy + Expert Mode",
+      "AI-Written Scripts + Custom Script Editor",
       "1080p MP4 export",
       "Custom scripts",
       "Priority generation",
     ],
-    cta: "Get Started",
+    cta: "Start Scaling →",
     href: "/signup",
     highlighted: true,
+    isAgency: false,
+  },
+  {
+    name: "Agency",
+    monthlyPrice: 199,
+    annualPrice: 159,
+    annualSavings: 480,
+    description: "For agencies and large teams managing multiple brands.",
+    perVideo: "$0.25/video",
+    features: [
+      "Up to 810 unique video ads/mo",
+      "10 AI personas",
+      "Unlimited brand profiles",
+      "AI-Written Scripts + Custom Script Editor",
+      "1080p MP4 export",
+      "Custom scripts",
+      "Priority generation queue",
+      "API access",
+      "5 team seats",
+    ],
+    cta: "Go Unlimited →",
+    href: "/signup",
+    highlighted: false,
+    isAgency: true,
   },
 ];
 
 export function PricingSection() {
+  const [annual, setAnnual] = useState(false);
+
   return (
     <section id="pricing" className="bg-background py-24 px-4 sm:px-6">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <FadeInUp className="text-center mb-14">
           <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground mb-3">Pricing</p>
+          <p className="text-sm text-[#888] mb-4">
+            Traditional UGC creators charge $150–$500 per video.
+          </p>
           <h2 className="text-[clamp(2rem,4vw,3rem)] font-semibold tracking-tight text-foreground">
             Simple, transparent pricing
           </h2>
           <p className="text-muted-foreground mt-3 text-base">
             Start free. Scale when you&apos;re ready.
           </p>
+
+          {/* Billing toggle */}
+          <div className="flex items-center justify-center gap-4 mt-8">
+            <button
+              onClick={() => setAnnual(false)}
+              className={`text-sm font-medium transition-colors ${
+                !annual ? "text-white" : "text-[#666]"
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setAnnual(!annual)}
+              className="relative w-11 h-6 rounded-full bg-[#222] border border-[#333] transition-all flex items-center"
+              aria-label="Toggle billing period"
+            >
+              <span
+                className={`absolute w-4 h-4 rounded-full bg-primary transition-all duration-200 ${
+                  annual ? "left-6" : "left-1"
+                }`}
+              />
+            </button>
+            <button
+              onClick={() => setAnnual(true)}
+              className={`text-sm font-medium transition-colors flex items-center gap-2 ${
+                annual ? "text-white" : "text-[#666]"
+              }`}
+            >
+              Annual
+              <span className="text-primary text-xs font-medium">Save 20%</span>
+            </button>
+          </div>
         </FadeInUp>
 
-        <div className="grid md:grid-cols-2 gap-4">
-          {plans.map((plan, i) => (
-            <ScaleIn key={plan.name} delay={i * 0.1}>
-              <div
-                className={`relative rounded-2xl p-8 flex flex-col h-full transition-all duration-300 ${
-                  plan.highlighted
-                    ? "bg-card border border-primary/40 shadow-[0_0_40px_rgba(249,115,22,0.07)]"
-                    : "bg-card border border-border hover:border-primary/30"
-                }`}
-              >
-                {plan.highlighted && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="bg-primary text-white text-xs font-medium rounded-full px-3 py-1">
-                      Most Popular
-                    </span>
-                  </div>
-                )}
-
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-foreground">{plan.name}</h3>
-                  <p className="text-muted-foreground text-sm mt-1">{plan.description}</p>
-                </div>
-
-                <div className="mb-6">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-5xl font-bold text-foreground">${plan.price}</span>
-                    <span className="text-muted-foreground text-lg">/mo</span>
-                  </div>
-                </div>
-
-                <ul className="space-y-3 mb-8 flex-1">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2.5">
-                      <Check className="size-4 text-primary flex-shrink-0" strokeWidth={2} />
-                      <span className="text-sm text-muted-foreground">{f}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <Link
-                  href={plan.href}
-                  className={`w-full py-3 rounded-full text-sm font-medium text-center transition-all duration-200 block ${
+        <div className="grid md:grid-cols-3 gap-4">
+          {plans.map((plan, i) => {
+            const price = annual ? plan.annualPrice : plan.monthlyPrice;
+            return (
+              <ScaleIn key={plan.name} delay={i * 0.1}>
+                <div
+                  className={`relative rounded-2xl p-8 flex flex-col h-full transition-all duration-300 ${
                     plan.highlighted
-                      ? "bg-primary text-white hover:bg-orange-600"
-                      : "border border-border text-foreground hover:border-primary/40"
+                      ? "bg-card border border-primary/40 shadow-[0_0_40px_rgba(249,115,22,0.07)]"
+                      : plan.isAgency
+                      ? "bg-card border border-[#333] hover:border-[#555]"
+                      : "bg-card border border-border hover:border-primary/30"
                   }`}
                 >
-                  {plan.cta}
-                </Link>
-              </div>
-            </ScaleIn>
-          ))}
+                  {plan.highlighted && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <span className="bg-primary text-white text-xs font-medium rounded-full px-3 py-1">
+                        Most Popular
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-foreground">{plan.name}</h3>
+                    <p className="text-muted-foreground text-sm mt-1">{plan.description}</p>
+                  </div>
+
+                  <div className="mb-2">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-5xl font-bold text-foreground">${price}</span>
+                      <span className="text-muted-foreground text-lg">/mo</span>
+                    </div>
+                    {annual && (
+                      <p className="text-xs text-[#888] mt-1">
+                        billed annually · save ${plan.annualSavings}/yr
+                      </p>
+                    )}
+                    <p className="text-xs text-primary mt-1">
+                      {plan.perVideo} vs. $500 with traditional UGC
+                    </p>
+                  </div>
+
+                  <ul className="space-y-3 mb-8 flex-1 mt-6">
+                    {plan.features.map((f) => (
+                      <li key={f} className="flex items-center gap-2.5">
+                        <Check className="size-4 text-primary flex-shrink-0" strokeWidth={2} />
+                        <span className="text-sm text-muted-foreground">{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Link
+                    href={plan.href}
+                    className={`w-full py-3 rounded-full text-sm font-medium text-center transition-all duration-200 block ${
+                      plan.highlighted
+                        ? "bg-primary text-white hover:bg-orange-600"
+                        : plan.isAgency
+                        ? "bg-white text-black hover:bg-[#f0f0f0]"
+                        : "border border-border text-foreground hover:border-primary/40"
+                    }`}
+                  >
+                    {plan.cta}
+                  </Link>
+                </div>
+              </ScaleIn>
+            );
+          })}
         </div>
 
         <FadeInUp delay={0.3}>
           <p className="text-center text-xs text-muted-foreground mt-8">
             All plans include: Free trial (3 segments) · No watermarks · MP4 download · Cancel anytime
+          </p>
+          <p className="text-center text-xs text-primary mt-3">
+            🔒 Beta pricing — lock in your rate forever. Prices increase at public launch.
           </p>
         </FadeInUp>
       </div>
