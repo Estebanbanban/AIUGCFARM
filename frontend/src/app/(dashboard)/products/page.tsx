@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
   Package,
@@ -54,6 +55,7 @@ function ProductCardSkeleton() {
 export default function ProductsPage() {
   const { data: products, isLoading, error } = useProducts();
   const scrapeProduct = useScrapeProduct();
+  const queryClient = useQueryClient();
 
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importUrl, setImportUrl] = useState('');
@@ -111,6 +113,7 @@ export default function ProductsPage() {
   }
 
   function handleUploadSuccess() {
+    queryClient.invalidateQueries({ queryKey: ['products'] });
     setShowImportDialog(false);
   }
 
