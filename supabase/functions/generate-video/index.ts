@@ -280,13 +280,14 @@ function computeCosts(resolvedMode: string, resolvedQuality: string) {
   return { variantCount, creditCost, klingModel };
 }
 
-/** Submit Kling jobs for all script segments and return job IDs map. */
+/** Submit Kling jobs for all script segments and return job IDs map + actual model used. */
 async function submitAllKlingJobs(
   script: GeneratedScript,
   signedImageUrl: string,
   klingModel: string,
-): Promise<Record<string, string>> {
+): Promise<{ jobIds: Record<string, string>; modelUsed: string }> {
   const jobEntries: Array<[string, string]> = [];
+  const jobModels: string[] = [];
   const SEG_KEY = { hooks: "hook", bodies: "body", ctas: "cta" } as const;
   const segmentTypes = ["hooks", "bodies", "ctas"] as const;
   const jobSubmissions = segmentTypes.flatMap((segType) =>
@@ -297,15 +298,19 @@ async function submitAllKlingJobs(
           image_url: signedImageUrl,
           script: `A UGC creator speaking directly to camera, saying: "${segment.text}" Natural, authentic talking-head style, casual handheld selfie aesthetic.`,
           duration: segment.duration_seconds <= 5 ? 5 : 10,
-          mode: "std",
+          mode: "pro",
+          sound: "on",
           model_name: klingModel,
         })
-      ).then((result) => [jobKey, result.job_id] as [string, string]);
+      ).then((result) => {
+        if (result.model_name) jobModels.push(result.model_name);
+        return [jobKey, result.job_id] as [string, string];
+      });
     })
   );
 
   jobEntries.push(...await Promise.all(jobSubmissions));
-  return Object.fromEntries(jobEntries);
+  return { jobIds: Object.fromEntries(jobEntries), modelUsed: jobModels[0] || klingModel };
 }
 
 // ── Main handler ─────────────────────────────────────────────────────
@@ -449,7 +454,7 @@ Deno.serve(async (req: Request) => {
         }
 
         // ── Submit Kling jobs ─────────────────────────────────────
-        const jobIds = await submitAllKlingJobs(
+        const { jobIds, modelUsed } = await submitAllKlingJobs(
           finalScript,
           klingCompositeUrl.signedUrl,
           klingModel,
@@ -460,6 +465,7 @@ Deno.serve(async (req: Request) => {
           .from("generations")
           .update({
             external_job_ids: jobIds,
+            kling_model: modelUsed,
             status: "generating_segments",
           })
           .eq("id", generation_id);
@@ -674,6 +680,7 @@ Deno.serve(async (req: Request) => {
         persona_id,
         mode: resolvedMode,
         video_quality: resolvedQuality,
+        kling_model: klingModel,
         status: "scripting",
         started_at: new Date().toISOString(),
       })
@@ -731,7 +738,7 @@ Deno.serve(async (req: Request) => {
 
       // ── Submit Kling video generation jobs ─────────────────────────
 
-      const jobIds = await submitAllKlingJobs(
+      const { jobIds, modelUsed } = await submitAllKlingJobs(
         script,
         klingCompositeUrl.signedUrl,
         klingModel,
@@ -743,6 +750,7 @@ Deno.serve(async (req: Request) => {
         .from("generations")
         .update({
           external_job_ids: jobIds,
+          kling_model: modelUsed,
           status: "generating_segments",
         })
         .eq("id", generationId);

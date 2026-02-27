@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { fadeIn } from "@/lib/animations";
 import { ArrowLeft } from "lucide-react";
+import { Logo } from "@/components/ui/Logo";
 
 function LoginForm() {
   const router = useRouter();
@@ -68,8 +69,8 @@ function LoginForm() {
       >
         {/* Logo */}
         <div className="mb-8 text-center">
-          <Link href="/" className="inline-block text-2xl font-bold tracking-tight text-zinc-900">
-            CineRads
+          <Link href="/" className="inline-block">
+            <Logo variant="full" size="lg" theme="light" />
           </Link>
         </div>
 

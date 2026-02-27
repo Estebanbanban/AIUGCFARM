@@ -246,7 +246,11 @@ export default function DashboardPage() {
         ) : hasGenerations ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {recentGenerations.map((gen) => {
-              const cost = calculateGenerationCost(gen.videos, gen.video_quality);
+              const cost = calculateGenerationCost(
+                gen.videos,
+                gen.video_quality,
+                gen.kling_model,
+              );
               const showCost = gen.status === "completed" && cost.totalBilledSeconds > 0;
               return (
                 <Link key={gen.id} href={`/generate/${gen.id}`} className="group">

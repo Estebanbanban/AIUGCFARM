@@ -16,6 +16,7 @@ const jsonLd = {
       name: "CineRads",
       url: "https://cinerads.com",
       description: "AI-powered UGC video ad generator for e-commerce brands",
+      logo: "https://cinerads.com/og-logo.png",
       sameAs: [],
     },
     {

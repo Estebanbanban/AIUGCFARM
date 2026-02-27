@@ -7,6 +7,7 @@ import { Menu, X, LayoutDashboard, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { createClient } from "@/lib/supabase/client";
+import { Logo } from "@/components/ui/Logo";
 
 interface AuthUser {
   name: string;
@@ -17,7 +18,6 @@ const navItems = [
   { label: "Features", href: "#features" },
   { label: "Pricing", href: "/pricing" },
   { label: "Blog", href: "/blog" },
-  { label: "FAQ", href: "#faq" },
 ];
 
 function UserMenu({ user }: { user: AuthUser }) {
@@ -166,8 +166,8 @@ export function MarketingHeader() {
         >
           <div className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-b from-white/40 via-white/10 to-transparent dark:from-white/10 dark:via-white/[0.03]" />
 
-          <Link href="/" className="relative z-10 text-lg font-semibold tracking-tight text-foreground">
-            CineRads
+          <Link href="/" className="relative z-10">
+            <Logo variant="full" size="md" theme="dark" />
           </Link>
 
           <nav className="relative z-10 hidden items-center gap-8 md:flex">
@@ -227,7 +227,7 @@ export function MarketingHeader() {
             className="fixed inset-0 z-[100] flex flex-col bg-background"
           >
             <div className="flex h-16 items-center justify-between border-b border-border px-4">
-              <span className="text-lg font-semibold text-foreground">CineRads</span>
+              <Logo variant="full" size="md" theme="dark" />
               <button
                 onClick={() => setMobileOpen(false)}
                 className="text-foreground"

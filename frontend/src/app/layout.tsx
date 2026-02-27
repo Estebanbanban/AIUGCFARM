@@ -26,6 +26,14 @@ export const metadata: Metadata = {
     "product video ads",
     "AI video generator for DTC",
   ],
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/site.webmanifest",
   openGraph: {
     title: "CineRads — AI UGC Video Ad Generator for Shopify & DTC Brands",
     description:
