@@ -1,77 +1,85 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { staggerContainer } from "@/lib/animations";
 import { UrlInputCta } from "./UrlInputCta";
-
-const headlineVariants = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-};
 
 export function HeroSection() {
   return (
-    <section className="relative pt-20 pb-4 md:pt-24 md:pb-6 overflow-hidden">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+    <section className="relative min-h-[52vh] flex flex-col justify-end bg-black overflow-hidden pt-24 pb-4">
+      {/* Subtle radial bloom behind headline */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.035) 0%, transparent 60%)",
+        }}
+      />
+
+      <div className="relative max-w-5xl mx-auto px-4 sm:px-6 text-center">
+        {/* Beta badge */}
         <motion.div
-          variants={staggerContainer}
-          initial="initial"
-          animate="animate"
-          className="text-center"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.25, 0.4, 0.25, 1] }}
+          className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#333] px-3 py-1 text-xs text-[#999]"
         >
-          {/* Beta badge */}
-          <motion.div
-            variants={headlineVariants}
-            transition={{ duration: 0.5, ease: [0.25, 0.4, 0.25, 1] }}
-            className="mb-3"
-          >
-            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-3 py-1 text-xs text-muted-foreground">
-              <span className="size-1.5 rounded-full bg-primary animate-pulse" />
-              Now in Beta — Start creating for free
-            </span>
-          </motion.div>
-
-          {/* Headline */}
-          <motion.h1
-            variants={headlineVariants}
-            transition={{ duration: 0.5, delay: 0.1, ease: [0.25, 0.4, 0.25, 1] }}
-            className="text-5xl md:text-7xl font-bold tracking-tight leading-[1.08]"
-          >
-            Your Products.
-            <br />
-            <span className="text-primary">AI-Powered</span> Ads.
-            <br />
-            Unlimited Scale.
-          </motion.h1>
-
-          {/* Subtitle */}
-          <motion.p
-            variants={headlineVariants}
-            transition={{ duration: 0.5, delay: 0.2, ease: [0.25, 0.4, 0.25, 1] }}
-            className="mt-3 text-base md:text-lg text-muted-foreground max-w-xl mx-auto"
-          >
-            Import your product URL, build an AI spokesperson, and generate
-            scroll-stopping video ads.
-          </motion.p>
-
-          {/* URL Input */}
-          <motion.div
-            variants={headlineVariants}
-            transition={{ duration: 0.5, delay: 0.3, ease: [0.25, 0.4, 0.25, 1] }}
-            className="mt-5"
-          >
-            <UrlInputCta />
-          </motion.div>
-
-          {/* Trust indicators */}
-          <motion.p
-            variants={headlineVariants}
-            transition={{ duration: 0.5, delay: 0.4, ease: [0.25, 0.4, 0.25, 1] }}
-            className="mt-3 text-xs text-muted-foreground"
-          >
-            No credit card required &middot; Free trial included &middot; 30-second setup
-          </motion.p>
+          <span className="size-1.5 rounded-full bg-primary animate-pulse" />
+          Now in Beta — Start creating for free
         </motion.div>
+
+        {/* Headline — 3 lines revealing from bottom */}
+        <div className="text-[clamp(2.8rem,8vw,5.5rem)] font-bold tracking-[-0.03em] leading-[1.05]">
+          {[
+            <span key="0" className="text-white">Your Products.</span>,
+            <span key="1" className="text-white"><span className="text-primary">AI-Powered</span> Ads.</span>,
+            <span key="2" className="text-white">Unlimited Scale.</span>,
+          ].map((line, i) => (
+            <div key={i} className="overflow-hidden">
+              <motion.div
+                initial={{ y: "110%" }}
+                animate={{ y: 0 }}
+                transition={{
+                  duration: 0.8,
+                  delay: 0.3 + i * 0.15,
+                  ease: [0.25, 0.4, 0.25, 1],
+                }}
+              >
+                {line}
+              </motion.div>
+            </div>
+          ))}
+        </div>
+
+        {/* Subtitle */}
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.75, ease: [0.25, 0.4, 0.25, 1] }}
+          className="mt-5 text-base md:text-lg text-[#999] max-w-lg mx-auto leading-relaxed"
+        >
+          Import your product URL, build an AI spokesperson, and generate
+          scroll-stopping video ads.
+        </motion.p>
+
+        {/* URL Input */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.9, ease: [0.25, 0.4, 0.25, 1] }}
+          className="mt-7"
+        >
+          <UrlInputCta />
+        </motion.div>
+
+        {/* Trust line */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 1.1 }}
+          className="mt-3 text-xs text-[#555]"
+        >
+          No credit card required &middot; Free trial included &middot; 30-second setup
+        </motion.p>
       </div>
     </section>
   );
