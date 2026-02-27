@@ -317,7 +317,7 @@ Deno.serve(async (req: Request) => {
     const userId = await optionalUserId(req);
 
     const rateLimitKey =
-      userId ?? req.headers.get("x-forwarded-for") || "anon";
+      (userId ?? req.headers.get("x-forwarded-for")) || "anon";
     const limit = userId ? 60 : 10;
     if (!rateLimit(rateLimitKey, limit)) {
       return json(
