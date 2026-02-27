@@ -3,6 +3,8 @@ const KLING_BASE = "https://api.klingai.com/v1";
 export interface KlingSubmitResult {
   job_id: string;
   status: string;
+  model_name: string;
+  mode: string;
 }
 
 export interface KlingJobStatus {
@@ -62,10 +64,14 @@ export async function submitKlingJob(params: {
   image_url: string;
   script: string;
   duration: number;
-  mode?: string;
+  mode?: "pro" | "std";
+  sound?: "on" | "off";
   model_name?: string;
 }): Promise<KlingSubmitResult> {
   const token = await generateKlingToken();
+  const requestedModel = params.model_name || "kling-v2-6";
+  const requestedMode = params.mode || "pro";
+  const requestedSound = params.sound || (requestedMode === "pro" ? "on" : "off");
 
   const res = await fetch(`${KLING_BASE}/videos/image2video`, {
     method: "POST",
@@ -74,12 +80,12 @@ export async function submitKlingJob(params: {
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
-      model_name: params.model_name || "kling-v2-6",
+      model_name: requestedModel,
       image: params.image_url,
       prompt: params.script,
       duration: String(params.duration),
-      mode: "pro", // sound: "on" requires pro mode (std does not support audio)
-      sound: "on",
+      mode: requestedMode,
+      sound: requestedSound,
     }),
   });
 
@@ -110,6 +116,8 @@ export async function submitKlingJob(params: {
   return {
     job_id: jobId,
     status: (data.task_status as string) ?? "pending",
+    model_name: (data.model_name as string) ?? requestedModel,
+    mode: (data.mode as string) ?? requestedMode,
   };
 }
 

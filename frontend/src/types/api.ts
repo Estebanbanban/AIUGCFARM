@@ -112,6 +112,7 @@ export interface GenerationHistoryItem {
   persona_id: string;
   mode: string;
   video_quality: Generation["video_quality"];
+  kling_model?: Generation["kling_model"];
   status: GenerationStatus;
   script: GenerationScript | null;
   composite_image_url: string | null;

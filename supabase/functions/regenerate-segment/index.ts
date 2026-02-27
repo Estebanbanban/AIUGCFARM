@@ -87,7 +87,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: generation, error: generationErr } = await sb
       .from("generations")
-      .select("id, owner_id, status, script, composite_image_url, external_job_ids, videos, video_quality")
+      .select("id, owner_id, status, script, composite_image_url, external_job_ids, videos, video_quality, kling_model")
       .eq("id", generation_id)
       .eq("owner_id", userId)
       .single();
@@ -162,14 +162,17 @@ Deno.serve(async (req: Request) => {
       }
 
       const quality = (generation.video_quality ?? "standard") as "standard" | "hd";
-      const modelName = KLING_MODEL[quality] ?? KLING_MODEL.standard;
+      const modelName = (generation.kling_model as string | null)
+        ?? KLING_MODEL[quality]
+        ?? KLING_MODEL.standard;
 
       const klingResult = await withRetry(() =>
         submitKlingJob({
           image_url: compositeSignedUrl,
           script: `A UGC creator speaking directly to camera, saying: "${segment.text}" Natural, authentic talking-head style, casual handheld selfie aesthetic.`,
           duration: clampKlingDuration(segment.duration_seconds ?? 5),
-          mode: "std",
+          mode: "pro",
+          sound: "on",
           model_name: modelName,
         }),
       );
@@ -203,6 +206,7 @@ Deno.serve(async (req: Request) => {
           error_message: null,
           completed_at: null,
           external_job_ids: updatedJobIds,
+          kling_model: klingResult.model_name || modelName,
           videos: nextVideos,
         })
         .eq("id", generation.id);
