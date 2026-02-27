@@ -37,6 +37,7 @@ export async function callEdge<T>(
       method: options.method || "POST",
       headers: {
         "Content-Type": "application/json",
+        apikey: supabaseAnonKey,
         Authorization: `Bearer ${accessToken}`,
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
@@ -64,6 +65,7 @@ export async function callEdgePublic<T>(
   options: { method?: string; body?: unknown } = {}
 ): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
+  headers.apikey = supabaseAnonKey;
 
   try {
     const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
@@ -95,7 +97,10 @@ export async function callEdgeMultipart<T>(
 
   const res = await fetch(`${EDGE_URL}/${fn}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${session.access_token}` },
+    headers: {
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${session.access_token}`,
+    },
     body: formData,
   });
 
