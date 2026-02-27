@@ -34,6 +34,103 @@ interface GeneratedScript {
   ctas: ScriptSegment[];
 }
 
+// ── Advanced Mode input types ─────────────────────────────────────────
+
+interface AdvancedSegmentInput {
+  script_text: string;
+  global_emotion: string;
+  global_intensity: number;
+  action_description?: string;
+  image_path?: string;
+}
+
+interface AdvancedSegmentsInput {
+  hooks: AdvancedSegmentInput[];
+  bodies: AdvancedSegmentInput[];
+  ctas: AdvancedSegmentInput[];
+}
+
+// ── Emotion utilities ─────────────────────────────────────────────────
+
+const EMOTION_TAG_REGEX = /\[e:(\w+):(\w+)\]/gi;
+
+interface EmotionTag {
+  emotion: string;
+  intensity: number;
+}
+
+function parseEmotionTags(text: string): EmotionTag[] {
+  const tags: EmotionTag[] = [];
+  let match: RegExpExecArray | null;
+  const regex = new RegExp(EMOTION_TAG_REGEX.source, "gi");
+  while ((match = regex.exec(text)) !== null) {
+    const emotion = match[1].toLowerCase();
+    const intensityStr = match[2].toLowerCase();
+    const intensityMap: Record<string, number> = { low: 1, "1": 1, medium: 2, "2": 2, high: 3, "3": 3 };
+    const intensity = intensityMap[intensityStr] ?? 2;
+    tags.push({ emotion, intensity });
+  }
+  return tags;
+}
+
+function stripEmotionTags(text: string): string {
+  return text.replace(new RegExp(EMOTION_TAG_REGEX.source, "gi"), "").replace(/\s{2,}/g, " ").trim();
+}
+
+const EMOTION_DIRECTIVES: Record<string, string> = {
+  happy: "warm smile, relaxed energy, genuine happiness",
+  excited: "enthusiastic, animated gestures, high energy, bright eyes",
+  surprised: "eyes wide, mouth slightly open, genuine shock and disbelief",
+  serious: "composed, direct eye contact, focused expression",
+  neutral: "",
+};
+
+const INTENSITY_WORDS: Record<number, string> = { 1: "subtly", 2: "noticeably", 3: "intensely" };
+
+function buildKlingPrompt(params: {
+  cleanedText: string;
+  globalEmotion?: string;
+  globalIntensity?: number;
+  inlineTags?: EmotionTag[];
+  actionDescription?: string;
+}): string {
+  const { cleanedText, globalEmotion, globalIntensity, inlineTags, actionDescription } = params;
+
+  let prompt = `A UGC creator speaking directly to camera, saying: "${cleanedText}" Natural, authentic talking-head style, casual handheld selfie aesthetic.`;
+
+  // Global emotion directive
+  if (globalEmotion && globalEmotion !== "neutral") {
+    const directive = EMOTION_DIRECTIVES[globalEmotion];
+    if (directive) {
+      const intensityWord = INTENSITY_WORDS[globalIntensity ?? 2] ?? "noticeably";
+      prompt += ` Throughout the video: ${intensityWord} ${directive}.`;
+    }
+  }
+
+  // Inline emotion tags
+  if (inlineTags && inlineTags.length > 0) {
+    const inlineDirectives = inlineTags
+      .map((t) => {
+        const directive = EMOTION_DIRECTIVES[t.emotion];
+        if (!directive) return null;
+        const intensityWord = INTENSITY_WORDS[t.intensity] ?? "noticeably";
+        return `${intensityWord} ${directive}`;
+      })
+      .filter(Boolean)
+      .join("; ");
+    if (inlineDirectives) {
+      prompt += ` At moments of emphasis: ${inlineDirectives}.`;
+    }
+  }
+
+  // Action description
+  if (actionDescription && actionDescription.trim()) {
+    prompt += ` Action: ${actionDescription.trim()}.`;
+  }
+
+  return prompt;
+}
+
 // ── Script generation via OpenRouter ──────────────────────────────────
 
 function buildSystemPrompt(count: number): string {
@@ -313,6 +410,34 @@ async function submitAllKlingJobs(
   return { jobIds: Object.fromEntries(jobEntries), modelUsed: jobModels[0] || klingModel };
 }
 
+/** Build a GeneratedScript from advanced segment inputs (strip emotion tags, estimate duration). */
+function buildScriptFromAdvanced(
+  advanced: AdvancedSegmentsInput,
+  variantCount: number,
+): GeneratedScript {
+  const toSegments = (
+    segs: AdvancedSegmentInput[],
+    minDur: number,
+    maxDur: number,
+  ): ScriptSegment[] =>
+    segs.slice(0, variantCount).map((s) => {
+      const cleanedText = stripEmotionTags(s.script_text);
+      const wordCount = cleanedText.split(/\s+/).filter(Boolean).length;
+      const estimated = Math.round(wordCount / 2.5);
+      return {
+        text: cleanedText,
+        duration_seconds: clamp(estimated || minDur, minDur, maxDur),
+        variant_label: "advanced",
+      };
+    });
+
+  return {
+    hooks: toSegments(advanced.hooks, 2, 4),
+    bodies: toSegments(advanced.bodies, 5, 9),
+    ctas: toSegments(advanced.ctas, 2, 4),
+  };
+}
+
 // ── Main handler ─────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -516,9 +641,14 @@ Deno.serve(async (req: Request) => {
     // New generation: either phase="script" (script-only) or default
     // ══════════════════════════════════════════════════════════════════
 
-    const { product_id, persona_id, mode, quality, composite_image_path } = body;
-
-    // ── 1. Validate input ──────────────────────────────────────────
+    const { product_id, persona_id, mode, quality, composite_image_path, advanced_segments } = body as {
+      product_id: string;
+      persona_id: string;
+      mode?: string;
+      quality?: string;
+      composite_image_path: string;
+      advanced_segments?: AdvancedSegmentsInput;
+    };
 
     if (!product_id) return json({ detail: "product_id is required" }, cors, 400);
     if (!persona_id) return json({ detail: "persona_id is required" }, cors, 400);
@@ -576,7 +706,19 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // ── 4. Compute effective cost (for both script-only and default) ─
+    // ── 4. Security: validate per-segment image paths ─────────────
+
+    if (advanced_segments) {
+      for (const segType of ["hooks", "bodies", "ctas"] as const) {
+        for (const seg of advanced_segments[segType]) {
+          if (seg.image_path && !seg.image_path.startsWith(`${userId}/`)) {
+            return json({ detail: "Access denied for segment image path" }, cors, 403);
+          }
+        }
+      }
+    }
+
+    // ── 5. Compute effective cost (for both script-only and default) ─
 
     const { data: profileData } = await sb
       .from("profiles")
@@ -670,7 +812,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // ── 5. Create generation record ────────────────────────────────
+    // ── 6. Create generation record ────────────────────────────────
 
     const { data: generation, error: genErr } = await sb
       .from("generations")
@@ -692,7 +834,7 @@ Deno.serve(async (req: Request) => {
 
     const generationId = generation.id;
 
-    // ── 6. Debit credits atomically (discounted if first video) ────
+    // ── 7. Debit credits atomically (discounted if first video) ────
 
     await debitCredits(userId, effectiveCost, generationId);
 
@@ -704,17 +846,25 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
-      // ── 7. Generate script ──────────────────────────────────────────
+      // ── 8. Generate (or use provided) script ───────────────────────
 
-      const { script, scriptRaw } = await generateScript(product, variantCount);
+      let script: GeneratedScript;
+      let scriptRaw: GeneratedScript | undefined;
+      if (advanced_segments) {
+        script = buildScriptFromAdvanced(advanced_segments, variantCount);
+      } else {
+        const result = await generateScript(product, variantCount);
+        script = result.script;
+        scriptRaw = result.scriptRaw;
+      }
 
-      // ── 8. Save script + composite path, update status ─────────────
+      // ── 9. Save script + composite path, update status ─────────────
 
       const { error: updateErr } = await sb
         .from("generations")
         .update({
           script,
-          script_raw: scriptRaw,
+          ...(scriptRaw ? { script_raw: scriptRaw } : {}),
           composite_image_url: composite_image_path,
           status: "submitting_jobs",
         })
@@ -724,7 +874,7 @@ Deno.serve(async (req: Request) => {
         throw new Error(`Failed to update generation: ${updateErr.message}`);
       }
 
-      // ── 9. Generate signed URL for Kling (2h expiry) ───────────────
+      // ── 10. Pre-sign main composite (2h) ───────────────────────────
 
       const { data: klingCompositeUrl, error: klingUrlErr } = await sb.storage
         .from("composite-images")
@@ -736,13 +886,66 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      // Signed URL cache: main composite pre-loaded
+      const signedUrlCache = new Map<string, string>([
+        [composite_image_path, klingCompositeUrl.signedUrl],
+      ]);
+
       // ── Submit Kling video generation jobs ─────────────────────────
 
-      const { jobIds, modelUsed } = await submitAllKlingJobs(
-        script,
-        klingCompositeUrl.signedUrl,
-        klingModel,
+      const jobModels: string[] = [];
+      const SEG_KEY = { hooks: "hook", bodies: "body", ctas: "cta" } as const;
+      const segmentTypes = ["hooks", "bodies", "ctas"] as const;
+
+      const jobSubmissions = segmentTypes.flatMap((segType) =>
+        script[segType].map((segment, i) => {
+          const jobKey = `${SEG_KEY[segType]}_${i + 1}`;
+          const advSeg = advanced_segments?.[segType]?.[i];
+
+          return (async () => {
+            // Resolve per-segment image or fall back to main composite
+            const imagePath = advSeg?.image_path ?? composite_image_path;
+            if (!signedUrlCache.has(imagePath)) {
+              const { data } = await sb.storage
+                .from("composite-images")
+                .createSignedUrl(imagePath, 7200);
+              if (data?.signedUrl) {
+                signedUrlCache.set(imagePath, data.signedUrl);
+              }
+            }
+            const imageUrl = signedUrlCache.get(imagePath) ?? klingCompositeUrl.signedUrl;
+
+            const inlineTags = advSeg ? parseEmotionTags(advSeg.script_text) : [];
+            const klingPrompt = advSeg
+              ? buildKlingPrompt({
+                  cleanedText: segment.text,
+                  globalEmotion: advSeg.global_emotion,
+                  globalIntensity: advSeg.global_intensity,
+                  inlineTags,
+                  actionDescription: advSeg.action_description,
+                })
+              : `A UGC creator speaking directly to camera, saying: "${segment.text}" Natural, authentic talking-head style, casual handheld selfie aesthetic.`;
+
+            return withRetry(() =>
+              submitKlingJob({
+                image_url: imageUrl,
+                script: klingPrompt,
+                duration: segment.duration_seconds <= 5 ? 5 : 10,
+                mode: "pro",
+                sound: "on",
+                model_name: klingModel,
+              })
+            ).then((result) => {
+              if (result.model_name) jobModels.push(result.model_name);
+              return [jobKey, result.job_id] as [string, string];
+            });
+          })();
+        })
       );
+
+      const jobEntries = await Promise.all(jobSubmissions);
+      const jobIds: Record<string, string> = Object.fromEntries(jobEntries);
+      const modelUsed = jobModels[0] || klingModel;
 
       // ── Update generation with job IDs and status ─────────────────
 

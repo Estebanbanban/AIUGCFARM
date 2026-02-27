@@ -155,3 +155,24 @@ export interface Generation {
   completed_at: string | null;
   created_at: string;
 }
+
+// ── Advanced Mode types ────────────────────────────────────────────────────
+
+export type EmotionName = "neutral" | "happy" | "excited" | "surprised" | "serious";
+export type EmotionIntensity = 1 | 2 | 3;
+
+export interface AdvancedSegmentConfig {
+  scriptText: string;
+  globalEmotion: EmotionName;
+  globalIntensity: EmotionIntensity;
+  actionDescription: string;
+  imagePath: string | null;
+  imageSignedUrl: string | null;
+  isRegeneratingImage: boolean;
+}
+
+export interface AdvancedSegmentsConfig {
+  hooks: AdvancedSegmentConfig[];
+  bodies: AdvancedSegmentConfig[];
+  ctas: AdvancedSegmentConfig[];
+}
