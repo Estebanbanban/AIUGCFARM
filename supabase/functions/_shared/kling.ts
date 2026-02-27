@@ -76,11 +76,10 @@ export async function submitKlingJob(params: {
     body: JSON.stringify({
       model_name: params.model_name || "kling-v2-6",
       image: params.image_url,
-      // Frame as spoken dialogue so Kling v3 native audio generates voiceover
-      prompt: `Person speaking directly to camera, saying: "${params.script}". Natural conversational delivery, UGC selfie talking-to-camera energy.`,
+      prompt: params.script,
       duration: String(params.duration),
       mode: params.mode || "std",
-      enable_audio: true,
+      sound: "on",
     }),
   });
 
