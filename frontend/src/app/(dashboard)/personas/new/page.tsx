@@ -99,6 +99,110 @@ function optionImageDataUri(key: string) {
   const wave = 240 + (seed % 60);
   const eye = 188 + (seed % 18);
 
+  const parseKind = () => {
+    if (key.startsWith("gender-")) return { kind: "gender", value: key.slice(7) };
+    if (key.startsWith("hair-style-")) return { kind: "hairStyle", value: key.slice(11) };
+    if (key.startsWith("body-type-")) return { kind: "bodyType", value: key.slice(10) };
+    if (key.startsWith("clothing-")) return { kind: "clothing", value: key.slice(9) };
+    if (key.startsWith("accessory-")) return { kind: "accessory", value: key.slice(10) };
+    return { kind: "generic", value: key };
+  };
+
+  const { kind, value } = parseKind();
+  const normalized = value.toLowerCase().replace(/_/g, " ");
+
+  let hair = '<path d="M292 256c0-62 48-104 108-104s108 42 108 104v30H292z" fill="#d4d4d8" opacity="0.85"/>';
+  let torso = '<rect x="245" y="420" width="310" height="380" rx="150" fill="#ffffff" opacity="0.82"/>';
+  let clothing = "";
+  let accessory = "";
+
+  if (kind === "gender") {
+    if (normalized === "male") {
+      hair = '<path d="M300 248c0-56 44-96 100-96s100 40 100 96v24H300z" fill="#d1d5db" opacity="0.88"/>';
+      torso = '<rect x="230" y="420" width="340" height="370" rx="120" fill="#ffffff" opacity="0.82"/>';
+    } else if (normalized === "female") {
+      hair = '<path d="M280 244c0-62 54-104 120-104s120 42 120 104v120H280z" fill="#d1d5db" opacity="0.9"/>';
+      torso = '<rect x="255" y="430" width="290" height="370" rx="145" fill="#ffffff" opacity="0.82"/>';
+    } else {
+      hair = '<path d="M290 248c0-60 50-100 110-100s110 40 110 100v54H290z" fill="#d4d4d8" opacity="0.88"/>';
+      torso = '<rect x="242" y="424" width="316" height="374" rx="134" fill="#ffffff" opacity="0.82"/>';
+    }
+  }
+
+  if (kind === "hairStyle") {
+    if (normalized.includes("bald")) {
+      hair = "";
+    } else if (normalized.includes("buzz")) {
+      hair = '<path d="M314 252c0-50 38-84 86-84s86 34 86 84v10H314z" fill="#d4d4d8" opacity="0.92"/>';
+    } else if (normalized.includes("afro")) {
+      hair = '<circle cx="400" cy="248" r="132" fill="#d4d4d8" opacity="0.88"/>';
+    } else if (normalized.includes("braids")) {
+      hair = '<path d="M286 246c0-60 52-102 114-102s114 42 114 102v78H286z" fill="#d4d4d8" opacity="0.9"/><rect x="292" y="292" width="30" height="180" rx="15" fill="#d4d4d8"/><rect x="478" y="292" width="30" height="180" rx="15" fill="#d4d4d8"/>';
+    } else if (normalized.includes("ponytail")) {
+      hair = '<path d="M286 246c0-60 52-102 114-102s114 42 114 102v82H286z" fill="#d4d4d8" opacity="0.9"/><rect x="502" y="274" width="42" height="120" rx="20" fill="#d4d4d8"/>';
+    } else if (normalized.includes("bob")) {
+      hair = '<path d="M286 246c0-60 52-102 114-102s114 42 114 102v132H286z" fill="#d4d4d8" opacity="0.9"/>';
+    } else if (normalized.includes("long")) {
+      hair = '<path d="M278 246c0-60 54-102 122-102s122 42 122 102v168H278z" fill="#d4d4d8" opacity="0.9"/>';
+    } else if (normalized.includes("medium")) {
+      hair = '<path d="M282 246c0-60 52-102 118-102s118 42 118 102v122H282z" fill="#d4d4d8" opacity="0.9"/>';
+    } else {
+      hair = '<path d="M292 252c0-58 48-98 108-98s108 40 108 98v72H292z" fill="#d4d4d8" opacity="0.9"/>';
+    }
+  }
+
+  if (kind === "bodyType") {
+    if (normalized.includes("slim")) {
+      torso = '<rect x="284" y="430" width="232" height="362" rx="118" fill="#ffffff" opacity="0.82"/>';
+    } else if (normalized.includes("athletic")) {
+      torso = '<path d="M240 520c0-62 52-112 116-112h88c64 0 116 50 116 112v170c0 74-60 134-134 134h-52c-74 0-134-60-134-134z" fill="#ffffff" opacity="0.82"/>';
+    } else if (normalized.includes("curvy")) {
+      torso = '<path d="M258 510c0-70 56-126 126-126h32c70 0 126 56 126 126v172c0 78-64 142-142 142h-0c-78 0-142-64-142-142z" fill="#ffffff" opacity="0.82"/>';
+    } else if (normalized.includes("plus")) {
+      torso = '<rect x="214" y="412" width="372" height="404" rx="170" fill="#ffffff" opacity="0.82"/>';
+    } else {
+      torso = '<rect x="245" y="420" width="310" height="380" rx="150" fill="#ffffff" opacity="0.82"/>';
+    }
+  }
+
+  if (kind === "clothing") {
+    if (normalized.includes("business")) {
+      clothing = '<path d="M260 532h280v238H260z" fill="#cbd5e1" opacity="0.55"/><path d="M322 532l78 100 78-100" fill="none" stroke="#94a3b8" stroke-width="14"/>';
+    } else if (normalized.includes("streetwear")) {
+      clothing = '<path d="M242 542h316v210H242z" fill="#cbd5e1" opacity="0.52"/><rect x="336" y="582" width="128" height="92" rx="26" fill="#94a3b8" opacity="0.55"/>';
+    } else if (normalized.includes("sporty")) {
+      clothing = '<path d="M246 534h308v226H246z" fill="#cbd5e1" opacity="0.52"/><path d="M280 564l240 176" stroke="#94a3b8" stroke-width="12" opacity="0.7"/>';
+    } else if (normalized.includes("elegant")) {
+      clothing = '<path d="M300 528h200v300H300z" fill="#cbd5e1" opacity="0.5"/><path d="M300 590c52 24 148 24 200 0" stroke="#94a3b8" stroke-width="10" opacity="0.72"/>';
+    } else if (normalized.includes("bohemian")) {
+      clothing = '<path d="M242 544h316v222H242z" fill="#cbd5e1" opacity="0.5"/><path d="M260 620h280M260 670h280" stroke="#94a3b8" stroke-width="8" opacity="0.55"/>';
+    } else if (normalized.includes("minimalist")) {
+      clothing = '<path d="M256 540h288v214H256z" fill="#cbd5e1" opacity="0.45"/>';
+    } else {
+      clothing = '<path d="M250 538h300v220H250z" fill="#cbd5e1" opacity="0.48"/>';
+    }
+  }
+
+  if (kind === "accessory") {
+    if (normalized.includes("glasses")) {
+      accessory = '<rect x="334" y="192" width="40" height="26" rx="8" fill="none" stroke="#9ca3af" stroke-width="6"/><rect x="426" y="192" width="40" height="26" rx="8" fill="none" stroke="#9ca3af" stroke-width="6"/><line x1="374" y1="205" x2="426" y2="205" stroke="#9ca3af" stroke-width="6"/>';
+    } else if (normalized.includes("sunglasses")) {
+      accessory = '<rect x="332" y="190" width="44" height="28" rx="8" fill="#9ca3af" opacity="0.7"/><rect x="424" y="190" width="44" height="28" rx="8" fill="#9ca3af" opacity="0.7"/><line x1="376" y1="204" x2="424" y2="204" stroke="#9ca3af" stroke-width="6"/>';
+    } else if (normalized.includes("earrings")) {
+      accessory = '<circle cx="318" cy="252" r="10" fill="none" stroke="#9ca3af" stroke-width="5"/><circle cx="482" cy="252" r="10" fill="none" stroke="#9ca3af" stroke-width="5"/>';
+    } else if (normalized.includes("necklace")) {
+      accessory = '<path d="M340 374c20 24 38 36 60 36s40-12 60-36" fill="none" stroke="#9ca3af" stroke-width="7"/><circle cx="400" cy="412" r="8" fill="#9ca3af"/>';
+    } else if (normalized.includes("watch")) {
+      accessory = '<rect x="480" y="670" width="48" height="28" rx="10" fill="none" stroke="#9ca3af" stroke-width="6"/>';
+    } else if (normalized.includes("hat")) {
+      accessory = '<path d="M294 170h212v34H294z" fill="#cbd5e1"/><path d="M320 132h160v44H320z" fill="#d1d5db"/>';
+    } else if (normalized.includes("scarf")) {
+      accessory = '<path d="M334 366h132v56H334z" fill="#d1d5db"/><rect x="334" y="408" width="34" height="114" rx="12" fill="#cbd5e1"/>';
+    } else {
+      accessory = "";
+    }
+  }
+
   const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000">
   <defs>
@@ -110,8 +214,11 @@ function optionImageDataUri(key: string) {
   </defs>
   <rect width="800" height="1000" fill="url(#bg)"/>
   <circle cx="400" cy="315" r="${wave}" fill="${bg2}" opacity="0.28"/>
+  ${hair}
   <circle cx="400" cy="275" r="115" fill="#ffffff" opacity="0.8"/>
-  <rect x="245" y="420" width="310" height="380" rx="150" fill="#ffffff" opacity="0.82"/>
+  ${torso}
+  ${clothing}
+  ${accessory}
   <circle cx="355" cy="${eye}" r="5.5" fill="#9ca3af"/>
   <circle cx="445" cy="${eye}" r="5.5" fill="#9ca3af"/>
   <rect x="356" y="232" width="88" height="6" rx="3" fill="#9ca3af" opacity="0.65"/>
