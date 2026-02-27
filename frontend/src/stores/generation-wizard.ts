@@ -8,6 +8,14 @@ interface GenerationWizardState {
   mode: "single" | "triple";
   quality: "standard" | "hd";
   format: "9:16" | "16:9";
+  ctaStyle:
+    | "auto"
+    | "product_name_drop"
+    | "link_in_bio"
+    | "link_in_comments"
+    | "comment_keyword"
+    | "check_description";
+  ctaCommentKeyword: string;
   compositeImagePath: string | null;
   setStep: (step: number) => void;
   setProductId: (id: string) => void;
@@ -15,6 +23,16 @@ interface GenerationWizardState {
   setMode: (mode: "single" | "triple") => void;
   setQuality: (quality: "standard" | "hd") => void;
   setFormat: (format: "9:16" | "16:9") => void;
+  setCtaStyle: (
+    style:
+      | "auto"
+      | "product_name_drop"
+      | "link_in_bio"
+      | "link_in_comments"
+      | "comment_keyword"
+      | "check_description",
+  ) => void;
+  setCtaCommentKeyword: (keyword: string) => void;
   setCompositeImagePath: (path: string | null) => void;
   reset: () => void;
 }
@@ -27,6 +45,8 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
     mode: "single",
     quality: "standard",
     format: "9:16",
+    ctaStyle: "auto",
+    ctaCommentKeyword: "",
     compositeImagePath: null,
     setStep: (step) =>
       set((state) => {
@@ -52,6 +72,14 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
       set((state) => {
         state.format = format;
       }),
+    setCtaStyle: (style) =>
+      set((state) => {
+        state.ctaStyle = style;
+      }),
+    setCtaCommentKeyword: (keyword) =>
+      set((state) => {
+        state.ctaCommentKeyword = keyword;
+      }),
     setCompositeImagePath: (path) =>
       set((state) => {
         state.compositeImagePath = path;
@@ -64,6 +92,8 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
         mode: "single" as const,
         quality: "standard" as const,
         format: "9:16" as const,
+        ctaStyle: "auto" as const,
+        ctaCommentKeyword: "",
         compositeImagePath: null,
       })),
   }))
