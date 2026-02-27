@@ -18,6 +18,7 @@ import {
   Play,
   Pause,
   Download,
+  RotateCcw,
   ChevronDown,
   ChevronUp,
   Send,
@@ -35,7 +36,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { useGenerationStatus } from "@/hooks/use-generations";
+import { useGenerationStatus, useRegenerateSegment } from "@/hooks/use-generations";
 import type { GenerationStatus, ScriptSegment, SegmentVideo } from "@/types/database";
 
 /* -------------------------------------------------------------------------- */
@@ -182,11 +183,15 @@ function VideoSegmentCard({
   label,
   isSelected,
   onSelect,
+  onRegenerate,
+  isRegenerating,
 }: {
   video: SegmentVideo;
   label: string;
   isSelected: boolean;
   onSelect: () => void;
+  onRegenerate: () => void;
+  isRegenerating: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -275,17 +280,36 @@ function VideoSegmentCard({
             </span>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8 shrink-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDownload();
-          }}
-        >
-          <Download className="size-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0"
+            title="Regenerate this segment (1 credit)"
+            disabled={isRegenerating}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRegenerate();
+            }}
+          >
+            {isRegenerating ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <RotateCcw className="size-4" />
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDownload();
+            }}
+          >
+            <Download className="size-4" />
+          </Button>
+        </div>
       </div>
     </button>
   );
@@ -503,6 +527,7 @@ export default function GenerationDetailPage() {
     error,
     refetch,
   } = useGenerationStatus(generationId);
+  const regenerateSegment = useRegenerateSegment();
 
   // Script collapsible state
   const [scriptExpanded, setScriptExpanded] = useState(true);
@@ -511,6 +536,7 @@ export default function GenerationDetailPage() {
   const [selectedHook, setSelectedHook] = useState(0);
   const [selectedBody, setSelectedBody] = useState(0);
   const [selectedCta, setSelectedCta] = useState(0);
+  const [regeneratingKey, setRegeneratingKey] = useState<string | null>(null);
 
   const status = (gen?.status as GenerationStatus) ?? "pending";
   const config = statusConfig[status] ?? statusConfig.scripting;
@@ -548,6 +574,32 @@ export default function GenerationDetailPage() {
       document.body.removeChild(a);
     });
     toast.success(`Downloading ${allVideos.length} segments`);
+  }
+
+  async function handleRegenerateSegment(
+    segmentType: "hook" | "body" | "cta",
+    variation: number,
+  ) {
+    if (regenerateSegment.isPending) return;
+    const jobKey = `${segmentType}_${variation}`;
+    try {
+      setRegeneratingKey(jobKey);
+      await regenerateSegment.mutateAsync({
+        generation_id: generationId,
+        segment_type: segmentType,
+        variation,
+      });
+      toast.success(
+        `Regenerating ${segmentType.toUpperCase()} ${variation}. 1 credit used.`,
+      );
+      refetch();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to regenerate segment.",
+      );
+    } finally {
+      setRegeneratingKey(null);
+    }
   }
 
   /* ---------------------------------------------------------------------- */
@@ -889,9 +941,14 @@ export default function GenerationDetailPage() {
         <>
           {/* Download all button */}
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">
-              Video Segments
-            </h2>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">
+                Video Segments
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Regenerate any single segment for 1 credit.
+              </p>
+            </div>
             <Button variant="outline" size="sm" onClick={handleDownloadAll}>
               <Download className="size-4" />
               Download All Segments
@@ -909,6 +966,8 @@ export default function GenerationDetailPage() {
                   label={`Hook ${i + 1}`}
                   isSelected={selectedHook === i}
                   onSelect={() => setSelectedHook(i)}
+                  onRegenerate={() => handleRegenerateSegment("hook", i + 1)}
+                  isRegenerating={regeneratingKey === `hook_${i + 1}`}
                 />
               ))}
               {(!segments.hooks || segments.hooks.length === 0) && (
@@ -930,6 +989,8 @@ export default function GenerationDetailPage() {
                   label={`Body ${i + 1}`}
                   isSelected={selectedBody === i}
                   onSelect={() => setSelectedBody(i)}
+                  onRegenerate={() => handleRegenerateSegment("body", i + 1)}
+                  isRegenerating={regeneratingKey === `body_${i + 1}`}
                 />
               ))}
               {(!segments.bodies || segments.bodies.length === 0) && (
@@ -951,6 +1012,8 @@ export default function GenerationDetailPage() {
                   label={`CTA ${i + 1}`}
                   isSelected={selectedCta === i}
                   onSelect={() => setSelectedCta(i)}
+                  onRegenerate={() => handleRegenerateSegment("cta", i + 1)}
+                  isRegenerating={regeneratingKey === `cta_${i + 1}`}
                 />
               ))}
               {(!segments.ctas || segments.ctas.length === 0) && (
