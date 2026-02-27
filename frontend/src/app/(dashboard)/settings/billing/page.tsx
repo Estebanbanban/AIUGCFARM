@@ -71,14 +71,14 @@ export default function BillingPage() {
   const buyCredits = useBuyCredits();
 
   function handleSwitchPlan(planKey: PlanTier) {
-    checkout.mutate(planKey, {
+    checkout.mutate({ plan: planKey }, {
       onSuccess: (url) => { window.location.href = url; },
       onError: (err) => toast.error(err.message || "Failed to start checkout"),
     });
   }
 
   function handleBuyPack(pack: CreditPackKey) {
-    buyCredits.mutate(pack, {
+    buyCredits.mutate({ pack }, {
       onSuccess: (url) => { window.location.href = url; },
       onError: (err) => toast.error(err.message || "Failed to start checkout"),
     });
