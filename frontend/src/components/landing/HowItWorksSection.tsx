@@ -43,12 +43,12 @@ const steps = [
 
 export function HowItWorksSection() {
   return (
-    <section className="bg-[#050505] py-24 px-4 sm:px-6">
+    <section className="bg-background-secondary py-24 px-4 sm:px-6">
       <div className="max-w-5xl mx-auto">
         {/* Heading */}
         <FadeInUp className="text-center mb-16">
-          <p className="text-xs uppercase tracking-[0.15em] text-[#555] mb-3">Process</p>
-          <h2 className="text-[clamp(2rem,4vw,3rem)] font-semibold tracking-tight text-white">
+          <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground mb-3">Process</p>
+          <h2 className="text-[clamp(2rem,4vw,3rem)] font-semibold tracking-tight text-foreground">
             How It Works
           </h2>
         </FadeInUp>
@@ -59,7 +59,7 @@ export function HowItWorksSection() {
             <motion.div key={step.number} variants={staggerItem} className="relative">
               {/* Connecting dashed line between steps (desktop) */}
               {i < steps.length - 1 && (
-                <div className="hidden md:block absolute top-5 left-[60%] w-[80%] border-t border-dashed border-[#2a2a2a] z-0" />
+                <div className="hidden md:block absolute top-5 left-[60%] w-[80%] border-t border-dashed border-border z-0" />
               )}
 
               <div className="relative z-10 flex flex-col items-center md:items-start text-center md:text-left px-6 py-8">
@@ -68,7 +68,7 @@ export function HowItWorksSection() {
                   <span className="text-primary font-mono text-xs font-bold">{step.number}</span>
                 </div>
 
-                <div className="relative w-full max-w-[280px] md:max-w-none aspect-[16/10] rounded-xl border border-[#1f1f1f] overflow-hidden mb-5 bg-[#0f0f0f]">
+                <div className="relative w-full max-w-[280px] md:max-w-none aspect-[16/10] rounded-xl border border-border overflow-hidden mb-5 bg-card">
                   {step.mediaType === "image" ? (
                     <Image
                       src={step.mediaSrc}
@@ -92,15 +92,15 @@ export function HowItWorksSection() {
                 </div>
 
                 {/* Icon */}
-                <step.icon className="size-6 text-[#555] mb-4" strokeWidth={1.5} />
+                <step.icon className="size-6 text-muted-foreground mb-4" strokeWidth={1.5} />
 
-                <h3 className="text-lg font-semibold text-white mb-2">{step.title}</h3>
-                <p className="text-sm text-[#888] leading-relaxed">{step.description}</p>
+                <h3 className="text-lg font-semibold text-foreground mb-2">{step.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
               </div>
 
               {/* Mobile connecting line */}
               {i < steps.length - 1 && (
-                <div className="md:hidden mx-auto w-px h-8 border-l border-dashed border-[#2a2a2a]" />
+                <div className="md:hidden mx-auto w-px h-8 border-l border-dashed border-border" />
               )}
             </motion.div>
           ))}
