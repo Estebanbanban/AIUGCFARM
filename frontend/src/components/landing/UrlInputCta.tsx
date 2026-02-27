@@ -1,55 +1,37 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { ArrowRight, Link as LinkIcon } from "lucide-react";
-import { fadeInUp } from "@/lib/animations";
 
-export function UrlInputCta({ inverted = false }: { inverted?: boolean }) {
+export function UrlInputCta() {
   const [url, setUrl] = useState("");
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (url.trim()) {
+      localStorage.setItem("pendingScrapeUrl", url);
+      window.location.href = "/signup";
+    }
+  };
+
   return (
-    <motion.div {...fadeInUp} className="w-full max-w-xl mx-auto">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (url.trim()) {
-            localStorage.setItem("pendingScrapeUrl", url);
-            window.location.href = "/signup";
-          }
-        }}
-        className={`flex items-center gap-2 rounded-xl border p-1.5 shadow-lg ${
-          inverted
-            ? "bg-white/10 border-white/20"
-            : "bg-white border-border shadow-black/5"
-        }`}
+    <form onSubmit={handleSubmit} className="max-w-xl mx-auto">
+      <div
+        className="relative flex items-center rounded-full border border-[#333] bg-[#141414] transition-all duration-200 focus-within:border-[#555] focus-within:shadow-[0_0_20px_rgba(249,115,22,0.08)]"
       >
-        <div className="flex items-center gap-2 flex-1 px-3">
-          <LinkIcon
-            className={`size-4 shrink-0 ${
-              inverted ? "text-white/40" : "text-muted-foreground"
-            }`}
-          />
-          <input
-            type="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="Paste your product or store URL..."
-            className={`flex-1 bg-transparent text-sm outline-none placeholder:text-sm ${
-              inverted
-                ? "text-white placeholder:text-white/40"
-                : "text-foreground placeholder:text-muted-foreground"
-            }`}
-          />
-        </div>
+        <input
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="Paste your product or store URL..."
+          className="h-14 w-full rounded-full bg-transparent pl-5 pr-[150px] text-sm text-white placeholder:text-[#555] focus:outline-none"
+        />
         <button
           type="submit"
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] shrink-0"
+          className="absolute right-1.5 h-11 rounded-full bg-primary px-6 text-sm font-medium text-white transition-colors hover:bg-orange-600"
         >
-          Get Started
-          <ArrowRight className="size-4" />
+          Get Started →
         </button>
-      </form>
-    </motion.div>
+      </div>
+    </form>
   );
 }
