@@ -16,17 +16,6 @@ export function HeroSection() {
       />
 
       <div className="relative max-w-5xl mx-auto px-4 sm:px-6 text-center">
-        {/* Beta badge */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.25, 0.4, 0.25, 1] }}
-          className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#333] px-3 py-1 text-xs text-[#999]"
-        >
-          <span className="size-1.5 rounded-full bg-primary animate-pulse" />
-          Now in Beta — Start creating for free
-        </motion.div>
-
         {/* Headline — 3 lines revealing from bottom */}
         <div className="text-[clamp(2.8rem,8vw,5.5rem)] font-bold tracking-[-0.03em] leading-[1.05]">
           {[
