@@ -7,6 +7,7 @@ import type { Generation } from "@/types/database";
 import type {
   CompositeImagesResponse,
   CreateGenerationResponse,
+  ApproveGenerationParams,
   EditCompositeImageResponse,
   GenerationProgressResponse,
   GenerationHistoryResponse,
@@ -102,6 +103,38 @@ export function useEditCompositeImage() {
   });
 }
 
+/** Generate script only (phase: "script") — no credits charged. */
+export function useGenerateScript() {
+  return useMutation({
+    mutationFn: async (input: GenerationInput & { phase: "script" }) => {
+      const res = await callEdge<CreateGenerationResponse>("generate-video", {
+        body: input,
+      });
+      return res.data;
+    },
+  });
+}
+
+/** Approve a pending script and kick off full video generation. */
+export function useApproveAndGenerate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ApproveGenerationParams) => {
+      const res = await callEdge<CreateGenerationResponse>("generate-video", {
+        body: { ...input, phase: "full" },
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["credits"] });
+      queryClient.invalidateQueries({ queryKey: ["generations"] });
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["credits"] });
+    },
+  });
+}
+
 /** Create a new generation (calls generate-video Edge Function). */
 export function useCreateGeneration() {
   const queryClient = useQueryClient();
@@ -163,7 +196,8 @@ export function useGenerationStatus(generationId: string | null) {
       const data = query.state.data;
       if (
         data?.status === "completed" ||
-        data?.status === "failed"
+        data?.status === "failed" ||
+        data?.status === "awaiting_approval"
       ) {
         return false;
       }

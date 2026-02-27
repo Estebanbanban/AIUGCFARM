@@ -38,6 +38,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { useGenerationStatus, useRegenerateSegment } from "@/hooks/use-generations";
 import type { GenerationStatus, ScriptSegment, SegmentVideo } from "@/types/database";
+import { trackVideoCompleted } from "@/lib/datafast";
 
 /* -------------------------------------------------------------------------- */
 /*  Status configuration                                                      */
@@ -53,6 +54,14 @@ const statusConfig: Record<
   },
   scripting: {
     label: "Writing scripts...",
+    badgeClass: "bg-amber-500/10 text-amber-400",
+  },
+  awaiting_approval: {
+    label: "Preparing...",
+    badgeClass: "bg-amber-500/10 text-amber-400",
+  },
+  locking: {
+    label: "Processing...",
     badgeClass: "bg-amber-500/10 text-amber-400",
   },
   submitting_jobs: {
@@ -90,7 +99,7 @@ const pipelineStages: PipelineStage[] = [
     key: "scripting",
     label: "Writing Script & POV Image",
     icon: <FileText className="size-4" />,
-    activeStatuses: ["pending", "scripting"],
+    activeStatuses: ["pending", "scripting", "awaiting_approval"],
     doneStatuses: ["submitting_jobs", "generating_segments", "completed"],
   },
   {
@@ -552,7 +561,9 @@ export default function GenerationDetailPage() {
   useEffect(() => {
     if (isComplete && segments) {
       setScriptExpanded(false);
+      trackVideoCompleted(gen?.mode ?? "unknown");
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isComplete, segments]);
 
   /* ----- Download all segments ----- */

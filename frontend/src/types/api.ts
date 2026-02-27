@@ -82,11 +82,35 @@ export interface RegenerateSegmentResponse {
   };
 }
 
+/** Request params for generate-video Edge Function */
+export interface CreateGenerationParams {
+  product_id: string;
+  persona_id: string;
+  mode?: "single" | "triple";
+  quality?: "standard" | "hd";
+  composite_image_path: string;
+  /** "script" = generate script only (no credit charge); omit for legacy full flow */
+  phase?: "script";
+}
+
+/** Request params for approving a script-only generation */
+export interface ApproveGenerationParams {
+  generation_id: string;
+  override_script?: GenerationScript;
+}
+
 /** Response from generate-video Edge Function */
 export interface CreateGenerationResponse {
   data: {
     generation_id: string;
     status: string;
+    /** Present when phase="script" — the generated script for review */
+    script?: GenerationScript;
+    /** Present when phase="script" — credits that will be charged on approval */
+    credits_to_charge?: number;
+    /** Present on full/approval flow — credits actually charged */
+    credits_charged?: number;
+    first_video_discount_applied?: boolean;
   };
 }
 

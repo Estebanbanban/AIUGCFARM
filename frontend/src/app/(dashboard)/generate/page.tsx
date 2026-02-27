@@ -22,6 +22,8 @@ import {
   Plus,
   Pencil,
   Sparkles,
+  TrendingUp,
+  Star,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -55,18 +57,30 @@ import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { useProducts, useScrapeProduct } from "@/hooks/use-products";
 import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
 import { usePersonas, resolvePersonaImageUrl } from "@/hooks/use-personas";
-import type { Persona, Product, BrandSummary } from "@/types/database";
+import type { Persona, Product, BrandSummary, ScriptSegment } from "@/types/database";
 import { useCredits } from "@/hooks/use-credits";
 import {
   useCreateGeneration,
   useEditCompositeImage,
   useGenerateCompositeImages,
+  useGenerateScript,
+  useApproveAndGenerate,
 } from "@/hooks/use-generations";
 import { useCheckout, useBuyCredits } from "@/hooks/use-checkout";
 import { useProfile } from "@/hooks/use-profile";
 import { ManualUploadForm } from "@/components/products/ManualUploadForm";
 import { ScrapeResults } from "@/components/products/ScrapeResults";
 import { PersonaBuilderInline } from "@/components/personas/PersonaBuilderInline";
+import {
+  trackProductImported,
+  trackPersonaCreated,
+  trackPreviewGenerated,
+  trackScriptGenerated,
+  trackVideoGenerationStarted,
+  trackPaywallShown,
+  trackCheckoutStarted,
+  trackCreditsPurchased,
+} from "@/lib/datafast";
 import { AdvancedModePanel } from "@/components/generate/AdvancedModePanel";
 import { Switch } from "@/components/ui/switch";
 import { callEdge } from "@/lib/api";
@@ -77,7 +91,8 @@ const steps = [
   { number: 1, label: "Product" },
   { number: 2, label: "Persona" },
   { number: 3, label: "Preview" },
-  { number: 4, label: "Generate" },
+  { number: 4, label: "Configure" },
+  { number: 5, label: "Review Script" },
 ];
 
 const CTA_STYLE_OPTIONS = [
@@ -212,6 +227,8 @@ export default function GeneratePage() {
   const createGeneration = useCreateGeneration();
   const generateComposites = useGenerateCompositeImages();
   const editComposite = useEditCompositeImage();
+  const generateScript = useGenerateScript();
+  const approveAndGenerate = useApproveAndGenerate();
   const checkout = useCheckout();
   const buyCredits = useBuyCredits();
 
@@ -254,11 +271,12 @@ export default function GeneratePage() {
     if (store.step === 1) return !!store.productId;
     if (store.step === 2) return !!store.personaId;
     if (store.step === 3) return !!store.compositeImagePath;
+    // Step 4 proceeds via "Generate Script" button, not the generic Next button
     return false;
   }
 
   function handleNext() {
-    if (store.step < 4) store.setStep(store.step + 1);
+    if (store.step < 5) store.setStep(store.step + 1);
   }
 
   function handleBack() {
@@ -333,6 +351,7 @@ export default function GeneratePage() {
     setShowScrapeResults(false);
     setAddingProduct(false);
     setScrapeError(null);
+    trackProductImported("url");
     queryClient.invalidateQueries({ queryKey: ["products"] });
     if (firstId) {
       store.setProductId(firstId);
@@ -342,6 +361,7 @@ export default function GeneratePage() {
   }
 
   function handleManualUploadSuccess() {
+    trackProductImported("manual");
     queryClient.invalidateQueries({ queryKey: ["products"] });
     setAddingProduct(false);
     // Don't auto-advance, user needs to click their product in the grid
@@ -359,6 +379,7 @@ export default function GeneratePage() {
   // ── Persona builder callback ─────────────────────────────────────────────
 
   function handlePersonaSaved(personaId: string) {
+    trackPersonaCreated();
     queryClient.invalidateQueries({ queryKey: ["personas"] });
     store.setPersonaId(personaId);
     setBuildingPersona(false);
@@ -390,6 +411,7 @@ export default function GeneratePage() {
       {
         onSuccess: (result) => {
           setCompositeImages(result.images);
+          trackPreviewGenerated();
         },
         onError: (err) => {
           toast.error(err.message || "Failed to generate preview images");
@@ -430,7 +452,83 @@ export default function GeneratePage() {
     );
   }
 
-  // ── Generation ───────────────────────────────────────────────────────────
+  // ── Script generation (phase 1) ─────────────────────────────────────────
+
+  async function handleGenerateScript() {
+    if (!hasEnoughCredits) {
+      trackPaywallShown("insufficient_credits");
+      setShowPaywall(true);
+      return;
+    }
+    if (requiresCommentKeyword && !commentKeyword) {
+      toast.error("Add a comment keyword for the CTA style.");
+      return;
+    }
+    if (!store.productId || !store.personaId || !store.compositeImagePath) return;
+
+    generateScript.mutate(
+      {
+        product_id: store.productId,
+        persona_id: store.personaId,
+        mode: store.mode,
+        quality: store.quality,
+        composite_image_path: store.compositeImagePath,
+        cta_style: store.ctaStyle,
+        cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
+        phase: "script",
+      },
+      {
+        onSuccess: (result) => {
+          if (result.script) {
+            trackScriptGenerated(store.mode, store.quality);
+            store.setPendingScript(
+              result.generation_id,
+              result.script,
+              result.credits_to_charge ?? effectiveCost,
+            );
+            store.setStep(5);
+          } else {
+            toast.error("Script was not returned. Please try again.");
+          }
+        },
+        onError: (err) => {
+          toast.error(err.message || "Failed to generate script");
+        },
+      },
+    );
+  }
+
+  // ── Approve & generate video (phase 2) ────────────────────────────────
+
+  async function handleApproveAndGenerate() {
+    if (!store.pendingGenerationId || !store.pendingScript) return;
+    if (!hasEnoughCredits) {
+      trackPaywallShown("insufficient_credits");
+      setShowPaywall(true);
+      return;
+    }
+
+    approveAndGenerate.mutate(
+      {
+        generation_id: store.pendingGenerationId,
+        override_script: store.pendingScript,
+      },
+      {
+        onSuccess: (result) => {
+          const genId = store.pendingGenerationId!;
+          trackVideoGenerationStarted(store.mode, store.quality);
+          store.reset();
+          router.push(`/generate/${genId}`);
+          toast.success("Generation started!");
+        },
+        onError: (err) => {
+          toast.error(err.message || "Failed to start generation");
+        },
+      },
+    );
+  }
+
+  // ── Legacy generation (backwards compat) ──────────────────────────────
 
   async function handleGenerate() {
     if (!hasEnoughCredits) {
@@ -556,14 +654,20 @@ export default function GeneratePage() {
 
   async function handleCheckout(plan: PlanTier) {
     checkout.mutate(plan, {
-      onSuccess: (url) => { window.location.href = url; },
+      onSuccess: (url) => {
+        trackCheckoutStarted(plan);
+        window.location.href = url;
+      },
       onError: (err) => { toast.error(err.message || "Failed to start checkout"); },
     });
   }
 
   async function handleBuyPack(pack: CreditPackKey) {
     buyCredits.mutate(pack, {
-      onSuccess: (url) => { window.location.href = url; },
+      onSuccess: (url) => {
+        trackCreditsPurchased(pack);
+        window.location.href = url;
+      },
       onError: (err) => { toast.error(err.message || "Failed to start checkout"); },
     });
   }
@@ -595,7 +699,13 @@ export default function GeneratePage() {
           <div key={s.number} className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => {
-                if (s.number < store.step) store.setStep(s.number);
+                // Allow going back to earlier steps, but when leaving step 5, clear pending script
+                if (s.number < store.step) {
+                  if (store.step === 5 && s.number < 5) {
+                    store.clearPendingScript();
+                  }
+                  store.setStep(s.number);
+                }
               }}
               className="flex items-center gap-2"
             >
@@ -1148,11 +1258,18 @@ export default function GeneratePage() {
           </div>
         )}
 
-        {/* ── Step 4: Review & Generate ─────────────────────────────────── */}
+        {/* ── Step 4: Configure ──────────────────────────────────────────── */}
         {store.step === 4 && (
           <div className="flex flex-col gap-6">
-            <h2 className="text-lg font-semibold">Review & Generate</h2>
+            <h2 className="text-lg font-semibold">Configure & Generate Script</h2>
 
+            {generateScript.isPending ? (
+              <div className="flex flex-col items-center gap-4 py-20">
+                <Loader2 className="size-10 animate-spin text-primary" />
+                <p className="text-base font-medium">Generating your script...</p>
+                <p className="text-sm text-muted-foreground">This usually takes 15-30 seconds</p>
+              </div>
+            ) : (
             <div className="mx-auto w-full max-w-lg">
               <Card>
                 <CardContent className="flex flex-col gap-4 p-6">
@@ -1302,7 +1419,7 @@ export default function GeneratePage() {
                             variant="secondary"
                             className="text-[10px]"
                           >
-                            2× credits
+                            2x credits
                           </Badge>
                         </div>
                         <p className="mt-0.5 text-xs text-muted-foreground">
@@ -1404,35 +1521,160 @@ export default function GeneratePage() {
                     </div>
                   )}
 
-                  {/* Generate button */}
+                  {/* Generate Script button */}
                   <Button
-                    onClick={handleGenerate}
-                    disabled={createGeneration.isPending || (requiresCommentKeyword && !commentKeyword)}
+                    onClick={handleGenerateScript}
+                    disabled={generateScript.isPending || (requiresCommentKeyword && !commentKeyword)}
                     size="lg"
                     className="w-full"
                   >
-                    {createGeneration.isPending ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="size-4" />
-                        Generate &mdash;{" "}
-                        {isFirstVideo ? (
-                          <>
-                            <span className="line-through opacity-60">{creditCost}</span>
-                            {" "}{effectiveCost} credits
-                          </>
-                        ) : (
-                          <>{creditCost} credits</>
-                        )}
-                      </>
-                    )}
+                    <Sparkles className="size-4" />
+                    Generate Script
                   </Button>
                 </CardContent>
               </Card>
+            </div>
+            )}
+          <div className="flex flex-col gap-6">
+            <h2 className="text-lg font-semibold">Review Script</h2>
+
+            <div className="mx-auto w-full max-w-2xl flex flex-col gap-4">
+              {/* Script sections */}
+              {(["hooks", "bodies", "ctas"] as const).map((sectionType) => (
+                <div key={sectionType}>
+                  {store.pendingScript![sectionType].map((segment: ScriptSegment, idx: number) => (
+                    <Card key={`${sectionType}-${idx}`} className="mb-3">
+                      <CardContent className="flex flex-col gap-3 p-4">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold uppercase text-foreground">
+                            {sectionType === "hooks" ? "Hook" : sectionType === "bodies" ? "Body" : "CTA"}
+                            {store.pendingScript![sectionType].length > 1 ? ` ${idx + 1}` : ""}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-xs capitalize">
+                              {segment.variant_label}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {segment.duration_seconds}s
+                            </Badge>
+                          </div>
+                        </div>
+                        <Textarea
+                          value={segment.text}
+                          onChange={(e) => store.updateScriptSection(sectionType, idx, e.target.value)}
+                          rows={3}
+                          className="resize-none text-sm"
+                        />
+                        <div className="flex justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={generateScript.isPending}
+                            onClick={() => {
+                              if (!store.productId || !store.personaId || !store.compositeImagePath) return;
+                              generateScript.mutate(
+                                {
+                                  product_id: store.productId,
+                                  persona_id: store.personaId,
+                                  mode: store.mode,
+                                  quality: store.quality,
+                                  composite_image_path: store.compositeImagePath,
+                                  cta_style: store.ctaStyle,
+                                  cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
+                                  phase: "script",
+                                },
+                                {
+                                  onSuccess: (result) => {
+                                    if (result.script) {
+                                      const newSegments = result.script[sectionType];
+                                      if (newSegments?.[idx]) {
+                                        store.updateScriptSection(sectionType, idx, newSegments[idx].text);
+                                      }
+                                    }
+                                    // Update pendingGenerationId so the approval targets the
+                                    // latest generation record (avoids approving a stale one).
+                                    if (result.generation_id) {
+                                      store.setPendingScript(
+                                        result.generation_id,
+                                        store.pendingScript!,
+                                        store.creditsToCharge ?? 0,
+                                      );
+                                    }
+                                  },
+                                  onError: (err) => {
+                                    toast.error(err.message || "Failed to regenerate");
+                                  },
+                                },
+                              );
+                            }}
+                          >
+                            {generateScript.isPending ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <RefreshCw className="size-3.5" />
+                            )}
+                            Regenerate {sectionType === "hooks" ? "Hook" : sectionType === "bodies" ? "Body" : "CTA"}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ))}
+
+              {/* Credits info */}
+              <div className="rounded-lg border border-border bg-muted/30 px-4 py-3">
+                <p className="text-sm text-muted-foreground">
+                  This will use{" "}
+                  <span className="font-semibold text-foreground">
+                    {store.creditsToCharge ?? effectiveCost}
+                  </span>{" "}
+                  credits
+                  {!isUnlimitedCredits && (
+                    <>
+                      {" "}({creditsRemaining} remaining)
+                    </>
+                  )}
+                </p>
+              </div>
+
+              {!hasEnoughCredits && !creditsLoading && (
+                <div className="rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
+                  You need {store.creditsToCharge ?? effectiveCost} credits but have{" "}
+                  {creditsRemaining}. Subscribe or upgrade to continue.
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="flex items-center justify-between pt-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    store.clearPendingScript();
+                    store.setStep(4);
+                  }}
+                >
+                  <ArrowLeft className="size-4" />
+                  Back
+                </Button>
+                <Button
+                  onClick={handleApproveAndGenerate}
+                  disabled={approveAndGenerate.isPending || (!hasEnoughCredits && !creditsLoading)}
+                  size="lg"
+                >
+                  {approveAndGenerate.isPending ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Starting generation...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="size-4" />
+                      Generate Video
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
 
             {/* Advanced Mode Panel — full width below the card */}
@@ -1457,9 +1699,13 @@ export default function GeneratePage() {
             )}
           </div>
         )}
+
+        {/* ── Step 5: Review Script ──────────────────────────────────────── */}
+        {store.step === 5 && store.pendingScript && (
       </div>
 
       {/* Navigation buttons */}
+      {store.step < 5 && (
       <div className="flex items-center justify-between border-t border-border pt-4">
         <Button
           variant="secondary"
@@ -1477,113 +1723,154 @@ export default function GeneratePage() {
           </Button>
         )}
       </div>
+      )}
 
       {/* Paywall dialog */}
       <Dialog open={showPaywall} onOpenChange={setShowPaywall}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {creditsRemaining > 0 ? "Not Enough Credits" : "Get Credits to Generate"}
-            </DialogTitle>
-            <DialogDescription>
-              {creditsRemaining > 0
-                ? `You need ${effectiveCost} credits but only have ${creditsRemaining}.`
-                : "Buy a one-time credit pack or subscribe for the best per-credit rate."}
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-lg p-0 overflow-hidden">
+          {/* Hero */}
+          <div className="bg-gradient-to-br from-primary/15 via-primary/5 to-background px-6 pt-6 pb-5">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/20">
+                <TrendingUp className="size-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-bold leading-tight">
+                  {creditsRemaining > 0
+                    ? "Almost there — just need a few more credits"
+                    : "Your next video is one click away"}
+                </DialogTitle>
+                <DialogDescription className="mt-1 text-sm">
+                  {creditsRemaining > 0
+                    ? `You have ${creditsRemaining} credit${creditsRemaining !== 1 ? "s" : ""}, but this generation needs ${effectiveCost}. Top up and keep going.`
+                    : "Traditional UGC creators charge $150–$500 per video. You're getting the same quality for under $5."}
+                </DialogDescription>
+              </div>
+            </div>
 
-          <div className="flex flex-col gap-5 py-2">
-            {/* First-video 50% off banner */}
+            {/* First-video deal */}
             {isFirstVideo && (
-              <div className="rounded-lg border border-primary/40 bg-primary/5 px-4 py-3">
-                <p className="text-sm font-semibold text-primary">Your first video is 50% off</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  This discount applies once. After your first generation, standard pricing applies.
-                </p>
+              <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-3 flex items-start gap-2.5">
+                <Star className="size-4 text-amber-400 shrink-0 mt-0.5" fill="currentColor" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-300">First video — 50% off</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    One-time discount. Applies automatically on your first generation.
+                  </p>
+                </div>
               </div>
             )}
+          </div>
 
-            {/* Credit packs */}
+          <div className="flex flex-col gap-5 px-6 py-5">
+            {/* Subscription plans — lead with recurring value */}
             <div>
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                One-time — no commitment
-              </p>
+              <div className="flex items-center justify-between mb-2.5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Subscribe — best value per credit
+                </p>
+                <span className="text-xs text-muted-foreground">vs $150–$500/video traditional</span>
+              </div>
               <div className="flex flex-col gap-2">
-                {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => (
-                  <div
-                    key={key}
-                    className="flex items-center justify-between rounded-lg border border-border px-4 py-3"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium">{pack.name}</p>
-                        {"badge" in pack && pack.badge && (
-                          <Badge variant="secondary" className="text-xs">{pack.badge}</Badge>
-                        )}
+                {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
+                  const isGrowth = key === "growth";
+                  const costPerVideo = (plan.price / (plan.credits / (key === "starter" ? 5 : 5))).toFixed(2);
+                  return (
+                    <div
+                      key={key}
+                      className={cn(
+                        "relative flex items-center justify-between rounded-xl border px-4 py-3 transition-colors",
+                        isGrowth
+                          ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
+                          : "border-border hover:border-primary/30",
+                      )}
+                    >
+                      {isGrowth && (
+                        <div className="absolute -top-2.5 left-4">
+                          <span className="bg-primary text-white text-[10px] font-semibold rounded-full px-2 py-0.5">
+                            Most popular
+                          </span>
+                        </div>
+                      )}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold">{plan.name}</p>
+                          <span className="text-xs text-muted-foreground">
+                            {plan.credits} cr/mo
+                          </span>
+                        </div>
+                        <p className="text-xs text-emerald-400 mt-0.5">
+                          ≈ ${(plan.price / (plan.credits / 5)).toFixed(2)}/video vs $150–$500 traditional
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {pack.credits} credits · {pack.description}
-                      </p>
+                      <div className="flex items-center gap-3 ml-4">
+                        <div className="text-right">
+                          <p className="text-sm font-bold">${plan.price}</p>
+                          <p className="text-[10px] text-muted-foreground">/mo</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant={isGrowth ? "default" : "outline"}
+                          onClick={() => handleCheckout(key)}
+                          disabled={checkout.isPending}
+                          className="shrink-0"
+                        >
+                          {checkout.isPending ? (
+                            <Loader2 className="size-3 animate-spin" />
+                          ) : (
+                            isGrowth ? "Start now →" : "Choose"
+                          )}
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-semibold">${pack.price}</span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleBuyPack(key)}
-                        disabled={buyCredits.isPending}
-                      >
-                        {buyCredits.isPending ? <Loader2 className="size-3 animate-spin" /> : "Buy"}
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
             <div className="flex items-center gap-3">
               <div className="flex-1 border-t border-border" />
-              <span className="text-xs text-muted-foreground">or subscribe for best value</span>
+              <span className="text-xs text-muted-foreground">or buy a one-time pack</span>
               <div className="flex-1 border-t border-border" />
             </div>
 
-            {/* Subscription plans */}
-            <div className="flex flex-col gap-2">
-              {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => (
+            {/* Credit packs — secondary option */}
+            <div className="flex flex-col gap-1.5">
+              {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => (
                 <div
                   key={key}
-                  className={cn(
-                    "flex items-center justify-between rounded-lg border px-4 py-3",
-                    key === "growth" ? "border-primary/50 bg-primary/5" : "border-border",
-                  )}
+                  className="flex items-center justify-between rounded-lg border border-border px-4 py-2.5 hover:border-primary/30 transition-colors"
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium">{plan.name}</p>
-                      {key === "growth" && (
-                        <Badge variant="secondary" className="bg-primary/10 text-xs text-primary">
-                          Popular
-                        </Badge>
+                      <p className="text-sm font-medium">{pack.credits} credits</p>
+                      {"badge" in pack && pack.badge && (
+                        <Badge variant="secondary" className="text-[10px]">{pack.badge}</Badge>
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {plan.credits} credits/mo · ${(plan.price / plan.credits).toFixed(2)}/cr
+                      {pack.description} · ${pack.pricePerCredit.toFixed(2)}/cr
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold">${plan.price}/mo</span>
+                    <span className="text-sm font-semibold">${pack.price}</span>
                     <Button
                       size="sm"
-                      variant={key === "growth" ? "default" : "outline"}
-                      onClick={() => handleCheckout(key)}
-                      disabled={checkout.isPending}
+                      variant="ghost"
+                      onClick={() => handleBuyPack(key)}
+                      disabled={buyCredits.isPending}
+                      className="border border-border"
                     >
-                      {checkout.isPending ? <Loader2 className="size-3 animate-spin" /> : "Subscribe"}
+                      {buyCredits.isPending ? <Loader2 className="size-3 animate-spin" /> : "Buy"}
                     </Button>
                   </div>
                 </div>
               ))}
             </div>
+
+            <p className="text-center text-[11px] text-muted-foreground -mt-1">
+              No commitment on packs · Cancel subscriptions anytime
+            </p>
           </div>
         </DialogContent>
       </Dialog>

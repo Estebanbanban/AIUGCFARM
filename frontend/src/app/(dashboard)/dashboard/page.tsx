@@ -41,6 +41,8 @@ import { calculateGenerationCost } from "@/lib/generation-cost";
 const statusColors: Record<GenerationStatus, string> = {
   pending: "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
   scripting: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  awaiting_approval: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  locking: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
   submitting_jobs: "bg-primary/10 text-primary",
   generating_segments: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
   completed: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",

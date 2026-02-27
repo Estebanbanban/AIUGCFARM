@@ -176,6 +176,12 @@ BODY — ${count} variant${plural} | 5–9 seconds each | 12–22 words max${bod
 Deliver the payoff fast. Cover: what it does → why it works → one proof point.
 At 2.5 words/sec: 5s ≈ 12 words, 7s ≈ 17 words, 9s ≈ 22 words. Stay within limits.
 
+CRITICAL BODY RULES (NEVER BREAK):
+- The body MUST NOT restate, echo, or mirror the hook's opening problem or pain point. The viewer already heard the hook.
+- Do NOT start the body with another problem statement if the hook already opened with one.
+- The body must CONTINUE from the hook: deliver proof, sensory detail, specific benefit, or social evidence.
+- Assume the hook has already established the problem. The body should answer: "here's what happened / here's why it works / here's the result."
+
 Available body structures:
 - problem_solution: "[Problem] was ruining [thing]. This [does X] in [timeframe]. [Specific result]."
 - demo_tease: Describe what they'd see if they tried it — specific sensory detail.
@@ -212,6 +218,8 @@ Price: ${product.price ?? "N/A"}
 Brand tone: ${brandSummary.tone ?? "conversational, authentic"}
 Target demographic: ${brandSummary.demographic ?? "general adults"}
 Key selling points: ${brandSummary.selling_points ?? "N/A"}
+
+PRICE NOTE: The product costs ${product.price} ${product.currency}. Do NOT use phrases like "just $X" or "only $X" unless this price is clearly budget-friendly for the product category. Present the price truthfully and contextually.
 
 CALIBRATION INSTRUCTIONS:
 - Match the hook to a real pain point this demographic actually feels.
@@ -276,10 +284,15 @@ function validateScript(raw: unknown, expectedCount: number): GeneratedScript {
   };
 }
 
+interface GenerateScriptResult {
+  script: GeneratedScript;
+  scriptRaw: GeneratedScript;
+}
+
 async function generateScript(
   product: Record<string, unknown>,
   variantCount: number,
-): Promise<GeneratedScript> {
+): Promise<GenerateScriptResult> {
   const rawContent = await withRetry(() =>
     callOpenRouter(
       [
@@ -297,7 +310,104 @@ async function generateScript(
   }
 
   const parsed = JSON.parse(cleaned);
-  return validateScript(parsed, variantCount);
+  const scriptRaw = validateScript(parsed, variantCount);
+
+  // ── Coherence review pass ───────────────────────────────────────────
+  try {
+    const reviewContent = await callOpenRouter(
+      [
+        {
+          role: "system",
+          content:
+            "You are a script editor for short-form UGC ads. Review this Hook+Body+CTA combo. " +
+            "Score on: non-repetition (0-25), flow (0-25), claim-realism (0-25), cta-fit (0-25). Total 0-100. " +
+            "If score < 70, rewrite each segment to fix issues. Return JSON only: " +
+            '{ "score": number, "review": string, "revised_hooks": ScriptSegment[], "revised_bodies": ScriptSegment[], "revised_ctas": ScriptSegment[] }. ' +
+            "If score >= 70, return originals in revised arrays unchanged.",
+        },
+        { role: "user", content: JSON.stringify(scriptRaw) },
+      ],
+      { maxTokens: variantCount === 1 ? 800 : 2000, timeoutMs: 30000, jsonMode: true },
+    );
+
+    let reviewCleaned = reviewContent.trim();
+    if (reviewCleaned.startsWith("```")) {
+      reviewCleaned = reviewCleaned
+        .replace(/^```(?:json)?\s*/, "")
+        .replace(/\s*```$/, "");
+    }
+
+    const reviewParsed = JSON.parse(reviewCleaned) as {
+      score: number;
+      review: string;
+      revised_hooks: unknown[];
+      revised_bodies: unknown[];
+      revised_ctas: unknown[];
+    };
+
+    console.log(
+      `Coherence review score: ${reviewParsed.score} — ${reviewParsed.review}`,
+    );
+
+    const revisedScript = validateScript(
+      {
+        hooks: reviewParsed.revised_hooks,
+        bodies: reviewParsed.revised_bodies,
+        ctas: reviewParsed.revised_ctas,
+      },
+      variantCount,
+    );
+
+    return { script: revisedScript, scriptRaw };
+  } catch (reviewErr) {
+    console.error("Coherence review failed, using raw draft:", reviewErr);
+    return { script: scriptRaw, scriptRaw };
+  }
+}
+
+// ── Shared helpers ────────────────────────────────────────────────────
+
+/** Compute credit cost and variant count from mode/quality. */
+function computeCosts(resolvedMode: string, resolvedQuality: string) {
+  const variantCount = resolvedMode === "single" ? 1 : 3;
+  const creditCost = resolvedMode === "single"
+    ? COSTS[resolvedQuality as keyof typeof COSTS].single
+    : COSTS[resolvedQuality as keyof typeof COSTS].batch;
+  const klingModel = KLING_MODEL[resolvedQuality as keyof typeof KLING_MODEL];
+  return { variantCount, creditCost, klingModel };
+}
+
+/** Submit Kling jobs for all script segments and return job IDs map + actual model used. */
+async function submitAllKlingJobs(
+  script: GeneratedScript,
+  signedImageUrl: string,
+  klingModel: string,
+): Promise<{ jobIds: Record<string, string>; modelUsed: string }> {
+  const jobEntries: Array<[string, string]> = [];
+  const jobModels: string[] = [];
+  const SEG_KEY = { hooks: "hook", bodies: "body", ctas: "cta" } as const;
+  const segmentTypes = ["hooks", "bodies", "ctas"] as const;
+  const jobSubmissions = segmentTypes.flatMap((segType) =>
+    script[segType].map((segment, i) => {
+      const jobKey = `${SEG_KEY[segType]}_${i + 1}`;
+      return withRetry(() =>
+        submitKlingJob({
+          image_url: signedImageUrl,
+          script: `A UGC creator speaking directly to camera, saying: "${segment.text}" Natural, authentic talking-head style, casual handheld selfie aesthetic.`,
+          duration: segment.duration_seconds <= 5 ? 5 : 10,
+          mode: "pro",
+          sound: "on",
+          model_name: klingModel,
+        })
+      ).then((result) => {
+        if (result.model_name) jobModels.push(result.model_name);
+        return [jobKey, result.job_id] as [string, string];
+      });
+    })
+  );
+
+  jobEntries.push(...await Promise.all(jobSubmissions));
+  return { jobIds: Object.fromEntries(jobEntries), modelUsed: jobModels[0] || klingModel };
 }
 
 /** Build a GeneratedScript from advanced segment inputs (strip emotion tags, estimate duration). */
@@ -342,17 +452,203 @@ Deno.serve(async (req: Request) => {
     const userId = await requireUserId(req);
     const sb = getAdminClient();
 
-    // ── 1. Validate input ──────────────────────────────────────────
+    const body = await req.json();
+    const { phase, generation_id, override_script } = body;
 
-    const { product_id, persona_id, mode, quality, composite_image_path, advanced_segments } =
-      await req.json() as {
-        product_id: string;
-        persona_id: string;
-        mode?: string;
-        quality?: string;
-        composite_image_path: string;
-        advanced_segments?: AdvancedSegmentsInput;
-      };
+    // ══════════════════════════════════════════════════════════════════
+    // PHASE "full" — Approve an existing awaiting_approval generation
+    // ══════════════════════════════════════════════════════════════════
+    if (generation_id) {
+      // Look up generation
+      const { data: gen, error: genLookupErr } = await sb
+        .from("generations")
+        .select("*")
+        .eq("id", generation_id)
+        .single();
+
+      if (genLookupErr || !gen) {
+        return json({ detail: "Generation not found" }, cors, 404);
+      }
+
+      // Auth check: owner must match authenticated user
+      if (gen.owner_id !== userId) {
+        return json({ detail: "Access denied" }, cors, 403);
+      }
+
+      // Atomic status lock: transition awaiting_approval → locking in a single UPDATE.
+      // This prevents concurrent double-approvals from both passing the status check
+      // before either one debits credits.
+      const { data: lockRows, error: lockErr } = await sb
+        .from("generations")
+        .update({ status: "locking" })
+        .eq("id", generation_id)
+        .eq("owner_id", userId)
+        .eq("status", "awaiting_approval")
+        .select("id");
+
+      if (lockErr || !lockRows || lockRows.length === 0) {
+        // Another request already transitioned the status — return 409
+        return json(
+          { detail: `Generation is no longer awaiting approval (already processing or completed).` },
+          cors,
+          409,
+        );
+      }
+
+      const resolvedMode = gen.mode as string;
+      const resolvedQuality = gen.video_quality as string;
+      const { variantCount, creditCost, klingModel } = computeCosts(resolvedMode, resolvedQuality);
+
+      // If override_script provided, validate and save
+      let finalScript: GeneratedScript;
+      if (override_script) {
+        finalScript = validateScript(override_script, variantCount);
+        await sb
+          .from("generations")
+          .update({ script: finalScript })
+          .eq("id", generation_id);
+      } else {
+        finalScript = gen.script as GeneratedScript;
+      }
+
+      if (!finalScript) {
+        // Unlock: revert status so user can retry
+        await sb
+          .from("generations")
+          .update({ status: "awaiting_approval" })
+          .eq("id", generation_id);
+        return json({ detail: "Generation has no script to approve" }, cors, 400);
+      }
+
+      // ── Compute effective cost + check credits ──────────────────
+      const { data: profileData } = await sb
+        .from("profiles")
+        .select("first_video_discount_used")
+        .eq("id", userId)
+        .single();
+
+      const isFirstVideo = profileData?.first_video_discount_used === false;
+      const effectiveCost = isFirstVideo ? Math.ceil(creditCost / 2) : creditCost;
+
+      const remaining = await checkCredits(userId);
+      if (remaining < effectiveCost) {
+        // Unlock: revert status so user can top up and retry
+        await sb
+          .from("generations")
+          .update({ status: "awaiting_approval" })
+          .eq("id", generation_id);
+        return json(
+          {
+            detail: `Insufficient credits. You need ${effectiveCost} credits but have ${remaining}. Purchase more or upgrade your plan.`,
+            first_video_discount: isFirstVideo,
+            effective_cost: effectiveCost,
+          },
+          cors,
+          402,
+        );
+      }
+
+      // ── Debit credits ───────────────────────────────────────────
+      await debitCredits(userId, effectiveCost, generation_id);
+
+      if (isFirstVideo) {
+        await sb
+          .from("profiles")
+          .update({ first_video_discount_used: true })
+          .eq("id", userId);
+      }
+
+      try {
+        // ── Update status to submitting_jobs ───────────────────────
+        await sb
+          .from("generations")
+          .update({ status: "submitting_jobs" })
+          .eq("id", generation_id);
+
+        const compositePath = gen.composite_image_url as string;
+
+        // ── Generate signed URL for Kling ─────────────────────────
+        const { data: klingCompositeUrl, error: klingUrlErr } = await sb.storage
+          .from("composite-images")
+          .createSignedUrl(compositePath, 7200);
+
+        if (klingUrlErr || !klingCompositeUrl?.signedUrl) {
+          throw new Error(
+            `Failed to generate Kling-accessible signed URL: ${klingUrlErr?.message}`,
+          );
+        }
+
+        // ── Submit Kling jobs ─────────────────────────────────────
+        const { jobIds, modelUsed } = await submitAllKlingJobs(
+          finalScript,
+          klingCompositeUrl.signedUrl,
+          klingModel,
+        );
+
+        // ── Update generation with job IDs ────────────────────────
+        const { error: jobUpdateErr } = await sb
+          .from("generations")
+          .update({
+            external_job_ids: jobIds,
+            kling_model: modelUsed,
+            status: "generating_segments",
+          })
+          .eq("id", generation_id);
+
+        if (jobUpdateErr) {
+          throw new Error(`Failed to update generation with job IDs: ${jobUpdateErr.message}`);
+        }
+
+        return json(
+          {
+            data: {
+              generation_id,
+              status: "generating_segments",
+              first_video_discount_applied: isFirstVideo,
+              credits_charged: effectiveCost,
+            },
+          },
+          cors,
+          200,
+        );
+      } catch (pipelineErr) {
+        const errMsg =
+          pipelineErr instanceof Error ? pipelineErr.message : String(pipelineErr);
+        console.error("generate-video approval pipeline error:", errMsg);
+
+        try {
+          await refundCredits(userId, effectiveCost, generation_id);
+          if (isFirstVideo) {
+            await sb
+              .from("profiles")
+              .update({ first_video_discount_used: false })
+              .eq("id", userId);
+          }
+        } catch (refundErr) {
+          console.error("Credit refund failed:", refundErr);
+        }
+
+        await sb
+          .from("generations")
+          .update({ status: "failed", error_message: errMsg })
+          .eq("id", generation_id);
+
+        throw pipelineErr;
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // New generation: either phase="script" (script-only) or default
+    // ══════════════════════════════════════════════════════════════════
+
+    const { product_id, persona_id, mode, quality, composite_image_path, advanced_segments } = body as {
+      product_id: string;
+      persona_id: string;
+      mode?: string;
+      quality?: string;
+      composite_image_path: string;
+      advanced_segments?: AdvancedSegmentsInput;
+    };
 
     if (!product_id) return json({ detail: "product_id is required" }, cors, 400);
     if (!persona_id) return json({ detail: "persona_id is required" }, cors, 400);
@@ -374,11 +670,7 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "quality must be 'standard' or 'hd'" }, cors, 400);
     }
 
-    const variantCount = resolvedMode === "single" ? 1 : 3;
-    const creditCost = resolvedMode === "single"
-      ? COSTS[resolvedQuality as keyof typeof COSTS].single
-      : COSTS[resolvedQuality as keyof typeof COSTS].batch;
-    const klingModel = KLING_MODEL[resolvedQuality as keyof typeof KLING_MODEL];
+    const { variantCount, creditCost, klingModel } = computeCosts(resolvedMode, resolvedQuality);
 
     // ── 2. Verify product ownership (confirmed = true) ────────────
 
@@ -426,9 +718,8 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // ── 5. Check credits + apply first-video discount ──────────────
+    // ── 5. Compute effective cost (for both script-only and default) ─
 
-    // Check if user is eligible for 50% first-video discount
     const { data: profileData } = await sb
       .from("profiles")
       .select("first_video_discount_used")
@@ -436,9 +727,78 @@ Deno.serve(async (req: Request) => {
       .single();
 
     const isFirstVideo = profileData?.first_video_discount_used === false;
-    // Apply 50% off (ceil to nearest whole credit)
     const effectiveCost = isFirstVideo ? Math.ceil(creditCost / 2) : creditCost;
 
+    // ══════════════════════════════════════════════════════════════════
+    // PHASE "script" — Generate script only, no credit debit
+    // ══════════════════════════════════════════════════════════════════
+    if (phase === "script") {
+      // ── Create generation record with awaiting_approval status ───
+      const { data: generation, error: genErr } = await sb
+        .from("generations")
+        .insert({
+          owner_id: userId,
+          product_id,
+          persona_id,
+          mode: resolvedMode,
+          video_quality: resolvedQuality,
+          composite_image_url: composite_image_path,
+          status: "awaiting_approval",
+          started_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+      if (genErr || !generation) {
+        throw new Error(`Failed to create generation: ${genErr?.message}`);
+      }
+
+      const generationId = generation.id;
+
+      try {
+        // ── Generate script (with coherence review) ─────────────────
+        const { script, scriptRaw } = await generateScript(product, variantCount);
+
+        // ── Save script to generation record ────────────────────────
+        const { error: updateErr } = await sb
+          .from("generations")
+          .update({ script, script_raw: scriptRaw })
+          .eq("id", generationId);
+
+        if (updateErr) {
+          throw new Error(`Failed to update generation: ${updateErr.message}`);
+        }
+
+        return json(
+          {
+            data: {
+              generation_id: generationId,
+              status: "awaiting_approval",
+              script,
+              credits_to_charge: effectiveCost,
+            },
+          },
+          cors,
+          201,
+        );
+      } catch (scriptErr) {
+        const errMsg =
+          scriptErr instanceof Error ? scriptErr.message : String(scriptErr);
+        console.error("generate-video script-only error:", errMsg);
+
+        await sb
+          .from("generations")
+          .update({ status: "failed", error_message: errMsg })
+          .eq("id", generationId);
+
+        throw scriptErr;
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // DEFAULT — Legacy single-call flow (debit + generate + submit)
+    // ══════════════════════════════════════════════════════════════════
+
+    // ── Check credits ──────────────────────────────────────────────
     const remaining = await checkCredits(userId);
     if (remaining < effectiveCost) {
       return json(
@@ -478,7 +838,6 @@ Deno.serve(async (req: Request) => {
 
     await debitCredits(userId, effectiveCost, generationId);
 
-    // If this was their first video, mark discount as used immediately
     if (isFirstVideo) {
       await sb
         .from("profiles")
@@ -490,10 +849,13 @@ Deno.serve(async (req: Request) => {
       // ── 8. Generate (or use provided) script ───────────────────────
 
       let script: GeneratedScript;
+      let scriptRaw: GeneratedScript | undefined;
       if (advanced_segments) {
         script = buildScriptFromAdvanced(advanced_segments, variantCount);
       } else {
-        script = await generateScript(product, variantCount);
+        const result = await generateScript(product, variantCount);
+        script = result.script;
+        scriptRaw = result.scriptRaw;
       }
 
       // ── 9. Save script + composite path, update status ─────────────
@@ -502,6 +864,7 @@ Deno.serve(async (req: Request) => {
         .from("generations")
         .update({
           script,
+          ...(scriptRaw ? { script_raw: scriptRaw } : {}),
           composite_image_url: composite_image_path,
           status: "submitting_jobs",
         })
@@ -528,9 +891,8 @@ Deno.serve(async (req: Request) => {
         [composite_image_path, klingCompositeUrl.signedUrl],
       ]);
 
-      // ── 11. Submit Kling video generation jobs ─────────────────────
+      // ── Submit Kling video generation jobs ─────────────────────────
 
-      // Build all 9 job submissions and run in parallel
       const jobModels: string[] = [];
       const SEG_KEY = { hooks: "hook", bodies: "body", ctas: "cta" } as const;
       const segmentTypes = ["hooks", "bodies", "ctas"] as const;
@@ -585,7 +947,7 @@ Deno.serve(async (req: Request) => {
       const jobIds: Record<string, string> = Object.fromEntries(jobEntries);
       const modelUsed = jobModels[0] || klingModel;
 
-      // ── 12. Update generation with job IDs and status ─────────────
+      // ── Update generation with job IDs and status ─────────────────
 
       const { error: jobUpdateErr } = await sb
         .from("generations")
@@ -600,7 +962,7 @@ Deno.serve(async (req: Request) => {
         throw new Error(`Failed to update generation with job IDs: ${jobUpdateErr.message}`);
       }
 
-      // ── 13. Return response ───────────────────────────────────────
+      // ── Return response ───────────────────────────────────────────
 
       return json(
         {
@@ -621,10 +983,8 @@ Deno.serve(async (req: Request) => {
 
       console.error("generate-batch pipeline error:", errMsg);
 
-      // Refund credits (refund whatever was actually charged, including discount)
       try {
         await refundCredits(userId, effectiveCost, generationId);
-        // If first-video discount was applied but gen failed, restore the discount eligibility
         if (isFirstVideo) {
           await sb
             .from("profiles")
