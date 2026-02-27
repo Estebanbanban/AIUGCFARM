@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import Script from "next/script";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -25,6 +26,14 @@ export const metadata: Metadata = {
     "product video ads",
     "AI video generator for DTC",
   ],
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/site.webmanifest",
   openGraph: {
     title: "CineRads — AI UGC Video Ad Generator for Shopify & DTC Brands",
     description:
@@ -44,6 +53,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} min-h-screen bg-background text-foreground antialiased`}>
+        <Script
+          src="https://datafa.st/js/script.js"
+          data-website-id="dfid_aeeAwbTgJDYJIXhN8pSZx"
+          data-domain="www.cinerads.com"
+          strategy="afterInteractive"
+        />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

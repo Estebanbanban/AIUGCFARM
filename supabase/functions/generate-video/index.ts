@@ -7,10 +7,11 @@ import { callOpenRouter } from "../_shared/openrouter.ts";
 import { withRetry } from "../_shared/retry.ts";
 import { submitKlingJob } from "../_shared/kling.ts";
 
-// Credits per segment set  -  HD (kling-v3) costs 2× standard (kling-v2-6)
+// 1 credit = $1. Kling v2.6 = ~$0.88/single gen → 5cr. Kling v3 = ~$1.76/single → 10cr.
+// First video: 50% off (ceil(cost/2)), tracked via first_video_discount_used on profile.
 const COSTS = {
-  standard: { single: 3, batch: 9 },
-  hd:       { single: 6, batch: 18 },
+  standard: { single: 5, batch: 15 },
+  hd:       { single: 10, batch: 30 },
 } as const;
 
 // Kling model name per quality tier
@@ -356,6 +357,12 @@ Deno.serve(async (req: Request) => {
     if (!product_id) return json({ detail: "product_id is required" }, cors, 400);
     if (!persona_id) return json({ detail: "persona_id is required" }, cors, 400);
     if (!composite_image_path) return json({ detail: "composite_image_path is required" }, cors, 400);
+    if (
+      typeof composite_image_path !== "string" ||
+      !composite_image_path.startsWith(`${userId}/`)
+    ) {
+      return json({ detail: "Access denied for this composite image" }, cors, 403);
+    }
 
     const resolvedMode = mode || "single";
     if (resolvedMode !== "single" && resolvedMode !== "triple") {
@@ -419,13 +426,26 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // ── 5. Check credits ───────────────────────────────────────────
+    // ── 5. Check credits + apply first-video discount ──────────────
+
+    // Check if user is eligible for 50% first-video discount
+    const { data: profileData } = await sb
+      .from("profiles")
+      .select("first_video_discount_used")
+      .eq("id", userId)
+      .single();
+
+    const isFirstVideo = profileData?.first_video_discount_used === false;
+    // Apply 50% off (ceil to nearest whole credit)
+    const effectiveCost = isFirstVideo ? Math.ceil(creditCost / 2) : creditCost;
 
     const remaining = await checkCredits(userId);
-    if (remaining < creditCost) {
+    if (remaining < effectiveCost) {
       return json(
         {
-          detail: `Insufficient credits. You need ${creditCost} credits but have ${remaining}. Purchase more or upgrade your plan.`,
+          detail: `Insufficient credits. You need ${effectiveCost} credits but have ${remaining}. Purchase more or upgrade your plan.`,
+          first_video_discount: isFirstVideo,
+          effective_cost: effectiveCost,
         },
         cors,
         402,
@@ -442,6 +462,7 @@ Deno.serve(async (req: Request) => {
         persona_id,
         mode: resolvedMode,
         video_quality: resolvedQuality,
+        kling_model: klingModel,
         status: "scripting",
         started_at: new Date().toISOString(),
       })
@@ -453,9 +474,17 @@ Deno.serve(async (req: Request) => {
 
     const generationId = generation.id;
 
-    // ── 7. Debit credits atomically ────────────────────────────────
+    // ── 7. Debit credits atomically (discounted if first video) ────
 
-    await debitCredits(userId, creditCost, generationId);
+    await debitCredits(userId, effectiveCost, generationId);
+
+    // If this was their first video, mark discount as used immediately
+    if (isFirstVideo) {
+      await sb
+        .from("profiles")
+        .update({ first_video_discount_used: true })
+        .eq("id", userId);
+    }
 
     try {
       // ── 8. Generate (or use provided) script ───────────────────────
@@ -501,6 +530,8 @@ Deno.serve(async (req: Request) => {
 
       // ── 11. Submit Kling video generation jobs ─────────────────────
 
+      // Build all 9 job submissions and run in parallel
+      const jobModels: string[] = [];
       const SEG_KEY = { hooks: "hook", bodies: "body", ctas: "cta" } as const;
       const segmentTypes = ["hooks", "bodies", "ctas"] as const;
 
@@ -538,16 +569,21 @@ Deno.serve(async (req: Request) => {
                 image_url: imageUrl,
                 script: klingPrompt,
                 duration: segment.duration_seconds <= 5 ? 5 : 10,
-                mode: "std",
+                mode: "pro",
+                sound: "on",
                 model_name: klingModel,
               })
-            ).then((result) => [jobKey, result.job_id] as [string, string]);
+            ).then((result) => {
+              if (result.model_name) jobModels.push(result.model_name);
+              return [jobKey, result.job_id] as [string, string];
+            });
           })();
         })
       );
 
       const jobEntries = await Promise.all(jobSubmissions);
       const jobIds: Record<string, string> = Object.fromEntries(jobEntries);
+      const modelUsed = jobModels[0] || klingModel;
 
       // ── 12. Update generation with job IDs and status ─────────────
 
@@ -555,6 +591,7 @@ Deno.serve(async (req: Request) => {
         .from("generations")
         .update({
           external_job_ids: jobIds,
+          kling_model: modelUsed,
           status: "generating_segments",
         })
         .eq("id", generationId);
@@ -570,6 +607,8 @@ Deno.serve(async (req: Request) => {
           data: {
             generation_id: generationId,
             status: "generating_segments",
+            first_video_discount_applied: isFirstVideo,
+            credits_charged: effectiveCost,
           },
         },
         cors,
@@ -582,8 +621,16 @@ Deno.serve(async (req: Request) => {
 
       console.error("generate-batch pipeline error:", errMsg);
 
+      // Refund credits (refund whatever was actually charged, including discount)
       try {
-        await refundCredits(userId, creditCost, generationId);
+        await refundCredits(userId, effectiveCost, generationId);
+        // If first-video discount was applied but gen failed, restore the discount eligibility
+        if (isFirstVideo) {
+          await sb
+            .from("profiles")
+            .update({ first_video_discount_used: false })
+            .eq("id", userId);
+        }
       } catch (refundErr) {
         console.error("Credit refund failed:", refundErr);
       }

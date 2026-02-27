@@ -5,6 +5,7 @@ export interface Profile {
   avatar_url: string | null;
   plan: "free" | "starter" | "growth" | "scale";
   role: "user" | "admin";
+  first_video_discount_used: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -141,6 +142,7 @@ export interface Generation {
   persona_id: string;
   mode: "single" | "triple";
   video_quality: "standard" | "hd";
+  kling_model: "kling-v2-6" | "kling-v3" | "kling-v3-0" | null;
   status: GenerationStatus;
   script: GenerationScript | null;
   composite_image_url: string | null;

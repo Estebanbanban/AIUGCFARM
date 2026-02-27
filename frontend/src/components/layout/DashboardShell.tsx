@@ -25,6 +25,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { Logo } from "@/components/ui/Logo";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -74,12 +75,8 @@ function SidebarContent({
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center px-6">
-        <Link
-          href="/"
-          className="text-xl font-semibold tracking-tight text-foreground"
-          onClick={onNavigate}
-        >
-          CineRads
+        <Link href="/" onClick={onNavigate}>
+          <Logo variant="full" size="sm" theme="dark" />
         </Link>
       </div>
 
@@ -112,13 +109,24 @@ function SidebarContent({
         <div className="rounded-lg border border-sidebar-border bg-card p-3">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Credits</span>
-            <span className="font-mono font-medium text-foreground">
-              {isUnlimitedCredits
-                ? "Unlimited"
-                : creditsRemaining > creditsTotal
-                ? creditsRemaining
-                : `${creditsRemaining}/${creditsTotal}`}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono font-medium text-foreground">
+                {isUnlimitedCredits
+                  ? "Unlimited"
+                  : creditsRemaining > creditsTotal
+                  ? creditsRemaining
+                  : `${creditsRemaining}/${creditsTotal}`}
+              </span>
+              <Link
+                href="/settings/billing"
+                onClick={onNavigate}
+                className="flex size-4 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
+                aria-label="Buy credits"
+                title="Buy credits"
+              >
+                <Plus className="size-2.5" />
+              </Link>
+            </div>
           </div>
           <Progress
             value={creditPercent}

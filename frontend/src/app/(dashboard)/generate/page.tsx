@@ -27,11 +27,13 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   PLANS,
+  CREDIT_PACKS,
   CREDITS_PER_SINGLE,
   CREDITS_PER_BATCH,
   CREDITS_PER_SINGLE_HD,
   CREDITS_PER_BATCH_HD,
   type PlanTier,
+  type CreditPackKey,
 } from "@/lib/stripe";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,7 +62,8 @@ import {
   useEditCompositeImage,
   useGenerateCompositeImages,
 } from "@/hooks/use-generations";
-import { useCheckout } from "@/hooks/use-checkout";
+import { useCheckout, useBuyCredits } from "@/hooks/use-checkout";
+import { useProfile } from "@/hooks/use-profile";
 import { ManualUploadForm } from "@/components/products/ManualUploadForm";
 import { ScrapeResults } from "@/components/products/ScrapeResults";
 import { PersonaBuilderInline } from "@/components/personas/PersonaBuilderInline";
@@ -193,6 +196,7 @@ export default function GeneratePage() {
     Array<{ path: string; signed_url: string }>
   >([]);
   const [selectedCompositeIdx, setSelectedCompositeIdx] = useState<number | null>(null);
+  const [showPreviewEditor, setShowPreviewEditor] = useState(false);
   const [previewEditPrompt, setPreviewEditPrompt] = useState("");
 
   // Step 4, advanced mode state
@@ -204,10 +208,12 @@ export default function GeneratePage() {
   const personaImageMap = useResolvedPersonaImages(personas);
   const scrapeProduct = useScrapeProduct();
   const { data: credits, isLoading: creditsLoading } = useCredits();
+  const { data: profile } = useProfile();
   const createGeneration = useCreateGeneration();
   const generateComposites = useGenerateCompositeImages();
   const editComposite = useEditCompositeImage();
   const checkout = useCheckout();
+  const buyCredits = useBuyCredits();
 
   const confirmedProducts = products?.filter((p) => p.confirmed) ?? [];
   const activePersonas = personas ?? [];
@@ -227,7 +233,12 @@ export default function GeneratePage() {
       : store.mode === "single"
         ? CREDITS_PER_SINGLE
         : CREDITS_PER_BATCH;
-  const hasEnoughCredits = isUnlimitedCredits || creditsRemaining >= creditCost;
+
+  // First-video 50% discount for new users
+  const isFirstVideo = profile?.first_video_discount_used === false;
+  const effectiveCost = isFirstVideo ? Math.ceil(creditCost / 2) : creditCost;
+
+  const hasEnoughCredits = isUnlimitedCredits || creditsRemaining >= effectiveCost;
   const requiresCommentKeyword = store.ctaStyle === "comment_keyword";
   const commentKeyword = store.ctaCommentKeyword
     .trim()
@@ -361,6 +372,7 @@ export default function GeneratePage() {
     // Clear composites when format changes so user regenerates with correct aspect ratio
     setCompositeImages([]);
     setSelectedCompositeIdx(null);
+    setShowPreviewEditor(false);
     store.setCompositeImagePath(null);
     setPreviewEditPrompt("");
   }
@@ -369,6 +381,7 @@ export default function GeneratePage() {
     if (!store.productId || !store.personaId) return;
     setCompositeImages([]);
     setSelectedCompositeIdx(null);
+    setShowPreviewEditor(false);
     store.setCompositeImagePath(null);
     setPreviewEditPrompt("");
 
@@ -387,6 +400,7 @@ export default function GeneratePage() {
 
   function handleSelectComposite(idx: number) {
     setSelectedCompositeIdx(idx);
+    setShowPreviewEditor(false);
     store.setCompositeImagePath(compositeImages[idx].path);
   }
 
@@ -404,6 +418,7 @@ export default function GeneratePage() {
         onSuccess: (result) => {
           setCompositeImages((prev) => [result.image, ...prev]);
           setSelectedCompositeIdx(0);
+          setShowPreviewEditor(false);
           store.setCompositeImagePath(result.image.path);
           setPreviewEditPrompt("");
           toast.success("Preview image updated");
@@ -541,12 +556,15 @@ export default function GeneratePage() {
 
   async function handleCheckout(plan: PlanTier) {
     checkout.mutate(plan, {
-      onSuccess: (url) => {
-        window.location.href = url;
-      },
-      onError: (err) => {
-        toast.error(err.message || "Failed to start checkout");
-      },
+      onSuccess: (url) => { window.location.href = url; },
+      onError: (err) => { toast.error(err.message || "Failed to start checkout"); },
+    });
+  }
+
+  async function handleBuyPack(pack: CreditPackKey) {
+    buyCredits.mutate(pack, {
+      onSuccess: (url) => { window.location.href = url; },
+      onError: (err) => { toast.error(err.message || "Failed to start checkout"); },
     });
   }
 
@@ -1015,54 +1033,6 @@ export default function GeneratePage() {
                   Click an image to select it — this becomes the base for your video.
                 </p>
 
-                <div className="rounded-lg border border-border bg-muted/20 p-4">
-                  <div className="flex flex-col gap-3">
-                    <div>
-                      <Label htmlFor="preview-edit-prompt" className="text-sm font-medium">
-                        Quick edit (optional)
-                      </Label>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Ask for changes like outfit, background, lighting, or time of day.
-                      </p>
-                    </div>
-
-                    <Textarea
-                      id="preview-edit-prompt"
-                      value={previewEditPrompt}
-                      onChange={(e) => setPreviewEditPrompt(e.target.value)}
-                      placeholder="Example: Change the outfit to a black hoodie and make the background a cozy cafe at sunset."
-                      maxLength={500}
-                    />
-
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs text-muted-foreground">
-                        Uses the selected preview image as the reference.
-                      </p>
-                      <Button
-                        size="sm"
-                        onClick={handleApplyPreviewEdit}
-                        disabled={
-                          editComposite.isPending ||
-                          !store.compositeImagePath ||
-                          previewEditPrompt.trim().length === 0
-                        }
-                      >
-                        {editComposite.isPending ? (
-                          <>
-                            <Loader2 className="size-3.5 animate-spin" />
-                            Applying Edit...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="size-3.5" />
-                            Apply Edit
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Full-width image grid: 4-col for portrait (tall), 2-col for landscape (wide) */}
                 <div className={cn(
                   "grid gap-3",
@@ -1100,6 +1070,79 @@ export default function GeneratePage() {
                     </button>
                   ))}
                 </div>
+
+                {selectedCompositeIdx !== null && compositeImages[selectedCompositeIdx] && (
+                  <div className="rounded-lg border border-border bg-muted/20 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium">Quick edit (optional)</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Adjust the selected preview before generating your videos.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowPreviewEditor((prev) => !prev)}
+                      >
+                        <Sparkles className="size-3.5" />
+                        {showPreviewEditor ? "Hide Edit" : "Edit Selected"}
+                      </Button>
+                    </div>
+
+                    {showPreviewEditor && (
+                      <div className="mt-3 flex flex-col gap-3">
+                        <Textarea
+                          id="preview-edit-prompt"
+                          value={previewEditPrompt}
+                          onChange={(e) => setPreviewEditPrompt(e.target.value)}
+                          placeholder="Example: Change the outfit to a black hoodie and make the background a cozy cafe at sunset."
+                          maxLength={500}
+                        />
+
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs text-muted-foreground">
+                            Uses the selected preview image as the reference.
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowPreviewEditor(false)}
+                              disabled={editComposite.isPending}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={handleApplyPreviewEdit}
+                              disabled={
+                                editComposite.isPending ||
+                                !store.compositeImagePath ||
+                                previewEditPrompt.trim().length === 0
+                              }
+                            >
+                              {editComposite.isPending ? (
+                                <>
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                  Applying Edit...
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="size-3.5" />
+                                  Apply Edit
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1376,7 +1419,15 @@ export default function GeneratePage() {
                     ) : (
                       <>
                         <Zap className="size-4" />
-                        Generate &mdash; {creditCost} credits
+                        Generate &mdash;{" "}
+                        {isFirstVideo ? (
+                          <>
+                            <span className="line-through opacity-60">{creditCost}</span>
+                            {" "}{effectiveCost} credits
+                          </>
+                        ) : (
+                          <>{creditCost} credits</>
+                        )}
                       </>
                     )}
                   </Button>
@@ -1432,65 +1483,107 @@ export default function GeneratePage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {creditsRemaining > 0
-                ? "Not Enough Credits"
-                : "Subscription Required"}
+              {creditsRemaining > 0 ? "Not Enough Credits" : "Get Credits to Generate"}
             </DialogTitle>
             <DialogDescription>
               {creditsRemaining > 0
-                ? `You need ${creditCost} credits but have ${creditsRemaining}. Upgrade your plan for more credits.`
-                : "Choose a plan to start generating UGC videos."}
+                ? `You need ${effectiveCost} credits but only have ${creditsRemaining}.`
+                : "Buy a one-time credit pack or subscribe for the best per-credit rate."}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col gap-3 py-4">
-            {(
-              Object.entries(PLANS) as [
-                PlanTier,
-                (typeof PLANS)[PlanTier],
-              ][]
-            ).map(([key, plan]) => (
-              <div
-                key={key}
-                className={cn(
-                  "flex items-center justify-between rounded-lg border px-4 py-3",
-                  key === "growth"
-                    ? "border-primary/50 bg-primary/5"
-                    : "border-border",
-                )}
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium">{plan.name}</p>
-                    {key === "growth" && (
-                      <Badge
-                        variant="secondary"
-                        className="bg-primary/10 text-xs text-primary"
-                      >
-                        Popular
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {plan.credits} credits/month
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold">${plan.price}/mo</span>
-                  <Button
-                    size="sm"
-                    variant={key === "growth" ? "default" : "outline"}
-                    onClick={() => handleCheckout(key)}
-                    disabled={checkout.isPending}
-                  >
-                    {checkout.isPending ? (
-                      <Loader2 className="size-3 animate-spin" />
-                    ) : (
-                      "Subscribe"
-                    )}
-                  </Button>
-                </div>
+
+          <div className="flex flex-col gap-5 py-2">
+            {/* First-video 50% off banner */}
+            {isFirstVideo && (
+              <div className="rounded-lg border border-primary/40 bg-primary/5 px-4 py-3">
+                <p className="text-sm font-semibold text-primary">Your first video is 50% off</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  This discount applies once. After your first generation, standard pricing applies.
+                </p>
               </div>
-            ))}
+            )}
+
+            {/* Credit packs */}
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                One-time — no commitment
+              </p>
+              <div className="flex flex-col gap-2">
+                {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between rounded-lg border border-border px-4 py-3"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">{pack.name}</p>
+                        {"badge" in pack && pack.badge && (
+                          <Badge variant="secondary" className="text-xs">{pack.badge}</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {pack.credits} credits · {pack.description}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold">${pack.price}</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleBuyPack(key)}
+                        disabled={buyCredits.isPending}
+                      >
+                        {buyCredits.isPending ? <Loader2 className="size-3 animate-spin" /> : "Buy"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex-1 border-t border-border" />
+              <span className="text-xs text-muted-foreground">or subscribe for best value</span>
+              <div className="flex-1 border-t border-border" />
+            </div>
+
+            {/* Subscription plans */}
+            <div className="flex flex-col gap-2">
+              {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => (
+                <div
+                  key={key}
+                  className={cn(
+                    "flex items-center justify-between rounded-lg border px-4 py-3",
+                    key === "growth" ? "border-primary/50 bg-primary/5" : "border-border",
+                  )}
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">{plan.name}</p>
+                      {key === "growth" && (
+                        <Badge variant="secondary" className="bg-primary/10 text-xs text-primary">
+                          Popular
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {plan.credits} credits/mo · ${(plan.price / plan.credits).toFixed(2)}/cr
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold">${plan.price}/mo</span>
+                    <Button
+                      size="sm"
+                      variant={key === "growth" ? "default" : "outline"}
+                      onClick={() => handleCheckout(key)}
+                      disabled={checkout.isPending}
+                    >
+                      {checkout.isPending ? <Loader2 className="size-3 animate-spin" /> : "Subscribe"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

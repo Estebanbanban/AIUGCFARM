@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "@/components/ui/Logo";
 
 const links = {
   Product: [
@@ -24,8 +25,8 @@ export function Footer() {
       <div className="mx-auto max-w-5xl">
         <div className="mb-12 grid grid-cols-2 gap-8 md:grid-cols-4">
           <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="text-lg font-semibold tracking-tight text-foreground">
-              CineRads
+            <Link href="/">
+              <Logo variant="full" size="sm" theme="dark" />
             </Link>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               AI-generated UGC video ads for e-commerce brands.

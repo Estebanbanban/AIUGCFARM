@@ -39,6 +39,7 @@ Deno.serve(async (req: Request) => {
         persona_id,
         mode,
         video_quality,
+        kling_model,
         status,
         script,
         composite_image_url,
