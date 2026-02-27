@@ -25,14 +25,14 @@ export function MarketingHeader() {
 
   return (
     <>
-      <header
-        className={`fixed top-0 z-50 h-16 w-full border-b transition-all duration-300 ${
-          scrolled
-            ? "border-border bg-background/90 backdrop-blur-xl"
-            : "border-transparent bg-background/75 backdrop-blur-md"
-        }`}
-      >
-        <div className="mx-auto flex h-full max-w-6xl items-center justify-between px-4 sm:px-6">
+      <header className="fixed left-0 right-0 top-3 z-50 px-3 sm:px-5">
+        <div
+          className={`mx-auto flex h-16 max-w-7xl items-center justify-between rounded-full border px-5 transition-all duration-300 sm:px-7 ${
+            scrolled
+              ? "border-border bg-background/92 shadow-[0_8px_22px_rgba(0,0,0,0.28)] backdrop-blur-xl"
+              : "border-border/80 bg-background/78 backdrop-blur-xl"
+          }`}
+        >
           <Link href="/" className="text-lg font-semibold tracking-tight text-foreground">
             CineRads
           </Link>
