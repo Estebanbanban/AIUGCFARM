@@ -228,6 +228,43 @@ function optionImageDataUri(key: string) {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
+function accessoryObjectDataUri(accessory: string) {
+  let shape = "";
+  if (accessory === "Glasses") {
+    shape = '<rect x="250" y="430" width="130" height="90" rx="28" fill="none" stroke="#6b7280" stroke-width="18"/><rect x="420" y="430" width="130" height="90" rx="28" fill="none" stroke="#6b7280" stroke-width="18"/><line x1="380" y1="470" x2="420" y2="470" stroke="#6b7280" stroke-width="18"/>';
+  } else if (accessory === "Sunglasses") {
+    shape = '<rect x="250" y="430" width="130" height="90" rx="28" fill="#374151"/><rect x="420" y="430" width="130" height="90" rx="28" fill="#374151"/><line x1="380" y1="470" x2="420" y2="470" stroke="#6b7280" stroke-width="18"/>';
+  } else if (accessory === "Earrings") {
+    shape = '<circle cx="315" cy="470" r="48" fill="none" stroke="#6b7280" stroke-width="16"/><circle cx="485" cy="470" r="48" fill="none" stroke="#6b7280" stroke-width="16"/>';
+  } else if (accessory === "Necklace") {
+    shape = '<path d="M240 430c50 118 270 118 320 0" fill="none" stroke="#6b7280" stroke-width="18"/><circle cx="400" cy="560" r="26" fill="#9ca3af"/>';
+  } else if (accessory === "Watch") {
+    shape = '<rect x="340" y="360" width="120" height="300" rx="28" fill="#d1d5db"/><rect x="322" y="440" width="156" height="140" rx="32" fill="#6b7280"/><circle cx="400" cy="510" r="40" fill="#e5e7eb"/><line x1="400" y1="510" x2="400" y2="482" stroke="#6b7280" stroke-width="8"/><line x1="400" y1="510" x2="428" y2="510" stroke="#6b7280" stroke-width="8"/>';
+  } else if (accessory === "Hat") {
+    shape = '<path d="M210 520h380v46H210z" fill="#6b7280"/><path d="M260 380h280v146H260z" fill="#9ca3af"/>';
+  } else if (accessory === "Scarf") {
+    shape = '<path d="M250 380h300v140H250z" fill="#9ca3af"/><rect x="260" y="500" width="80" height="200" rx="18" fill="#6b7280"/><rect x="460" y="500" width="80" height="200" rx="18" fill="#6b7280"/>';
+  } else {
+    shape = "";
+  }
+
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="60%" stop-color="#e5e7eb"/>
+      <stop offset="100%" stop-color="#d1d5db"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="1000" fill="url(#bg)"/>
+  <rect x="64" y="64" width="672" height="872" rx="42" fill="#ffffff" opacity="0.55"/>
+  ${shape}
+</svg>`;
+
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 function optionHumanPhotoUri(key: string) {
   const u = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=80`;
 
@@ -271,14 +308,14 @@ function optionHumanPhotoUri(key: string) {
   };
 
   const accessoryMap: Record<string, string> = {
-    None: u("photo-1544005313-94ddf0286df2"),
-    Glasses: u("photo-1492562080023-ab3db95bfbce"),
-    Sunglasses: u("photo-1519699047748-de8e457a634e"),
-    Earrings: u("photo-1488426862026-3ee34a7d66df"),
-    Necklace: u("photo-1521572267360-ee0c2909d518"),
-    Watch: u("photo-1545996124-0501ebae84d0"),
-    Hat: u("photo-1504593811423-6dd665756598"),
-    Scarf: u("photo-1515886657613-9f3515b0c78f"),
+    None: accessoryObjectDataUri("None"),
+    Glasses: accessoryObjectDataUri("Glasses"),
+    Sunglasses: accessoryObjectDataUri("Sunglasses"),
+    Earrings: accessoryObjectDataUri("Earrings"),
+    Necklace: accessoryObjectDataUri("Necklace"),
+    Watch: accessoryObjectDataUri("Watch"),
+    Hat: accessoryObjectDataUri("Hat"),
+    Scarf: accessoryObjectDataUri("Scarf"),
   };
 
   if (key.startsWith("gender-")) return genderMap[key.slice(7)] ?? optionImageDataUri(key);
