@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0f0f0f"/>
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#ffffff" stroke-width="0.3" opacity="0.08"/>
+    </pattern>
+    <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F97316"/>
+      <stop offset="100%" stop-color="#EA580C"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  <rect x="0" y="0" width="4" height="630" fill="url(#barGrad)"/>
+  <text x="40" y="60" font-family="sans-serif" font-size="14" fill="#F97316" letter-spacing="3" text-anchor="start" font-weight="600">ECOMMERCE</text>
+  <!-- Decorative: Infinity/Meta-like loop -->
+  <path d="M 620 315 C 620 260 680 200 740 200 C 800 200 860 260 860 315 C 860 370 800 430 740 430 C 680 430 620 370 620 315 Z" fill="none" stroke="#F97316" stroke-width="1.5" opacity="0.2"/>
+  <path d="M 540 315 C 540 240 600 180 660 180 C 720 180 740 240 740 315 C 740 240 760 180 820 180 C 880 180 940 240 940 315 C 940 390 880 450 820 450 C 760 450 740 390 740 315 C 740 390 720 450 660 450 C 600 450 540 390 540 315 Z" fill="none" stroke="#F97316" stroke-width="1" opacity="0.15"/>
+  <!-- Placement dots -->
+  <circle cx="620" cy="315" r="5" fill="#F97316" opacity="0.4"/>
+  <circle cx="740" cy="200" r="5" fill="#F97316" opacity="0.3"/>
+  <circle cx="860" cy="315" r="5" fill="#F97316" opacity="0.4"/>
+  <circle cx="740" cy="430" r="5" fill="#F97316" opacity="0.3"/>
+  <!-- Small labels -->
+  <text x="620" y="340" font-family="sans-serif" font-size="9" fill="#ffffff" opacity="0.15" text-anchor="middle">REELS</text>
+  <text x="740" y="188" font-family="sans-serif" font-size="9" fill="#ffffff" opacity="0.15" text-anchor="middle">STORIES</text>
+  <text x="860" y="340" font-family="sans-serif" font-size="9" fill="#ffffff" opacity="0.15" text-anchor="middle">FEED</text>
+  <text x="1100" y="520" font-family="sans-serif" font-size="200" fill="#ffffff" opacity="0.03" text-anchor="end" font-weight="900">08</text>
+  <text x="1160" y="610" font-family="sans-serif" font-size="16" fill="#ffffff" opacity="0.5" text-anchor="end">CineRads</text>
+</svg>

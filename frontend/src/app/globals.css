@@ -125,6 +125,11 @@
   --background-secondary: oklch(0.155 0 0);
 }
 
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
