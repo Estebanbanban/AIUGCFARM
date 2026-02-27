@@ -34,42 +34,12 @@ export function HeroSection() {
           </motion.p>
 
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4, delay: 0.6 }}
-            className="mt-4 flex justify-center"
-          >
-            <span className="border border-primary/30 bg-primary/5 text-primary text-xs rounded-full px-3 py-1 inline-flex items-center gap-1.5">
-              <span>🎁</span>
-              3 free video segments — no credit card needed
-            </span>
-          </motion.div>
-
-          <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.5, ease: [0.25, 0.4, 0.25, 1] }}
             className="mt-10"
           >
             <UrlInputCta />
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.4, delay: 0.8 }}
-            className="mt-4 flex justify-center"
-          >
-            <button
-              onClick={() => {
-                const el = document.getElementById("how-it-works");
-                if (el) el.scrollIntoView({ behavior: "smooth" });
-              }}
-              className="text-sm text-[#888] hover:text-white transition-colors flex items-center gap-2"
-            >
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full border border-[#555]">▶</span>
-              Watch how it works
-            </button>
           </motion.div>
 
           <motion.p
