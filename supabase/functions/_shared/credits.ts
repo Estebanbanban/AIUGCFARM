@@ -34,3 +34,53 @@ export async function debitCredit(
   });
   if (rpcErr) throw new Error(`Credit decrement failed: ${rpcErr.message}`);
 }
+
+/** Debit N credits from a user. Inserts a ledger entry and decrements the balance atomically. */
+export async function debitCredits(
+  userId: string,
+  amount: number,
+  referenceId: string,
+): Promise<void> {
+  const sb = getAdminClient();
+
+  // Insert ledger entry
+  const { error: ledgerErr } = await sb.from("credit_ledger").insert({
+    owner_id: userId,
+    amount: -amount,
+    reason: "generation",
+    reference_id: referenceId,
+  });
+  if (ledgerErr) throw new Error(`Ledger insert failed: ${ledgerErr.message}`);
+
+  // Decrement balance atomically
+  const { error: rpcErr } = await sb.rpc("decrement_credits", {
+    p_user_id: userId,
+    p_amount: amount,
+  });
+  if (rpcErr) throw new Error(`Credit decrement failed: ${rpcErr.message}`);
+}
+
+/** Refund N credits to a user. Inserts a positive ledger entry and increments the balance. */
+export async function refundCredits(
+  userId: string,
+  amount: number,
+  referenceId: string,
+): Promise<void> {
+  const sb = getAdminClient();
+
+  // Insert ledger entry (positive amount for refund)
+  const { error: ledgerErr } = await sb.from("credit_ledger").insert({
+    owner_id: userId,
+    amount: amount,
+    reason: "refund",
+    reference_id: referenceId,
+  });
+  if (ledgerErr) throw new Error(`Refund ledger insert failed: ${ledgerErr.message}`);
+
+  // Increment balance (negative p_amount = increment)
+  const { error: rpcErr } = await sb.rpc("decrement_credits", {
+    p_user_id: userId,
+    p_amount: -amount,
+  });
+  if (rpcErr) throw new Error(`Credit refund failed: ${rpcErr.message}`);
+}
