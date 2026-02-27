@@ -25,6 +25,17 @@ export const skinTones = [
   "#5C3A1E",
 ] as const;
 
+export const ethnicities = [
+  "White / Caucasian",
+  "Black / African",
+  "East Asian",
+  "South Asian",
+  "Southeast Asian",
+  "Latino / Hispanic",
+  "Middle Eastern",
+  "Mixed / Multiracial",
+] as const;
+
 export const hairColors = [
   "Black",
   "Dark Brown",
@@ -85,7 +96,8 @@ export const accessories = [
 
 export const personaAttributesSchema = z.object({
   gender: z.enum(personaGenders),
-  skin_tone: z.string(),
+  ethnicity: z.string().optional(),
+  skin_tone: z.string().optional(),
   age: z.enum(personaAgeRanges),
   hair_color: z.string(),
   hair_style: z.string(),
