@@ -266,57 +266,56 @@ function accessoryObjectDataUri(accessory: string) {
 }
 
 function optionHumanPhotoUri(key: string) {
-  const local = (index: number) =>
-    `/img/Gemini_Generated_Image_h670yrh670yrh670${index === 1 ? "" : `-${index}`}.png`;
+  const local = (suffix: string) => `/img/Gemini_Generated_Image_h670yrh670yrh670${suffix}.png`;
 
   const genderMap: Record<string, string> = {
-    male: local(1),
-    female: local(2),
-    non_binary: local(2),
+    male: local(""),
+    female: local("-3"),
+    non_binary: local("-2"),
   };
 
   const hairStyleMap: Record<string, string> = {
-    "Short Straight": local(3),
-    "Short Curly": local(4),
-    "Medium Straight": local(5),
-    "Long Straight": local(6),
-    "Medium Wavy": local(7),
-    "Long Curly": local(8),
-    "Buzz Cut": local(9),
-    Bob: local(10),
-    Ponytail: local(11),
-    Braids: local(12),
-    Afro: local(13),
-    Bald: local(14),
+    "Short Straight": local("-4"),
+    "Short Curly": local("-5"),
+    "Medium Straight": local("-6"),
+    "Long Straight": local("-7"),
+    "Medium Wavy": local("-8"),
+    "Long Curly": local("-9"),
+    "Buzz Cut": local("-10"),
+    Bob: local("-11"),
+    Ponytail: local("-12"),
+    Braids: local("-13"),
+    Afro: local("-14"),
+    Bald: local("-15"),
   };
 
   const bodyTypeMap: Record<string, string> = {
-    slim: local(15),
-    average: local(16),
-    athletic: local(17),
-    curvy: local(18),
-    plus_size: local(19),
+    slim: local("-16"),
+    average: local("-17"),
+    athletic: local("-18"),
+    curvy: local("-19"),
+    plus_size: local("-21"),
   };
 
   const clothingMap: Record<string, string> = {
-    Casual: local(20),
-    "Business Casual": local(21),
-    Streetwear: local(22),
-    Sporty: local(23),
-    Elegant: local(24),
-    Bohemian: local(25),
-    Minimalist: local(26),
+    Casual: local("-20"),
+    "Business Casual": local("-23"),
+    Streetwear: local("-24"),
+    Sporty: local("-25"),
+    Elegant: local("-26"),
+    Bohemian: local("-27"),
+    Minimalist: local("-28"),
   };
 
   const accessoryMap: Record<string, string> = {
-    None: local(34),
-    Glasses: local(27),
-    Sunglasses: local(28),
-    Earrings: local(29),
-    Necklace: local(30),
-    Watch: local(31),
-    Hat: local(32),
-    Scarf: local(33),
+    None: optionImageDataUri("accessory-none"),
+    Glasses: local("-29"),
+    Sunglasses: local("-30"),
+    Earrings: local("-31"),
+    Necklace: local("-32"),
+    Watch: local("-33"),
+    Hat: local("-34"),
+    Scarf: local("-32"),
   };
 
   if (key.startsWith("gender-")) return genderMap[key.slice(7)] ?? optionImageDataUri(key);
