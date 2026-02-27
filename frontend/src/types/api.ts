@@ -52,6 +52,7 @@ export interface ConfirmProductsResponse {
 /* -------------------------------------------------------------------------- */
 
 import type {
+  Generation,
   GenerationStatus,
   GenerationScript,
   GenerationSegments,
@@ -70,6 +71,7 @@ export interface GenerationProgressResponse {
   data: {
     generation_id: string;
     status: GenerationStatus;
+    mode?: Generation["mode"];
     script?: GenerationScript | null;
     composite_image_url?: string | null;
     progress?: { completed: number; total: number };

@@ -173,6 +173,7 @@ Deno.serve(async (req: Request) => {
         data: {
           generation_id: gen.id,
           status: gen.status,
+          mode: gen.mode,
           script: gen.script,
           composite_image_url: compositeImageUrl,
           segments,
@@ -187,6 +188,7 @@ Deno.serve(async (req: Request) => {
         data: {
           generation_id: gen.id,
           status: gen.status,
+          mode: gen.mode,
           script: gen.script,
           composite_image_url: compositeImageUrl,
           error_message: gen.error_message,
@@ -327,6 +329,7 @@ Deno.serve(async (req: Request) => {
           data: {
             generation_id: generationId,
             status: "failed",
+            mode: gen.mode,
             script: gen.script,
             composite_image_url: compositeImageUrl,
             error_message: failedMessage || "One or more video segments failed",
@@ -353,6 +356,7 @@ Deno.serve(async (req: Request) => {
           data: {
             generation_id: generationId,
             status: "completed",
+            mode: gen.mode,
             script: gen.script,
             composite_image_url: compositeImageUrl,
             segments,
@@ -371,6 +375,7 @@ Deno.serve(async (req: Request) => {
         data: {
           generation_id: generationId,
           status: "generating_segments",
+          mode: gen.mode,
           script: gen.script,
           composite_image_url: compositeImageUrl,
           progress: { completed: completedCount, total: totalCount },
@@ -383,6 +388,7 @@ Deno.serve(async (req: Request) => {
       data: {
         generation_id: gen.id,
         status: gen.status,
+        mode: gen.mode,
         script: gen.script ?? undefined,
         composite_image_url: compositeImageUrl,
       },
