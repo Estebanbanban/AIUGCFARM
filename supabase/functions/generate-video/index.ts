@@ -376,10 +376,11 @@ Deno.serve(async (req: Request) => {
 
       // Build all 9 job submissions and run in parallel
       const jobEntries: Array<[string, string]> = [];
+      const SEG_KEY = { hooks: "hook", bodies: "body", ctas: "cta" } as const;
       const segmentTypes = ["hooks", "bodies", "ctas"] as const;
       const jobSubmissions = segmentTypes.flatMap((segType) =>
         script[segType].map((segment, i) => {
-          const jobKey = `${segType.slice(0, -1)}_${i + 1}`; // hook_1, body_1, cta_1, etc.
+          const jobKey = `${SEG_KEY[segType]}_${i + 1}`; // hook_1, body_1, cta_1, etc.
           return withRetry(() =>
             submitKlingJob({
               image_url: klingCompositeUrl.signedUrl,
