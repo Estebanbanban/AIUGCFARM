@@ -694,88 +694,146 @@ export default function GeneratePage() {
         {/* ── Step 3: Preview ───────────────────────────────────────────── */}
         {store.step === 3 && (
           <div className="flex flex-col gap-6">
-            <div>
-              <h2 className="text-lg font-semibold">Preview Your Scene</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Generate a composite image of your persona with the product. Pick the one you like — this becomes the base for your video.
-              </p>
-            </div>
+            {compositeImages.length === 0 ? (
+              /* ── Before generation: large format picker + CTA ── */
+              <div className="flex flex-col gap-6">
+                <div>
+                  <h2 className="text-lg font-semibold">Choose a Video Format</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Pick the format for your ad. This sets the aspect ratio of your scene images and video.
+                  </p>
+                </div>
 
-            {/* Format selector */}
-            <div>
-              <p className="mb-2 text-sm font-medium">Video format</p>
-              <div className="grid max-w-xs grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleFormatChange("9:16")}
-                  className={cn(
-                    "flex flex-col items-center gap-2 rounded-lg border px-4 py-3 transition-all",
-                    store.format === "9:16"
-                      ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                      : "border-border hover:border-muted-foreground/30",
-                  )}
-                >
-                  <Smartphone className="size-5" />
-                  <div className="text-center">
-                    <p className="text-sm font-semibold">Portrait</p>
-                    <p className="text-xs text-muted-foreground">9:16 · Phone</p>
+                {generateComposites.isPending ? (
+                  <div className="flex flex-col items-center gap-4 py-20">
+                    <Loader2 className="size-10 animate-spin text-primary" />
+                    <p className="text-base font-medium">Generating preview images…</p>
+                    <p className="text-sm text-muted-foreground">This usually takes 20–40 seconds</p>
                   </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleFormatChange("16:9")}
-                  className={cn(
-                    "flex flex-col items-center gap-2 rounded-lg border px-4 py-3 transition-all",
-                    store.format === "16:9"
-                      ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                      : "border-border hover:border-muted-foreground/30",
-                  )}
-                >
-                  <Monitor className="size-5" />
-                  <div className="text-center">
-                    <p className="text-sm font-semibold">Landscape</p>
-                    <p className="text-xs text-muted-foreground">16:9 · Wide</p>
-                  </div>
-                </button>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-4 sm:max-w-lg">
+                      <button
+                        type="button"
+                        onClick={() => handleFormatChange("9:16")}
+                        className={cn(
+                          "flex flex-col items-center gap-4 rounded-xl border-2 px-6 py-8 transition-all",
+                          store.format === "9:16"
+                            ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                            : "border-border hover:border-muted-foreground/40 hover:bg-muted/30",
+                        )}
+                      >
+                        <Smartphone className={cn("size-10", store.format === "9:16" ? "text-primary" : "text-muted-foreground")} />
+                        <div className="text-center">
+                          <p className="text-base font-semibold">Portrait</p>
+                          <p className="mt-1 text-sm text-muted-foreground">9:16 · TikTok / Reels / Stories</p>
+                        </div>
+                        {store.format === "9:16" && (
+                          <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                            <Check className="size-3.5" /> Selected
+                          </div>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleFormatChange("16:9")}
+                        className={cn(
+                          "flex flex-col items-center gap-4 rounded-xl border-2 px-6 py-8 transition-all",
+                          store.format === "16:9"
+                            ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                            : "border-border hover:border-muted-foreground/40 hover:bg-muted/30",
+                        )}
+                      >
+                        <Monitor className={cn("size-10", store.format === "16:9" ? "text-primary" : "text-muted-foreground")} />
+                        <div className="text-center">
+                          <p className="text-base font-semibold">Landscape</p>
+                          <p className="mt-1 text-sm text-muted-foreground">16:9 · YouTube / Facebook Ads</p>
+                        </div>
+                        {store.format === "16:9" && (
+                          <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                            <Check className="size-3.5" /> Selected
+                          </div>
+                        )}
+                      </button>
+                    </div>
+
+                    <Button size="lg" onClick={handleGenerateComposites} className="w-fit">
+                      <ImageIcon className="size-4" />
+                      Generate Preview Images
+                    </Button>
+                  </>
+                )}
               </div>
-            </div>
-
-            {/* Generate button — shown before first generation */}
-            {compositeImages.length === 0 && !generateComposites.isPending && (
-              <Button
-                onClick={handleGenerateComposites}
-                className="w-fit"
-              >
-                <ImageIcon className="size-4" />
-                Generate Preview Images
-              </Button>
-            )}
-
-            {/* Loading state */}
-            {generateComposites.isPending && (
-              <div className="flex flex-col items-center gap-3 py-16">
-                <Loader2 className="size-8 animate-spin text-primary" />
-                <p className="text-sm font-medium">Generating preview images…</p>
-                <p className="text-xs text-muted-foreground">This usually takes 20–40 seconds</p>
-              </div>
-            )}
-
-            {/* Image grid */}
-            {compositeImages.length > 0 && !generateComposites.isPending && (
+            ) : (
+              /* ── After generation: compact controls + full-width image grid ── */
               <div className="flex flex-col gap-4">
+                {/* Compact header bar */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-sm font-medium text-muted-foreground">Format:</span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleFormatChange("9:16")}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-all",
+                        store.format === "9:16"
+                          ? "border-primary bg-primary/5 font-medium text-primary"
+                          : "border-border text-muted-foreground hover:border-muted-foreground/40",
+                      )}
+                    >
+                      <Smartphone className="size-3.5" />
+                      Portrait
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleFormatChange("16:9")}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-all",
+                        store.format === "16:9"
+                          ? "border-primary bg-primary/5 font-medium text-primary"
+                          : "border-border text-muted-foreground hover:border-muted-foreground/40",
+                      )}
+                    >
+                      <Monitor className="size-3.5" />
+                      Landscape
+                    </button>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateComposites}
+                    disabled={generateComposites.isPending}
+                    className="ml-auto"
+                  >
+                    {generateComposites.isPending ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="size-3.5" />
+                    )}
+                    Regenerate
+                  </Button>
+                </div>
+
                 <p className="text-sm text-muted-foreground">
-                  Click an image to select it, then continue to generate your video.
+                  Click an image to select it — this becomes the base for your video.
                 </p>
-                <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+
+                {/* Full-width image grid: 4-col for portrait (tall), 2-col for landscape (wide) */}
+                <div className={cn(
+                  "grid gap-3",
+                  store.format === "9:16" ? "grid-cols-4" : "grid-cols-2",
+                )}>
                   {compositeImages.map((img, i) => (
                     <button
                       key={i}
                       onClick={() => handleSelectComposite(i)}
-                      className="group relative overflow-hidden rounded-lg focus:outline-none"
+                      className="group relative overflow-hidden rounded-xl focus:outline-none"
                     >
                       <div
                         className={cn(
-                          "relative overflow-hidden rounded-lg border-2 transition-all",
+                          "relative overflow-hidden rounded-xl border-2 transition-all",
                           store.format === "9:16" ? "aspect-[9/16]" : "aspect-video",
                           selectedCompositeIdx === i
                             ? "border-primary ring-2 ring-primary/30"
@@ -799,15 +857,6 @@ export default function GeneratePage() {
                     </button>
                   ))}
                 </div>
-
-                <Button
-                  variant="outline"
-                  onClick={handleGenerateComposites}
-                  className="w-fit"
-                >
-                  <RefreshCw className="size-4" />
-                  Regenerate
-                </Button>
               </div>
             )}
           </div>

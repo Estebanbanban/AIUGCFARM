@@ -202,6 +202,20 @@ Deno.serve(async (req: Request) => {
       const jobIds = gen.external_job_ids as Record<string, string>;
       const jobKeys = Object.keys(jobIds);
 
+      // Guard against empty job IDs (shouldn't happen, but prevents 0===0 false "completed")
+      if (jobKeys.length === 0) {
+        return json({
+          data: {
+            generation_id: gen.id,
+            status: "generating_segments",
+            mode: gen.mode,
+            script: gen.script,
+            composite_image_url: compositeImageUrl,
+            progress: { completed: 0, total: 0 },
+          },
+        }, cors);
+      }
+
       // Load existing stored videos progress (or start fresh)
       const storedVideos: StoredVideos = (
         gen.videos &&
