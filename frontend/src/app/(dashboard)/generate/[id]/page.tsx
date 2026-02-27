@@ -572,12 +572,21 @@ export default function GenerationDetailPage() {
   function handleDownloadAll() {
     if (!segments) return;
     const allVideos = [
-      ...(segments.hooks ?? []),
-      ...(segments.bodies ?? []),
-      ...(segments.ctas ?? []),
+      ...(segments.hooks ?? []).map((v, i) => ({ ...v, label: `hook_${i + 1}` })),
+      ...(segments.bodies ?? []).map((v, i) => ({ ...v, label: `body_${i + 1}` })),
+      ...(segments.ctas ?? []).map((v, i) => ({ ...v, label: `cta_${i + 1}` })),
     ];
-    allVideos.forEach((v) => window.open(v.url, "_blank"));
-    toast.success(`Opening ${allVideos.length} segment downloads`);
+    // Use programmatic anchor click to avoid popup blocker
+    allVideos.forEach((v) => {
+      const a = document.createElement("a");
+      a.href = v.url;
+      a.download = `${generationId}_${v.label}.mp4`;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+    toast.success(`Downloading ${allVideos.length} segments`);
   }
 
   /* ---------------------------------------------------------------------- */

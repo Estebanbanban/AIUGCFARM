@@ -366,27 +366,26 @@ Deno.serve(async (req: Request) => {
 
       // ── 14. Submit 9 Kling video generation jobs ──────────────────
 
-      const jobIds: Record<string, string> = {};
+      // Build all 9 job submissions and run in parallel
+      const jobEntries: Array<[string, string]> = [];
       const segmentTypes = ["hooks", "bodies", "ctas"] as const;
-
-      for (const segType of segmentTypes) {
-        for (let i = 0; i < script[segType].length; i++) {
-          const segment = script[segType][i];
+      const jobSubmissions = segmentTypes.flatMap((segType) =>
+        script[segType].map((segment, i) => {
           const jobKey = `${segType.slice(0, -1)}_${i + 1}`; // hook_1, body_1, cta_1, etc.
-
-          const result = await withRetry(() =>
+          return withRetry(() =>
             submitKlingJob({
               image_url: klingCompositeUrl.signedUrl,
               script: segment.text,
               duration: segment.duration_seconds,
               aspect_ratio: "9:16",
               mode: "standard",
-            }),
-          );
+            })
+          ).then((result) => [jobKey, result.job_id] as [string, string]);
+        })
+      );
 
-          jobIds[jobKey] = result.job_id;
-        }
-      }
+      jobEntries.push(...await Promise.all(jobSubmissions));
+      const jobIds: Record<string, string> = Object.fromEntries(jobEntries);
 
       // ── 15. Update generation with job IDs and status ─────────────
 

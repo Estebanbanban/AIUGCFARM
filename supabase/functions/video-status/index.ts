@@ -69,24 +69,33 @@ async function signSegmentVideos(
   const result: ResponseSegments = { hooks: [], bodies: [], ctas: [] };
   const segmentTypes = ["hooks", "bodies", "ctas"] as const;
 
-  for (const segType of segmentTypes) {
-    for (const seg of stored[segType]) {
+  // Sign all URLs in parallel
+  const signingTasks = segmentTypes.flatMap((segType) =>
+    stored[segType].map(async (seg) => {
       const { data, error } = await sb.storage
         .from("generated-videos")
         .createSignedUrl(seg.storage_path, 3600);
 
       if (error || !data?.signedUrl) {
         console.error(`Failed to sign video URL for ${seg.storage_path}:`, error?.message);
-        continue;
+        return null;
       }
 
-      result[segType].push({
-        url: data.signedUrl,
-        duration: seg.duration,
-        variation: seg.variation,
-        variant_label: seg.variant_label,
-      });
-    }
+      return {
+        segType,
+        video: {
+          url: data.signedUrl,
+          duration: seg.duration,
+          variation: seg.variation,
+          variant_label: seg.variant_label,
+        } as ResponseSegmentVideo,
+      };
+    })
+  );
+
+  const signed = await Promise.all(signingTasks);
+  for (const item of signed) {
+    if (item) result[item.segType].push(item.video);
   }
 
   return result;
