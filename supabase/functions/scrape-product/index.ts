@@ -391,8 +391,11 @@ Deno.serve(async (req: Request) => {
         .from("products")
         .insert(rows)
         .select("id");
-      if (error) throw new Error(`DB insert failed: ${error.message}`);
-      savedIds = (inserted ?? []).map((r: { id: string }) => r.id);
+      if (error) {
+        console.error("DB insert failed (non-fatal):", error.message);
+      } else {
+        savedIds = (inserted ?? []).map((r: { id: string }) => r.id);
+      }
     }
 
     return json(
