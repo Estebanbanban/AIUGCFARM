@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dialog";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { useProducts } from "@/hooks/use-products";
+import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
 import { usePersonas, resolvePersonaImageUrl } from "@/hooks/use-personas";
 import type { Persona } from "@/types/database";
 import { useCredits } from "@/hooks/use-credits";
@@ -54,6 +55,31 @@ const steps = [
   { number: 3, label: "Review" },
   { number: 4, label: "Generate" },
 ];
+
+/** Resolve product image URLs (handles storage paths vs external URLs). */
+function useResolvedProductImages(products: { id: string; images: string[] }[] | undefined) {
+  const [imageMap, setImageMap] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    if (!products || products.length === 0) return;
+    let cancelled = false;
+    async function resolve() {
+      const entries = await Promise.all(
+        products!.map(async (p) => {
+          const raw = p.images?.[0];
+          if (!raw) return [p.id, null] as [string, null];
+          const url = isExternalUrl(raw) ? raw : await getSignedImageUrl("product-images", raw);
+          return [p.id, url] as [string, string | null];
+        })
+      );
+      if (!cancelled) setImageMap(Object.fromEntries(entries));
+    }
+    resolve();
+    return () => { cancelled = true; };
+  }, [products]);
+
+  return imageMap;
+}
 
 /** Resolve image URLs for a list of personas (handles storage paths). */
 function useResolvedPersonaImages(personas: Persona[] | undefined) {
@@ -89,6 +115,7 @@ export default function GeneratePage() {
   const [showPaywall, setShowPaywall] = useState(false);
 
   const { data: products, isLoading: productsLoading } = useProducts();
+  const productImageMap = useResolvedProductImages(products);
   const { data: personas, isLoading: personasLoading } = usePersonas();
   const { data: credits, isLoading: creditsLoading } = useCredits();
   const createGeneration = useCreateGeneration();
@@ -282,9 +309,9 @@ export default function GeneratePage() {
                     >
                       <CardContent className="flex flex-col gap-3 p-5">
                         <div className="flex aspect-video items-center justify-center rounded-lg bg-muted">
-                          {product.images?.[0] ? (
+                          {productImageMap[product.id] ? (
                             <img
-                              src={product.images[0]}
+                              src={productImageMap[product.id]!}
                               alt={product.name}
                               className="size-full rounded-lg object-cover"
                             />
@@ -606,7 +633,7 @@ export default function GeneratePage() {
         ) : (
           <Button
             onClick={handleGenerate}
-            disabled={createGeneration.isPending}
+            disabled={createGeneration.isPending || !hasEnoughCredits}
             size="lg"
           >
             {createGeneration.isPending ? (

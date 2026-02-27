@@ -33,35 +33,11 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
-import { PLANS } from "@/lib/stripe";
+import { PLANS, type PlanTier } from "@/lib/stripe";
 import { useCredits } from "@/hooks/use-credits";
 import { useProfile } from "@/hooks/use-profile";
 import { useSubscription, useCreditLedger } from "@/hooks/use-billing";
-import { useBillingPortal } from "@/hooks/use-checkout";
-
-const plans = [
-  {
-    name: "Starter",
-    price: "$29/mo",
-    credits: 27,
-    features: ["27 credits/month", "3 persona slots", "Basic support"],
-    current: false,
-  },
-  {
-    name: "Growth",
-    price: "$79/mo",
-    credits: 90,
-    features: ["90 credits/month", "10 persona slots", "Priority support"],
-    current: true,
-  },
-  {
-    name: "Scale",
-    price: "$149/mo",
-    credits: 300,
-    features: ["300 credits/month", "Unlimited personas", "Dedicated support"],
-    current: false,
-  },
-];
+import { useBillingPortal, useCheckout } from "@/hooks/use-checkout";
 
 const reasonLabels: Record<string, { label: string; color: string }> = {
   generation: { label: "Generation", color: "text-red-400" },
@@ -86,6 +62,14 @@ export default function BillingPage() {
   const { data: subscription, isLoading: subLoading } = useSubscription();
   const { data: ledger, isLoading: ledgerLoading } = useCreditLedger();
   const billingPortal = useBillingPortal();
+  const checkout = useCheckout();
+
+  function handleSwitchPlan(planKey: PlanTier) {
+    checkout.mutate(planKey, {
+      onSuccess: (url) => { window.location.href = url; },
+      onError: (err) => toast.error(err.message || "Failed to start checkout"),
+    });
+  }
 
   const plan = profile?.plan ?? "free";
   const planConfig = plan !== "free" ? PLANS[plan as keyof typeof PLANS] : null;
@@ -243,44 +227,46 @@ export default function BillingPage() {
       <div className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold">Available Plans</h2>
         <div className="grid gap-4 sm:grid-cols-3">
-          {plans.map((p) => (
-            <Card
-              key={p.name}
-              className={cn(
-                p.current && "border-primary/50 ring-1 ring-primary/20"
-              )}
-            >
-              <CardContent className="flex flex-col gap-4 p-5">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold">{p.name}</h3>
-                    {p.current && (
-                      <Badge variant="secondary" className="text-xs">
-                        Current
-                      </Badge>
-                    )}
+          {(Object.entries(PLANS) as [PlanTier, typeof PLANS[PlanTier]][]).map(([key, p]) => {
+            const isCurrent = plan === key;
+            return (
+              <Card
+                key={key}
+                className={cn(isCurrent && "border-primary/50 ring-1 ring-primary/20")}
+              >
+                <CardContent className="flex flex-col gap-4 p-5">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">{p.name}</h3>
+                      {isCurrent && (
+                        <Badge variant="secondary" className="text-xs">Current</Badge>
+                      )}
+                    </div>
+                    <p className="mt-1 text-2xl font-bold">${p.price}/mo</p>
                   </div>
-                  <p className="mt-1 text-2xl font-bold">{p.price}</p>
-                </div>
-                <ul className="flex flex-col gap-2">
-                  {p.features.map((feature) => (
-                    <li
-                      key={feature}
-                      className="flex items-center gap-2 text-sm text-muted-foreground"
+                  <ul className="flex flex-col gap-2">
+                    {p.features.map((feature) => (
+                      <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Check className="size-3.5 text-primary" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  {!isCurrent && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="mt-auto"
+                      onClick={() => handleSwitchPlan(key)}
+                      disabled={checkout.isPending}
                     >
-                      <Check className="size-3.5 text-primary" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                {!p.current && (
-                  <Button variant="secondary" size="sm" className="mt-auto">
-                    Switch to {p.name}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                      {checkout.isPending ? <Loader2 className="size-4 animate-spin" /> : `Switch to ${p.name}`}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
 
