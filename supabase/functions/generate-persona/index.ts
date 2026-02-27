@@ -4,10 +4,7 @@ import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
 import { withRetry } from "../_shared/retry.ts";
 import { callOpenRouter } from "../_shared/openrouter.ts";
-
-const NANOBANANA_API_KEY = Deno.env.get("NANOBANANA_API_KEY");
-const NANOBANANA_BASE_URL =
-  Deno.env.get("NANOBANANA_BASE_URL") || "https://api.nanobanana.com/v1";
+import { generateImagesFromPrompt } from "../_shared/nanobanana.ts";
 
 const PERSONA_LIMITS: Record<string, number> = {
   free: 0,
@@ -246,40 +243,8 @@ async function generateScenePrompt(
 /* ------------------------------------------------------------------ */
 
 /** Call NanoBanana API to generate persona images (with retry). */
-async function generateImages(prompt: string): Promise<string[]> {
-  if (!NANOBANANA_API_KEY) {
-    throw new Error("NANOBANANA_API_KEY is not configured");
-  }
-
-  return withRetry(async () => {
-    const res = await fetch(`${NANOBANANA_BASE_URL}/images/generate`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${NANOBANANA_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        prompt,
-        num_images: 4,
-        width: 768,
-        height: 1024,
-        guidance_scale: 7.5,
-      }),
-    });
-
-    if (!res.ok) {
-      const errText = (await res.text()).slice(0, 500);
-      throw new Error(`NanoBanana image generation failed (${res.status}): ${errText}`);
-    }
-
-    const body = await res.json();
-    // Expected response: { images: [{ url: "..." }, ...] }
-    const urls = (body.images ?? []).map((img: { url: string }) => img.url);
-    if (urls.length === 0) {
-      throw new Error("NanoBanana returned no images");
-    }
-    return urls;
-  }, 3, 500);
+function generateImages(prompt: string): Promise<string[]> {
+  return withRetry(() => generateImagesFromPrompt(prompt, 4), 3, 500);
 }
 
 /* ------------------------------------------------------------------ */
