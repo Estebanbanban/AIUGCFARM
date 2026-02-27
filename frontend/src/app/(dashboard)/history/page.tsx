@@ -11,6 +11,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
@@ -184,7 +186,7 @@ export default function HistoryPage() {
                       </Badge>
                     </div>
 
-                    {/* Mode badge */}
+                    {/* Mode + segment count */}
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="text-xs capitalize">
                         {gen.mode} mode
@@ -198,6 +200,29 @@ export default function HistoryPage() {
                         </span>
                       )}
                     </div>
+
+                    {/* Failed: show error + retry */}
+                    {gen.status === "failed" && (
+                      <div
+                        className="flex items-start gap-2 rounded-md bg-red-500/10 px-3 py-2"
+                        onClick={(e) => e.preventDefault()}
+                      >
+                        <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-red-400" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs text-red-400">
+                            {gen.error_message ?? "Generation failed"}
+                          </p>
+                          <Link
+                            href="/generate"
+                            className="mt-1 inline-flex items-center gap-1 text-xs text-red-400 underline-offset-2 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <RefreshCw className="size-3" />
+                            Try again
+                          </Link>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </Link>
