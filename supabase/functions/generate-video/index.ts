@@ -6,7 +6,7 @@ import { checkCredits, debitCredits, refundCredits } from "../_shared/credits.ts
 import { callOpenRouter } from "../_shared/openrouter.ts";
 import { withRetry } from "../_shared/retry.ts";
 import { submitKlingJob } from "../_shared/kling.ts";
-import { generateCompositeFromImages } from "../_shared/nanobanana.ts";
+import { generateCompositeFromImages, type GeneratedImage } from "../_shared/nanobanana.ts";
 
 // Credits per segment set — HD (kling-v3) costs 2× standard (kling-v2-6)
 const COSTS = {
@@ -145,13 +145,13 @@ async function generateScript(
   return validateScript(parsed, variantCount);
 }
 
-// ── Composite image via NanoBanana ───────────────────────────────────
+// ── Composite image via Gemini / NanoBanana 2 ────────────────────────
 
 function generateCompositeImage(
   personaImageUrl: string,
   productImageUrl: string,
   scenePrompt?: string,
-): Promise<string> {
+): Promise<GeneratedImage> {
   const compositePrompt = scenePrompt
     ? `${scenePrompt} The person is naturally holding and using the product, which is clearly visible in frame.`
     : undefined;
@@ -319,17 +319,13 @@ Deno.serve(async (req: Request) => {
 
       // ── 10. Upload composite image to Supabase Storage ───────────
 
-      const compositeRes = await fetch(compositeExternalUrl);
-      if (!compositeRes.ok) {
-        throw new Error("Failed to download composite image from NanoBanana");
-      }
-      const compositeBlob = await compositeRes.blob();
-      const compositeStoragePath = `${userId}/${generationId}/composite.png`;
+      const compositeExt = compositeExternalUrl.mimeType.includes("png") ? "png" : "jpg";
+      const compositeStoragePath = `${userId}/${generationId}/composite.${compositeExt}`;
 
       const { error: uploadErr } = await sb.storage
         .from("composite-images")
-        .upload(compositeStoragePath, compositeBlob, {
-          contentType: "image/png",
+        .upload(compositeStoragePath, compositeExternalUrl.data, {
+          contentType: compositeExternalUrl.mimeType,
           upsert: false,
         });
       if (uploadErr) {
@@ -388,7 +384,7 @@ Deno.serve(async (req: Request) => {
             submitKlingJob({
               image_url: klingCompositeUrl.signedUrl,
               script: segment.text,
-              duration: segment.duration_seconds,
+              duration: segment.duration_seconds <= 5 ? 5 : 10, // Kling only accepts 5 or 10
               mode: "std",
               model_name: klingModel,
             })

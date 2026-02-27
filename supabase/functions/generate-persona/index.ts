@@ -4,7 +4,7 @@ import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
 import { withRetry } from "../_shared/retry.ts";
 import { callOpenRouter } from "../_shared/openrouter.ts";
-import { generateImagesFromPrompt } from "../_shared/nanobanana.ts";
+import { generateImagesFromPrompt, type GeneratedImage } from "../_shared/nanobanana.ts";
 
 const PERSONA_LIMITS: Record<string, number> = {
   free: 0,
@@ -242,9 +242,9 @@ async function generateScenePrompt(
 /*  NanoBanana API                                                    */
 /* ------------------------------------------------------------------ */
 
-/** Call NanoBanana API to generate persona images (with retry). */
-function generateImages(prompt: string): Promise<string[]> {
-  return withRetry(() => generateImagesFromPrompt(prompt, 4), 3, 500);
+/** Generate persona images via Gemini (NanoBanana 2), with retry. */
+function generateImages(prompt: string): Promise<GeneratedImage[]> {
+  return withRetry(() => generateImagesFromPrompt(prompt, 2), 3, 500);
 }
 
 /* ------------------------------------------------------------------ */
@@ -324,22 +324,19 @@ Deno.serve(async (req: Request) => {
     const { prompt, generated: promptGenerated } = await generateScenePrompt(validAttrs);
     console.log(`Scene prompt (${promptGenerated ? "LLM" : "fallback"}):`, prompt);
 
-    // Generate images via NanoBanana (with retry)
-    const imageUrls = await generateImages(prompt);
+    // Generate images via Gemini / NanoBanana 2 (with retry)
+    const images = await generateImages(prompt);
 
     // Upload generated images to persona-images bucket (private)
     const storagePaths: string[] = [];
-    for (let i = 0; i < imageUrls.length; i++) {
-      const imageRes = await fetch(imageUrls[i]);
-      if (!imageRes.ok) continue;
-
-      const imageBlob = await imageRes.blob();
-      const storagePath = `${userId}/${crypto.randomUUID()}.png`;
+    for (const image of images) {
+      const ext = image.mimeType.includes("png") ? "png" : "jpg";
+      const storagePath = `${userId}/${crypto.randomUUID()}.${ext}`;
 
       const { error: uploadErr } = await sb.storage
         .from("persona-images")
-        .upload(storagePath, imageBlob, {
-          contentType: "image/png",
+        .upload(storagePath, image.data, {
+          contentType: image.mimeType,
           upsert: false,
         });
 
