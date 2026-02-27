@@ -134,7 +134,7 @@ async function generateScript(
         { role: "system", content: buildSystemPrompt(variantCount) },
         { role: "user", content: buildUserPrompt(product) },
       ],
-      { maxTokens: variantCount === 1 ? 600 : 1500, timeoutMs: 30000 },
+      { maxTokens: variantCount === 1 ? 600 : 1500, timeoutMs: 30000, jsonMode: true },
     ),
   );
 

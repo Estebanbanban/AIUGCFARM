@@ -103,12 +103,20 @@ Deno.serve(async (req: Request) => {
           .eq("id", userId);
         if (profileErr) console.error("checkout: profile update failed:", profileErr);
 
-        // Grant initial credits for the plan
+        // Grant initial credits for the plan (ADD to existing, don't overwrite)
         const credits = PLAN_CREDITS[plan] ?? 0;
         if (credits > 0) {
-          // Upsert credit balance
+          // Read current balance so we can increment rather than overwrite
+          const { data: existing } = await sb
+            .from("credit_balances")
+            .select("remaining")
+            .eq("owner_id", userId)
+            .maybeSingle();
+
+          const newBalance = (existing?.remaining ?? 0) + credits;
+
           const { error: balErr } = await sb.from("credit_balances").upsert(
-            { owner_id: userId, remaining: credits },
+            { owner_id: userId, remaining: newBalance },
             { onConflict: "owner_id" },
           );
           if (balErr) console.error("checkout: credit balance upsert failed:", balErr);
@@ -116,7 +124,7 @@ Deno.serve(async (req: Request) => {
           const { error: ledgerErr } = await sb.from("credit_ledger").insert({
             owner_id: userId,
             amount: credits,
-            reason: "subscription_renewal",
+            reason: "subscription_purchase",
           });
           if (ledgerErr) console.error("checkout: credit ledger insert failed:", ledgerErr);
         }
@@ -190,6 +198,12 @@ Deno.serve(async (req: Request) => {
         // Fallback to metadata
         if (!plan) {
           plan = subscription.metadata?.plan ?? null;
+        }
+
+        // If we can't determine the plan, skip to avoid corrupting DB
+        if (!plan) {
+          console.error("subscription.updated: unknown plan for price ID", priceId);
+          break;
         }
 
         const status = subscription.status === "active"

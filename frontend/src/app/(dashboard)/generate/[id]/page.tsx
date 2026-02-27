@@ -512,7 +512,7 @@ export default function GenerationDetailPage() {
   const [selectedBody, setSelectedBody] = useState(0);
   const [selectedCta, setSelectedCta] = useState(0);
 
-  const status = (gen?.status as GenerationStatus) ?? "scripting";
+  const status = (gen?.status as GenerationStatus) ?? "pending";
   const config = statusConfig[status] ?? statusConfig.scripting;
   const isComplete = status === "completed";
   const isFailed = status === "failed";
@@ -1046,9 +1046,9 @@ export default function GenerationDetailPage() {
                   </div>
 
                   <p className="text-xs text-muted-foreground">
-                    3 hooks x 3 bodies x 3 CTAs = 27 possible combinations.
-                    Select different segments above to preview other
-                    combinations.
+                    {gen?.mode === "single"
+                      ? "1 hook · 1 body · 1 CTA — your complete ad."
+                      : "3 hooks x 3 bodies x 3 CTAs = 27 possible combinations. Select different segments above to preview other combinations."}
                   </p>
                 </div>
               </div>
@@ -1093,15 +1093,6 @@ export default function GenerationDetailPage() {
         </Card>
       )}
 
-      {/* Non-fatal error message during processing */}
-      {gen?.error_message && !isFailed && (
-        <Card className="border-amber-500/30">
-          <CardContent className="flex items-center gap-3 py-4">
-            <AlertCircle className="size-5 shrink-0 text-amber-400" />
-            <p className="text-sm text-amber-400">{gen.error_message}</p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

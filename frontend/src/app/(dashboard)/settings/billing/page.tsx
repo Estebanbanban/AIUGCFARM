@@ -77,9 +77,7 @@ export default function BillingPage() {
   const creditsTotal = planConfig?.credits ?? 9;
   const creditPercent =
     creditsTotal > 0
-      ? Math.round(
-          ((creditsTotal - creditsRemaining) / creditsTotal) * 100
-        )
+      ? Math.round((creditsRemaining / creditsTotal) * 100)
       : 0;
 
   const isLoading = creditsLoading || profileLoading || subLoading;

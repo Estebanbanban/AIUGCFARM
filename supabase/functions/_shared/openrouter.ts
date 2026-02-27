@@ -9,7 +9,7 @@ interface ChatMessage {
 
 export async function callOpenRouter(
   messages: ChatMessage[],
-  options?: { maxTokens?: number; timeoutMs?: number },
+  options?: { maxTokens?: number; timeoutMs?: number; jsonMode?: boolean },
 ): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(
@@ -32,6 +32,7 @@ export async function callOpenRouter(
         model: OPENROUTER_MODEL,
         messages,
         max_tokens: options?.maxTokens ?? 500,
+        ...(options?.jsonMode ? { response_format: { type: "json_object" } } : {}),
       }),
       signal: controller.signal,
     });
