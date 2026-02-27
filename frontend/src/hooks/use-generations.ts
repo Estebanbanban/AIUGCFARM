@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { callEdge } from "@/lib/api";
 import type { Generation } from "@/types/database";
 import type {
+  CompositeImagesResponse,
   CreateGenerationResponse,
   GenerationProgressResponse,
   GenerationHistoryResponse,
@@ -15,6 +16,7 @@ interface GenerationInput {
   persona_id: string;
   mode: "single" | "triple";
   quality: "standard" | "hd";
+  composite_image_path: string;
 }
 
 export interface GenerationWithRelations extends Generation {
@@ -51,6 +53,22 @@ export function useGeneration(id: string) {
       return data;
     },
     enabled: !!id,
+  });
+}
+
+/** Generate composite preview images (persona + product) before spending credits. */
+export function useGenerateCompositeImages() {
+  return useMutation({
+    mutationFn: async (input: {
+      product_id: string;
+      persona_id: string;
+      format: "9:16" | "16:9";
+    }) => {
+      const res = await callEdge<CompositeImagesResponse>("generate-composite-images", {
+        body: input,
+      });
+      return res.data;
+    },
   });
 }
 

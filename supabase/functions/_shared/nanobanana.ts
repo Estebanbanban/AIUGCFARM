@@ -82,6 +82,7 @@ export async function generateCompositeFromImages(
   personImageUrl: string,
   productImageUrl: string,
   scenePrompt?: string,
+  aspectRatio: "9:16" | "16:9" = "9:16",
 ): Promise<GeneratedImage> {
   const [personRes, productRes] = await Promise.all([
     fetch(personImageUrl),
@@ -101,9 +102,13 @@ export async function generateCompositeFromImages(
   const personMime = personRes.headers.get("content-type") || "image/jpeg";
   const productMime = productRes.headers.get("content-type") || "image/jpeg";
 
+  const formatHint = aspectRatio === "9:16"
+    ? "Vertical 9:16 portrait format for mobile/phone screen."
+    : "Horizontal 16:9 landscape format for widescreen.";
+
   const compositePrompt = scenePrompt
-    ? `${scenePrompt} The person is naturally holding and showcasing the product, which is clearly visible in frame. Composite the person and product naturally in a UGC selfie-style image.`
-    : "Create a UGC-style composite image of this person naturally holding and using this product while talking to camera. Natural lighting, authentic, selfie aesthetic.";
+    ? `${scenePrompt} The person is filming themselves POV-style (arm extended, front-camera angle, slight wide-angle distortion), naturally holding and showcasing the product which is clearly visible in frame. iPhone selfie aesthetic, talking-to-camera energy. ${formatHint}`
+    : `UGC selfie-style image: POV from the phone front-camera, arm extended at selfie length, slight wide-angle distortion. The person is looking directly into the camera lens while naturally holding and showcasing the product, which is clearly visible in frame. Natural window lighting, authentic imperfections, talking-to-camera energy. ${formatHint}`;
 
   const res = await fetch(endpoint(), {
     method: "POST",
@@ -116,7 +121,7 @@ export async function generateCompositeFromImages(
           { inlineData: { mimeType: productMime, data: productB64 } },
         ],
       }],
-      generationConfig: { responseModalities: ["IMAGE"] },
+      generationConfig: { responseModalities: ["IMAGE"], aspectRatio },
     }),
   });
 
