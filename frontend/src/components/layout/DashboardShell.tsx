@@ -75,7 +75,7 @@ function SidebarContent({
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center px-6">
         <Link
-          href="/dashboard"
+          href="/"
           className="text-xl font-semibold tracking-tight text-foreground"
           onClick={onNavigate}
         >
