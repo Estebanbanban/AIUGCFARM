@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence, useScroll, useMotionValueEvent, useSpring } from "framer-motion";
 import { FadeInUp, ScaleIn } from "@/lib/motion";
 import Image from "next/image";
 
@@ -45,67 +45,105 @@ type FeatureId = (typeof features)[number]["id"];
 const featureMedia: Record<
   FeatureId,
   {
-    type: "image" | "video";
+    type: "image";
     src: string;
     alt: string;
   }
 > = {
   import: {
     type: "image",
-    src: "https://images.unsplash.com/photo-1556740749-887f6717d7e4?auto=format&fit=crop&w=1200&q=80",
+    src: "https://images.unsplash.com/photo-1556740749-887f6717d7e4?auto=format&fit=max&w=1400&q=80",
     alt: "Ecommerce storefront with product catalog",
   },
   persona: {
     type: "image",
-    src: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=1200&q=80",
+    src: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=max&w=1400&q=80",
     alt: "Creator portrait for AI persona",
   },
   generate: {
-    type: "video",
-    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+    type: "image",
+    src: "https://images.unsplash.com/photo-1492619375914-88005aa9e8fb?auto=format&fit=max&w=1400&q=80",
     alt: "AI generated ad video timeline",
   },
   mixer: {
-    type: "video",
-    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
+    type: "image",
+    src: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=max&w=1400&q=80",
     alt: "Multiple ad variations preview",
   },
+};
+
+const personaHeaderMedia: Record<string, string> = {
+  Alex: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=max&w=1400&q=80",
+  Maya: "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=max&w=1400&q=80",
+  Jordan: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=max&w=1400&q=80",
+  Riley: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=max&w=1400&q=80",
 };
 
 /* ── Mockup: Import — full product import UI ── */
 function MockImport() {
   const products = [
-    { name: "Hydra Serum", price: "$45", tag: "Bestseller", color: "from-amber-950/60 to-amber-900/30" },
-    { name: "Cloud Runner Pro", price: "$129", tag: "New", color: "from-blue-950/60 to-blue-900/30" },
-    { name: "Vital Blend", price: "$39", tag: "Popular", color: "from-green-950/60 to-green-900/30" },
-    { name: "Luna Ring", price: "$89", tag: "Limited", color: "from-stone-900/60 to-stone-800/30" },
+    {
+      name: "Hydra Serum",
+      price: "$45",
+      tag: "Bestseller",
+      image: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=max&w=1200&q=80",
+      accent: "from-amber-500/25 via-amber-300/10 to-transparent",
+    },
+    {
+      name: "Cloud Runner Pro",
+      price: "$129",
+      tag: "New",
+      image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=max&w=1200&q=80",
+      accent: "from-blue-500/25 via-blue-300/10 to-transparent",
+    },
+    {
+      name: "Vital Blend",
+      price: "$39",
+      tag: "Popular",
+      image: "https://images.unsplash.com/photo-1552046122-03184de85e08?auto=format&fit=max&w=1200&q=80",
+      accent: "from-emerald-500/25 via-emerald-300/10 to-transparent",
+    },
+    {
+      name: "Luna Ring",
+      price: "$89",
+      tag: "Limited",
+      image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=max&w=1200&q=80",
+      accent: "from-slate-500/25 via-slate-300/10 to-transparent",
+    },
   ];
   return (
     <div className="flex flex-col h-full gap-4">
       {/* URL bar */}
-      <div className="flex items-center gap-2 rounded-lg bg-[#0e0e0e] border border-[#1f1f1f] px-3 py-2">
+      <div className="flex items-center gap-2 rounded-lg bg-[#0d1016] border border-white/10 px-3 py-2">
         <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-        <span className="text-xs text-[#555] font-mono truncate">shopify.com/collections/all</span>
-        <span className="ml-auto text-[10px] text-primary font-medium shrink-0">Scanning…</span>
+        <span className="text-xs text-[#7b8291] font-mono truncate">shopify.com/collections/all</span>
+        <span className="ml-auto text-[10px] text-primary font-medium shrink-0">Scanning...</span>
       </div>
       {/* Product grid */}
-      <div className="grid grid-cols-2 gap-3 flex-1">
+      <div className="grid grid-cols-2 gap-3 flex-1 min-h-0 auto-rows-fr">
         {products.map((p, i) => (
           <motion.div
             key={p.name}
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.12, duration: 0.45, ease: [0.25, 0.4, 0.25, 1] }}
-            className={`rounded-xl bg-gradient-to-br ${p.color} border border-[#1f1f1f] p-3 flex flex-col gap-2`}
+            className="h-full rounded-xl border border-white/10 bg-[#11151d] p-2 flex flex-col gap-2 overflow-hidden"
           >
-            <div className="aspect-square rounded-lg bg-[#1a1a1a] flex items-center justify-center">
-              <div className="w-8 h-8 rounded bg-[#252525]" />
+            <div className="relative h-24 rounded-lg overflow-hidden bg-[#0f1116]">
+              <Image
+                src={p.image}
+                alt={p.name}
+                fill
+                className="object-contain p-1"
+                sizes="(max-width: 1024px) 50vw, 20vw"
+              />
+              <div className={`absolute inset-0 bg-gradient-to-t ${p.accent} opacity-60`} />
             </div>
-            <div>
-              <p className="text-xs font-medium text-white leading-none">{p.name}</p>
+            <div className="px-0.5">
+              <p className="text-xs font-semibold text-white leading-none">{p.name}</p>
               <div className="flex items-center justify-between mt-1">
-                <p className="text-[10px] text-[#666]">{p.price}</p>
-                <span className="text-[9px] bg-primary/15 text-primary rounded px-1.5 py-0.5">{p.tag}</span>
+                <p className="text-[11px] text-[#b2b9c6]">{p.price}</p>
+                <span className="text-[9px] bg-white/10 text-[#e2e8f6] rounded px-1.5 py-0.5">{p.tag}</span>
               </div>
             </div>
           </motion.div>
@@ -116,28 +154,68 @@ function MockImport() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.6, duration: 0.4 }}
-        className="rounded-xl bg-[#0e0e0e] border border-[#1f1f1f] p-3"
+        className="rounded-xl bg-[#0d1016] border border-white/10 p-3"
       >
         <div className="flex items-center gap-2 mb-2">
           <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-          <p className="text-[10px] uppercase tracking-wider text-[#555] font-mono">AI Brand Profile Generated</p>
+          <p className="text-[10px] uppercase tracking-wider text-[#7b8291] font-mono">AI Brand Profile Generated</p>
         </div>
-        <p className="text-xs text-[#777] leading-relaxed">Premium skincare & lifestyle brand. Target: women 25–34. Tone: confident, clean, aspirational.</p>
+        <p className="text-xs text-[#c8cdda] leading-relaxed">Premium skincare & lifestyle brand. Target: women 25-34. Tone: confident, clean, aspirational.</p>
       </motion.div>
     </div>
   );
 }
 
 /* ── Mockup: Persona — full builder UI ── */
-function MockPersona() {
-  const attrs = [
-    { name: "Tone", label: "Bold & Confident", fill: 78 },
-    { name: "Energy", label: "Upbeat", fill: 62 },
-    { name: "Style", label: "Minimal", fill: 85 },
-    { name: "Age Range", label: "25–34", fill: 55 },
-    { name: "Authenticity", label: "Very High", fill: 90 },
-  ];
-  const personas = ["Alex", "Maya", "Jordan", "Riley"];
+function MockPersona({ onPersonaChange }: { onPersonaChange?: (name: string) => void }) {
+  const personas = [
+    {
+      name: "Alex",
+      attrs: [
+        { name: "Tone", label: "Bold & Confident", fill: 78 },
+        { name: "Energy", label: "Upbeat", fill: 62 },
+        { name: "Style", label: "Minimal", fill: 85 },
+        { name: "Age Range", label: "25-34", fill: 55 },
+        { name: "Authenticity", label: "Very High", fill: 90 },
+      ],
+    },
+    {
+      name: "Maya",
+      attrs: [
+        { name: "Tone", label: "Warm & Friendly", fill: 72 },
+        { name: "Energy", label: "Calm", fill: 48 },
+        { name: "Style", label: "Lifestyle", fill: 69 },
+        { name: "Age Range", label: "22-30", fill: 43 },
+        { name: "Authenticity", label: "High", fill: 84 },
+      ],
+    },
+    {
+      name: "Jordan",
+      attrs: [
+        { name: "Tone", label: "Direct & Clear", fill: 66 },
+        { name: "Energy", label: "Balanced", fill: 58 },
+        { name: "Style", label: "Educational", fill: 74 },
+        { name: "Age Range", label: "28-38", fill: 63 },
+        { name: "Authenticity", label: "Very High", fill: 88 },
+      ],
+    },
+    {
+      name: "Riley",
+      attrs: [
+        { name: "Tone", label: "Playful", fill: 70 },
+        { name: "Energy", label: "High", fill: 81 },
+        { name: "Style", label: "Trendy", fill: 77 },
+        { name: "Age Range", label: "20-28", fill: 36 },
+        { name: "Authenticity", label: "High", fill: 79 },
+      ],
+    },
+  ] as const;
+  const [selectedPersona, setSelectedPersona] = useState(0);
+  const activePersona = personas[selectedPersona];
+  useEffect(() => {
+    onPersonaChange?.(activePersona.name);
+  }, [activePersona.name, onPersonaChange]);
+
   return (
     <div className="flex flex-col h-full gap-5">
       {/* Persona selector */}
@@ -145,26 +223,31 @@ function MockPersona() {
         <p className="text-[10px] uppercase tracking-widest text-[#444] mb-2.5 font-mono">Choose Spokesperson</p>
         <div className="grid grid-cols-4 gap-2">
           {personas.map((name, i) => (
-            <div
-              key={name}
+            <button
+              key={name.name}
+              type="button"
+              onClick={() => {
+                setSelectedPersona(i);
+                onPersonaChange?.(name.name);
+              }}
               className={`rounded-xl border p-3 flex flex-col items-center gap-1.5 cursor-pointer transition-all ${
-                i === 0 ? "border-primary/50 bg-primary/8" : "border-[#1f1f1f] bg-[#0e0e0e]"
+                i === selectedPersona ? "border-primary/50 bg-primary/8" : "border-[#1f1f1f] bg-[#0e0e0e]"
               }`}
             >
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                i === 0 ? "bg-primary/20 text-primary" : "bg-[#1a1a1a] text-[#444]"
+                i === selectedPersona ? "bg-primary/20 text-primary" : "bg-[#1a1a1a] text-[#444]"
               }`}>
-                {name[0]}
+                {name.name[0]}
               </div>
-              <p className={`text-[9px] ${i === 0 ? "text-white" : "text-[#555]"}`}>{name}</p>
-            </div>
+              <p className={`text-[9px] ${i === selectedPersona ? "text-white" : "text-[#555]"}`}>{name.name}</p>
+            </button>
           ))}
         </div>
       </div>
       {/* Attributes */}
       <div className="flex-1 space-y-3.5">
         <p className="text-[10px] uppercase tracking-widest text-[#444] font-mono">Brand Attributes</p>
-        {attrs.map((a, i) => (
+        {activePersona.attrs.map((a, i) => (
           <div key={a.name} className="space-y-1">
             <div className="flex justify-between items-baseline">
               <span className="text-xs text-[#888]">{a.name}</span>
@@ -182,7 +265,7 @@ function MockPersona() {
         ))}
       </div>
       <div className="rounded-xl bg-[#0e0e0e] border border-primary/20 px-4 py-3 text-center">
-        <p className="text-xs text-primary font-medium">Persona saved · used across 12 campaigns</p>
+        <p className="text-xs text-primary font-medium">{activePersona.name} persona saved · used across 12 campaigns</p>
       </div>
     </div>
   );
@@ -322,15 +405,20 @@ function MockMixer() {
   );
 }
 
-const mockups: Record<FeatureId, () => React.ReactElement> = {
-  import: MockImport,
-  persona: MockPersona,
-  generate: MockGenerate,
-  mixer: MockMixer,
+type MockupProps = {
+  onPersonaChange?: (name: string) => void;
+};
+
+const mockups: Record<FeatureId, (props: MockupProps) => React.ReactElement> = {
+  import: () => <MockImport />,
+  persona: (props) => <MockPersona onPersonaChange={props.onPersonaChange} />,
+  generate: () => <MockGenerate />,
+  mixer: () => <MockMixer />,
 };
 
 function FeatureShowcase() {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [selectedPersonaName, setSelectedPersonaName] = useState("Alex");
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Track scroll through the tall container → map to active feature
@@ -339,14 +427,24 @@ function FeatureShowcase() {
     offset: ["start start", "end end"],
   });
 
-  useMotionValueEvent(scrollYProgress, "change", (v) => {
-    const idx = Math.min(features.length - 1, Math.floor(v * features.length));
-    setActiveIndex(idx);
+  // Smooth the scroll signal first to avoid abrupt feature jumps.
+  const smoothProgress = useSpring(scrollYProgress, {
+    stiffness: 120,
+    damping: 28,
+    mass: 0.35,
+  });
+
+  useMotionValueEvent(smoothProgress, "change", (v) => {
+    const idx = Math.max(0, Math.min(features.length - 1, Math.round(v * (features.length - 1))));
+    setActiveIndex((prev) => (prev === idx ? prev : idx));
   });
 
   const active = features[activeIndex];
   const ActiveMockup = mockups[active.id];
-  const activeMedia = featureMedia[active.id];
+  const activeMedia =
+    active.id === "persona"
+      ? { ...featureMedia.persona, src: personaHeaderMedia[selectedPersonaName] ?? featureMedia.persona.src }
+      : featureMedia[active.id];
 
   return (
     // Tall outer container: 100vh per feature so scroll drives transitions
@@ -356,7 +454,7 @@ function FeatureShowcase() {
       style={{ height: `${features.length * 100}vh` }}
     >
       {/* Sticky panel — stays in view while user scrolls */}
-      <div className="sticky top-0 h-screen flex items-center overflow-hidden">
+      <div className="sticky top-0 h-screen flex items-center overflow-visible">
         {/* Full-bleed layout: sidebar left, big visual right */}
         <div className="w-full flex h-full">
 
@@ -377,11 +475,13 @@ function FeatureShowcase() {
                   >
                     <div className="flex items-start gap-3">
                       {/* Active indicator bar */}
-                      <div className="mt-1.5 w-0.5 shrink-0 rounded-full overflow-hidden bg-[#1a1a1a]" style={{ height: isActive ? "auto" : "14px" }}>
+                      <div className="mt-1.5 h-14 w-0.5 shrink-0 rounded-full overflow-hidden bg-[#1a1a1a]">
                         <motion.div
                           className="w-full bg-primary rounded-full"
-                          animate={{ height: isActive ? "100%" : "14px" }}
-                          style={{ height: "14px" }}
+                          initial={false}
+                          animate={{ scaleY: isActive ? 1 : 0.25, opacity: isActive ? 1 : 0.55 }}
+                          style={{ height: "100%", originY: 0 }}
+                          transition={{ type: "spring", stiffness: 220, damping: 28, mass: 0.3 }}
                         />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -390,27 +490,26 @@ function FeatureShowcase() {
                         }`}>
                           {f.title}
                         </p>
-                        <AnimatePresence>
-                          {isActive && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              transition={{ duration: 0.3, ease: [0.25, 0.4, 0.25, 1] }}
-                              className="overflow-hidden"
-                            >
-                              <p className="text-sm text-[#666] leading-relaxed mt-2">
-                                {f.description}
-                              </p>
-                              <p className="text-xs text-[#555] mt-1.5 leading-relaxed">
-                                {f.learnMore}
-                              </p>
-                              <p className="text-xs text-primary mt-3 hover:underline cursor-pointer inline-block">
-                                Learn more →
-                              </p>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+                        <motion.div
+                          initial={false}
+                          animate={{ height: isActive ? "auto" : 0, opacity: isActive ? 1 : 0, y: isActive ? 0 : -4 }}
+                          transition={{
+                            height: { duration: 0.45, ease: [0.25, 0.4, 0.25, 1] },
+                            opacity: { duration: 0.3, ease: "easeOut" },
+                            y: { duration: 0.28, ease: "easeOut" },
+                          }}
+                          className="overflow-hidden"
+                        >
+                          <p className="text-sm text-[#666] leading-relaxed mt-2">
+                            {f.description}
+                          </p>
+                          <p className="text-xs text-[#555] mt-1.5 leading-relaxed">
+                            {f.learnMore}
+                          </p>
+                          <p className="text-xs text-primary mt-3 hover:underline cursor-pointer inline-block">
+                            Learn more →
+                          </p>
+                        </motion.div>
                       </div>
                     </div>
                   </button>
@@ -435,7 +534,7 @@ function FeatureShowcase() {
           {/* ── RIGHT PANEL ── large mockup, takes remaining space */}
           <div className="hidden lg:flex flex-1 items-center justify-center p-10 bg-[#040404]">
             <div className="w-full max-w-xl h-full max-h-[580px] rounded-2xl bg-[#0d0d0d] border border-[#1a1a1a] p-7 shadow-[0_0_80px_rgba(0,0,0,0.6)]">
-              <div className="relative w-full h-40 rounded-xl overflow-hidden border border-[#1f1f1f] mb-5 bg-[#0b0b0b]">
+              <div className="relative w-full h-48 rounded-xl overflow-hidden border border-[#1f1f1f] mb-5 bg-[#0b0b0b]">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={`${active.id}-media`}
@@ -445,25 +544,33 @@ function FeatureShowcase() {
                     transition={{ duration: 0.25 }}
                     className="h-full w-full"
                   >
-                    {activeMedia.type === "image" ? (
-                      <Image
-                        src={activeMedia.src}
-                        alt={activeMedia.alt}
-                        fill
-                        className="object-cover"
-                        sizes="40vw"
-                      />
+                    {active.id === "persona" ? (
+                      <div className="h-full w-full grid grid-cols-[11rem_1fr] gap-3 p-3">
+                        <div className="relative h-full rounded-lg overflow-hidden border border-white/10">
+                          <Image
+                            src={activeMedia.src}
+                            alt={activeMedia.alt}
+                            fill
+                            className="object-cover object-center"
+                            sizes="15vw"
+                          />
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-gradient-to-br from-[#12161f] to-[#0d1016] flex flex-col justify-center px-4">
+                          <p className="text-[10px] uppercase tracking-widest text-[#647089] font-mono mb-1">Selected Persona</p>
+                          <p className="text-xl font-semibold text-white">{selectedPersonaName}</p>
+                          <p className="text-xs text-[#9ea7b8] mt-1">Live preview updates when user selects another spokesperson.</p>
+                        </div>
+                      </div>
                     ) : (
-                      <video
-                        className="h-full w-full object-cover"
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        preload="none"
-                      >
-                        <source src={activeMedia.src} type="video/mp4" />
-                      </video>
+                      <div className="h-full w-full p-1">
+                        <Image
+                          src={activeMedia.src}
+                          alt={activeMedia.alt}
+                          fill
+                          className="object-contain"
+                          sizes="40vw"
+                        />
+                      </div>
                     )}
                   </motion.div>
                 </AnimatePresence>
@@ -477,7 +584,7 @@ function FeatureShowcase() {
                   exit={{ opacity: 0, y: -16 }}
                   transition={{ duration: 0.4, ease: [0.25, 0.4, 0.25, 1] }}
                 >
-                  <ActiveMockup />
+                  <ActiveMockup onPersonaChange={setSelectedPersonaName} />
                 </motion.div>
               </AnimatePresence>
             </div>
@@ -630,7 +737,7 @@ function BentoPersistentPersona() {
 
 function BentoGrid() {
   return (
-    <section className="bg-[#0A0A0A] pb-24 px-4 sm:px-6">
+    <section className="bg-[#0A0A0A] pt-20 sm:pt-24 lg:pt-28 pb-24 px-4 sm:px-6">
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Row 1 */}
