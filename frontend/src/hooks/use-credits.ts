@@ -2,13 +2,24 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { callEdge } from "@/lib/api";
-import type { CreditBalance } from "@/types/database";
+
+interface CreditInfo {
+  remaining: number;
+  plan: string;
+}
+
+interface CreditBalanceResponse {
+  data: CreditInfo;
+}
 
 export function useCredits() {
-  return useQuery<CreditBalance>({
+  return useQuery<CreditInfo>({
     queryKey: ["credits"],
     queryFn: async () => {
-      return callEdge<CreditBalance>("credit-balance", { method: "GET" });
+      const res = await callEdge<CreditBalanceResponse>("credit-balance", {
+        method: "GET",
+      });
+      return res.data;
     },
   });
 }

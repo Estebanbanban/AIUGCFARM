@@ -14,6 +14,9 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { useCredits } from "@/hooks/use-credits";
+import { useProfile } from "@/hooks/use-profile";
+import { PLANS } from "@/lib/stripe";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
@@ -41,9 +44,12 @@ function SidebarContent({
   onNavigate?: () => void;
 }) {
   const router = useRouter();
-  const creditsRemaining = 18;
-  const creditsTotal = 27;
-  const creditPercent = Math.round((creditsRemaining / creditsTotal) * 100);
+  const { data: credits } = useCredits();
+  const { data: profile } = useProfile();
+  const creditsRemaining = credits?.remaining ?? 0;
+  const plan = profile?.plan ?? "free";
+  const creditsTotal = plan !== "free" ? (PLANS[plan as keyof typeof PLANS]?.credits ?? 0) : 9;
+  const creditPercent = creditsTotal > 0 ? Math.round((creditsRemaining / creditsTotal) * 100) : 0;
 
   async function handleSignOut() {
     const supabase = createClient();

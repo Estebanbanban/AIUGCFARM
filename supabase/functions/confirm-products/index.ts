@@ -42,6 +42,48 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Validate edits before applying
+    if (edits && typeof edits === "object") {
+      for (const productId of product_ids) {
+        const edit = edits[productId];
+        if (!edit) continue;
+
+        // Validate name: must be non-empty string if provided
+        if (edit.name !== undefined) {
+          if (typeof edit.name !== "string" || edit.name.trim().length === 0) {
+            return json(
+              { detail: `Invalid name for product ${productId}: must be a non-empty string` },
+              cors,
+              400,
+            );
+          }
+        }
+
+        // Validate price: must be >= 0 if provided
+        if (edit.price !== undefined && edit.price !== null) {
+          const price = Number(edit.price);
+          if (isNaN(price) || price < 0) {
+            return json(
+              { detail: `Invalid price for product ${productId}: must be a number >= 0` },
+              cors,
+              400,
+            );
+          }
+        }
+
+        // Validate images: must be an array if provided
+        if (edit.images !== undefined) {
+          if (!Array.isArray(edit.images)) {
+            return json(
+              { detail: `Invalid images for product ${productId}: must be an array` },
+              cors,
+              400,
+            );
+          }
+        }
+      }
+    }
+
     // Apply edits and confirm each product
     const results: { id: string; updated: boolean }[] = [];
 

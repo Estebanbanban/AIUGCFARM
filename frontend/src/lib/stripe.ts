@@ -1,21 +1,18 @@
-import Stripe from "stripe";
-
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-12-18.acacia" as Stripe.LatestApiVersion,
-  typescript: true,
-});
-
+/**
+ * Plan definitions for UI display.
+ * Stripe checkout is handled server-side via the stripe-checkout Edge Function.
+ * No Stripe SDK or secret key needed on the frontend.
+ */
 export const PLANS = {
   starter: {
     name: "Starter",
     price: 29,
-    priceId: process.env.STRIPE_STARTER_PRICE_ID!,
     credits: 27,
     personas: 1,
     brands: 1,
     resolution: "720p",
     features: [
-      "27 credits/month",
+      "27 segment credits/month (3 batches)",
       "1 AI persona",
       "1 brand profile",
       "Easy Mode generation",
@@ -25,30 +22,28 @@ export const PLANS = {
   growth: {
     name: "Growth",
     price: 79,
-    priceId: process.env.STRIPE_GROWTH_PRICE_ID!,
     credits: 90,
     personas: 3,
     brands: 3,
-    resolution: "1080p",
+    resolution: "720p",
     features: [
-      "90 credits/month",
+      "90 segment credits/month (10 batches)",
       "3 AI personas",
       "3 brand profiles",
       "Easy + Expert Mode",
-      "1080p export",
+      "720p export",
       "Custom script editing",
     ],
   },
   scale: {
     name: "Scale",
     price: 149,
-    priceId: process.env.STRIPE_SCALE_PRICE_ID!,
     credits: 300,
     personas: 10,
     brands: 10,
     resolution: "1080p",
     features: [
-      "300 credits/month",
+      "300 segment credits/month",
       "10 AI personas",
       "10 brand profiles",
       "Easy + Expert Mode",
@@ -60,3 +55,6 @@ export const PLANS = {
 } as const;
 
 export type PlanTier = keyof typeof PLANS;
+
+/** Cost per batch generation in segment credits */
+export const CREDITS_PER_BATCH = 9;

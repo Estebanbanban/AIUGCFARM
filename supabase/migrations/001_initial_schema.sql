@@ -40,7 +40,7 @@ CREATE TABLE profiles (
 -- subscriptions
 CREATE TABLE subscriptions (
   id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  owner_id                UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  owner_id                UUID NOT NULL UNIQUE REFERENCES profiles(id) ON DELETE CASCADE,
   stripe_customer_id      TEXT NOT NULL,
   stripe_subscription_id  TEXT UNIQUE,
   plan                    TEXT CHECK (plan IN ('starter','growth','scale')),
@@ -110,7 +110,7 @@ CREATE TABLE generations (
   mode              TEXT NOT NULL DEFAULT 'easy'
                       CHECK (mode IN ('easy','expert')),
   status            TEXT NOT NULL DEFAULT 'pending'
-                      CHECK (status IN ('pending','scripting','generating_image','generating_video','stitching','completed','failed')),
+                      CHECK (status IN ('pending','scripting','generating_image','submitting_jobs','generating_segments','generating_video','stitching','completed','failed')),
   script            JSONB,
   composite_image_url TEXT,
   videos            JSONB DEFAULT '[]',
@@ -180,12 +180,12 @@ BEGIN
     COALESCE(NEW.raw_user_meta_data ->> 'avatar_url', '')
   );
 
-  -- Seed 1 free credit
+  -- Seed 9 free segment credits (1 full batch = 27 video combinations)
   INSERT INTO credit_balances (owner_id, remaining)
-  VALUES (NEW.id, 1);
+  VALUES (NEW.id, 9);
 
   INSERT INTO credit_ledger (owner_id, amount, reason)
-  VALUES (NEW.id, 1, 'free_trial');
+  VALUES (NEW.id, 9, 'free_trial');
 
   RETURN NEW;
 END;

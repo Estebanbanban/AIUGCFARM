@@ -107,6 +107,8 @@ export type GenerationStatus =
   | "pending"
   | "scripting"
   | "generating_image"
+  | "submitting_jobs"
+  | "generating_segments"
   | "generating_video"
   | "stitching"
   | "completed"

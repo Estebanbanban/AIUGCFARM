@@ -86,6 +86,16 @@ const statusConfig: Record<
     color: "text-blue-400",
     icon: <Loader2 className="size-4 animate-spin text-blue-400" />,
   },
+  submitting_jobs: {
+    label: "Submitting jobs",
+    color: "text-blue-400",
+    icon: <Loader2 className="size-4 animate-spin text-blue-400" />,
+  },
+  generating_segments: {
+    label: "Generating segments",
+    color: "text-blue-400",
+    icon: <Loader2 className="size-4 animate-spin text-blue-400" />,
+  },
   generating_video: {
     label: "Generating videos",
     color: "text-blue-400",

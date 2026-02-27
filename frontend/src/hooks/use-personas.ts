@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { callEdge } from "@/lib/api";
-import type { Persona } from "@/types/database";
+import type { Persona, Generation } from "@/types/database";
 import type { CreatePersonaInput } from "@/schemas/persona";
 
 export function usePersonas() {
@@ -14,6 +14,7 @@ export function usePersonas() {
       const { data, error } = await supabase
         .from("personas")
         .select("*")
+        .eq("is_active", true)
         .order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
       return data;
@@ -81,18 +82,30 @@ export function useDeletePersona(id: string) {
   return useMutation({
     mutationFn: async () => {
       const supabase = createClient();
-      const { error } = await supabase.from("personas").delete().eq("id", id);
+      const { error } = await supabase
+        .from("personas")
+        .update({ is_active: false })
+        .eq("id", id);
       if (error) throw new Error(error.message);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["personas"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["personas"] });
+      queryClient.invalidateQueries({ queryKey: ["personas", id] });
+    },
   });
 }
 
 export function useGeneratePersonaImages() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { persona_id: string }) => {
-      return callEdge<{ image_urls: string[] }>("generate-persona", {
+    mutationFn: async (data: { name: string; attributes: Record<string, unknown> }) => {
+      return callEdge<{
+        data: {
+          id: string;
+          generated_images: string[];
+          generated_image_urls: string[];
+        };
+      }>("generate-persona", {
         body: data,
       });
     },
@@ -105,10 +118,55 @@ export function useSelectPersonaImage() {
   return useMutation({
     mutationFn: async (data: {
       persona_id: string;
-      image_url: string;
+      image_index: number;
     }) => {
-      return callEdge<Persona>("select-persona-image", { body: data });
+      return callEdge<{
+        data: {
+          persona_id: string;
+          selected_image_url: string;
+          signed_url: string | null;
+        };
+      }>("select-persona-image", { body: data });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["personas"] }),
   });
+}
+
+export type GenerationWithProduct = Generation & {
+  products: { name: string } | null;
+};
+
+export function usePersonaGenerations(personaId: string) {
+  return useQuery<GenerationWithProduct[]>({
+    queryKey: ["persona-generations", personaId],
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("generations")
+        .select("*, products(name)")
+        .eq("persona_id", personaId)
+        .order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data as GenerationWithProduct[];
+    },
+    enabled: !!personaId,
+  });
+}
+
+/**
+ * Resolves a persona image URL. If the URL is already an HTTP URL it is
+ * returned as-is; otherwise it is treated as a Supabase Storage path and
+ * a signed URL (1-hour expiry) is generated.
+ */
+export async function resolvePersonaImageUrl(
+  url: string | null | undefined
+): Promise<string | null> {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+
+  const supabase = createClient();
+  const { data } = await supabase.storage
+    .from("persona-images")
+    .createSignedUrl(url, 3600);
+  return data?.signedUrl ?? null;
 }

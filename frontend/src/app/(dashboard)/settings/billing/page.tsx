@@ -9,8 +9,8 @@ import {
   ArrowUpRight,
   CreditCard,
   Loader2,
-  AlertTriangle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -31,55 +31,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/utils";
-
-const mockSubscription = {
-  plan: "growth" as const,
-  planLabel: "Growth",
-  price: "$79/mo",
-  status: "active" as const,
-  currentPeriodEnd: "2026-03-15T00:00:00Z",
-  creditsRemaining: 72,
-  creditsTotal: 90,
-  cancelAtPeriodEnd: false,
-};
-
-const mockLedger = [
-  {
-    id: "entry-1",
-    date: "2026-02-24",
-    reason: "generation" as const,
-    description: "Vitamin C Serum video generation",
-    amount: -1,
-  },
-  {
-    id: "entry-2",
-    date: "2026-02-22",
-    reason: "generation" as const,
-    description: "Protein Shake video generation",
-    amount: -1,
-  },
-  {
-    id: "entry-3",
-    date: "2026-02-20",
-    reason: "refund" as const,
-    description: "Refund for failed generation",
-    amount: 1,
-  },
-  {
-    id: "entry-4",
-    date: "2026-02-15",
-    reason: "subscription_renewal" as const,
-    description: "Growth plan monthly credits",
-    amount: 90,
-  },
-  {
-    id: "entry-5",
-    date: "2026-02-14",
-    reason: "generation" as const,
-    description: "Running Shoes video generation",
-    amount: -1,
-  },
-];
+import { PLANS } from "@/lib/stripe";
+import { useCredits } from "@/hooks/use-credits";
+import { useProfile } from "@/hooks/use-profile";
+import { useSubscription, useCreditLedger } from "@/hooks/use-billing";
+import { useBillingPortal } from "@/hooks/use-checkout";
 
 const reasonLabels: Record<string, { label: string; color: string }> = {
   generation: { label: "Generation", color: "text-red-400" },
@@ -98,18 +54,59 @@ const statusColors: Record<string, string> = {
 
 export default function BillingPage() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [isManaging, setIsManaging] = useState(false);
 
-  const creditPercent = Math.round(
-    ((mockSubscription.creditsTotal - mockSubscription.creditsRemaining) /
-      mockSubscription.creditsTotal) *
-      100
-  );
+  const { data: credits, isLoading: creditsLoading } = useCredits();
+  const { data: profile, isLoading: profileLoading } = useProfile();
+  const { data: subscription, isLoading: subLoading } = useSubscription();
+  const { data: ledger, isLoading: ledgerLoading } = useCreditLedger();
+  const billingPortal = useBillingPortal();
+
+  const plan = profile?.plan ?? "free";
+  const planConfig = plan !== "free" ? PLANS[plan as keyof typeof PLANS] : null;
+  const creditsRemaining = credits?.remaining ?? 0;
+  const creditsTotal = planConfig?.credits ?? 9;
+  const creditPercent =
+    creditsTotal > 0
+      ? Math.round(
+          ((creditsTotal - creditsRemaining) / creditsTotal) * 100
+        )
+      : 0;
+
+  const isLoading = creditsLoading || profileLoading || subLoading;
 
   function handleManageBilling() {
-    setIsManaging(true);
-    // Would redirect to Stripe Customer Portal
-    setTimeout(() => setIsManaging(false), 2000);
+    billingPortal.mutate(undefined, {
+      onSuccess: (url) => {
+        window.location.href = url;
+      },
+      onError: (err) => {
+        toast.error(err.message || "Failed to open billing portal");
+      },
+    });
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center gap-3">
+          <Button asChild variant="ghost" size="icon">
+            <Link href="/dashboard/settings">
+              <ArrowLeft className="size-4" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Billing & Subscription
+            </h1>
+          </div>
+        </div>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="h-32 animate-pulse bg-muted" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -138,13 +135,18 @@ export default function BillingPage() {
             <div>
               <CardTitle className="text-foreground">Current Plan</CardTitle>
               <CardDescription>
-                Next billing date:{" "}
-                {formatDate(mockSubscription.currentPeriodEnd)}
+                {subscription?.current_period_end
+                  ? `Next billing date: ${formatDate(subscription.current_period_end)}`
+                  : plan === "free"
+                    ? "Free plan — no billing"
+                    : "No active subscription"}
               </CardDescription>
             </div>
-            <Badge className={statusColors[mockSubscription.status]}>
-              {mockSubscription.status}
-            </Badge>
+            {subscription && (
+              <Badge className={statusColors[subscription.status] ?? statusColors.incomplete}>
+                {subscription.status}
+              </Badge>
+            )}
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -155,38 +157,37 @@ export default function BillingPage() {
               </div>
               <div>
                 <p className="text-lg font-bold text-foreground">
-                  {mockSubscription.planLabel}
+                  {planConfig?.name ?? "Free"}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {mockSubscription.price}
+                  {planConfig ? `$${planConfig.price}/mo` : "No subscription"}
                 </p>
               </div>
             </div>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleManageBilling}
-                disabled={isManaging}
-              >
-                {isManaging ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <>
-                    Change Plan
-                    <ArrowUpRight className="size-4" />
-                  </>
-                )}
-              </Button>
+              {subscription ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleManageBilling}
+                  disabled={billingPortal.isPending}
+                >
+                  {billingPortal.isPending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <>
+                      Manage Billing
+                      <ArrowUpRight className="size-4" />
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button asChild size="sm" className="bg-violet-600 hover:bg-violet-700">
+                  <Link href="/pricing">Choose a Plan</Link>
+                </Button>
+              )}
             </div>
           </div>
-
-          {mockSubscription.cancelAtPeriodEnd && (
-            <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 px-4 py-2 text-sm text-amber-400">
-              <AlertTriangle className="size-4" />
-              Your subscription will cancel at the end of the current period.
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -195,8 +196,7 @@ export default function BillingPage() {
         <CardHeader>
           <CardTitle className="text-foreground">Credit Usage</CardTitle>
           <CardDescription>
-            {mockSubscription.creditsRemaining} of{" "}
-            {mockSubscription.creditsTotal} credits remaining this month
+            {creditsRemaining} of {creditsTotal} credits remaining this month
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -206,36 +206,34 @@ export default function BillingPage() {
           />
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
-              {mockSubscription.creditsTotal -
-                mockSubscription.creditsRemaining}{" "}
-              used
+              {creditsTotal - creditsRemaining} used
             </span>
-            <span className="font-medium text-foreground">
-              {creditPercent}%
-            </span>
+            <span className="font-medium text-foreground">{creditPercent}%</span>
           </div>
         </CardContent>
       </Card>
 
       {/* Cancel Subscription */}
-      <div className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
-        <div>
-          <p className="text-sm font-medium text-foreground">
-            Cancel Subscription
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Your access continues until the end of the billing period.
-          </p>
+      {subscription && subscription.status === "active" && (
+        <div className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              Cancel Subscription
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Your access continues until the end of the billing period.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-red-400 hover:bg-red-500/10 hover:text-red-400"
+            onClick={() => setShowCancelDialog(true)}
+          >
+            Cancel Plan
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="text-red-400 hover:bg-red-500/10 hover:text-red-400"
-          onClick={() => setShowCancelDialog(true)}
-        >
-          Cancel Plan
-        </Button>
-      </div>
+      )}
 
       <Separator />
 
@@ -247,55 +245,64 @@ export default function BillingPage() {
 
         <Card>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
-                      Date
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
-                      Type
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
-                      Description
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">
-                      Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mockLedger.map((entry) => {
-                    const config = reasonLabels[entry.reason];
-                    return (
-                      <tr
-                        key={entry.id}
-                        className="border-b border-border last:border-0"
-                      >
-                        <td className="px-4 py-3 text-sm text-muted-foreground">
-                          {formatDate(entry.date)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant="secondary" className="text-xs">
-                            {config.label}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-foreground">
-                          {entry.description}
-                        </td>
-                        <td
-                          className={`px-4 py-3 text-right text-sm font-medium ${config.color}`}
+            {ledgerLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : !ledger || ledger.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-12 text-center">
+                <p className="text-sm text-muted-foreground">
+                  No credit history yet
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
+                        Date
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
+                        Type
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium uppercase text-muted-foreground">
+                        Amount
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ledger.map((entry) => {
+                      const config = reasonLabels[entry.reason] ?? {
+                        label: entry.reason,
+                        color: "text-foreground",
+                      };
+                      return (
+                        <tr
+                          key={entry.id}
+                          className="border-b border-border last:border-0"
                         >
-                          {entry.amount > 0 ? "+" : ""}
-                          {entry.amount}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {formatDate(entry.created_at)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge variant="secondary" className="text-xs">
+                              {config.label}
+                            </Badge>
+                          </td>
+                          <td
+                            className={`px-4 py-3 text-right text-sm font-medium ${config.color}`}
+                          >
+                            {entry.amount > 0 ? "+" : ""}
+                            {entry.amount}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -306,10 +313,9 @@ export default function BillingPage() {
           <DialogHeader>
             <DialogTitle>Cancel Subscription?</DialogTitle>
             <DialogDescription>
-              Are you sure you want to cancel your{" "}
-              {mockSubscription.planLabel} plan? You will retain access until{" "}
-              {formatDate(mockSubscription.currentPeriodEnd)}, but unused
-              credits will not carry over.
+              Are you sure you want to cancel your {planConfig?.name ?? ""} plan?
+              {subscription?.current_period_end &&
+                ` You will retain access until ${formatDate(subscription.current_period_end)}, but unused credits will not carry over.`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -321,9 +327,12 @@ export default function BillingPage() {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => setShowCancelDialog(false)}
+              onClick={() => {
+                handleManageBilling();
+                setShowCancelDialog(false);
+              }}
             >
-              Confirm Cancellation
+              Manage in Stripe
             </Button>
           </DialogFooter>
         </DialogContent>

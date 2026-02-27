@@ -47,25 +47,39 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const selectedUrl = images[image_index];
+    // generated_images stores storage paths — select the path
+    const selectedPath = images[image_index];
 
+    // Store the storage PATH as selected_image_url (not a signed URL)
     const { error: updateErr } = await sb
       .from("personas")
-      .update({ selected_image_url: selectedUrl })
+      .update({ selected_image_url: selectedPath })
       .eq("id", persona_id)
       .eq("owner_id", userId);
 
     if (updateErr) throw new Error(`Update failed: ${updateErr.message}`);
 
-    return json({
-      data: { persona_id, selected_image_url: selectedUrl },
-    }, cors);
+    // Generate a fresh signed URL for the frontend to display immediately
+    const { data: signedData } = await sb.storage
+      .from("persona-images")
+      .createSignedUrl(selectedPath, 3600); // 1 hour
+
+    return json(
+      {
+        data: {
+          persona_id,
+          selected_image_url: selectedPath,
+          signed_url: signedData?.signedUrl ?? null,
+        },
+      },
+      cors,
+    );
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg === "Unauthorized") {
       return json({ detail: "Authentication required" }, cors, 401);
     }
     console.error("select-persona-image error:", e);
-    return json({ detail: "Internal error" }, cors, 500);
+    return json({ detail: "Failed to select persona image. Please try again." }, cors, 500);
   }
 });

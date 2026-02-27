@@ -83,7 +83,7 @@ Deno.serve(async (req: Request) => {
             : session.subscription?.id;
 
         // Upsert subscription
-        await sb.from("subscriptions").upsert(
+        const { error: subErr } = await sb.from("subscriptions").upsert(
           {
             owner_id: userId,
             stripe_customer_id: stripeCustomerId ?? "",
@@ -94,27 +94,31 @@ Deno.serve(async (req: Request) => {
           },
           { onConflict: "owner_id" },
         );
+        if (subErr) console.error("checkout: subscription upsert failed:", subErr);
 
         // Update profile plan
-        await sb
+        const { error: profileErr } = await sb
           .from("profiles")
           .update({ plan })
           .eq("id", userId);
+        if (profileErr) console.error("checkout: profile update failed:", profileErr);
 
         // Grant initial credits for the plan
         const credits = PLAN_CREDITS[plan] ?? 0;
         if (credits > 0) {
           // Upsert credit balance
-          await sb.from("credit_balances").upsert(
+          const { error: balErr } = await sb.from("credit_balances").upsert(
             { owner_id: userId, remaining: credits },
             { onConflict: "owner_id" },
           );
+          if (balErr) console.error("checkout: credit balance upsert failed:", balErr);
 
-          await sb.from("credit_ledger").insert({
+          const { error: ledgerErr } = await sb.from("credit_ledger").insert({
             owner_id: userId,
             amount: credits,
             reason: "subscription_renewal",
           });
+          if (ledgerErr) console.error("checkout: credit ledger insert failed:", ledgerErr);
         }
 
         break;
@@ -148,16 +152,18 @@ Deno.serve(async (req: Request) => {
         const credits = PLAN_CREDITS[sub.plan] ?? 0;
         if (credits > 0) {
           // Reset credit balance to plan amount on renewal
-          await sb.from("credit_balances").upsert(
+          const { error: balErr } = await sb.from("credit_balances").upsert(
             { owner_id: sub.owner_id, remaining: credits },
             { onConflict: "owner_id" },
           );
+          if (balErr) console.error("invoice.paid: credit balance upsert failed:", balErr);
 
-          await sb.from("credit_ledger").insert({
+          const { error: ledgerErr } = await sb.from("credit_ledger").insert({
             owner_id: sub.owner_id,
             amount: credits,
             reason: "subscription_renewal",
           });
+          if (ledgerErr) console.error("invoice.paid: credit ledger insert failed:", ledgerErr);
         }
 
         break;
@@ -167,22 +173,21 @@ Deno.serve(async (req: Request) => {
         const subscription = event.data.object as Stripe.Subscription;
         const stripeSubId = subscription.id;
 
-        // Get plan from items
+        // Reverse-lookup plan from price ID
         const planItem = subscription.items?.data?.[0];
         const priceId = planItem?.price?.id;
 
-        // Reverse-lookup plan name from price ID
+        // Try price ID lookup first (most reliable), then metadata fallback
         let plan: string | null = null;
-        for (const [key, val] of Object.entries(PLAN_CREDITS)) {
-          // Check metadata or use subscription metadata
-          if (subscription.metadata?.plan === key) {
-            plan = key;
-            break;
-          }
-          // Fallback: ignore val, just use metadata
-          void val;
+        if (priceId) {
+          const priceStarter = Deno.env.get("STRIPE_PRICE_STARTER");
+          const priceGrowth = Deno.env.get("STRIPE_PRICE_GROWTH");
+          const priceScale = Deno.env.get("STRIPE_PRICE_SCALE");
+          if (priceId === priceStarter) plan = "starter";
+          else if (priceId === priceGrowth) plan = "growth";
+          else if (priceId === priceScale) plan = "scale";
         }
-        // If plan not found in metadata, try to keep existing
+        // Fallback to metadata
         if (!plan) {
           plan = subscription.metadata?.plan ?? null;
         }
@@ -225,8 +230,6 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        void priceId; // available for future price-based plan lookup
-
         break;
       }
 
@@ -252,6 +255,12 @@ Deno.serve(async (req: Request) => {
             .from("profiles")
             .update({ plan: "free" })
             .eq("id", sub.owner_id);
+
+          // Clear remaining credits
+          await sb.from("credit_balances").upsert(
+            { owner_id: sub.owner_id, remaining: 0 },
+            { onConflict: "owner_id" },
+          );
         }
 
         break;

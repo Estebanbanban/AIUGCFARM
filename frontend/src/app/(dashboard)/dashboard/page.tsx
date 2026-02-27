@@ -14,8 +14,10 @@ import {
   Package,
   ArrowRight,
   Clock,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PLANS } from "@/lib/stripe";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -26,46 +28,19 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { formatDate } from "@/lib/utils";
+import { useCredits } from "@/hooks/use-credits";
+import { useProfile } from "@/hooks/use-profile";
+import { useGenerations } from "@/hooks/use-generations";
+import { usePersonas } from "@/hooks/use-personas";
 import type { GenerationStatus } from "@/types/database";
-
-const mockStats = {
-  videosGenerated: 12,
-  creditsRemaining: 18,
-  creditsTotal: 27,
-  activePersonas: 1,
-};
-
-const mockRecentGenerations = [
-  {
-    id: "gen-1",
-    productName: "Vitamin C Serum",
-    personaName: "Sophie",
-    date: "Feb 24, 2026",
-    status: "completed" as GenerationStatus,
-    videoCount: 4,
-  },
-  {
-    id: "gen-2",
-    productName: "Protein Shake",
-    personaName: "Marcus",
-    date: "Feb 22, 2026",
-    status: "completed" as GenerationStatus,
-    videoCount: 4,
-  },
-  {
-    id: "gen-3",
-    productName: "Running Shoes X1",
-    personaName: "Sophie",
-    date: "Feb 20, 2026",
-    status: "generating_video" as GenerationStatus,
-    videoCount: 2,
-  },
-];
 
 const statusColors: Record<string, string> = {
   completed: "bg-emerald-500/10 text-emerald-400",
   generating_video: "bg-amber-500/10 text-amber-400",
+  generating_segments: "bg-amber-500/10 text-amber-400",
   generating_image: "bg-amber-500/10 text-amber-400",
+  submitting_jobs: "bg-amber-500/10 text-amber-400",
   scripting: "bg-amber-500/10 text-amber-400",
   stitching: "bg-amber-500/10 text-amber-400",
   failed: "bg-red-500/10 text-red-400",
@@ -81,6 +56,23 @@ function statusLabel(status: GenerationStatus): string {
 export default function DashboardPage() {
   const [firstName, setFirstName] = useState("there");
 
+  const { data: credits, isLoading: creditsLoading } = useCredits();
+  const { data: profile } = useProfile();
+  const { data: generations, isLoading: generationsLoading } = useGenerations();
+  const { data: personas } = usePersonas();
+
+  const plan = profile?.plan ?? "free";
+  const planConfig = plan !== "free" ? PLANS[plan as keyof typeof PLANS] : null;
+  const creditsRemaining = credits?.remaining ?? 0;
+  const creditsTotal = planConfig?.credits ?? 9;
+
+  const recentGenerations = (generations ?? []).slice(0, 5);
+  const videosGenerated = (generations ?? []).filter(
+    (g) => g.status === "completed"
+  ).length;
+  const activePersonas = personas?.length ?? 0;
+  const hasGenerations = recentGenerations.length > 0;
+
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -91,8 +83,6 @@ export default function DashboardPage() {
       }
     });
   }, []);
-
-  const hasGenerations = mockRecentGenerations.length > 0;
 
   return (
     <div className="flex flex-col gap-8">
@@ -114,9 +104,13 @@ export default function DashboardPage() {
               <Video className="size-5 text-violet-500" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Videos Generated</p>
+              <p className="text-sm text-muted-foreground">Generations</p>
               <p className="text-2xl font-bold text-foreground">
-                {mockStats.videosGenerated}
+                {generationsLoading ? (
+                  <Loader2 className="size-5 animate-spin" />
+                ) : (
+                  videosGenerated
+                )}
               </p>
             </div>
           </CardContent>
@@ -133,16 +127,20 @@ export default function DashboardPage() {
                   Credits Remaining
                 </p>
                 <p className="text-2xl font-bold text-foreground">
-                  {mockStats.creditsRemaining}/{mockStats.creditsTotal}
+                  {creditsLoading ? (
+                    <Loader2 className="size-5 animate-spin" />
+                  ) : (
+                    `${creditsRemaining}/${creditsTotal}`
+                  )}
                 </p>
               </div>
             </div>
-            <Progress
-              value={
-                (mockStats.creditsRemaining / mockStats.creditsTotal) * 100
-              }
-              className="h-1.5 bg-muted [&>[data-slot=progress-indicator]]:bg-violet-500"
-            />
+            {!creditsLoading && creditsTotal > 0 && (
+              <Progress
+                value={(creditsRemaining / creditsTotal) * 100}
+                className="h-1.5 bg-muted [&>[data-slot=progress-indicator]]:bg-violet-500"
+              />
+            )}
           </CardContent>
         </Card>
 
@@ -154,7 +152,7 @@ export default function DashboardPage() {
             <div>
               <p className="text-sm text-muted-foreground">Active Personas</p>
               <p className="text-2xl font-bold text-foreground">
-                {mockStats.activePersonas}
+                {activePersonas}
               </p>
             </div>
           </CardContent>
@@ -199,9 +197,15 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {hasGenerations ? (
+        {generationsLoading ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {mockRecentGenerations.map((gen) => (
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="h-32 animate-pulse bg-muted" />
+            ))}
+          </div>
+        ) : hasGenerations ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {recentGenerations.map((gen) => (
               <Link
                 key={gen.id}
                 href={`/dashboard/generate/${gen.id}`}
@@ -211,7 +215,7 @@ export default function DashboardPage() {
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between">
                       <CardTitle className="text-sm font-medium text-foreground">
-                        {gen.productName}
+                        {gen.product_id.slice(0, 8)}...
                       </CardTitle>
                       <Badge
                         variant="secondary"
@@ -223,17 +227,14 @@ export default function DashboardPage() {
                         {statusLabel(gen.status)}
                       </Badge>
                     </div>
-                    <CardDescription className="text-xs">
-                      Persona: {gen.personaName}
-                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <div className="flex items-center gap-1.5">
                         <Clock className="size-3" />
-                        {gen.date}
+                        {formatDate(gen.created_at)}
                       </div>
-                      <span>{gen.videoCount} videos</span>
+                      <span className="capitalize">{gen.mode} mode</span>
                     </div>
                   </CardContent>
                 </Card>

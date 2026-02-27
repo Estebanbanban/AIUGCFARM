@@ -15,12 +15,12 @@ Deno.serve(async (req: Request) => {
     const userId = await requireUserId(req);
     const sb = getAdminClient();
 
-    // Fetch credit balance
+    // Fetch credit balance (maybeSingle in case row doesn't exist yet)
     const { data: balance } = await sb
       .from("credit_balances")
       .select("remaining")
       .eq("owner_id", userId)
-      .single();
+      .maybeSingle();
 
     // Fetch profile plan
     const { data: profile } = await sb

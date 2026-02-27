@@ -15,11 +15,15 @@ interface PersonaBuilderState {
   generatedImages: string[];
   selectedImageIndex: number | null;
   isGenerating: boolean;
+  isSaving: boolean;
+  personaId: string | null;
   setField: (field: string, value: string) => void;
   toggleAccessory: (accessory: string) => void;
   setGeneratedImages: (urls: string[]) => void;
   selectImage: (index: number) => void;
   setIsGenerating: (val: boolean) => void;
+  setIsSaving: (val: boolean) => void;
+  setPersonaId: (id: string) => void;
   reset: () => void;
 }
 
@@ -37,6 +41,8 @@ const initialState = {
   generatedImages: [] as string[],
   selectedImageIndex: null as number | null,
   isGenerating: false,
+  isSaving: false,
+  personaId: null as string | null,
 };
 
 export const usePersonaBuilderStore = create<PersonaBuilderState>()(
@@ -64,6 +70,14 @@ export const usePersonaBuilderStore = create<PersonaBuilderState>()(
     setIsGenerating: (val) =>
       set((state) => {
         state.isGenerating = val;
+      }),
+    setIsSaving: (val) =>
+      set((state) => {
+        state.isSaving = val;
+      }),
+    setPersonaId: (id) =>
+      set((state) => {
+        state.personaId = id;
       }),
     reset: () => set(() => ({ ...initialState })),
   }))

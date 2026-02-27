@@ -2,10 +2,14 @@
 
 export const dynamic = "force-dynamic";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Sparkles, Check, User } from "lucide-react";
+import Image from "next/image";
+import { ArrowLeft, Loader2, Sparkles, Check, User, ImageIcon } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { callEdge } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,26 +64,79 @@ export default function NewPersonaPage() {
   const router = useRouter();
   const store = usePersonaBuilderStore();
 
-  function handleGenerate() {
+  const [imageLoadErrors, setImageLoadErrors] = useState<Set<number>>(new Set());
+
+  async function handleGenerate() {
     if (!store.name.trim()) return;
     store.setIsGenerating(true);
-    // Simulate generation with mock images
-    setTimeout(() => {
-      store.setGeneratedImages([
-        "/api/placeholder/persona-1",
-        "/api/placeholder/persona-2",
-        "/api/placeholder/persona-3",
-        "/api/placeholder/persona-4",
-      ]);
+    setImageLoadErrors(new Set());
+    toast.info("Generating persona images...");
+
+    try {
+      const attributes = {
+        gender: store.gender,
+        skin_tone: store.skinTone,
+        age: store.ageRange,
+        hair_color: store.hairColor,
+        hair_style: store.hairStyle,
+        eye_color: store.eyeColor,
+        body_type: store.bodyType,
+        clothing_style: store.clothingStyle,
+        accessories: store.accessories,
+      };
+
+      const result = await callEdge<{
+        data: {
+          id: string;
+          generated_images: string[];
+          generated_image_urls: string[];
+        };
+      }>("generate-persona", {
+        body: {
+          name: store.name,
+          attributes,
+          // Pass persona_id on regeneration so the backend updates instead of inserting
+          ...(store.personaId ? { persona_id: store.personaId } : {}),
+        },
+      });
+
+      // Use signed URLs for display, NOT storage paths
+      const displayUrls = result.data.generated_image_urls ?? result.data.generated_images;
+      store.setPersonaId(result.data.id);
+      store.setGeneratedImages(displayUrls);
+      toast.success(
+        `${displayUrls.length} persona images generated!`
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to generate persona";
+      toast.error(message);
+    } finally {
       store.setIsGenerating(false);
-    }, 3000);
+    }
   }
 
-  function handleSave() {
-    if (store.selectedImageIndex === null) return;
-    // Would call useCreatePersona mutation
-    router.push("/dashboard/personas");
-    store.reset();
+  async function handleSave() {
+    if (store.selectedImageIndex === null || !store.personaId) return;
+    store.setIsSaving(true);
+
+    try {
+      await callEdge("select-persona-image", {
+        body: {
+          persona_id: store.personaId,
+          image_index: store.selectedImageIndex,
+        },
+      });
+      toast.success("Persona saved!");
+      router.push("/dashboard/personas");
+      store.reset();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to save persona";
+      toast.error(message);
+    } finally {
+      store.setIsSaving(false);
+    }
   }
 
   return (
@@ -104,7 +161,11 @@ export default function NewPersonaPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         {/* Left Panel — Attribute Controls */}
         <ScrollArea className="h-[calc(100vh-180px)] pr-4 lg:h-auto lg:pr-0">
-          <div className="flex flex-col gap-6">
+          <fieldset disabled={store.isGenerating || store.isSaving}>
+          <div className={cn(
+            "flex flex-col gap-6 transition-opacity",
+            (store.isGenerating || store.isSaving) && "pointer-events-none opacity-60"
+          )}>
             {/* Name */}
             <Card>
               <CardContent className="flex flex-col gap-3">
@@ -370,13 +431,38 @@ export default function NewPersonaPage() {
               </CardContent>
             </Card>
           </div>
+          </fieldset>
         </ScrollArea>
 
         {/* Right Panel — Preview & Generation */}
         <div className="flex flex-col gap-4">
           <div className="sticky top-6">
+            {/* Loading Skeleton — shown while generating */}
+            {store.isGenerating && store.generatedImages.length === 0 && (
+              <Card className="mb-4">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium text-foreground">
+                    Generating Persona...
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    {[0, 1, 2, 3].map((i) => (
+                      <div
+                        key={i}
+                        className="aspect-square animate-pulse rounded-lg bg-muted"
+                      />
+                    ))}
+                  </div>
+                  <p className="text-center text-xs text-muted-foreground">
+                    This may take up to 30 seconds...
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Attribute Summary */}
-            {store.generatedImages.length === 0 && (
+            {store.generatedImages.length === 0 && !store.isGenerating && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm font-medium text-foreground">
@@ -509,9 +595,22 @@ export default function NewPersonaPage() {
                             : "border-transparent hover:border-muted-foreground/30"
                         )}
                       >
-                        <div className="flex size-full items-center justify-center">
-                          <User className="size-12 text-muted-foreground" />
-                        </div>
+                        {imageLoadErrors.has(index) ? (
+                          <div className="flex size-full items-center justify-center">
+                            <ImageIcon className="size-12 text-muted-foreground" />
+                          </div>
+                        ) : (
+                          <Image
+                            src={url}
+                            alt={`Persona option ${index + 1}`}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 768px) 50vw, 190px"
+                            onError={() =>
+                              setImageLoadErrors((prev) => new Set(prev).add(index))
+                            }
+                          />
+                        )}
                         {store.selectedImageIndex === index && (
                           <div className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-violet-500">
                             <Check className="size-3.5 text-white" />
@@ -549,17 +648,30 @@ export default function NewPersonaPage() {
                 <>
                   <Button
                     onClick={handleSave}
-                    disabled={store.selectedImageIndex === null}
+                    disabled={
+                      store.selectedImageIndex === null ||
+                      !store.personaId ||
+                      store.isSaving
+                    }
                     className="w-full bg-violet-600 hover:bg-violet-700"
                     size="lg"
                   >
-                    <Check className="size-4" />
-                    Save Persona
+                    {store.isSaving ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="size-4" />
+                        Save Persona
+                      </>
+                    )}
                   </Button>
                   <Button
                     onClick={handleGenerate}
                     variant="outline"
-                    disabled={store.isGenerating}
+                    disabled={store.isGenerating || store.isSaving}
                     className="w-full"
                   >
                     {store.isGenerating ? (
