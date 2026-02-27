@@ -263,56 +263,57 @@ function accessoryObjectDataUri(accessory: string) {
 }
 
 function optionHumanPhotoUri(key: string) {
-  const u = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=80`;
+  const local = (index: number) =>
+    `/img/Gemini_Generated_Image_h670yrh670yrh670${index === 1 ? "" : `-${index}`}.png`;
 
   const genderMap: Record<string, string> = {
-    male: u("photo-1500648767791-00dcc994a43e"),
-    female: u("photo-1544005313-94ddf0286df2"),
-    non_binary: u("photo-1488426862026-3ee34a7d66df"),
+    male: local(1),
+    female: local(2),
+    non_binary: local(2),
   };
 
   const hairStyleMap: Record<string, string> = {
-    "Short Straight": u("photo-1507003211169-0a1dd7228f2d"),
-    "Short Curly": u("photo-1506794778202-cad84cf45f1d"),
-    "Medium Straight": u("photo-1494790108377-be9c29b29330"),
-    "Medium Wavy": u("photo-1487412720507-e7ab37603c6f"),
-    "Long Straight": u("photo-1544005313-94ddf0286df2"),
-    "Long Curly": u("photo-1521572267360-ee0c2909d518"),
-    "Buzz Cut": u("photo-1542206395-9feb3edaa68d"),
-    Bob: u("photo-1524250502761-1ac6f2e30d43"),
-    Ponytail: u("photo-1524504388940-b1c1722653e1"),
-    Braids: u("photo-1517841905240-472988babdf9"),
-    Afro: u("photo-1504593811423-6dd665756598"),
-    Bald: u("photo-1519085360753-af0119f7cbe7"),
+    "Short Straight": local(3),
+    "Short Curly": local(4),
+    "Medium Straight": local(5),
+    "Long Straight": local(6),
+    "Medium Wavy": local(7),
+    "Long Curly": local(8),
+    "Buzz Cut": local(9),
+    Bob: local(10),
+    Ponytail: local(11),
+    Braids: local(12),
+    Afro: local(13),
+    Bald: local(14),
   };
 
   const bodyTypeMap: Record<string, string> = {
-    slim: u("photo-1494790108377-be9c29b29330"),
-    average: u("photo-1500648767791-00dcc994a43e"),
-    athletic: u("photo-1545996124-0501ebae84d0"),
-    curvy: u("photo-1524504388940-b1c1722653e1"),
-    plus_size: u("photo-1521119989659-a83eee488004"),
+    slim: local(15),
+    average: local(16),
+    athletic: local(17),
+    curvy: local(18),
+    plus_size: local(19),
   };
 
   const clothingMap: Record<string, string> = {
-    Casual: u("photo-1487412720507-e7ab37603c6f"),
-    "Business Casual": u("photo-1507003211169-0a1dd7228f2d"),
-    Streetwear: u("photo-1504593811423-6dd665756598"),
-    Sporty: u("photo-1542206395-9feb3edaa68d"),
-    Elegant: u("photo-1494790108377-be9c29b29330"),
-    Bohemian: u("photo-1521572267360-ee0c2909d518"),
-    Minimalist: u("photo-1500648767791-00dcc994a43e"),
+    Casual: local(20),
+    "Business Casual": local(21),
+    Streetwear: local(22),
+    Sporty: local(23),
+    Elegant: local(24),
+    Bohemian: local(25),
+    Minimalist: local(26),
   };
 
   const accessoryMap: Record<string, string> = {
-    None: u("photo-1612690119274-8819a81c13a2"),
-    Glasses: u("photo-1591843336309-cbf414ad7978"),
-    Sunglasses: u("photo-1608539733292-190446b22b83"),
-    Earrings: u("photo-1649675094138-2436328c27f0"),
-    Necklace: u("photo-1718312267215-58bbba315a15"),
-    Watch: u("photo-1694598152256-a346298ae0b5"),
-    Hat: u("photo-1751003801817-638f03892c1e"),
-    Scarf: u("photo-1672798379137-f872e2631e0b"),
+    None: local(34),
+    Glasses: local(27),
+    Sunglasses: local(28),
+    Earrings: local(29),
+    Necklace: local(30),
+    Watch: local(31),
+    Hat: local(32),
+    Scarf: local(33),
   };
 
   if (key.startsWith("gender-")) return genderMap[key.slice(7)] ?? optionImageDataUri(key);
