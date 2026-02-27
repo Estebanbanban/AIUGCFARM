@@ -115,6 +115,7 @@ function parseJobKey(jobKey: string): { segType: "hooks" | "bodies" | "ctas"; va
   const typeMap: Record<string, "hooks" | "bodies" | "ctas"> = {
     hook: "hooks",
     body: "bodies",
+    bodie: "bodies", // legacy alias from a previous bug
     cta: "ctas",
   };
 
