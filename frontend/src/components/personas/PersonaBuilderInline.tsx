@@ -226,60 +226,56 @@ function optionImageDataUri(key: string) {
 }
 
 function optionHumanPhotoUri(key: string) {
-  const seed = (hashString(key) % 997) + 1;
-  const base = "https://source.unsplash.com/800x1000/?";
-  const neutral = "portrait,studio,neutral background,person";
-
-  const q = (query: string) => `${base}${encodeURIComponent(`${neutral},${query}`)}&sig=${seed}`;
+  const u = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=80`;
 
   const genderMap: Record<string, string> = {
-    male: q("man"),
-    female: q("woman"),
-    non_binary: q("androgynous person"),
+    male: u("photo-1500648767791-00dcc994a43e"),
+    female: u("photo-1544005313-94ddf0286df2"),
+    non_binary: u("photo-1488426862026-3ee34a7d66df"),
   };
 
   const hairStyleMap: Record<string, string> = {
-    "Short Straight": q("short straight hair"),
-    "Short Curly": q("short curly hair"),
-    "Medium Straight": q("medium straight hair"),
-    "Medium Wavy": q("medium wavy hair"),
-    "Long Straight": q("long straight hair"),
-    "Long Curly": q("long curly hair"),
-    "Buzz Cut": q("buzz cut"),
-    Bob: q("bob haircut"),
-    Ponytail: q("ponytail hairstyle"),
-    Braids: q("braids hairstyle"),
-    Afro: q("afro hairstyle"),
-    Bald: q("bald head"),
+    "Short Straight": u("photo-1507003211169-0a1dd7228f2d"),
+    "Short Curly": u("photo-1506794778202-cad84cf45f1d"),
+    "Medium Straight": u("photo-1494790108377-be9c29b29330"),
+    "Medium Wavy": u("photo-1487412720507-e7ab37603c6f"),
+    "Long Straight": u("photo-1544005313-94ddf0286df2"),
+    "Long Curly": u("photo-1521572267360-ee0c2909d518"),
+    "Buzz Cut": u("photo-1542206395-9feb3edaa68d"),
+    Bob: u("photo-1524250502761-1ac6f2e30d43"),
+    Ponytail: u("photo-1524504388940-b1c1722653e1"),
+    Braids: u("photo-1517841905240-472988babdf9"),
+    Afro: u("photo-1504593811423-6dd665756598"),
+    Bald: u("photo-1519085360753-af0119f7cbe7"),
   };
 
   const bodyTypeMap: Record<string, string> = {
-    slim: q("slim body portrait"),
-    average: q("average body portrait"),
-    athletic: q("athletic body portrait"),
-    curvy: q("curvy body portrait"),
-    plus_size: q("plus size portrait"),
+    slim: u("photo-1494790108377-be9c29b29330"),
+    average: u("photo-1500648767791-00dcc994a43e"),
+    athletic: u("photo-1545996124-0501ebae84d0"),
+    curvy: u("photo-1524504388940-b1c1722653e1"),
+    plus_size: u("photo-1521119989659-a83eee488004"),
   };
 
   const clothingMap: Record<string, string> = {
-    Casual: q("casual outfit"),
-    "Business Casual": q("business casual outfit"),
-    Streetwear: q("streetwear outfit"),
-    Sporty: q("sporty outfit"),
-    Elegant: q("elegant outfit"),
-    Bohemian: q("bohemian style outfit"),
-    Minimalist: q("minimalist outfit"),
+    Casual: u("photo-1487412720507-e7ab37603c6f"),
+    "Business Casual": u("photo-1507003211169-0a1dd7228f2d"),
+    Streetwear: u("photo-1504593811423-6dd665756598"),
+    Sporty: u("photo-1542206395-9feb3edaa68d"),
+    Elegant: u("photo-1494790108377-be9c29b29330"),
+    Bohemian: u("photo-1521572267360-ee0c2909d518"),
+    Minimalist: u("photo-1500648767791-00dcc994a43e"),
   };
 
   const accessoryMap: Record<string, string> = {
-    None: q("simple portrait"),
-    Glasses: q("person wearing glasses"),
-    Sunglasses: q("person wearing sunglasses"),
-    Earrings: q("person wearing earrings"),
-    Necklace: q("person wearing necklace"),
-    Watch: q("person wearing watch"),
-    Hat: q("person wearing hat"),
-    Scarf: q("person wearing scarf"),
+    None: u("photo-1544005313-94ddf0286df2"),
+    Glasses: u("photo-1492562080023-ab3db95bfbce"),
+    Sunglasses: u("photo-1519699047748-de8e457a634e"),
+    Earrings: u("photo-1488426862026-3ee34a7d66df"),
+    Necklace: u("photo-1521572267360-ee0c2909d518"),
+    Watch: u("photo-1545996124-0501ebae84d0"),
+    Hat: u("photo-1504593811423-6dd665756598"),
+    Scarf: u("photo-1515886657613-9f3515b0c78f"),
   };
 
   if (key.startsWith("gender-")) return genderMap[key.slice(7)] ?? optionImageDataUri(key);
@@ -420,6 +416,7 @@ function ImageCard({
           alt=""
           aria-hidden="true"
           className="absolute inset-0 h-full w-full object-cover"
+          onError={(e) => { e.currentTarget.style.display = "none"; }}
         />
       )}
 
