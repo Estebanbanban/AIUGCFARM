@@ -31,18 +31,16 @@ import { Progress } from "@/components/ui/progress";
 import { formatDate } from "@/lib/utils";
 import { useCredits } from "@/hooks/use-credits";
 import { useProfile } from "@/hooks/use-profile";
-import { useGenerations } from "@/hooks/use-generations";
+import { useGenerations, type GenerationWithRelations } from "@/hooks/use-generations";
 import { usePersonas } from "@/hooks/use-personas";
 import type { GenerationStatus } from "@/types/database";
 
 const statusColors: Record<string, string> = {
   completed: "bg-emerald-500/10 text-emerald-400",
-  generating_video: "bg-amber-500/10 text-amber-400",
-  generating_segments: "bg-amber-500/10 text-amber-400",
+  submitting_jobs: "bg-violet-500/10 text-violet-400",
+  generating_segments: "bg-blue-500/10 text-blue-400",
   generating_image: "bg-amber-500/10 text-amber-400",
-  submitting_jobs: "bg-amber-500/10 text-amber-400",
   scripting: "bg-amber-500/10 text-amber-400",
-  stitching: "bg-amber-500/10 text-amber-400",
   failed: "bg-red-500/10 text-red-400",
   pending: "bg-zinc-500/10 text-zinc-400",
 };
@@ -58,7 +56,7 @@ export default function DashboardPage() {
 
   const { data: credits, isLoading: creditsLoading } = useCredits();
   const { data: profile } = useProfile();
-  const { data: generations, isLoading: generationsLoading } = useGenerations();
+  const { data: generations, isLoading: generationsLoading } = useGenerations() as { data: GenerationWithRelations[] | undefined; isLoading: boolean };
   const { data: personas } = usePersonas();
 
   const plan = profile?.plan ?? "free";
@@ -162,19 +160,19 @@ export default function DashboardPage() {
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-3">
         <Button asChild className="bg-violet-600 hover:bg-violet-700">
-          <Link href="/dashboard/generate">
+          <Link href="/generate">
             <Sparkles className="size-4" />
             New Generation
           </Link>
         </Button>
         <Button asChild variant="outline">
-          <Link href="/dashboard/personas/new">
+          <Link href="/personas/new">
             <UserPlus className="size-4" />
             Create Persona
           </Link>
         </Button>
         <Button asChild variant="outline">
-          <Link href="/dashboard/products">
+          <Link href="/products">
             <Package className="size-4" />
             Import Products
           </Link>
@@ -189,7 +187,7 @@ export default function DashboardPage() {
           </h2>
           {hasGenerations && (
             <Button asChild variant="ghost" size="sm">
-              <Link href="/dashboard/generate">
+              <Link href="/history">
                 View all
                 <ArrowRight className="size-4" />
               </Link>
@@ -208,33 +206,35 @@ export default function DashboardPage() {
             {recentGenerations.map((gen) => (
               <Link
                 key={gen.id}
-                href={`/dashboard/generate/${gen.id}`}
+                href={`/generate/${gen.id}`}
                 className="group"
               >
                 <Card className="transition-colors hover:border-violet-500/30">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-sm font-medium text-foreground">
-                        {gen.product_id.slice(0, 8)}...
-                      </CardTitle>
+                  <CardContent className="flex flex-col gap-2 py-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {gen.products?.name ?? `Generation ${gen.id.slice(0, 8)}`}
+                        </p>
+                        {gen.personas?.name && (
+                          <p className="truncate text-xs text-muted-foreground">
+                            {gen.personas.name}
+                          </p>
+                        )}
+                      </div>
                       <Badge
                         variant="secondary"
                         className={cn(
-                          "text-xs capitalize",
-                          statusColors[gen.status]
+                          "shrink-0 text-xs capitalize",
+                          statusColors[gen.status] ?? statusColors.pending
                         )}
                       >
                         {statusLabel(gen.status)}
                       </Badge>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="size-3" />
-                        {formatDate(gen.created_at)}
-                      </div>
-                      <span className="capitalize">{gen.mode} mode</span>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Clock className="size-3" />
+                      {formatDate(gen.created_at)}
                     </div>
                   </CardContent>
                 </Card>
@@ -257,7 +257,7 @@ export default function DashboardPage() {
                 </p>
               </div>
               <Button asChild className="bg-violet-600 hover:bg-violet-700">
-                <Link href="/dashboard/generate">
+                <Link href="/generate">
                   <Sparkles className="size-4" />
                   Get Started
                 </Link>

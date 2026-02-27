@@ -90,12 +90,35 @@ export interface Persona {
   updated_at: string;
 }
 
-export interface GenerationScript {
-  hook: { text: string; duration: number };
-  body: { text: string; duration: number };
-  cta: { text: string; duration: number };
+export interface ScriptSegment {
+  text: string;
+  duration_seconds: number;
+  variant_label: string;
 }
 
+/** @deprecated Use ScriptSegment instead */
+export type ScriptVariant = ScriptSegment;
+
+export interface GenerationScript {
+  hooks: ScriptSegment[];
+  bodies: ScriptSegment[];
+  ctas: ScriptSegment[];
+}
+
+export interface SegmentVideo {
+  url: string;
+  duration: number;
+  variation: number;
+  variant_label: string;
+}
+
+export interface GenerationSegments {
+  hooks: SegmentVideo[];
+  bodies: SegmentVideo[];
+  ctas: SegmentVideo[];
+}
+
+/** @deprecated Use SegmentVideo and GenerationSegments instead */
 export interface GenerationVideo {
   url: string;
   thumbnail_url: string;
@@ -106,7 +129,7 @@ export interface GenerationVideo {
 export type GenerationStatus =
   | "pending"
   | "scripting"
-  | "generating_image"
+  | "content_ready"
   | "submitting_jobs"
   | "generating_segments"
   | "generating_video"
@@ -119,11 +142,11 @@ export interface Generation {
   owner_id: string;
   product_id: string;
   persona_id: string;
-  mode: "easy" | "expert";
+  mode: "single" | "triple";
   status: GenerationStatus;
   script: GenerationScript | null;
   composite_image_url: string | null;
-  videos: GenerationVideo[];
+  videos: GenerationSegments | null;
   error_message: string | null;
   external_job_ids: Record<string, string>;
   started_at: string | null;

@@ -242,14 +242,16 @@ As the system, I want to generate 9 UGC ad script variants from product data and
 - 3 Hook variants (3-5s each, different opening angles)
 - 3 Body variants (5-10s each, different selling points emphasized)
 - 3 CTA variants (3-5s each, different urgency/action framing)
-**And** tuned to product description and brand tone **And** status updates to `'scripting'` then `'generating_image'` **And** scripts saved to `generations.script`
+**And** tuned to product description and brand tone **And** status set to `'scripting'` at creation **And** scripts saved to `generations.script`
 
-> **Audit note:** Credit deduction (from Story 4.8) merged here. 9 credits per batch, not 1. OpenRouter replaces OpenAI.
+> **Audit note:** Credit deduction (from Story 4.8) merged here. 9 credits per batch, not 1. OpenRouter replaces OpenAI. Status flow clarification: script generation and composite image run **in parallel** (both happen while status = `'scripting'`). There is no separate `generating_image` status — both complete before status advances to `'submitting_jobs'`.
 
 ### Story 5.3: POV Composite Image Generation
 As the system, I want to generate a composite image of persona holding/using the product.
 
-**Given** script generation complete **When** next step of `generate-video/` executes **Then** NanoBanana generates POV-style composite from persona's selected image + product image **And** uploaded to `composite-images` Storage bucket **And** status updates to `'submitting_jobs'`
+**Given** `generate-video/` is in `'scripting'` status **When** composite image step executes in parallel with script generation **Then** NanoBanana generates POV-style composite from persona's selected image + product image **And** composite uploaded to `composite-images` Storage bucket **And** once BOTH script and composite complete, status advances to `'submitting_jobs'`
+
+> **Implementation note:** Script generation (`callOpenRouter`) and composite image generation (`generateCompositeImage`) run concurrently via `Promise.all`. The `'scripting'` status covers both operations.
 
 ### Story 5.4: Script Generation Retry on Failure
 As the system, I want to retry AI API calls on failure.
@@ -259,9 +261,9 @@ As the system, I want to retry AI API calls on failure.
 ### Story 5.5: Generation Status Tracking (+ Progress UI)
 As a user, I want real-time progress of my generation.
 
-**Given** generation in progress **When** frontend polls `video-status/` every 5s **Then** current status returned (scripting → generating_image → submitting_jobs → generating_segments → completed) **And** progress indicator shows segments completed / 9 total **And** stage label displayed
+**Given** generation in progress **When** frontend polls `video-status/` every 5s **Then** current status returned with these transitions: `scripting → submitting_jobs → generating_segments → completed` **And** progress indicator shows segments completed / 9 total **And** stage label displayed per pipeline step
 
-> **Audit note:** Merged Story 6.8 (Generation Progress UI) — same component handles all progress states. Status values updated for segment model.
+> **Audit note (2026-02-27):** Merged Story 6.8 (Generation Progress UI) — same component handles all progress states. Status flow corrected: `generating_image` removed (script + image run in parallel under `scripting`). Actual backend status flow: `pending → scripting → submitting_jobs → generating_segments → completed|failed`.
 
 ---
 
@@ -276,13 +278,13 @@ System submits 9 segment jobs to Kling 3.0, polls for completion, delivers segme
 ### Story 6.1: Segment Job Submission (9 Jobs)
 As the system, I want to submit independent Kling jobs for each segment variant.
 
-**Given** composite image and 9 script variants ready **When** `generate-video/` submits jobs **Then** Kling 3.0 receives 9 jobs:
-- 3 Hook jobs (hook_1, hook_2, hook_3)
-- 3 Body jobs (body_1, body_2, body_3) — body > 10s split into sub-segments
-- 3 CTA jobs (cta_1, cta_2, cta_3)
-**And** each job uses the composite image + segment script text **And** job IDs stored in `generations.external_job_ids` JSONB **And** status set to `'generating_segments'` **And** generation_id returned to frontend
+**Given** composite image and 9 script variants ready **When** `generate-video/` submits jobs **Then** Kling `kling-v2-6` model receives 9 jobs in parallel:
+- 3 Hook jobs (hook_1, hook_2, hook_3) — 3-5s duration
+- 3 Body jobs (body_1, body_2, body_3) — 5-10s duration (LLM caps at 10s max; no runtime splitting needed)
+- 3 CTA jobs (cta_1, cta_2, cta_3) — 3-5s duration
+**And** each job uses the composite image (`image` field) + segment script text (`prompt`) + `mode: "std"` **And** job IDs stored in `generations.external_job_ids` JSONB **And** status set to `'generating_segments'` **And** generation_id returned to frontend
 
-> **Audit note:** 9 jobs per PRD segment model (3H+3B+3C), not 12 (3×4 variations). Kling API endpoints abstracted behind `_shared/kling.ts` helper for easy updates.
+> **Audit note (2026-02-27):** FR22 (body segment splitting for >10s) satisfied by LLM script constraint (body bounded 5-10s), not runtime splitting. Kling API fixed: field name `image` (not `image_url`), mode `std` (not `standard`), model `kling-v2-6` explicitly set. Kling image2video endpoint does not accept `aspect_ratio` — aspect ratio inferred from input image.
 
 ### Story 6.2: Video Segment Polling
 As the system, I want to poll Kling 3.0 for each segment's completion.
@@ -299,9 +301,9 @@ As a user, I want to review my 9 generated segments organized by type and previe
 ### Story 6.6: Segment Download
 As a user, I want to download individual video segments as MP4.
 
-**Given** viewing completed generation **When** click "Download" on any segment **Then** MP4 downloads via signed URL **And** all 9 segments downloadable individually **And** bulk download option (zip of all 9)
+**Given** viewing completed generation **When** click "Download" on any segment **Then** MP4 downloads via signed URL **And** all 9 segments downloadable individually
 
-> **Audit note:** Full stitched combination download deferred to Phase 1.5. Users download individual segments for now.
+> **Audit note (2026-02-27):** Full stitched combination download deferred to Phase 1.5. Bulk zip download deferred to Phase 1.5 (requires server-side zip creation not feasible in Deno Edge Functions). MVP: individual segment download only via signed URL.
 
 ### Story 6.7: Generation Failure Handling
 As a user, I want clear feedback when generation fails.

@@ -56,5 +56,7 @@ export const PLANS = {
 
 export type PlanTier = keyof typeof PLANS;
 
-/** Cost per batch generation in segment credits */
+/** Cost per single generation (1 hook + 1 body + 1 CTA) */
+export const CREDITS_PER_SINGLE = 3;
+/** Cost per triple generation (3 hooks + 3 bodies + 3 CTAs) */
 export const CREDITS_PER_BATCH = 9;

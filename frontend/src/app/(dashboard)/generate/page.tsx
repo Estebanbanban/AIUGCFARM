@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { PLANS, CREDITS_PER_BATCH, type PlanTier } from "@/lib/stripe";
+import { PLANS, CREDITS_PER_SINGLE, CREDITS_PER_BATCH, type PlanTier } from "@/lib/stripe";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -37,7 +37,8 @@ import {
 } from "@/components/ui/dialog";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { useProducts } from "@/hooks/use-products";
-import { usePersonas } from "@/hooks/use-personas";
+import { usePersonas, resolvePersonaImageUrl } from "@/hooks/use-personas";
+import type { Persona } from "@/types/database";
 import { useCredits } from "@/hooks/use-credits";
 import { useCreateGeneration } from "@/hooks/use-generations";
 import { useCheckout } from "@/hooks/use-checkout";
@@ -47,6 +48,34 @@ const steps = [
   { number: 2, label: "Persona" },
   { number: 3, label: "Review" },
 ];
+
+/** Resolve image URLs for a list of personas (handles storage paths). */
+function useResolvedPersonaImages(personas: Persona[] | undefined) {
+  const [imageMap, setImageMap] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    if (!personas || personas.length === 0) return;
+
+    let cancelled = false;
+    async function resolve() {
+      const entries = await Promise.all(
+        personas!.map(async (p) => {
+          const url = await resolvePersonaImageUrl(p.selected_image_url);
+          return [p.id, url] as [string, string | null];
+        })
+      );
+      if (!cancelled) {
+        setImageMap(Object.fromEntries(entries));
+      }
+    }
+    resolve();
+    return () => {
+      cancelled = true;
+    };
+  }, [personas]);
+
+  return imageMap;
+}
 
 export default function GeneratePage() {
   const router = useRouter();
@@ -58,6 +87,7 @@ export default function GeneratePage() {
   const { data: credits, isLoading: creditsLoading } = useCredits();
   const createGeneration = useCreateGeneration();
   const checkout = useCheckout();
+  const personaImageMap = useResolvedPersonaImages(personas);
 
   const confirmedProducts = products?.filter((p) => p.confirmed) ?? [];
   const activePersonas = personas ?? [];
@@ -66,7 +96,8 @@ export default function GeneratePage() {
   const selectedPersona = activePersonas.find((p) => p.id === store.personaId);
 
   const creditsRemaining = credits?.remaining ?? 0;
-  const hasEnoughCredits = creditsRemaining >= CREDITS_PER_BATCH;
+  const creditCost = store.mode === "single" ? CREDITS_PER_SINGLE : CREDITS_PER_BATCH;
+  const hasEnoughCredits = creditsRemaining >= creditCost;
 
   function handleNext() {
     if (store.step < 3) store.setStep(store.step + 1);
@@ -101,12 +132,12 @@ export default function GeneratePage() {
       {
         product_id: store.productId,
         persona_id: store.personaId,
-        mode: store.mode as "easy" | "expert",
+        mode: store.mode,
       },
       {
-        onSuccess: (generation) => {
+        onSuccess: (result) => {
           store.reset();
-          router.push(`/dashboard/generate/${generation.id}`);
+          router.push(`/generate/${result.generation_id}`);
           toast.success("Generation started!");
         },
         onError: (err) => {
@@ -325,9 +356,9 @@ export default function GeneratePage() {
                     >
                       <CardContent className="flex flex-col items-center gap-3 py-6">
                         <div className="flex size-20 items-center justify-center rounded-full bg-muted">
-                          {persona.selected_image_url ? (
+                          {personaImageMap[persona.id] ? (
                             <img
-                              src={persona.selected_image_url}
+                              src={personaImageMap[persona.id]!}
                               alt={persona.name}
                               className="size-full rounded-full object-cover"
                             />
@@ -396,38 +427,70 @@ export default function GeneratePage() {
 
                   <Separator />
 
-                  {/* Mode */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Mode</span>
-                    <Badge variant="secondary" className="capitalize">
-                      {store.mode}
-                    </Badge>
+                  {/* Mode toggle */}
+                  <div>
+                    <p className="mb-2 text-sm text-muted-foreground">
+                      Generation mode
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => store.setMode("single")}
+                        className={cn(
+                          "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
+                          store.mode === "single"
+                            ? "border-violet-500 bg-violet-500/5 ring-1 ring-violet-500/30"
+                            : "border-border hover:border-muted-foreground/30"
+                        )}
+                      >
+                        <div className="flex w-full items-center justify-between">
+                          <p className="text-sm font-semibold text-foreground">
+                            Single
+                          </p>
+                          <p className="text-sm font-bold text-violet-400">
+                            {CREDITS_PER_SINGLE} credits
+                          </p>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          1 hook · 1 body · 1 CTA
+                        </p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => store.setMode("triple")}
+                        className={cn(
+                          "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
+                          store.mode === "triple"
+                            ? "border-violet-500 bg-violet-500/5 ring-1 ring-violet-500/30"
+                            : "border-border hover:border-muted-foreground/30"
+                        )}
+                      >
+                        <div className="flex w-full items-center justify-between">
+                          <p className="text-sm font-semibold text-foreground">
+                            3x
+                          </p>
+                          <p className="text-sm font-bold text-violet-400">
+                            {CREDITS_PER_BATCH} credits
+                          </p>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          3 hooks · 3 bodies · 3 CTAs
+                        </p>
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Generation Info */}
-                  <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        What you will get
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        3 Hook + 3 Body + 3 CTA segments = 27 combinations
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-violet-400">
-                        {CREDITS_PER_BATCH}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        credits cost
-                      </p>
-                    </div>
+                  {/* Generation info summary */}
+                  <div className="rounded-lg bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
+                    {store.mode === "single"
+                      ? "You'll get 1 complete video combination."
+                      : "You'll get 27 possible combinations (3×3×3)."}
                   </div>
 
                   {!hasEnoughCredits && !creditsLoading && (
                     <div className="rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
-                      You need {CREDITS_PER_BATCH} credits but have{" "}
-                      {creditsRemaining}. Subscribe or upgrade to continue.
+                      You need {creditCost} credits but have {creditsRemaining}.
+                      Subscribe or upgrade to continue.
                     </div>
                   )}
                 </CardContent>
@@ -490,7 +553,7 @@ export default function GeneratePage() {
             </DialogTitle>
             <DialogDescription>
               {creditsRemaining > 0
-                ? `You need ${CREDITS_PER_BATCH} credits but have ${creditsRemaining}. Upgrade your plan for more credits.`
+                ? `You need ${creditCost} credits but have ${creditsRemaining}. Upgrade your plan for more credits.`
                 : "Choose a plan to start generating UGC videos."}
             </DialogDescription>
           </DialogHeader>

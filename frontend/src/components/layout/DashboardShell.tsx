@@ -8,6 +8,7 @@ import {
   Package,
   Users,
   Sparkles,
+  Clock,
   Settings,
   Menu,
   LogOut,
@@ -32,7 +33,8 @@ const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Products", href: "/dashboard/products", icon: Package },
   { label: "Personas", href: "/dashboard/personas", icon: Users },
-  { label: "Generate", href: "/dashboard/generate", icon: Sparkles },
+  { label: "Generate", href: "/generate", icon: Sparkles },
+  { label: "History", href: "/history", icon: Clock },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
