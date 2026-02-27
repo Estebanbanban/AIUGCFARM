@@ -14,6 +14,7 @@ import {
   Package,
   RefreshCw,
   Smartphone,
+  Trash2,
   User,
   Zap,
   LinkIcon,
@@ -42,6 +43,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogDescription,
@@ -50,7 +52,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { useProducts, useScrapeProduct } from "@/hooks/use-products";
 import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
-import { usePersonas, resolvePersonaImageUrl } from "@/hooks/use-personas";
+import {
+  useDeletePersona,
+  usePersonas,
+  resolvePersonaImageUrl,
+} from "@/hooks/use-personas";
 import type { Persona, Product, BrandSummary } from "@/types/database";
 import { useCredits } from "@/hooks/use-credits";
 import {
@@ -187,6 +193,7 @@ export default function GeneratePage() {
   >([]);
   const [selectedCompositeIdx, setSelectedCompositeIdx] = useState<number | null>(null);
   const [previewEditPrompt, setPreviewEditPrompt] = useState("");
+  const [personaToDelete, setPersonaToDelete] = useState<Persona | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewWaitSeconds, setPreviewWaitSeconds] = useState(0);
   const previewRequestRef = useRef(0);
@@ -200,6 +207,7 @@ export default function GeneratePage() {
   const createGeneration = useCreateGeneration();
   const generateComposites = useGenerateCompositeImages();
   const editComposite = useEditCompositeImage();
+  const deletePersona = useDeletePersona(personaToDelete?.id ?? "");
   const checkout = useCheckout();
 
   const confirmedProducts = products?.filter((p) => p.confirmed) ?? [];
@@ -234,7 +242,7 @@ export default function GeneratePage() {
 
   function canProceed() {
     if (store.step === 1) return !!store.productId;
-    if (store.step === 2) return !!store.personaId;
+    if (store.step === 2) return !!selectedPersona;
     if (store.step === 3) return !!store.compositeImagePath;
     return false;
   }
@@ -345,6 +353,24 @@ export default function GeneratePage() {
     store.setPersonaId(personaId);
     setBuildingPersona(false);
     store.setStep(3);
+  }
+
+  function handleDeletePersona() {
+    if (!personaToDelete) return;
+    const deletingId = personaToDelete.id;
+
+    deletePersona.mutate(undefined, {
+      onSuccess: () => {
+        if (store.personaId === deletingId) {
+          store.setPersonaId("");
+        }
+        setPersonaToDelete(null);
+        toast.success("Persona deleted");
+      },
+      onError: (err) => {
+        toast.error(err.message || "Failed to delete persona");
+      },
+    });
   }
 
   // ── Composite preview handlers ───────────────────────────────────────────
@@ -756,48 +782,58 @@ export default function GeneratePage() {
             ) : activePersonas.length > 0 ? (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {activePersonas.map((persona) => (
-                  <button
-                    key={persona.id}
-                    onClick={() => store.setPersonaId(persona.id)}
-                    className="text-left"
-                  >
-                    <Card
-                      className={cn(
-                        "h-full transition-all",
-                        store.personaId === persona.id
-                          ? "border-primary ring-1 ring-primary/30"
-                          : "hover:border-muted-foreground/30",
-                      )}
+                  <div key={persona.id} className="flex flex-col gap-2">
+                    <button
+                      onClick={() => store.setPersonaId(persona.id)}
+                      className="text-left"
                     >
-                      <CardContent className="flex flex-col items-center gap-3 p-6">
-                        <div className="flex size-20 items-center justify-center rounded-full bg-muted">
-                          {personaImageMap[persona.id] ? (
-                            <img
-                              src={personaImageMap[persona.id]!}
-                              alt={persona.name}
-                              className="size-full rounded-full object-cover"
-                            />
-                          ) : (
-                            <User className="size-8 text-muted-foreground" />
-                          )}
-                        </div>
-                        <div className="text-center">
-                          <h3 className="font-medium">{persona.name}</h3>
-                          <p className="text-xs text-muted-foreground">
-                            {persona.attributes.gender} /{" "}
-                            {persona.attributes.age} /{" "}
-                            {persona.attributes.clothing_style}
-                          </p>
-                        </div>
-                        {store.personaId === persona.id && (
-                          <div className="flex items-center gap-1.5 text-xs text-primary">
-                            <Check className="size-3.5" />
-                            Selected
-                          </div>
+                      <Card
+                        className={cn(
+                          "h-full transition-all",
+                          store.personaId === persona.id
+                            ? "border-primary ring-1 ring-primary/30"
+                            : "hover:border-muted-foreground/30",
                         )}
-                      </CardContent>
-                    </Card>
-                  </button>
+                      >
+                        <CardContent className="flex flex-col items-center gap-3 p-6">
+                          <div className="flex size-20 items-center justify-center rounded-full bg-muted">
+                            {personaImageMap[persona.id] ? (
+                              <img
+                                src={personaImageMap[persona.id]!}
+                                alt={persona.name}
+                                className="size-full rounded-full object-cover"
+                              />
+                            ) : (
+                              <User className="size-8 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div className="text-center">
+                            <h3 className="font-medium">{persona.name}</h3>
+                            <p className="text-xs text-muted-foreground">
+                              {persona.attributes.gender} /{" "}
+                              {persona.attributes.age} /{" "}
+                              {persona.attributes.clothing_style}
+                            </p>
+                          </div>
+                          {store.personaId === persona.id && (
+                            <div className="flex items-center gap-1.5 text-xs text-primary">
+                              <Check className="size-3.5" />
+                              Selected
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setPersonaToDelete(persona)}
+                    >
+                      <Trash2 className="size-4" />
+                      Delete
+                    </Button>
+                  </div>
                 ))}
               </div>
             ) : null}
@@ -1317,6 +1353,46 @@ export default function GeneratePage() {
           </Button>
         )}
       </div>
+
+      <Dialog
+        open={!!personaToDelete}
+        onOpenChange={(open) => {
+          if (!open) setPersonaToDelete(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete persona</DialogTitle>
+            <DialogDescription>
+              Delete &quot;{personaToDelete?.name}&quot; from your persona library?
+              Existing generations will not be affected.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPersonaToDelete(null)}
+              disabled={deletePersona.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeletePersona}
+              disabled={deletePersona.isPending}
+            >
+              {deletePersona.isPending ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Persona"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Paywall dialog */}
       <Dialog open={showPaywall} onOpenChange={setShowPaywall}>
