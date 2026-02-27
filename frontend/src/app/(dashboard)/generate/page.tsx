@@ -123,6 +123,7 @@ export default function GeneratePage() {
   // Step 1 — product add state
   const [addingProduct, setAddingProduct] = useState(false);
   const [importUrl, setImportUrl] = useState("");
+  const [scrapeError, setScrapeError] = useState<string | null>(null);
   const [scrapedProducts, setScrapedProducts] = useState<Product[]>([]);
   const [scrapedBrandSummary, setScrapedBrandSummary] =
     useState<BrandSummary | null>(null);
@@ -183,6 +184,7 @@ export default function GeneratePage() {
 
   async function handleScrape() {
     if (!importUrl.trim()) return;
+    setScrapeError(null);
     try {
       const result = await scrapeProduct.mutateAsync({ url: importUrl.trim() });
       if (result.save_failed || !result.saved) {
@@ -218,8 +220,11 @@ export default function GeneratePage() {
       setShowScrapeResults(true);
       setImportUrl("");
     } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to import product";
+      setScrapeError(message);
       toast.error(
-        err instanceof Error ? err.message : "Failed to import product",
+        message,
         { action: { label: "Retry", onClick: handleScrape } },
       );
     }
@@ -231,6 +236,7 @@ export default function GeneratePage() {
     setScrapedBrandSummary(null);
     setShowScrapeResults(false);
     setAddingProduct(false);
+    setScrapeError(null);
     queryClient.invalidateQueries({ queryKey: ["products"] });
     if (firstId) {
       store.setProductId(firstId);
@@ -249,7 +255,9 @@ export default function GeneratePage() {
     setAddingProduct(false);
     setShowScrapeResults(false);
     setScrapedProducts([]);
+    setScrapedBrandSummary(null);
     setImportUrl("");
+    setScrapeError(null);
   }
 
   // ── Persona builder callback ─────────────────────────────────────────────
@@ -448,6 +456,9 @@ export default function GeneratePage() {
                           Supports Shopify stores and most e-commerce product
                           pages.
                         </p>
+                        {scrapeError && (
+                          <p className="text-xs text-destructive">{scrapeError}</p>
+                        )}
                       </div>
                       <Button
                         onClick={handleScrape}

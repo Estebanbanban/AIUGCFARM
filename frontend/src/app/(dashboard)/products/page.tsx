@@ -59,6 +59,7 @@ export default function ProductsPage() {
 
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importUrl, setImportUrl] = useState('');
+  const [scrapeError, setScrapeError] = useState<string | null>(null);
   const [scrapedProducts, setScrapedProducts] = useState<Product[]>([]);
   const [scrapedBrandSummary, setScrapedBrandSummary] = useState<BrandSummary | null>(null);
   const [showScrapeResults, setShowScrapeResults] = useState(false);
@@ -68,6 +69,7 @@ export default function ProductsPage() {
   async function handleScrape() {
     if (!importUrl.trim()) return;
 
+    setScrapeError(null);
     try {
       const result = await scrapeProduct.mutateAsync({ url: importUrl.trim() });
       if (result.save_failed || !result.saved) {
@@ -103,6 +105,7 @@ export default function ProductsPage() {
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Failed to scrape product';
+      setScrapeError(message);
       toast.error(message, {
         action: {
           label: 'Retry',
@@ -117,6 +120,7 @@ export default function ProductsPage() {
     setScrapedProducts([]);
     setScrapedBrandSummary(null);
     setShowImportDialog(false);
+    setScrapeError(null);
     toast.success('Products imported successfully!');
   }
 
@@ -132,6 +136,7 @@ export default function ProductsPage() {
       setScrapedProducts([]);
       setScrapedBrandSummary(null);
       setImportUrl('');
+      setScrapeError(null);
     }
   }
 
@@ -283,6 +288,9 @@ export default function ProductsPage() {
                     <p className="text-xs text-muted-foreground">
                       Supports Shopify stores and most e-commerce product pages.
                     </p>
+                    {scrapeError && (
+                      <p className="text-xs text-destructive">{scrapeError}</p>
+                    )}
                   </div>
                   <div className="flex justify-end gap-2">
                     <Button
