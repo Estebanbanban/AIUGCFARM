@@ -317,6 +317,7 @@ Deno.serve(async (req: Request) => {
         persona_id,
         mode: resolvedMode,
         video_quality: resolvedQuality,
+        kling_model: klingModel,
         status: "scripting",
         started_at: new Date().toISOString(),
       })
@@ -376,6 +377,7 @@ Deno.serve(async (req: Request) => {
 
       // Build all 9 job submissions and run in parallel
       const jobEntries: Array<[string, string]> = [];
+      const jobModels: string[] = [];
       const SEG_KEY = { hooks: "hook", bodies: "body", ctas: "cta" } as const;
       const segmentTypes = ["hooks", "bodies", "ctas"] as const;
       const jobSubmissions = segmentTypes.flatMap((segType) =>
@@ -386,15 +388,20 @@ Deno.serve(async (req: Request) => {
               image_url: klingCompositeUrl.signedUrl,
               script: `A UGC creator speaking directly to camera, saying: "${segment.text}" Natural, authentic talking-head style, casual handheld selfie aesthetic.`,
               duration: segment.duration_seconds <= 5 ? 5 : 10, // Kling only accepts 5 or 10
-              mode: "std",
+              mode: "pro",
+              sound: "on",
               model_name: klingModel,
             })
-          ).then((result) => [jobKey, result.job_id] as [string, string]);
+          ).then((result) => {
+            if (result.model_name) jobModels.push(result.model_name);
+            return [jobKey, result.job_id] as [string, string];
+          });
         })
       );
 
       jobEntries.push(...await Promise.all(jobSubmissions));
       const jobIds: Record<string, string> = Object.fromEntries(jobEntries);
+      const modelUsed = jobModels[0] || klingModel;
 
       // ── 15. Update generation with job IDs and status ─────────────
 
@@ -402,6 +409,7 @@ Deno.serve(async (req: Request) => {
         .from("generations")
         .update({
           external_job_ids: jobIds,
+          kling_model: modelUsed,
           status: "generating_segments",
         })
         .eq("id", generationId);
