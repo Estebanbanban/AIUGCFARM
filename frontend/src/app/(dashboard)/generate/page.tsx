@@ -55,24 +55,37 @@ import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { useProducts, useScrapeProduct } from "@/hooks/use-products";
 import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
 import { usePersonas, resolvePersonaImageUrl } from "@/hooks/use-personas";
-import type { Persona, Product, BrandSummary } from "@/types/database";
+import type { Persona, Product, BrandSummary, ScriptSegment } from "@/types/database";
 import { useCredits } from "@/hooks/use-credits";
 import {
   useCreateGeneration,
   useEditCompositeImage,
   useGenerateCompositeImages,
+  useGenerateScript,
+  useApproveAndGenerate,
 } from "@/hooks/use-generations";
 import { useCheckout, useBuyCredits } from "@/hooks/use-checkout";
 import { useProfile } from "@/hooks/use-profile";
 import { ManualUploadForm } from "@/components/products/ManualUploadForm";
 import { ScrapeResults } from "@/components/products/ScrapeResults";
 import { PersonaBuilderInline } from "@/components/personas/PersonaBuilderInline";
+import {
+  trackProductImported,
+  trackPersonaCreated,
+  trackPreviewGenerated,
+  trackScriptGenerated,
+  trackVideoGenerationStarted,
+  trackPaywallShown,
+  trackCheckoutStarted,
+  trackCreditsPurchased,
+} from "@/lib/datafast";
 
 const steps = [
   { number: 1, label: "Product" },
   { number: 2, label: "Persona" },
   { number: 3, label: "Preview" },
-  { number: 4, label: "Generate" },
+  { number: 4, label: "Configure" },
+  { number: 5, label: "Review Script" },
 ];
 
 const CTA_STYLE_OPTIONS = [
@@ -204,6 +217,8 @@ export default function GeneratePage() {
   const createGeneration = useCreateGeneration();
   const generateComposites = useGenerateCompositeImages();
   const editComposite = useEditCompositeImage();
+  const generateScript = useGenerateScript();
+  const approveAndGenerate = useApproveAndGenerate();
   const checkout = useCheckout();
   const buyCredits = useBuyCredits();
 
@@ -246,11 +261,12 @@ export default function GeneratePage() {
     if (store.step === 1) return !!store.productId;
     if (store.step === 2) return !!store.personaId;
     if (store.step === 3) return !!store.compositeImagePath;
+    // Step 4 proceeds via "Generate Script" button, not the generic Next button
     return false;
   }
 
   function handleNext() {
-    if (store.step < 4) store.setStep(store.step + 1);
+    if (store.step < 5) store.setStep(store.step + 1);
   }
 
   function handleBack() {
@@ -325,6 +341,7 @@ export default function GeneratePage() {
     setShowScrapeResults(false);
     setAddingProduct(false);
     setScrapeError(null);
+    trackProductImported("url");
     queryClient.invalidateQueries({ queryKey: ["products"] });
     if (firstId) {
       store.setProductId(firstId);
@@ -334,6 +351,7 @@ export default function GeneratePage() {
   }
 
   function handleManualUploadSuccess() {
+    trackProductImported("manual");
     queryClient.invalidateQueries({ queryKey: ["products"] });
     setAddingProduct(false);
     // Don't auto-advance, user needs to click their product in the grid
@@ -351,6 +369,7 @@ export default function GeneratePage() {
   // ── Persona builder callback ─────────────────────────────────────────────
 
   function handlePersonaSaved(personaId: string) {
+    trackPersonaCreated();
     queryClient.invalidateQueries({ queryKey: ["personas"] });
     store.setPersonaId(personaId);
     setBuildingPersona(false);
@@ -382,6 +401,7 @@ export default function GeneratePage() {
       {
         onSuccess: (result) => {
           setCompositeImages(result.images);
+          trackPreviewGenerated();
         },
         onError: (err) => {
           toast.error(err.message || "Failed to generate preview images");
@@ -422,7 +442,83 @@ export default function GeneratePage() {
     );
   }
 
-  // ── Generation ───────────────────────────────────────────────────────────
+  // ── Script generation (phase 1) ─────────────────────────────────────────
+
+  async function handleGenerateScript() {
+    if (!hasEnoughCredits) {
+      trackPaywallShown("insufficient_credits");
+      setShowPaywall(true);
+      return;
+    }
+    if (requiresCommentKeyword && !commentKeyword) {
+      toast.error("Add a comment keyword for the CTA style.");
+      return;
+    }
+    if (!store.productId || !store.personaId || !store.compositeImagePath) return;
+
+    generateScript.mutate(
+      {
+        product_id: store.productId,
+        persona_id: store.personaId,
+        mode: store.mode,
+        quality: store.quality,
+        composite_image_path: store.compositeImagePath,
+        cta_style: store.ctaStyle,
+        cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
+        phase: "script",
+      },
+      {
+        onSuccess: (result) => {
+          if (result.script) {
+            trackScriptGenerated(store.mode, store.quality);
+            store.setPendingScript(
+              result.generation_id,
+              result.script,
+              result.credits_to_charge ?? effectiveCost,
+            );
+            store.setStep(5);
+          } else {
+            toast.error("Script was not returned. Please try again.");
+          }
+        },
+        onError: (err) => {
+          toast.error(err.message || "Failed to generate script");
+        },
+      },
+    );
+  }
+
+  // ── Approve & generate video (phase 2) ────────────────────────────────
+
+  async function handleApproveAndGenerate() {
+    if (!store.pendingGenerationId || !store.pendingScript) return;
+    if (!hasEnoughCredits) {
+      trackPaywallShown("insufficient_credits");
+      setShowPaywall(true);
+      return;
+    }
+
+    approveAndGenerate.mutate(
+      {
+        generation_id: store.pendingGenerationId,
+        override_script: store.pendingScript,
+      },
+      {
+        onSuccess: (result) => {
+          const genId = store.pendingGenerationId!;
+          trackVideoGenerationStarted(store.mode, store.quality);
+          store.reset();
+          router.push(`/generate/${genId}`);
+          toast.success("Generation started!");
+        },
+        onError: (err) => {
+          toast.error(err.message || "Failed to start generation");
+        },
+      },
+    );
+  }
+
+  // ── Legacy generation (backwards compat) ──────────────────────────────
 
   async function handleGenerate() {
     if (!hasEnoughCredits) {
@@ -460,14 +556,20 @@ export default function GeneratePage() {
 
   async function handleCheckout(plan: PlanTier) {
     checkout.mutate(plan, {
-      onSuccess: (url) => { window.location.href = url; },
+      onSuccess: (url) => {
+        trackCheckoutStarted(plan);
+        window.location.href = url;
+      },
       onError: (err) => { toast.error(err.message || "Failed to start checkout"); },
     });
   }
 
   async function handleBuyPack(pack: CreditPackKey) {
     buyCredits.mutate(pack, {
-      onSuccess: (url) => { window.location.href = url; },
+      onSuccess: (url) => {
+        trackCreditsPurchased(pack);
+        window.location.href = url;
+      },
       onError: (err) => { toast.error(err.message || "Failed to start checkout"); },
     });
   }
@@ -499,7 +601,13 @@ export default function GeneratePage() {
           <div key={s.number} className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => {
-                if (s.number < store.step) store.setStep(s.number);
+                // Allow going back to earlier steps, but when leaving step 5, clear pending script
+                if (s.number < store.step) {
+                  if (store.step === 5 && s.number < 5) {
+                    store.clearPendingScript();
+                  }
+                  store.setStep(s.number);
+                }
               }}
               className="flex items-center gap-2"
             >
@@ -1052,11 +1160,18 @@ export default function GeneratePage() {
           </div>
         )}
 
-        {/* ── Step 4: Review & Generate ─────────────────────────────────── */}
+        {/* ── Step 4: Configure ──────────────────────────────────────────── */}
         {store.step === 4 && (
           <div className="flex flex-col gap-6">
-            <h2 className="text-lg font-semibold">Review & Generate</h2>
+            <h2 className="text-lg font-semibold">Configure & Generate Script</h2>
 
+            {generateScript.isPending ? (
+              <div className="flex flex-col items-center gap-4 py-20">
+                <Loader2 className="size-10 animate-spin text-primary" />
+                <p className="text-base font-medium">Generating your script...</p>
+                <p className="text-sm text-muted-foreground">This usually takes 15-30 seconds</p>
+              </div>
+            ) : (
             <div className="mx-auto w-full max-w-lg">
               <Card>
                 <CardContent className="flex flex-col gap-4 p-6">
@@ -1206,7 +1321,7 @@ export default function GeneratePage() {
                             variant="secondary"
                             className="text-[10px]"
                           >
-                            2× credits
+                            2x credits
                           </Badge>
                         </div>
                         <p className="mt-0.5 text-xs text-muted-foreground">
@@ -1284,41 +1399,172 @@ export default function GeneratePage() {
                     </div>
                   )}
 
-                  {/* Generate button */}
+                  {/* Generate Script button */}
                   <Button
-                    onClick={handleGenerate}
-                    disabled={createGeneration.isPending || (requiresCommentKeyword && !commentKeyword)}
+                    onClick={handleGenerateScript}
+                    disabled={generateScript.isPending || (requiresCommentKeyword && !commentKeyword)}
                     size="lg"
                     className="w-full"
                   >
-                    {createGeneration.isPending ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="size-4" />
-                        Generate &mdash;{" "}
-                        {isFirstVideo ? (
-                          <>
-                            <span className="line-through opacity-60">{creditCost}</span>
-                            {" "}{effectiveCost} credits
-                          </>
-                        ) : (
-                          <>{creditCost} credits</>
-                        )}
-                      </>
-                    )}
+                    <Sparkles className="size-4" />
+                    Generate Script
                   </Button>
                 </CardContent>
               </Card>
+            </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Step 5: Review Script ──────────────────────────────────────── */}
+        {store.step === 5 && store.pendingScript && (
+          <div className="flex flex-col gap-6">
+            <h2 className="text-lg font-semibold">Review Script</h2>
+
+            <div className="mx-auto w-full max-w-2xl flex flex-col gap-4">
+              {/* Script sections */}
+              {(["hooks", "bodies", "ctas"] as const).map((sectionType) => (
+                <div key={sectionType}>
+                  {store.pendingScript![sectionType].map((segment: ScriptSegment, idx: number) => (
+                    <Card key={`${sectionType}-${idx}`} className="mb-3">
+                      <CardContent className="flex flex-col gap-3 p-4">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold uppercase text-foreground">
+                            {sectionType === "hooks" ? "Hook" : sectionType === "bodies" ? "Body" : "CTA"}
+                            {store.pendingScript![sectionType].length > 1 ? ` ${idx + 1}` : ""}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-xs capitalize">
+                              {segment.variant_label}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {segment.duration_seconds}s
+                            </Badge>
+                          </div>
+                        </div>
+                        <Textarea
+                          value={segment.text}
+                          onChange={(e) => store.updateScriptSection(sectionType, idx, e.target.value)}
+                          rows={3}
+                          className="resize-none text-sm"
+                        />
+                        <div className="flex justify-end">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={generateScript.isPending}
+                            onClick={() => {
+                              if (!store.productId || !store.personaId || !store.compositeImagePath) return;
+                              generateScript.mutate(
+                                {
+                                  product_id: store.productId,
+                                  persona_id: store.personaId,
+                                  mode: store.mode,
+                                  quality: store.quality,
+                                  composite_image_path: store.compositeImagePath,
+                                  cta_style: store.ctaStyle,
+                                  cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
+                                  phase: "script",
+                                },
+                                {
+                                  onSuccess: (result) => {
+                                    if (result.script) {
+                                      const newSegments = result.script[sectionType];
+                                      if (newSegments?.[idx]) {
+                                        store.updateScriptSection(sectionType, idx, newSegments[idx].text);
+                                      }
+                                    }
+                                    // Update pendingGenerationId so the approval targets the
+                                    // latest generation record (avoids approving a stale one).
+                                    if (result.generation_id) {
+                                      store.setPendingScript(
+                                        result.generation_id,
+                                        store.pendingScript!,
+                                        store.creditsToCharge ?? 0,
+                                      );
+                                    }
+                                  },
+                                  onError: (err) => {
+                                    toast.error(err.message || "Failed to regenerate");
+                                  },
+                                },
+                              );
+                            }}
+                          >
+                            {generateScript.isPending ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <RefreshCw className="size-3.5" />
+                            )}
+                            Regenerate {sectionType === "hooks" ? "Hook" : sectionType === "bodies" ? "Body" : "CTA"}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ))}
+
+              {/* Credits info */}
+              <div className="rounded-lg border border-border bg-muted/30 px-4 py-3">
+                <p className="text-sm text-muted-foreground">
+                  This will use{" "}
+                  <span className="font-semibold text-foreground">
+                    {store.creditsToCharge ?? effectiveCost}
+                  </span>{" "}
+                  credits
+                  {!isUnlimitedCredits && (
+                    <>
+                      {" "}({creditsRemaining} remaining)
+                    </>
+                  )}
+                </p>
+              </div>
+
+              {!hasEnoughCredits && !creditsLoading && (
+                <div className="rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
+                  You need {store.creditsToCharge ?? effectiveCost} credits but have{" "}
+                  {creditsRemaining}. Subscribe or upgrade to continue.
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="flex items-center justify-between pt-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    store.clearPendingScript();
+                    store.setStep(4);
+                  }}
+                >
+                  <ArrowLeft className="size-4" />
+                  Back
+                </Button>
+                <Button
+                  onClick={handleApproveAndGenerate}
+                  disabled={approveAndGenerate.isPending || (!hasEnoughCredits && !creditsLoading)}
+                  size="lg"
+                >
+                  {approveAndGenerate.isPending ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Starting generation...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="size-4" />
+                      Generate Video
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         )}
       </div>
 
       {/* Navigation buttons */}
+      {store.step < 5 && (
       <div className="flex items-center justify-between border-t border-border pt-4">
         <Button
           variant="secondary"
@@ -1336,6 +1582,7 @@ export default function GeneratePage() {
           </Button>
         )}
       </div>
+      )}
 
       {/* Paywall dialog */}
       <Dialog open={showPaywall} onOpenChange={setShowPaywall}>

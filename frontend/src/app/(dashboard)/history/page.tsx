@@ -49,6 +49,8 @@ function ResolvedImage({ path, alt, className }: { path: string; alt: string; cl
 const statusColors: Record<GenerationStatus, string> = {
   pending: "bg-zinc-500/10 text-zinc-400",
   scripting: "bg-amber-500/10 text-amber-400",
+  awaiting_approval: "bg-amber-500/10 text-amber-400",
+  locking: "bg-amber-500/10 text-amber-400",
   submitting_jobs: "bg-primary/10 text-primary",
   generating_segments: "bg-blue-500/10 text-blue-400",
   completed: "bg-emerald-500/10 text-emerald-400",

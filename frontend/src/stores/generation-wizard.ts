@@ -1,5 +1,12 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
+import type { ScriptSegment } from "@/types/database";
+
+interface PendingScript {
+  hooks: ScriptSegment[];
+  bodies: ScriptSegment[];
+  ctas: ScriptSegment[];
+}
 
 interface GenerationWizardState {
   step: number;
@@ -17,6 +24,9 @@ interface GenerationWizardState {
     | "check_description";
   ctaCommentKeyword: string;
   compositeImagePath: string | null;
+  pendingGenerationId: string | null;
+  pendingScript: PendingScript | null;
+  creditsToCharge: number | null;
   setStep: (step: number) => void;
   setProductId: (id: string) => void;
   setPersonaId: (id: string) => void;
@@ -34,6 +44,9 @@ interface GenerationWizardState {
   ) => void;
   setCtaCommentKeyword: (keyword: string) => void;
   setCompositeImagePath: (path: string | null) => void;
+  setPendingScript: (id: string, script: PendingScript, credits: number) => void;
+  updateScriptSection: (type: "hooks" | "bodies" | "ctas", index: number, text: string) => void;
+  clearPendingScript: () => void;
   reset: () => void;
 }
 
@@ -48,6 +61,9 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
     ctaStyle: "auto",
     ctaCommentKeyword: "",
     compositeImagePath: null,
+    pendingGenerationId: null,
+    pendingScript: null,
+    creditsToCharge: null,
     setStep: (step) =>
       set((state) => {
         state.step = step;
@@ -84,6 +100,24 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
       set((state) => {
         state.compositeImagePath = path;
       }),
+    setPendingScript: (id, script, credits) =>
+      set((state) => {
+        state.pendingGenerationId = id;
+        state.pendingScript = script;
+        state.creditsToCharge = credits;
+      }),
+    updateScriptSection: (type, index, text) =>
+      set((state) => {
+        if (state.pendingScript && state.pendingScript[type][index]) {
+          state.pendingScript[type][index].text = text;
+        }
+      }),
+    clearPendingScript: () =>
+      set((state) => {
+        state.pendingGenerationId = null;
+        state.pendingScript = null;
+        state.creditsToCharge = null;
+      }),
     reset: () =>
       set(() => ({
         step: 1,
@@ -95,6 +129,9 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
         ctaStyle: "auto" as const,
         ctaCommentKeyword: "",
         compositeImagePath: null,
+        pendingGenerationId: null,
+        pendingScript: null,
+        creditsToCharge: null,
       })),
   }))
 );
