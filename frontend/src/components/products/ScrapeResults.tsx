@@ -57,9 +57,9 @@ export function ScrapeResults({
   async function handleConfirmAll() {
     setConfirming(true);
     try {
-      for (const product of products) {
-        await confirmProduct.mutateAsync({ product_id: product.id });
-      }
+      await confirmProduct.mutateAsync({
+        product_ids: products.map((p) => p.id),
+      });
       toast.success('Products confirmed!');
       onConfirmed();
     } catch (err) {

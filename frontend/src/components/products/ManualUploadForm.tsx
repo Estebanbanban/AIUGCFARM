@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { callEdge } from '@/lib/api';
+import { callEdgeMultipart } from '@/lib/api';
 import { createProductSchema } from '@/schemas/product';
 
 const MAX_FILES = 10;
@@ -129,16 +129,18 @@ export function ManualUploadForm({ onSuccess }: ManualUploadFormProps) {
     setIsSubmitting(true);
 
     try {
-      // Upload product data via Edge Function
-      await callEdge('upload-product', {
-        body: {
-          ...parsed.data,
-          // For now, we send the product data as JSON.
-          // Image uploads would be handled by a separate storage upload flow
-          // if the Edge Function supports it.
-          image_count: selectedFiles.length,
-        },
-      });
+      // Build multipart form data with product fields + image files
+      const formData = new FormData();
+      formData.append('name', parsed.data.name);
+      if (parsed.data.description) formData.append('description', parsed.data.description);
+      if (parsed.data.price !== undefined) formData.append('price', String(parsed.data.price));
+      formData.append('currency', parsed.data.currency ?? 'USD');
+      if (parsed.data.category) formData.append('category', parsed.data.category);
+      for (const sf of selectedFiles) {
+        formData.append('images', sf.file);
+      }
+
+      await callEdgeMultipart('upload-product', formData);
 
       toast.success('Product uploaded successfully!');
 

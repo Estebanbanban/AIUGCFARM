@@ -230,8 +230,6 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        void priceId; // available for future price-based plan lookup
-
         break;
       }
 
@@ -257,6 +255,12 @@ Deno.serve(async (req: Request) => {
             .from("profiles")
             .update({ plan: "free" })
             .eq("id", sub.owner_id);
+
+          // Clear remaining credits
+          await sb.from("credit_balances").upsert(
+            { owner_id: sub.owner_id, remaining: 0 },
+            { onConflict: "owner_id" },
+          );
         }
 
         break;

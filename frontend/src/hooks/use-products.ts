@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { callEdge } from "@/lib/api";
 import type { Product } from "@/types/database";
+import type { ScrapeResponse, ScrapeResponseData, ConfirmProductsResponse } from "@/types/api";
 import type { CreateProductInput, UpdateProductInput } from "@/schemas/product";
 
 export function useProducts() {
@@ -93,7 +94,8 @@ export function useScrapeProduct() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: { url: string }) => {
-      return callEdge<Product>("scrape-product", { body: data });
+      const res = await callEdge<ScrapeResponse>("scrape-product", { body: data });
+      return res.data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
   });
@@ -102,8 +104,9 @@ export function useScrapeProduct() {
 export function useConfirmProduct() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { product_id: string }) => {
-      return callEdge<Product>("confirm-products", { body: data });
+    mutationFn: async (data: { product_ids: string[] }) => {
+      const res = await callEdge<ConfirmProductsResponse>("confirm-products", { body: data });
+      return res.data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
   });

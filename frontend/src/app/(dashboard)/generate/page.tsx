@@ -12,7 +12,6 @@ import {
   ImageIcon,
   Loader2,
   Package,
-  Sparkles,
   User,
   Zap,
 } from "lucide-react";
@@ -35,7 +34,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { useProducts } from "@/hooks/use-products";

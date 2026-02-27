@@ -9,7 +9,6 @@ import {
   ArrowUpRight,
   CreditCard,
   Loader2,
-  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";

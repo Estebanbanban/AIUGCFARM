@@ -40,7 +40,7 @@ CREATE TABLE profiles (
 -- subscriptions
 CREATE TABLE subscriptions (
   id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  owner_id                UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  owner_id                UUID NOT NULL UNIQUE REFERENCES profiles(id) ON DELETE CASCADE,
   stripe_customer_id      TEXT NOT NULL,
   stripe_subscription_id  TEXT UNIQUE,
   plan                    TEXT CHECK (plan IN ('starter','growth','scale')),
@@ -110,7 +110,7 @@ CREATE TABLE generations (
   mode              TEXT NOT NULL DEFAULT 'easy'
                       CHECK (mode IN ('easy','expert')),
   status            TEXT NOT NULL DEFAULT 'pending'
-                      CHECK (status IN ('pending','scripting','generating_image','generating_video','stitching','completed','failed')),
+                      CHECK (status IN ('pending','scripting','generating_image','submitting_jobs','generating_segments','generating_video','stitching','completed','failed')),
   script            JSONB,
   composite_image_url TEXT,
   videos            JSONB DEFAULT '[]',

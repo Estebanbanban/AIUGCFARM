@@ -31,7 +31,7 @@ import { useProducts, useScrapeProduct, useDeleteProduct } from '@/hooks/use-pro
 import { ProductCard } from '@/components/products/ProductCard';
 import { ScrapeResults } from '@/components/products/ScrapeResults';
 import { ManualUploadForm } from '@/components/products/ManualUploadForm';
-import type { Product } from '@/types/database';
+import type { Product, BrandSummary } from '@/types/database';
 
 function ProductCardSkeleton() {
   return (
@@ -58,6 +58,7 @@ export default function ProductsPage() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importUrl, setImportUrl] = useState('');
   const [scrapedProducts, setScrapedProducts] = useState<Product[]>([]);
+  const [scrapedBrandSummary, setScrapedBrandSummary] = useState<BrandSummary | null>(null);
   const [showScrapeResults, setShowScrapeResults] = useState(false);
 
   const hasProducts = (products?.length ?? 0) > 0;
@@ -67,9 +68,27 @@ export default function ProductsPage() {
 
     try {
       const result = await scrapeProduct.mutateAsync({ url: importUrl.trim() });
-      // The result could be a single product or have a products array
-      const scraped = Array.isArray(result) ? result : [result];
+      // Map scraped products to Product shape for ScrapeResults
+      const scraped: Product[] = result.products
+        .filter((p) => p.id != null)
+        .map((p) => ({
+          id: p.id!,
+          owner_id: '',
+          store_url: null,
+          name: p.name,
+          description: p.description,
+          price: p.price,
+          currency: p.currency,
+          images: p.images,
+          brand_summary: p.brand_summary as BrandSummary | null,
+          category: p.category,
+          source: p.source as Product['source'],
+          confirmed: false,
+          created_at: '',
+          updated_at: '',
+        }));
       setScrapedProducts(scraped);
+      setScrapedBrandSummary(result.brand_summary ?? null);
       setShowScrapeResults(true);
       setImportUrl('');
     } catch (err) {
@@ -87,6 +106,7 @@ export default function ProductsPage() {
   function handleScrapeConfirmed() {
     setShowScrapeResults(false);
     setScrapedProducts([]);
+    setScrapedBrandSummary(null);
     setShowImportDialog(false);
     toast.success('Products imported successfully!');
   }
@@ -100,6 +120,7 @@ export default function ProductsPage() {
       setShowImportDialog(false);
       setShowScrapeResults(false);
       setScrapedProducts([]);
+      setScrapedBrandSummary(null);
       setImportUrl('');
     }
   }
@@ -216,7 +237,7 @@ export default function ProductsPage() {
           {showScrapeResults && scrapedProducts.length > 0 ? (
             <ScrapeResults
               products={scrapedProducts}
-              brandSummary={scrapedProducts[0]?.brand_summary}
+              brandSummary={scrapedBrandSummary}
               onConfirmed={handleScrapeConfirmed}
             />
           ) : (
