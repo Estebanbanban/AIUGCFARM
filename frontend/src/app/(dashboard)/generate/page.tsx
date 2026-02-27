@@ -10,7 +10,10 @@ import {
   Check,
   ImageIcon,
   Loader2,
+  Monitor,
   Package,
+  RefreshCw,
+  Smartphone,
   User,
   Zap,
   LinkIcon,
@@ -48,7 +51,7 @@ import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
 import { usePersonas, resolvePersonaImageUrl } from "@/hooks/use-personas";
 import type { Persona, Product, BrandSummary } from "@/types/database";
 import { useCredits } from "@/hooks/use-credits";
-import { useCreateGeneration } from "@/hooks/use-generations";
+import { useCreateGeneration, useGenerateCompositeImages } from "@/hooks/use-generations";
 import { useCheckout } from "@/hooks/use-checkout";
 import { ManualUploadForm } from "@/components/products/ManualUploadForm";
 import { ScrapeResults } from "@/components/products/ScrapeResults";
@@ -57,7 +60,8 @@ import { PersonaBuilderInline } from "@/components/personas/PersonaBuilderInline
 const steps = [
   { number: 1, label: "Product" },
   { number: 2, label: "Persona" },
-  { number: 3, label: "Generate" },
+  { number: 3, label: "Preview" },
+  { number: 4, label: "Generate" },
 ];
 
 function useResolvedProductImages(
@@ -138,6 +142,12 @@ export default function GeneratePage() {
   // Step 2, persona builder state
   const [buildingPersona, setBuildingPersona] = useState(false);
 
+  // Step 3, composite preview state
+  const [compositeImages, setCompositeImages] = useState<
+    Array<{ path: string; signed_url: string }>
+  >([]);
+  const [selectedCompositeIdx, setSelectedCompositeIdx] = useState<number | null>(null);
+
   const { data: products, isLoading: productsLoading } = useProducts();
   const productImageMap = useResolvedProductImages(products);
   const { data: personas, isLoading: personasLoading } = usePersonas();
@@ -145,6 +155,7 @@ export default function GeneratePage() {
   const scrapeProduct = useScrapeProduct();
   const { data: credits, isLoading: creditsLoading } = useCredits();
   const createGeneration = useCreateGeneration();
+  const generateComposites = useGenerateCompositeImages();
   const checkout = useCheckout();
 
   const confirmedProducts = products?.filter((p) => p.confirmed) ?? [];
@@ -175,11 +186,12 @@ export default function GeneratePage() {
   function canProceed() {
     if (store.step === 1) return !!store.productId;
     if (store.step === 2) return !!store.personaId;
+    if (store.step === 3) return !!store.compositeImagePath;
     return false;
   }
 
   function handleNext() {
-    if (store.step < 3) store.setStep(store.step + 1);
+    if (store.step < 4) store.setStep(store.step + 1);
   }
 
   function handleBack() {
@@ -286,6 +298,40 @@ export default function GeneratePage() {
     store.setStep(3);
   }
 
+  // ── Composite preview handlers ───────────────────────────────────────────
+
+  function handleFormatChange(format: "9:16" | "16:9") {
+    store.setFormat(format);
+    // Clear composites when format changes so user regenerates with correct aspect ratio
+    setCompositeImages([]);
+    setSelectedCompositeIdx(null);
+    store.setCompositeImagePath(null);
+  }
+
+  async function handleGenerateComposites() {
+    if (!store.productId || !store.personaId) return;
+    setCompositeImages([]);
+    setSelectedCompositeIdx(null);
+    store.setCompositeImagePath(null);
+
+    generateComposites.mutate(
+      { product_id: store.productId, persona_id: store.personaId, format: store.format },
+      {
+        onSuccess: (result) => {
+          setCompositeImages(result.images);
+        },
+        onError: (err) => {
+          toast.error(err.message || "Failed to generate preview images");
+        },
+      },
+    );
+  }
+
+  function handleSelectComposite(idx: number) {
+    setSelectedCompositeIdx(idx);
+    store.setCompositeImagePath(compositeImages[idx].path);
+  }
+
   // ── Generation ───────────────────────────────────────────────────────────
 
   async function handleGenerate() {
@@ -293,7 +339,7 @@ export default function GeneratePage() {
       setShowPaywall(true);
       return;
     }
-    if (!store.productId || !store.personaId) return;
+    if (!store.productId || !store.personaId || !store.compositeImagePath) return;
 
     createGeneration.mutate(
       {
@@ -301,6 +347,7 @@ export default function GeneratePage() {
         persona_id: store.personaId,
         mode: store.mode,
         quality: store.quality,
+        composite_image_path: store.compositeImagePath,
       },
       {
         onSuccess: (result) => {
@@ -644,8 +691,130 @@ export default function GeneratePage() {
           </div>
         )}
 
-        {/* ── Step 3: Review & Generate ─────────────────────────────────── */}
+        {/* ── Step 3: Preview ───────────────────────────────────────────── */}
         {store.step === 3 && (
+          <div className="flex flex-col gap-6">
+            <div>
+              <h2 className="text-lg font-semibold">Preview Your Scene</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Generate a composite image of your persona with the product. Pick the one you like — this becomes the base for your video.
+              </p>
+            </div>
+
+            {/* Format selector */}
+            <div>
+              <p className="mb-2 text-sm font-medium">Video format</p>
+              <div className="grid max-w-xs grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleFormatChange("9:16")}
+                  className={cn(
+                    "flex flex-col items-center gap-2 rounded-lg border px-4 py-3 transition-all",
+                    store.format === "9:16"
+                      ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                      : "border-border hover:border-muted-foreground/30",
+                  )}
+                >
+                  <Smartphone className="size-5" />
+                  <div className="text-center">
+                    <p className="text-sm font-semibold">Portrait</p>
+                    <p className="text-xs text-muted-foreground">9:16 · Phone</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleFormatChange("16:9")}
+                  className={cn(
+                    "flex flex-col items-center gap-2 rounded-lg border px-4 py-3 transition-all",
+                    store.format === "16:9"
+                      ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                      : "border-border hover:border-muted-foreground/30",
+                  )}
+                >
+                  <Monitor className="size-5" />
+                  <div className="text-center">
+                    <p className="text-sm font-semibold">Landscape</p>
+                    <p className="text-xs text-muted-foreground">16:9 · Wide</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Generate button — shown before first generation */}
+            {compositeImages.length === 0 && !generateComposites.isPending && (
+              <Button
+                onClick={handleGenerateComposites}
+                className="w-fit"
+              >
+                <ImageIcon className="size-4" />
+                Generate Preview Images
+              </Button>
+            )}
+
+            {/* Loading state */}
+            {generateComposites.isPending && (
+              <div className="flex flex-col items-center gap-3 py-16">
+                <Loader2 className="size-8 animate-spin text-primary" />
+                <p className="text-sm font-medium">Generating preview images…</p>
+                <p className="text-xs text-muted-foreground">This usually takes 20–40 seconds</p>
+              </div>
+            )}
+
+            {/* Image grid */}
+            {compositeImages.length > 0 && !generateComposites.isPending && (
+              <div className="flex flex-col gap-4">
+                <p className="text-sm text-muted-foreground">
+                  Click an image to select it, then continue to generate your video.
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+                  {compositeImages.map((img, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleSelectComposite(i)}
+                      className="group relative overflow-hidden rounded-lg focus:outline-none"
+                    >
+                      <div
+                        className={cn(
+                          "relative overflow-hidden rounded-lg border-2 transition-all",
+                          store.format === "9:16" ? "aspect-[9/16]" : "aspect-video",
+                          selectedCompositeIdx === i
+                            ? "border-primary ring-2 ring-primary/30"
+                            : "border-transparent group-hover:border-muted-foreground/40",
+                        )}
+                      >
+                        <img
+                          src={img.signed_url}
+                          alt={`Preview ${i + 1}`}
+                          className="size-full object-cover"
+                        />
+                        {selectedCompositeIdx === i && (
+                          <div className="absolute inset-0 flex items-end justify-center bg-primary/10 pb-3">
+                            <div className="flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
+                              <Check className="size-3" />
+                              Selected
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  onClick={handleGenerateComposites}
+                  className="w-fit"
+                >
+                  <RefreshCw className="size-4" />
+                  Regenerate
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Step 4: Review & Generate ─────────────────────────────────── */}
+        {store.step === 4 && (
           <div className="flex flex-col gap-6">
             <h2 className="text-lg font-semibold">Review & Generate</h2>
 
@@ -677,6 +846,30 @@ export default function GeneratePage() {
                       </p>
                     </div>
                   </div>
+
+                  {/* Selected composite preview */}
+                  {store.compositeImagePath && selectedCompositeIdx !== null && compositeImages[selectedCompositeIdx] && (
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={cn(
+                          "shrink-0 overflow-hidden rounded-lg bg-muted",
+                          store.format === "9:16" ? "h-16 w-9" : "h-10 w-16",
+                        )}
+                      >
+                        <img
+                          src={compositeImages[selectedCompositeIdx].signed_url}
+                          alt="Selected scene"
+                          className="size-full object-cover"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Scene</p>
+                        <p className="text-sm font-medium">
+                          {store.format === "9:16" ? "Portrait 9:16" : "Landscape 16:9"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   <Separator />
 
@@ -835,7 +1028,7 @@ export default function GeneratePage() {
           Back
         </Button>
 
-        {store.step < 3 && (
+        {store.step < 4 && (
           <Button onClick={handleNext} disabled={!canProceed()}>
             Next
             <ArrowRight className="size-4" />
