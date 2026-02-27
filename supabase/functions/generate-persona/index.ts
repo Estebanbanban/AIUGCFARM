@@ -245,9 +245,10 @@ async function generateScenePrompt(
 }
 
 /**
- * Append explicit physical attributes to any scene prompt so Gemini
- * always renders the correct person — skin tone, gender, hair, etc.
- * The LLM scene prompt sets the scene/vibe; this pins the appearance.
+ * Build the final Gemini image prompt with physical attributes FIRST.
+ * Placing mandatory appearance at the top ensures Gemini honours every
+ * trait — hair colour, eye colour, skin tone, etc. — before reading the
+ * scene description, which only sets background/lighting/vibe.
  */
 function buildImagePrompt(attributes: PersonaAttributes, scenePrompt: string): string {
   const skinLabel = hexToSkinToneLabel(attributes.skin_tone);
@@ -258,18 +259,20 @@ function buildImagePrompt(attributes: PersonaAttributes, scenePrompt: string): s
     (a) => a.toLowerCase() !== "none",
   );
 
-  const physicalAttrs = [
-    genderLabel,
-    ageLabel,
-    `${skinLabel} skin tone`,
-    bodyLabel,
-    `${attributes.hair_color} ${attributes.hair_style.toLowerCase()} hair`,
-    `${attributes.eye_color.toLowerCase()} eyes`,
-    `wearing ${attributes.clothing_style.toLowerCase()} style clothing`,
-    ...(realAccessories.length > 0 ? [`with ${realAccessories.join(", ").toLowerCase()}`] : []),
-  ].join(", ");
+  // Physical appearance block — listed first so Gemini weights it highest.
+  const appearanceBlock = [
+    `MANDATORY SUBJECT APPEARANCE — render EXACTLY as specified below. Every attribute is NON-NEGOTIABLE. Do NOT substitute, alter, or omit any trait:`,
+    `• Gender: ${genderLabel.toUpperCase()}`,
+    `• Age: ${ageLabel}`,
+    `• Skin tone: ${skinLabel.toUpperCase()} skin`,
+    `• Body: ${bodyLabel}`,
+    `• Hair: ${attributes.hair_color.toUpperCase()} ${attributes.hair_style} hair — this colour is REQUIRED`,
+    `• Eyes: ${attributes.eye_color.toUpperCase()} eyes — this colour is REQUIRED`,
+    `• Clothing: ${attributes.clothing_style} style`,
+    ...(realAccessories.length > 0 ? [`• Accessories: ${realAccessories.join(", ")}`] : []),
+  ].join("\n");
 
-  return `${scenePrompt} Subject (follow exactly): ${physicalAttrs}.`;
+  return `${appearanceBlock}\n\nScene / setting (background and lighting only — do NOT change the person's appearance):\n${scenePrompt}`;
 }
 
 /* ------------------------------------------------------------------ */
