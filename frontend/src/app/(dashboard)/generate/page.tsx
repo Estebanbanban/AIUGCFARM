@@ -317,7 +317,7 @@ export default function GeneratePage() {
   const personaImageMap = useResolvedPersonaImages(personas);
   const scrapeProduct = useScrapeProduct();
   const { data: credits, isLoading: creditsLoading } = useCredits();
-  const { data: profile } = useProfile();
+  const { data: profile, isLoading: profileLoading } = useProfile();
   const generateComposites = useGenerateCompositeImages();
   const editComposite = useEditCompositeImage();
 
@@ -1090,7 +1090,8 @@ export default function GeneratePage() {
               (() => {
                 const plan = profile?.plan as PlanTier | undefined;
                 const personaLimit = plan && PLANS[plan] ? PLANS[plan].personas : 1;
-                const atLimit = activePersonas.length >= personaLimit;
+                // Only enforce limit once profile has loaded to avoid false paywall on race condition
+                const atLimit = !profileLoading && activePersonas.length >= personaLimit;
                 return (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {activePersonas.map((persona) => {
@@ -2588,66 +2589,76 @@ export default function GeneratePage() {
             </div>
 
             {/* Plan cards */}
-            <div className="grid gap-4 sm:grid-cols-3 max-w-3xl mx-auto">
-              {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
-                const isGrowth = key === "growth";
-                const discountedMonthly = offer.isActive ? offer.discountedPrice(plan.price) : null;
-                const isCurrentPlan = (profile?.plan as PlanTier | undefined) === key;
-                return (
-                  <div
-                    key={key}
-                    className={cn(
-                      "relative rounded-2xl border p-5 flex flex-col gap-4",
-                      isGrowth
-                        ? "border-primary/40 bg-primary/5 shadow-md"
-                        : "border-border bg-card",
-                    )}
-                  >
-                    {isGrowth && (
-                      <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-0.5 text-xs">
-                        Most popular
-                      </Badge>
-                    )}
-                    <div>
-                      <p className="font-semibold text-base">{plan.name}</p>
-                      <div className="mt-1 flex items-baseline gap-1">
-                        {discountedMonthly !== null ? (
-                          <>
-                            <span className="text-2xl font-bold">${discountedMonthly}</span>
-                            <span className="text-sm text-muted-foreground line-through">${plan.price}</span>
-                            <span className="text-xs text-muted-foreground">/mo</span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="text-2xl font-bold">${plan.price}</span>
-                            <span className="text-xs text-muted-foreground">/mo</span>
-                          </>
-                        )}
-                      </div>
-                      <p className="mt-1 text-xs text-orange-500 font-medium">
-                        Up to {plan.personas} persona{plan.personas !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant={isGrowth ? "default" : "outline"}
-                      className="w-full font-bold"
-                      onClick={() => {
-                        setShowPersonaLimitPaywall(false);
-                        handleCheckout(key);
-                      }}
-                      disabled={checkout.isPending || isCurrentPlan}
+            {(() => {
+              const currentPlan = profile?.plan as PlanTier | undefined;
+              const currentLimit = currentPlan && PLANS[currentPlan] ? PLANS[currentPlan].personas : 1;
+              return (
+              <div className="grid gap-4 sm:grid-cols-3 max-w-3xl mx-auto">
+                {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
+                  const isGrowth = key === "growth";
+                  const discountedMonthly = offer.isActive ? offer.discountedPrice(plan.price) : null;
+                  const isCurrentPlan = currentPlan === key;
+                  // Disable plans that don't unlock more personas than current plan
+                  const isDowngrade = plan.personas <= currentLimit && !isCurrentPlan;
+                  const isDisabled = checkout.isPending || isCurrentPlan || isDowngrade;
+                  return (
+                    <div
+                      key={key}
+                      className={cn(
+                        "relative rounded-2xl border p-5 flex flex-col gap-4",
+                        isGrowth
+                          ? "border-primary/40 bg-primary/5 shadow-md"
+                          : "border-border bg-card",
+                        isDowngrade && "opacity-40",
+                      )}
                     >
-                      {isCurrentPlan
-                        ? "Current plan"
-                        : checkout.isPending
-                        ? <Loader2 className="size-4 animate-spin" />
-                        : `Choose ${plan.name}`}
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
+                      {isGrowth && (
+                        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-0.5 text-xs">
+                          Most popular
+                        </Badge>
+                      )}
+                      <div>
+                        <p className="font-semibold text-base">{plan.name}</p>
+                        <div className="mt-1 flex items-baseline gap-1">
+                          {discountedMonthly !== null ? (
+                            <>
+                              <span className="text-2xl font-bold">${discountedMonthly}</span>
+                              <span className="text-sm text-muted-foreground line-through">${plan.price}</span>
+                              <span className="text-xs text-muted-foreground">/mo</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-2xl font-bold">${plan.price}</span>
+                              <span className="text-xs text-muted-foreground">/mo</span>
+                            </>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs text-orange-500 font-medium">
+                          Up to {plan.personas} persona{plan.personas !== 1 ? "s" : ""}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={isGrowth ? "default" : "outline"}
+                        className="w-full font-bold"
+                        onClick={() => {
+                          setShowPersonaLimitPaywall(false);
+                          handleCheckout(key);
+                        }}
+                        disabled={isDisabled}
+                      >
+                        {isCurrentPlan
+                          ? "Current plan"
+                          : checkout.isPending
+                          ? <Loader2 className="size-4 animate-spin" />
+                          : `Choose ${plan.name}`}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+              );
+            })()}
 
             <p className="mt-6 text-center text-xs text-muted-foreground">
               No commitment on packs · Cancel subscriptions anytime
