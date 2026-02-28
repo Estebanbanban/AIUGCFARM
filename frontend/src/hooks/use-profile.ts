@@ -19,7 +19,7 @@ export function useProfile() {
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
-        .single();
+        .maybeSingle();
       if (error) throw new Error(error.message);
       return data as Profile;
     },
