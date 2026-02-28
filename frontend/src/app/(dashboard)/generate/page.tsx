@@ -26,6 +26,7 @@ import {
   Star,
   Clock,
   Flame,
+  AlertCircle,
 } from "lucide-react";
 import { useFirstPurchaseOffer, COUPON_30_OFF } from "@/hooks/use-first-purchase-offer";
 import { toast } from "sonner";
@@ -63,7 +64,6 @@ import { usePersonas, resolvePersonaImageUrl } from "@/hooks/use-personas";
 import type { Persona, Product, BrandSummary, ScriptSegment } from "@/types/database";
 import { useCredits } from "@/hooks/use-credits";
 import {
-  useCreateGeneration,
   useEditCompositeImage,
   useGenerateCompositeImages,
   useGenerateScript,
@@ -227,7 +227,6 @@ export default function GeneratePage() {
   const scrapeProduct = useScrapeProduct();
   const { data: credits, isLoading: creditsLoading } = useCredits();
   const { data: profile } = useProfile();
-  const createGeneration = useCreateGeneration();
   const generateComposites = useGenerateCompositeImages();
   const editComposite = useEditCompositeImage();
   const generateScript = useGenerateScript();
@@ -525,71 +524,6 @@ export default function GeneratePage() {
           trackVideoGenerationStarted(store.mode, store.quality);
           store.reset();
           router.push(`/generate/${genId}`);
-          toast.success("Generation started!");
-        },
-        onError: (err) => {
-          toast.error(err.message || "Failed to start generation");
-        },
-      },
-    );
-  }
-
-  // ── Legacy generation (backwards compat) ──────────────────────────────
-
-  async function handleGenerate() {
-    if (!hasEnoughCredits) {
-      offer.startOffer();
-      setShowPaywall(true);
-      return;
-    }
-    if (requiresCommentKeyword && !commentKeyword) {
-      toast.error("Add a comment keyword for the CTA style.");
-      return;
-    }
-    if (!store.productId || !store.personaId || !store.compositeImagePath) return;
-
-    const advancedSegmentsInput =
-      store.advancedMode && store.advancedSegments
-        ? {
-            hooks: store.advancedSegments.hooks.map((s) => ({
-              script_text: s.scriptText,
-              global_emotion: s.globalEmotion,
-              global_intensity: s.globalIntensity,
-              action_description: s.actionDescription || undefined,
-              image_path: s.imagePath || undefined,
-            })),
-            bodies: store.advancedSegments.bodies.map((s) => ({
-              script_text: s.scriptText,
-              global_emotion: s.globalEmotion,
-              global_intensity: s.globalIntensity,
-              action_description: s.actionDescription || undefined,
-              image_path: s.imagePath || undefined,
-            })),
-            ctas: store.advancedSegments.ctas.map((s) => ({
-              script_text: s.scriptText,
-              global_emotion: s.globalEmotion,
-              global_intensity: s.globalIntensity,
-              action_description: s.actionDescription || undefined,
-              image_path: s.imagePath || undefined,
-            })),
-          }
-        : undefined;
-
-    createGeneration.mutate(
-      {
-        product_id: store.productId,
-        persona_id: store.personaId,
-        mode: store.mode,
-        quality: store.quality,
-        composite_image_path: store.compositeImagePath,
-        cta_style: store.ctaStyle,
-        cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
-        advanced_segments: advancedSegmentsInput,
-      },
-      {
-        onSuccess: (result) => {
-          store.reset();
-          router.push(`/generate/${result.generation_id}`);
           toast.success("Generation started!");
         },
         onError: (err) => {
@@ -976,18 +910,23 @@ export default function GeneratePage() {
               />
             ) : activePersonas.length > 0 ? (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {activePersonas.map((persona) => (
+                {activePersonas.map((persona) => {
+                  const hasImage = !!persona.selected_image_url;
+                  return (
                   <button
                     key={persona.id}
-                    onClick={() => store.setPersonaId(persona.id)}
-                    className="text-left"
+                    onClick={() => hasImage && store.setPersonaId(persona.id)}
+                    disabled={!hasImage}
+                    className={cn("text-left", !hasImage && "cursor-not-allowed opacity-50")}
                   >
                     <Card
                       className={cn(
                         "h-full transition-all",
                         store.personaId === persona.id
                           ? "border-primary ring-1 ring-primary/30"
-                          : "hover:border-muted-foreground/30",
+                          : hasImage
+                          ? "hover:border-muted-foreground/30"
+                          : "",
                       )}
                     >
                       <CardContent className="flex flex-col items-center gap-3 p-6">
@@ -1010,16 +949,22 @@ export default function GeneratePage() {
                             {persona.attributes.clothing_style}
                           </p>
                         </div>
-                        {store.personaId === persona.id && (
+                        {!hasImage ? (
+                          <div className="flex items-center gap-1.5 text-xs text-amber-500">
+                            <AlertCircle className="size-3.5" />
+                            Needs image — visit Personas
+                          </div>
+                        ) : store.personaId === persona.id ? (
                           <div className="flex items-center gap-1.5 text-xs text-primary">
                             <Check className="size-3.5" />
                             Selected
                           </div>
-                        )}
+                        ) : null}
                       </CardContent>
                     </Card>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             ) : null}
           </div>
