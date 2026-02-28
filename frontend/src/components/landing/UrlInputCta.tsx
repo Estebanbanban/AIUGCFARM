@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { trackCtaClicked } from "@/lib/datafast";
 
-export function UrlInputCta() {
+export function UrlInputCta({ location = "hero" }: { location?: "hero" | "final_cta" }) {
   const [url, setUrl] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (url.trim()) {
+      trackCtaClicked(location);
       localStorage.setItem("pendingScrapeUrl", url);
       window.location.href = "/signup";
     }

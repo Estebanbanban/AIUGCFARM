@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { fadeIn } from "@/lib/animations";
 import { ArrowLeft } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
+import { trackLogin } from "@/lib/datafast";
 
 function LoginForm() {
   const router = useRouter();
@@ -39,11 +40,13 @@ function LoginForm() {
       return;
     }
 
+    trackLogin("email");
     router.push("/dashboard");
     router.refresh();
   }
 
   async function handleGoogleLogin() {
+    trackLogin("google");
     const supabase = createClient();
     await supabase.auth.signInWithOAuth({
       provider: "google",

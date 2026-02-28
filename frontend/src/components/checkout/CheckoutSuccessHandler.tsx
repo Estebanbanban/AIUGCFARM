@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { PurchaseSuccessModal } from "@/components/checkout/PurchaseSuccessModal";
 import type { PlanTier, CreditPackKey } from "@/lib/stripe";
 import { PLANS, CREDIT_PACKS } from "@/lib/stripe";
+import { trackPurchaseConfirmed } from "@/lib/datafast";
 
 export function CheckoutSuccessHandler() {
   const searchParams = useSearchParams();
@@ -21,9 +22,11 @@ export function CheckoutSuccessHandler() {
     const packParam = searchParams.get("pack");
 
     if (planParam && planParam in PLANS) {
+      trackPurchaseConfirmed("subscription", planParam);
       setPlan(planParam as PlanTier);
       setOpen(true);
     } else if (packParam && packParam in CREDIT_PACKS) {
+      trackPurchaseConfirmed("credits", packParam);
       setPack(packParam as CreditPackKey);
       setOpen(true);
     }

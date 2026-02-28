@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { fadeIn } from "@/lib/animations";
 import { ArrowLeft } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
+import { trackSignup, trackEmailVerified } from "@/lib/datafast";
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState("");
@@ -40,6 +41,7 @@ export default function SignupPage() {
       return;
     }
 
+    trackSignup("email");
     setVerifying(true);
     setLoading(false);
   }
@@ -62,6 +64,7 @@ export default function SignupPage() {
       return;
     }
 
+    trackEmailVerified();
     window.location.href = "/dashboard";
   }
 
@@ -72,6 +75,7 @@ export default function SignupPage() {
   }
 
   async function handleGoogleSignup() {
+    trackSignup("google");
     const supabase = createClient();
     await supabase.auth.signInWithOAuth({
       provider: "google",

@@ -8,6 +8,7 @@ import { ScaleIn, FadeInUp } from "@/lib/motion";
 import { createClient } from "@/lib/supabase/client";
 import { callEdge } from "@/lib/api";
 import type { PlanTier } from "@/lib/stripe";
+import { trackCtaClicked } from "@/lib/datafast";
 
 const plans: {
   key: PlanTier;
@@ -100,6 +101,7 @@ export function PricingSection() {
   }, []);
 
   async function handlePlanClick(planKey: PlanTier) {
+    trackCtaClicked("pricing", planKey);
     if (!isLoggedIn) {
       router.push(`/signup?plan=${planKey}`);
       return;

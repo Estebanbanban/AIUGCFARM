@@ -39,7 +39,7 @@ export function HeroSection() {
             transition={{ duration: 0.55, delay: 0.5, ease: [0.25, 0.4, 0.25, 1] }}
             className="mt-10"
           >
-            <UrlInputCta />
+            <UrlInputCta location="hero" />
           </motion.div>
 
           <motion.p
