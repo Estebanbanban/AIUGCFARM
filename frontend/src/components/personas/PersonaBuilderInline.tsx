@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 import { createClient } from '@/lib/supabase/client';
 import { resolvePersonaImageUrl } from '@/hooks/use-personas';
 import Image from 'next/image';
 import {
   Loader2, Sparkles, Check, User, ImageIcon, X,
   ChevronDown, ChevronUp, Eye, Palette, Clock,
-  Shirt, Watch,
+  Shirt, Watch, Type, LayoutGrid,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -15,6 +16,7 @@ import { callEdge } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { usePersonaBuilderStore } from '@/stores/persona-builder';
@@ -63,8 +65,8 @@ function hashString(input: string) {
   return Math.abs(hash);
 }
 
-function neutralCardStyle(key: string): React.CSSProperties {
-  const palettes: Array<[string, string, string]> = [
+function neutralCardStyle(key: string, isDark = false): React.CSSProperties {
+  const lightPalettes: Array<[string, string, string]> = [
     ['#f5f5f4', '#e7e5e4', '#d6d3d1'],
     ['#f8fafc', '#e2e8f0', '#cbd5e1'],
     ['#f4f4f5', '#e4e4e7', '#d4d4d8'],
@@ -72,7 +74,16 @@ function neutralCardStyle(key: string): React.CSSProperties {
     ['#f5f5f5', '#e7e5e4', '#d4d4d4'],
     ['#fafaf9', '#e7e5e4', '#d6d3d1'],
   ];
+  const darkPalettes: Array<[string, string, string]> = [
+    ['#292524', '#44403c', '#57534e'],
+    ['#1e293b', '#334155', '#475569'],
+    ['#27272a', '#3f3f46', '#52525b'],
+    ['#1e293b', '#374151', '#4b5563'],
+    ['#292524', '#44403c', '#57534e'],
+    ['#1c1917', '#44403c', '#57534e'],
+  ];
 
+  const palettes = isDark ? darkPalettes : lightPalettes;
   const idx = hashString(key) % palettes.length;
   const [base, shade, accent] = palettes[idx];
 
@@ -86,17 +97,29 @@ function neutralCardStyle(key: string): React.CSSProperties {
   };
 }
 
-function optionImageDataUri(key: string) {
+function optionImageDataUri(key: string, isDark = false) {
   const seed = hashString(key);
-  const palettes = [
+  const lightPalettes = [
     ['#f8fafc', '#e2e8f0', '#cbd5e1'],
     ['#fafaf9', '#e7e5e4', '#d6d3d1'],
     ['#f5f5f4', '#e7e5e4', '#d4d4d4'],
     ['#f4f4f5', '#e4e4e7', '#d4d4d8'],
   ] as const;
+  const darkPalettes = [
+    ['#1e293b', '#334155', '#475569'],
+    ['#1c1917', '#292524', '#44403c'],
+    ['#18181b', '#27272a', '#3f3f46'],
+    ['#18181b', '#27272a', '#3f3f46'],
+  ] as const;
+  const palettes = isDark ? darkPalettes : lightPalettes;
   const [bg1, bg2, bg3] = palettes[seed % palettes.length];
   const wave = 240 + (seed % 60);
   const eye = 188 + (seed % 18);
+
+  // Dark-mode swapped fill colours
+  const hairFill1 = isDark ? '#52525b' : '#d4d4d8';
+  const hairFill2 = isDark ? '#4b5563' : '#d1d5db';
+  const clothingFill = isDark ? '#475569' : '#cbd5e1';
 
   const parseKind = () => {
     if (key.startsWith('gender-')) return { kind: 'gender', value: key.slice(7) };
@@ -110,20 +133,20 @@ function optionImageDataUri(key: string) {
   const { kind, value } = parseKind();
   const normalized = value.toLowerCase().replace(/_/g, ' ');
 
-  let hair = '<path d="M292 256c0-62 48-104 108-104s108 42 108 104v30H292z" fill="#d4d4d8" opacity="0.85"/>';
+  let hair = `<path d="M292 256c0-62 48-104 108-104s108 42 108 104v30H292z" fill="${hairFill1}" opacity="0.85"/>`;
   let torso = '<rect x="245" y="420" width="310" height="380" rx="150" fill="#ffffff" opacity="0.82"/>';
   let clothing = '';
   let accessory = '';
 
   if (kind === 'gender') {
     if (normalized === 'male') {
-      hair = '<path d="M300 248c0-56 44-96 100-96s100 40 100 96v24H300z" fill="#d1d5db" opacity="0.88"/>';
+      hair = `<path d="M300 248c0-56 44-96 100-96s100 40 100 96v24H300z" fill="${hairFill2}" opacity="0.88"/>`;
       torso = '<rect x="230" y="420" width="340" height="370" rx="120" fill="#ffffff" opacity="0.82"/>';
     } else if (normalized === 'female') {
-      hair = '<path d="M280 244c0-62 54-104 120-104s120 42 120 104v120H280z" fill="#d1d5db" opacity="0.9"/>';
+      hair = `<path d="M280 244c0-62 54-104 120-104s120 42 120 104v120H280z" fill="${hairFill2}" opacity="0.9"/>`;
       torso = '<rect x="255" y="430" width="290" height="370" rx="145" fill="#ffffff" opacity="0.82"/>';
     } else {
-      hair = '<path d="M290 248c0-60 50-100 110-100s110 40 110 100v54H290z" fill="#d4d4d8" opacity="0.88"/>';
+      hair = `<path d="M290 248c0-60 50-100 110-100s110 40 110 100v54H290z" fill="${hairFill1}" opacity="0.88"/>`;
       torso = '<rect x="242" y="424" width="316" height="374" rx="134" fill="#ffffff" opacity="0.82"/>';
     }
   }
@@ -132,21 +155,21 @@ function optionImageDataUri(key: string) {
     if (normalized.includes('bald')) {
       hair = '';
     } else if (normalized.includes('buzz')) {
-      hair = '<path d="M314 252c0-50 38-84 86-84s86 34 86 84v10H314z" fill="#d4d4d8" opacity="0.92"/>';
+      hair = `<path d="M314 252c0-50 38-84 86-84s86 34 86 84v10H314z" fill="${hairFill1}" opacity="0.92"/>`;
     } else if (normalized.includes('afro')) {
-      hair = '<circle cx="400" cy="248" r="132" fill="#d4d4d8" opacity="0.88"/>';
+      hair = `<circle cx="400" cy="248" r="132" fill="${hairFill1}" opacity="0.88"/>`;
     } else if (normalized.includes('braids')) {
-      hair = '<path d="M286 246c0-60 52-102 114-102s114 42 114 102v78H286z" fill="#d4d4d8" opacity="0.9"/><rect x="292" y="292" width="30" height="180" rx="15" fill="#d4d4d8"/><rect x="478" y="292" width="30" height="180" rx="15" fill="#d4d4d8"/>';
+      hair = `<path d="M286 246c0-60 52-102 114-102s114 42 114 102v78H286z" fill="${hairFill1}" opacity="0.9"/><rect x="292" y="292" width="30" height="180" rx="15" fill="${hairFill1}"/><rect x="478" y="292" width="30" height="180" rx="15" fill="${hairFill1}"/>`;
     } else if (normalized.includes('ponytail')) {
-      hair = '<path d="M286 246c0-60 52-102 114-102s114 42 114 102v82H286z" fill="#d4d4d8" opacity="0.9"/><rect x="502" y="274" width="42" height="120" rx="20" fill="#d4d4d8"/>';
+      hair = `<path d="M286 246c0-60 52-102 114-102s114 42 114 102v82H286z" fill="${hairFill1}" opacity="0.9"/><rect x="502" y="274" width="42" height="120" rx="20" fill="${hairFill1}"/>`;
     } else if (normalized.includes('bob')) {
-      hair = '<path d="M286 246c0-60 52-102 114-102s114 42 114 102v132H286z" fill="#d4d4d8" opacity="0.9"/>';
+      hair = `<path d="M286 246c0-60 52-102 114-102s114 42 114 102v132H286z" fill="${hairFill1}" opacity="0.9"/>`;
     } else if (normalized.includes('long')) {
-      hair = '<path d="M278 246c0-60 54-102 122-102s122 42 122 102v168H278z" fill="#d4d4d8" opacity="0.9"/>';
+      hair = `<path d="M278 246c0-60 54-102 122-102s122 42 122 102v168H278z" fill="${hairFill1}" opacity="0.9"/>`;
     } else if (normalized.includes('medium')) {
-      hair = '<path d="M282 246c0-60 52-102 118-102s118 42 118 102v122H282z" fill="#d4d4d8" opacity="0.9"/>';
+      hair = `<path d="M282 246c0-60 52-102 118-102s118 42 118 102v122H282z" fill="${hairFill1}" opacity="0.9"/>`;
     } else {
-      hair = '<path d="M292 252c0-58 48-98 108-98s108 40 108 98v72H292z" fill="#d4d4d8" opacity="0.9"/>';
+      hair = `<path d="M292 252c0-58 48-98 108-98s108 40 108 98v72H292z" fill="${hairFill1}" opacity="0.9"/>`;
     }
   }
 
@@ -166,19 +189,19 @@ function optionImageDataUri(key: string) {
 
   if (kind === 'clothing') {
     if (normalized.includes('business')) {
-      clothing = '<path d="M260 532h280v238H260z" fill="#cbd5e1" opacity="0.55"/><path d="M322 532l78 100 78-100" fill="none" stroke="#94a3b8" stroke-width="14"/>';
+      clothing = `<path d="M260 532h280v238H260z" fill="${clothingFill}" opacity="0.55"/><path d="M322 532l78 100 78-100" fill="none" stroke="#94a3b8" stroke-width="14"/>`;
     } else if (normalized.includes('streetwear')) {
-      clothing = '<path d="M242 542h316v210H242z" fill="#cbd5e1" opacity="0.52"/><rect x="336" y="582" width="128" height="92" rx="26" fill="#94a3b8" opacity="0.55"/>';
+      clothing = `<path d="M242 542h316v210H242z" fill="${clothingFill}" opacity="0.52"/><rect x="336" y="582" width="128" height="92" rx="26" fill="#94a3b8" opacity="0.55"/>`;
     } else if (normalized.includes('sporty')) {
-      clothing = '<path d="M246 534h308v226H246z" fill="#cbd5e1" opacity="0.52"/><path d="M280 564l240 176" stroke="#94a3b8" stroke-width="12" opacity="0.7"/>';
+      clothing = `<path d="M246 534h308v226H246z" fill="${clothingFill}" opacity="0.52"/><path d="M280 564l240 176" stroke="#94a3b8" stroke-width="12" opacity="0.7"/>`;
     } else if (normalized.includes('elegant')) {
-      clothing = '<path d="M300 528h200v300H300z" fill="#cbd5e1" opacity="0.5"/><path d="M300 590c52 24 148 24 200 0" stroke="#94a3b8" stroke-width="10" opacity="0.72"/>';
+      clothing = `<path d="M300 528h200v300H300z" fill="${clothingFill}" opacity="0.5"/><path d="M300 590c52 24 148 24 200 0" stroke="#94a3b8" stroke-width="10" opacity="0.72"/>`;
     } else if (normalized.includes('bohemian')) {
-      clothing = '<path d="M242 544h316v222H242z" fill="#cbd5e1" opacity="0.5"/><path d="M260 620h280M260 670h280" stroke="#94a3b8" stroke-width="8" opacity="0.55"/>';
+      clothing = `<path d="M242 544h316v222H242z" fill="${clothingFill}" opacity="0.5"/><path d="M260 620h280M260 670h280" stroke="#94a3b8" stroke-width="8" opacity="0.55"/>`;
     } else if (normalized.includes('minimalist')) {
-      clothing = '<path d="M256 540h288v214H256z" fill="#cbd5e1" opacity="0.45"/>';
+      clothing = `<path d="M256 540h288v214H256z" fill="${clothingFill}" opacity="0.45"/>`;
     } else {
-      clothing = '<path d="M250 538h300v220H250z" fill="#cbd5e1" opacity="0.48"/>';
+      clothing = `<path d="M250 538h300v220H250z" fill="${clothingFill}" opacity="0.48"/>`;
     }
   }
 
@@ -194,9 +217,9 @@ function optionImageDataUri(key: string) {
     } else if (normalized.includes('watch')) {
       accessory = '<rect x="480" y="670" width="48" height="28" rx="10" fill="none" stroke="#9ca3af" stroke-width="6"/>';
     } else if (normalized.includes('hat')) {
-      accessory = '<path d="M294 170h212v34H294z" fill="#cbd5e1"/><path d="M320 132h160v44H320z" fill="#d1d5db"/>';
+      accessory = `<path d="M294 170h212v34H294z" fill="${clothingFill}"/><path d="M320 132h160v44H320z" fill="${hairFill2}"/>`;
     } else if (normalized.includes('scarf')) {
-      accessory = '<path d="M334 366h132v56H334z" fill="#d1d5db"/><rect x="334" y="408" width="34" height="114" rx="12" fill="#cbd5e1"/>';
+      accessory = `<path d="M334 366h132v56H334z" fill="${hairFill2}"/><rect x="334" y="408" width="34" height="114" rx="12" fill="${clothingFill}"/>`;
     } else {
       accessory = '';
     }
@@ -227,22 +250,32 @@ function optionImageDataUri(key: string) {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-function accessoryObjectDataUri(accessory: string) {
+function accessoryObjectDataUri(accessory: string, isDark = false) {
+  // Colour tokens that adapt to theme
+  const c1 = isDark ? '#6b7280' : '#9ca3af'; // lighter strokes / fills
+  const c2 = isDark ? '#4b5563' : '#6b7280'; // mid-tone strokes / fills
+  const c3 = isDark ? '#1f2937' : '#374151'; // dark fills (sunglasses lenses)
+  const bgStop1 = isDark ? '#1e293b' : '#f8fafc';
+  const bgStop2 = isDark ? '#334155' : '#e5e7eb';
+  const bgStop3 = isDark ? '#475569' : '#d1d5db';
+  const watchBand = isDark ? '#374151' : '#d1d5db';
+  const watchFace = isDark ? '#1f2937' : '#e5e7eb';
+
   let shape = '';
   if (accessory === 'Glasses') {
-    shape = '<rect x="250" y="430" width="130" height="90" rx="28" fill="none" stroke="#6b7280" stroke-width="18"/><rect x="420" y="430" width="130" height="90" rx="28" fill="none" stroke="#6b7280" stroke-width="18"/><line x1="380" y1="470" x2="420" y2="470" stroke="#6b7280" stroke-width="18"/>';
+    shape = `<rect x="250" y="430" width="130" height="90" rx="28" fill="none" stroke="${c2}" stroke-width="18"/><rect x="420" y="430" width="130" height="90" rx="28" fill="none" stroke="${c2}" stroke-width="18"/><line x1="380" y1="470" x2="420" y2="470" stroke="${c2}" stroke-width="18"/>`;
   } else if (accessory === 'Sunglasses') {
-    shape = '<rect x="250" y="430" width="130" height="90" rx="28" fill="#374151"/><rect x="420" y="430" width="130" height="90" rx="28" fill="#374151"/><line x1="380" y1="470" x2="420" y2="470" stroke="#6b7280" stroke-width="18"/>';
+    shape = `<rect x="250" y="430" width="130" height="90" rx="28" fill="${c3}"/><rect x="420" y="430" width="130" height="90" rx="28" fill="${c3}"/><line x1="380" y1="470" x2="420" y2="470" stroke="${c2}" stroke-width="18"/>`;
   } else if (accessory === 'Earrings') {
-    shape = '<circle cx="315" cy="470" r="48" fill="none" stroke="#6b7280" stroke-width="16"/><circle cx="485" cy="470" r="48" fill="none" stroke="#6b7280" stroke-width="16"/>';
+    shape = `<circle cx="315" cy="470" r="48" fill="none" stroke="${c2}" stroke-width="16"/><circle cx="485" cy="470" r="48" fill="none" stroke="${c2}" stroke-width="16"/>`;
   } else if (accessory === 'Necklace') {
-    shape = '<path d="M240 430c50 118 270 118 320 0" fill="none" stroke="#6b7280" stroke-width="18"/><circle cx="400" cy="560" r="26" fill="#9ca3af"/>';
+    shape = `<path d="M240 430c50 118 270 118 320 0" fill="none" stroke="${c2}" stroke-width="18"/><circle cx="400" cy="560" r="26" fill="${c1}"/>`;
   } else if (accessory === 'Watch') {
-    shape = '<rect x="340" y="360" width="120" height="300" rx="28" fill="#d1d5db"/><rect x="322" y="440" width="156" height="140" rx="32" fill="#6b7280"/><circle cx="400" cy="510" r="40" fill="#e5e7eb"/><line x1="400" y1="510" x2="400" y2="482" stroke="#6b7280" stroke-width="8"/><line x1="400" y1="510" x2="428" y2="510" stroke="#6b7280" stroke-width="8"/>';
+    shape = `<rect x="340" y="360" width="120" height="300" rx="28" fill="${watchBand}"/><rect x="322" y="440" width="156" height="140" rx="32" fill="${c2}"/><circle cx="400" cy="510" r="40" fill="${watchFace}"/><line x1="400" y1="510" x2="400" y2="482" stroke="${c2}" stroke-width="8"/><line x1="400" y1="510" x2="428" y2="510" stroke="${c2}" stroke-width="8"/>`;
   } else if (accessory === 'Hat') {
-    shape = '<path d="M210 520h380v46H210z" fill="#6b7280"/><path d="M260 380h280v146H260z" fill="#9ca3af"/>';
+    shape = `<path d="M210 520h380v46H210z" fill="${c2}"/><path d="M260 380h280v146H260z" fill="${c1}"/>`;
   } else if (accessory === 'Scarf') {
-    shape = '<path d="M250 380h300v140H250z" fill="#9ca3af"/><rect x="260" y="500" width="80" height="200" rx="18" fill="#6b7280"/><rect x="460" y="500" width="80" height="200" rx="18" fill="#6b7280"/>';
+    shape = `<path d="M250 380h300v140H250z" fill="${c1}"/><rect x="260" y="500" width="80" height="200" rx="18" fill="${c2}"/><rect x="460" y="500" width="80" height="200" rx="18" fill="${c2}"/>`;
   } else {
     shape = '';
   }
@@ -251,9 +284,9 @@ function accessoryObjectDataUri(accessory: string) {
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#f8fafc"/>
-      <stop offset="60%" stop-color="#e5e7eb"/>
-      <stop offset="100%" stop-color="#d1d5db"/>
+      <stop offset="0%" stop-color="${bgStop1}"/>
+      <stop offset="60%" stop-color="${bgStop2}"/>
+      <stop offset="100%" stop-color="${bgStop3}"/>
     </linearGradient>
   </defs>
   <rect width="800" height="1000" fill="url(#bg)"/>
@@ -443,59 +476,64 @@ function Section({
   );
 }
 
-/** Full-image option card with label + primary-colour ring when selected */
+/** Compact thumbnail option card with label + primary-colour ring when selected */
 function ImageCard({
   label,
   selected,
   onClick,
   imageSrc,
   placeholderStyle,
-  aspect = 'aspect-[3/4]',
+  swatch = false,
 }: {
   label: string;
   selected: boolean;
   onClick: () => void;
   imageSrc?: string;
   placeholderStyle?: React.CSSProperties;
-  aspect?: string;
+  swatch?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        'relative overflow-hidden rounded-xl transition-all duration-150',
-        aspect,
-        selected
-          ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
-          : 'ring-1 ring-border hover:ring-primary/40',
+        'relative flex flex-col items-center gap-1',
       )}
     >
-      <div className="absolute inset-0 bg-muted" style={placeholderStyle} />
-      {imageSrc && (
-        <img
-          src={imageSrc}
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 h-full w-full object-cover"
-          onError={(e) => { e.currentTarget.style.display = "none"; }}
-        />
-      )}
-
-      {/* Bottom gradient for label legibility */}
-      <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/70 to-transparent" />
-
-      {/* Label row */}
-      <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5">
+      <div
+        className={cn(
+          'relative overflow-hidden rounded-lg transition-all duration-150',
+          swatch ? 'h-10 w-10' : 'h-20 w-16',
+          selected
+            ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+            : 'ring-1 ring-border hover:ring-primary/40',
+        )}
+      >
+        <div className="absolute inset-0 bg-muted" style={placeholderStyle} />
+        {imageSrc && (
+          <img
+            src={imageSrc}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover"
+            onError={(e) => { e.currentTarget.style.display = "none"; }}
+          />
+        )}
         {selected && (
-          <div className="flex size-5 flex-shrink-0 items-center justify-center rounded-full bg-primary">
-            <Check className="size-3 text-primary-foreground" strokeWidth={3} />
+          <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
+            <div className="flex size-5 flex-shrink-0 items-center justify-center rounded-full bg-primary">
+              <Check className="size-3 text-primary-foreground" strokeWidth={3} />
+            </div>
           </div>
         )}
-        <span className="text-sm font-semibold leading-none text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.9)]">
-          {label}
-        </span>
       </div>
+      <span className={cn(
+        'max-w-[4.5rem] truncate text-center text-[11px] leading-tight',
+        selected ? 'font-semibold text-primary' : 'text-muted-foreground',
+      )}>
+        {label}
+      </span>
     </button>
   );
 }
@@ -536,6 +574,31 @@ interface PersonaBuilderInlineProps {
 export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInlineProps) {
   const store = usePersonaBuilderStore();
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<number>>(new Set());
+  const [builderMode, setBuilderMode] = useState<'visual' | 'text'>('visual');
+  const [textPrompt, setTextPrompt] = useState('');
+
+  // ── Theme detection ────────────────────────────────────────────────────────
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const isDark = mounted && resolvedTheme === 'dark';
+
+  // ── Dark-mode aware placeholder style maps ─────────────────────────────────
+  const genderPlaceholderStyleDynamic: Record<string, React.CSSProperties> =
+    Object.fromEntries(personaGenders.map((value) => [value, neutralCardStyle(`gender-${value}`, isDark)]));
+
+  const hairStylePlaceholderStyleDynamic: Record<string, React.CSSProperties> =
+    Object.fromEntries(hairStyles.map((value) => [value, neutralCardStyle(`hair-style-${value}`, isDark)]));
+
+  const bodyTypePlaceholderStyleDynamic: Record<string, React.CSSProperties> =
+    Object.fromEntries(personaBodyTypes.map((value) => [value, neutralCardStyle(`body-type-${value}`, isDark)]));
+
+  const clothingPlaceholderStyleDynamic: Record<string, React.CSSProperties> =
+    Object.fromEntries(clothingStyles.map((value) => [value, neutralCardStyle(`clothing-${value}`, isDark)]));
+
+  const accessoriesPlaceholderStyleDynamic: Record<string, React.CSSProperties> =
+    Object.fromEntries(accessoryOptions.map((value) => [value, neutralCardStyle(`accessory-${value}`, isDark)]));
+
 
   async function handleGenerate() {
     if (!store.name.trim()) return;
@@ -563,6 +626,39 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
         body: {
           name: store.name,
           attributes,
+          ...(store.personaId ? { persona_id: store.personaId } : {}),
+        },
+      });
+
+      const displayUrls = result.data.generated_image_urls ?? result.data.generated_images;
+      store.setPersonaId(result.data.id);
+      store.setGeneratedImages(displayUrls);
+      toast.success(`${displayUrls.length} persona images generated!`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to generate persona');
+    } finally {
+      store.setIsGenerating(false);
+    }
+  }
+
+  async function handleGenerateFromText() {
+    if (!textPrompt.trim()) return;
+    store.setIsGenerating(true);
+    setImageLoadErrors(new Set());
+    toast.info('Generating persona from description…');
+
+    try {
+      const result = await callEdge<{
+        data: { id: string; generated_images: string[]; generated_image_urls: string[] };
+      }>('generate-persona', {
+        body: {
+          name: store.name || 'Custom Persona',
+          custom_prompt: textPrompt,
+          attributes: {
+            gender: store.gender,
+            ethnicity: store.ethnicity,
+            age: store.ageRange,
+          },
           ...(store.personaId ? { persona_id: store.personaId } : {}),
         },
       });
@@ -622,6 +718,78 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
             (store.isGenerating || store.isSaving) && 'pointer-events-none opacity-50',
           )}>
 
+            {/* Mode toggle */}
+            <div className="flex rounded-lg border border-border bg-muted/50 p-1">
+              <button
+                type="button"
+                onClick={() => setBuilderMode('visual')}
+                className={cn(
+                  'flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                  builderMode === 'visual'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <LayoutGrid className="size-3.5" />
+                Visual Builder
+              </button>
+              <button
+                type="button"
+                onClick={() => setBuilderMode('text')}
+                className={cn(
+                  'flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                  builderMode === 'text'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <Type className="size-3.5" />
+                Describe in text
+              </button>
+            </div>
+
+            {builderMode === 'text' ? (
+              <div className="flex flex-col gap-4 p-4">
+                <div>
+                  <Label className="text-sm font-medium">Describe your ideal persona</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Describe appearance, style, and vibe in plain language
+                  </p>
+                </div>
+                <Textarea
+                  value={textPrompt}
+                  onChange={(e) => setTextPrompt(e.target.value)}
+                  placeholder="e.g. Young athletic woman, 25-30, dark curly hair, confident and energetic, wearing activewear"
+                  rows={4}
+                  className="resize-none"
+                />
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Persona Name
+                  </Label>
+                  <Input
+                    placeholder="e.g. Sophie, Marcus"
+                    value={store.name}
+                    onChange={(e) => store.setField('name', e.target.value)}
+                  />
+                </div>
+                <Button onClick={handleGenerateFromText} disabled={!textPrompt.trim() || store.isGenerating}>
+                  {store.isGenerating ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Generating…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="size-4" />
+                      Generate Persona
+                    </>
+                  )}
+                </Button>
+              </div>
+            ) : (
+            <>
+
             {/* Name */}
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -636,7 +804,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
 
             {/* Gender */}
             <Section icon={<User className="size-4" />} label="Gender" count={1}>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
                 {personaGenders.map((g) => (
                   <ImageCard
                     key={g}
@@ -644,7 +812,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     selected={store.gender === g}
                     onClick={() => store.setField('gender', g)}
                     imageSrc={genderImageSrc[g]}
-                    placeholderStyle={genderPlaceholderStyle[g]}
+                    placeholderStyle={genderPlaceholderStyleDynamic[g]}
                   />
                 ))}
               </div>
@@ -652,7 +820,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
 
             {/* Ethnicity */}
             <Section icon={<Palette className="size-4" />} label="Ethnicity" count={1}>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
                 {ethnicities.map((eth) => (
                   <ImageCard
                     key={eth}
@@ -682,7 +850,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
 
             {/* Hair Color */}
             <Section icon={<Palette className="size-4" />} label="Hair Color" count={1}>
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+              <div className="grid grid-cols-5 gap-2 sm:grid-cols-6">
                 {hairColors.map((color) => (
                   <ImageCard
                     key={color}
@@ -690,7 +858,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     selected={store.hairColor === color}
                     onClick={() => store.setField('hairColor', color)}
                     placeholderStyle={hairPlaceholderStyle[color]}
-                    aspect="aspect-square"
+                    swatch
                   />
                 ))}
               </div>
@@ -698,7 +866,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
 
             {/* Hair Style */}
             <Section icon={<User className="size-4" />} label="Hair Style" count={1}>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
                 {hairStyles.map((style) => (
                   <ImageCard
                     key={style}
@@ -706,7 +874,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     selected={store.hairStyle === style}
                     onClick={() => store.setField('hairStyle', style)}
                     imageSrc={hairStyleImageSrc[style]}
-                    placeholderStyle={hairStylePlaceholderStyle[style]}
+                    placeholderStyle={hairStylePlaceholderStyleDynamic[style]}
                   />
                 ))}
               </div>
@@ -714,7 +882,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
 
             {/* Eye Color */}
             <Section icon={<Eye className="size-4" />} label="Eye Color" count={1}>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-5 gap-2 sm:grid-cols-6">
                 {eyeColors.map((color) => (
                   <ImageCard
                     key={color}
@@ -722,7 +890,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     selected={store.eyeColor === color}
                     onClick={() => store.setField('eyeColor', color)}
                     placeholderStyle={eyePlaceholderStyle[color]}
-                    aspect="aspect-square"
+                    swatch
                   />
                 ))}
               </div>
@@ -730,7 +898,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
 
             {/* Body Type */}
             <Section icon={<User className="size-4" />} label="Body Type" count={1}>
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
                 {personaBodyTypes.map((type) => (
                   <ImageCard
                     key={type}
@@ -738,8 +906,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     selected={store.bodyType === type}
                     onClick={() => store.setField('bodyType', type)}
                     imageSrc={bodyTypeImageSrc[type]}
-                    placeholderStyle={bodyTypePlaceholderStyle[type]}
-                    aspect="aspect-[4/5]"
+                    placeholderStyle={bodyTypePlaceholderStyleDynamic[type]}
                   />
                 ))}
               </div>
@@ -747,7 +914,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
 
             {/* Clothing Style */}
             <Section icon={<Shirt className="size-4" />} label="Clothing Style" count={1}>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
                 {clothingStyles.map((style) => (
                   <ImageCard
                     key={style}
@@ -755,7 +922,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     selected={store.clothingStyle === style}
                     onClick={() => store.setField('clothingStyle', style)}
                     imageSrc={clothingImageSrc[style]}
-                    placeholderStyle={clothingPlaceholderStyle[style]}
+                    placeholderStyle={clothingPlaceholderStyleDynamic[style]}
                   />
                 ))}
               </div>
@@ -768,7 +935,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
               count={store.accessories.length}
             >
               <p className="mb-2 text-xs text-muted-foreground">Select up to 5</p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
                 {accessoryOptions.map((acc) => {
                   const isSelected = store.accessories.includes(acc);
                   return (
@@ -778,13 +945,15 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                       selected={isSelected}
                       onClick={() => store.toggleAccessory(acc)}
                       imageSrc={accessoriesImageSrc[acc]}
-                      placeholderStyle={accessoriesPlaceholderStyle[acc]}
-                      aspect="aspect-square"
+                      placeholderStyle={accessoriesPlaceholderStyleDynamic[acc]}
                     />
                   );
                 })}
               </div>
             </Section>
+
+            </>
+            )}
 
           </div>
         </fieldset>
