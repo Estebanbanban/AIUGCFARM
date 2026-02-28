@@ -383,6 +383,14 @@ function CombinationPreview({
     isActive: isPackZipping,
   } = useZipDownload();
 
+  // Toast on Download Pack failure
+  useEffect(() => {
+    if (packZipStatus === "error") {
+      toast.error("Pack download failed. Check your connection and try again.");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [packZipStatus]);
+
   const isStitching =
     stitchStatus !== "idle" &&
     stitchStatus !== "done" &&
@@ -864,6 +872,14 @@ export default function GenerationDetailPage() {
     }, 1000);
     return () => clearInterval(interval);
   }, [isProcessing, lastChecked]);
+
+  // Toast on ZIP download failure (Story A)
+  useEffect(() => {
+    if (zipStatus === "error") {
+      toast.error("ZIP download failed. Check your connection and try again.");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zipStatus]);
 
   /* ----- Download all segments as ZIP (Story A) ----- */
   function handleDownloadAll() {
@@ -1460,7 +1476,11 @@ export default function GenerationDetailPage() {
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Estimated time: {formatEstimatedTime(combosToExport.length * 25)}
-                          {combosToExport.length > 9 && (
+                          {combosToExport.length > 27 ? (
+                            <span className="ml-1 text-red-400">
+                              — Max 27 combinations
+                            </span>
+                          ) : combosToExport.length > 9 && (
                             <span className="ml-1 text-amber-400">
                               — Large export, stay on this tab
                             </span>

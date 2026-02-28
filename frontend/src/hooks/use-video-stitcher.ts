@@ -7,6 +7,9 @@ import { useCallback, useRef, useState } from "react";
 // Singleton — load once, reuse across stitches
 let ffmpegSingleton: FFmpeg | null = null;
 
+// Mutex — FFmpeg WASM is single-threaded; only one stitch can run at a time
+let ffmpegBusy = false;
+
 async function getFFmpeg(): Promise<FFmpeg> {
   if (ffmpegSingleton?.loaded) return ffmpegSingleton;
 
@@ -134,41 +137,46 @@ export async function stitchToBlob(
   bodyUrl: string,
   ctaUrl: string,
 ): Promise<Blob> {
-  const ffmpeg = await getFFmpeg();
+  if (ffmpegBusy) throw new Error("FFmpeg is already in use — wait for the current stitch to finish.");
+  ffmpegBusy = true;
 
-  // Clean up any leftover files from a previous run
-  await cleanupFFmpegFiles(ffmpeg);
+  try {
+    const ffmpeg = await getFFmpeg();
 
-  await Promise.all([
-    ffmpeg.writeFile("hook.mp4", await fetchFile(hookUrl))
-      .catch(async () => ffmpeg.writeFile("hook.mp4", await fetchFile(hookUrl))),
-    ffmpeg.writeFile("body.mp4", await fetchFile(bodyUrl))
-      .catch(async () => ffmpeg.writeFile("body.mp4", await fetchFile(bodyUrl))),
-    ffmpeg.writeFile("cta.mp4", await fetchFile(ctaUrl))
-      .catch(async () => ffmpeg.writeFile("cta.mp4", await fetchFile(ctaUrl))),
-  ]);
+    // Clean up any leftover files from a previous run
+    await cleanupFFmpegFiles(ffmpeg);
 
-  const [hookB, bodyB, ctaB] = await Promise.all([
-    detectSpeechBounds(ffmpeg, "hook.mp4"),
-    detectSpeechBounds(ffmpeg, "body.mp4"),
-    detectSpeechBounds(ffmpeg, "cta.mp4"),
-  ]);
+    await Promise.all([
+      ffmpeg.writeFile("hook.mp4", await fetchFile(hookUrl))
+        .catch(async () => ffmpeg.writeFile("hook.mp4", await fetchFile(hookUrl))),
+      ffmpeg.writeFile("body.mp4", await fetchFile(bodyUrl))
+        .catch(async () => ffmpeg.writeFile("body.mp4", await fetchFile(bodyUrl))),
+      ffmpeg.writeFile("cta.mp4", await fetchFile(ctaUrl))
+        .catch(async () => ffmpeg.writeFile("cta.mp4", await fetchFile(ctaUrl))),
+    ]);
 
-  await ffmpeg.exec(["-i", "hook.mp4", "-ss", hookB.start.toFixed(3), "-to", hookB.end.toFixed(3), "-c", "copy", "hook_t.mp4"]);
-  await ffmpeg.exec(["-i", "body.mp4", "-ss", bodyB.start.toFixed(3), "-to", bodyB.end.toFixed(3), "-c", "copy", "body_t.mp4"]);
-  await ffmpeg.exec(["-i", "cta.mp4",  "-ss", ctaB.start.toFixed(3),  "-to", ctaB.end.toFixed(3),  "-c", "copy", "cta_t.mp4"]);
+    const [hookB, bodyB, ctaB] = await Promise.all([
+      detectSpeechBounds(ffmpeg, "hook.mp4"),
+      detectSpeechBounds(ffmpeg, "body.mp4"),
+      detectSpeechBounds(ffmpeg, "cta.mp4"),
+    ]);
 
-  const manifest = "file 'hook_t.mp4'\nfile 'body_t.mp4'\nfile 'cta_t.mp4'\n";
-  await ffmpeg.writeFile("list.txt", new TextEncoder().encode(manifest));
-  await ffmpeg.exec(["-f", "concat", "-safe", "0", "-i", "list.txt", "-c", "copy", "output.mp4"]);
+    await ffmpeg.exec(["-i", "hook.mp4", "-ss", hookB.start.toFixed(3), "-to", hookB.end.toFixed(3), "-c", "copy", "hook_t.mp4"]);
+    await ffmpeg.exec(["-i", "body.mp4", "-ss", bodyB.start.toFixed(3), "-to", bodyB.end.toFixed(3), "-c", "copy", "body_t.mp4"]);
+    await ffmpeg.exec(["-i", "cta.mp4",  "-ss", ctaB.start.toFixed(3),  "-to", ctaB.end.toFixed(3),  "-c", "copy", "cta_t.mp4"]);
 
-  const data = (await ffmpeg.readFile("output.mp4")) as Uint8Array;
-  const blob = new Blob([data.buffer as ArrayBuffer], { type: "video/mp4" });
+    const manifest = "file 'hook_t.mp4'\nfile 'body_t.mp4'\nfile 'cta_t.mp4'\n";
+    await ffmpeg.writeFile("list.txt", new TextEncoder().encode(manifest));
+    await ffmpeg.exec(["-f", "concat", "-safe", "0", "-i", "list.txt", "-c", "copy", "output.mp4"]);
 
-  // Clean up immediately after reading output
-  await cleanupFFmpegFiles(ffmpeg);
+    const data = (await ffmpeg.readFile("output.mp4")) as Uint8Array;
+    const blob = new Blob([data.buffer as ArrayBuffer], { type: "video/mp4" });
 
-  return blob;
+    await cleanupFFmpegFiles(ffmpeg);
+    return blob;
+  } finally {
+    ffmpegBusy = false;
+  }
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────────
@@ -202,6 +210,13 @@ export function useVideoStitcher() {
 
   const stitch = useCallback(
     async (hookUrl: string, bodyUrl: string, ctaUrl: string) => {
+      if (ffmpegBusy) {
+        setError("FFmpeg is already in use — wait for the current stitch to finish.");
+        setStatus("error");
+        return;
+      }
+      ffmpegBusy = true;
+
       // Revoke previous blob to free memory
       if (prevBlobUrl.current) {
         URL.revokeObjectURL(prevBlobUrl.current);
@@ -286,6 +301,8 @@ export function useVideoStitcher() {
         const msg = err instanceof Error ? err.message : "Stitching failed";
         setError(msg);
         setStatus("error");
+      } finally {
+        ffmpegBusy = false;
       }
     },
     [],
