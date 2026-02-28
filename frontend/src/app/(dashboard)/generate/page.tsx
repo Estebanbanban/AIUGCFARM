@@ -314,6 +314,22 @@ export default function GeneratePage() {
   const { data: profile } = useProfile();
   const generateComposites = useGenerateCompositeImages();
   const editComposite = useEditCompositeImage();
+
+  // Step 3 cycling progress messages while composites generate
+  const COMPOSITE_MESSAGES = [
+    "Placing your persona in the scene...",
+    "Compositing product and persona...",
+    "Rendering lighting and style...",
+    "Finalising preview images...",
+    "Almost ready...",
+  ];
+  const [compositeMsgIdx, setCompositeMsgIdx] = useState(0);
+  useEffect(() => {
+    if (!generateComposites.isPending) { setCompositeMsgIdx(0); return; }
+    const id = setInterval(() => setCompositeMsgIdx((i) => (i + 1) % COMPOSITE_MESSAGES.length), 2800);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generateComposites.isPending]);
   const generateScript = useGenerateScript();
   const approveAndGenerate = useApproveAndGenerate();
   const watchedGenerationsStore = useWatchedGenerationsStore();
@@ -1180,21 +1196,38 @@ export default function GeneratePage() {
                 </div>
 
                 {generateComposites.isPending ? (
-                  <div className="flex flex-col gap-4">
-                    <div className="grid grid-cols-4 gap-3">
-                      {[1, 2, 3, 4].map((i) => (
+                  <div className="flex flex-col items-center gap-6 py-6">
+                    {/* Central animated indicator */}
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="relative flex size-16 items-center justify-center rounded-full bg-primary/10">
+                        <Sparkles className="size-7 animate-pulse text-primary" />
+                        <div className="absolute inset-0 animate-ping rounded-full bg-primary/10" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-semibold text-foreground">Generating preview</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground transition-all duration-500">
+                          {COMPOSITE_MESSAGES[compositeMsgIdx]}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground/60">~20 seconds</p>
+                      </div>
+                    </div>
+                    {/* Skeleton cards */}
+                    <div className="grid w-full grid-cols-4 gap-3">
+                      {[0, 1, 2, 3].map((i) => (
                         <div
                           key={i}
                           className={cn(
-                            "animate-pulse rounded-xl bg-muted",
+                            "relative overflow-hidden rounded-xl bg-muted",
                             (store.format ?? "9:16") === "9:16" ? "aspect-[9/16]" : "aspect-video",
                           )}
-                        />
+                        >
+                          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-muted via-primary/5 to-muted" style={{ animationDelay: `${i * 200}ms` }} />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Loader2 className="size-5 animate-spin text-primary/25" style={{ animationDelay: `${i * 150}ms` }} />
+                          </div>
+                        </div>
                       ))}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      Generating preview (~20s)...
-                    </p>
                   </div>
                 ) : (
                   <Button
