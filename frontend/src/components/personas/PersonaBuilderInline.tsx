@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { resolvePersonaImageUrl } from '@/hooks/use-personas';
 import Image from 'next/image';
 import {
   Loader2, Sparkles, Check, User, ImageIcon, X,

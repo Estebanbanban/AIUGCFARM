@@ -2,9 +2,11 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { resolvePersonaImageUrl } from "@/hooks/use-personas";
 import Image from "next/image";
 import {
   ArrowLeft, Loader2, Sparkles, Check, User, ImageIcon,
@@ -502,6 +504,37 @@ export default function NewPersonaPage() {
   const router = useRouter();
   const store = usePersonaBuilderStore();
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<number>>(new Set());
+
+  // Restore generated images from DB when page loads with a persisted personaId
+  // (signed URLs expire after 1hr, so we re-sign from the stored storage paths)
+  useEffect(() => {
+    if (!store.personaId || store.generatedImages.length > 0 || store.isGenerating) return;
+    let cancelled = false;
+    async function restoreImages() {
+      const supabase = createClient();
+      const { data: persona } = await supabase
+        .from("personas")
+        .select("generated_images, selected_image_url")
+        .eq("id", store.personaId!)
+        .single();
+      if (!persona?.generated_images?.length || cancelled) return;
+      const signed = await Promise.all(
+        (persona.generated_images as string[]).map((p) => resolvePersonaImageUrl(p)),
+      );
+      const valid = signed.filter(Boolean) as string[];
+      if (valid.length > 0 && !cancelled) {
+        store.setGeneratedImages(valid);
+        // Restore which image was selected, if any
+        if (persona.selected_image_url) {
+          const idx = (persona.generated_images as string[]).indexOf(persona.selected_image_url);
+          if (idx >= 0) store.selectImage(idx);
+        }
+      }
+    }
+    restoreImages();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.personaId]);
 
   async function handleGenerate() {
     if (!store.name.trim()) return;

@@ -16,9 +16,10 @@ import {
   Clock,
   Loader2,
   DollarSign,
+  PlayCircle,
 } from "lucide-react";
 import { cn, formatDate, formatCurrency } from "@/lib/utils";
-import { PLANS } from "@/lib/stripe";
+import { PLANS, CREDITS_PER_SINGLE, CREDITS_PER_BATCH, CREDITS_PER_SINGLE_HD, CREDITS_PER_BATCH_HD } from "@/lib/stripe";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -36,6 +37,8 @@ import {
 } from "@/hooks/use-generations";
 import { usePersonas } from "@/hooks/use-personas";
 import type { GenerationStatus } from "@/types/database";
+import { useGenerationWizardStore } from "@/stores/generation-wizard";
+import { useRouter } from "next/navigation";
 import { calculateGenerationCost } from "@/lib/generation-cost";
 import { Suspense } from "react";
 import { CheckoutSuccessHandler } from "@/components/checkout/CheckoutSuccessHandler";
@@ -78,6 +81,8 @@ const quickActions = [
 ];
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const wizard = useGenerationWizardStore();
   const [firstName, setFirstName] = useState("there");
 
   const { data: credits, isLoading: creditsLoading } = useCredits();
@@ -95,11 +100,33 @@ export default function DashboardPage() {
   const creditsTotal = planConfig?.credits ?? 9;
 
   const recentGenerations = (generations ?? []).slice(0, 5);
+  const draftGenerations = (generations ?? []).filter(
+    (g) => g.status === "awaiting_approval",
+  );
   const videosGenerated = (generations ?? []).filter(
     (g) => g.status === "completed"
   ).length;
   const activePersonas = personas?.length ?? 0;
   const hasGenerations = recentGenerations.length > 0;
+
+  function handleResumeDraft(gen: GenerationWithRelations) {
+    if (!gen.script) {
+      router.push("/generate");
+      return;
+    }
+    const creditsToCharge =
+      gen.video_quality === "hd"
+        ? gen.mode === "single" ? CREDITS_PER_SINGLE_HD : CREDITS_PER_BATCH_HD
+        : gen.mode === "single" ? CREDITS_PER_SINGLE : CREDITS_PER_BATCH;
+    wizard.resumeFromGeneration({
+      generationId: gen.id,
+      script: gen.script,
+      creditsToCharge,
+      productId: gen.product_id,
+      personaId: gen.persona_id,
+    });
+    router.push("/generate");
+  }
 
   useEffect(() => {
     const supabase = createClient();
@@ -229,6 +256,50 @@ export default function DashboardPage() {
           ))}
         </CardContent>
       </Card>
+
+      {draftGenerations.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold text-foreground">
+            Script Ready — Awaiting Approval
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {draftGenerations.map((gen) => (
+              <Card
+                key={gen.id}
+                className="border-amber-500/30 bg-amber-500/5 transition-colors hover:border-amber-500/60"
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="line-clamp-1 text-sm font-medium">
+                      {gen.products?.name ?? `Generation ${gen.id.slice(0, 8)}`}
+                    </CardTitle>
+                    <Badge
+                      variant="secondary"
+                      className="shrink-0 bg-amber-500/10 text-xs text-amber-700 dark:text-amber-300"
+                    >
+                      Draft
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Clock className="size-3" />
+                    {formatDate(gen.created_at)}
+                  </div>
+                </CardHeader>
+                <CardContent className="pb-4 pt-0">
+                  <Button
+                    size="sm"
+                    className="w-full gap-1.5"
+                    onClick={() => handleResumeDraft(gen)}
+                  >
+                    <PlayCircle className="size-3.5" />
+                    Review &amp; Generate
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
