@@ -26,6 +26,7 @@ import {
   Star,
   Clock,
   Flame,
+  AlertCircle,
 } from "lucide-react";
 import { useFirstPurchaseOffer, COUPON_30_OFF } from "@/hooks/use-first-purchase-offer";
 import { toast } from "sonner";
@@ -909,18 +910,23 @@ export default function GeneratePage() {
               />
             ) : activePersonas.length > 0 ? (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {activePersonas.map((persona) => (
+                {activePersonas.map((persona) => {
+                  const hasImage = !!persona.selected_image_url;
+                  return (
                   <button
                     key={persona.id}
-                    onClick={() => store.setPersonaId(persona.id)}
-                    className="text-left"
+                    onClick={() => hasImage && store.setPersonaId(persona.id)}
+                    disabled={!hasImage}
+                    className={cn("text-left", !hasImage && "cursor-not-allowed opacity-50")}
                   >
                     <Card
                       className={cn(
                         "h-full transition-all",
                         store.personaId === persona.id
                           ? "border-primary ring-1 ring-primary/30"
-                          : "hover:border-muted-foreground/30",
+                          : hasImage
+                          ? "hover:border-muted-foreground/30"
+                          : "",
                       )}
                     >
                       <CardContent className="flex flex-col items-center gap-3 p-6">
@@ -943,16 +949,22 @@ export default function GeneratePage() {
                             {persona.attributes.clothing_style}
                           </p>
                         </div>
-                        {store.personaId === persona.id && (
+                        {!hasImage ? (
+                          <div className="flex items-center gap-1.5 text-xs text-amber-500">
+                            <AlertCircle className="size-3.5" />
+                            Needs image — visit Personas
+                          </div>
+                        ) : store.personaId === persona.id ? (
                           <div className="flex items-center gap-1.5 text-xs text-primary">
                             <Check className="size-3.5" />
                             Selected
                           </div>
-                        )}
+                        ) : null}
                       </CardContent>
                     </Card>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             ) : null}
           </div>
