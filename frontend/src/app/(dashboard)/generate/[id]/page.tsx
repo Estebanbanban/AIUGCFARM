@@ -1001,6 +1001,52 @@ export default function GenerationDetailPage() {
       )}
 
       {/* ---------------------------------------------------------------- */}
+      {/*  Productive wait                                                   */}
+      {/* ---------------------------------------------------------------- */}
+      {isProcessing && (
+        <Card>
+          <CardContent className="flex flex-col gap-3 py-4">
+            <p className="text-sm font-semibold text-foreground">
+              While your video renders (~3–4 min)
+            </p>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">Start your next campaign</p>
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/generate">New generation</Link>
+                </Button>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">Build another persona</p>
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/personas/new">New persona</Link>
+                </Button>
+              </div>
+              {gen?.script && (
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">Copy your script</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const lines: string[] = [];
+                      gen.script!.hooks?.forEach((s, i) => lines.push(`Hook ${i + 1}: ${s.text}`));
+                      gen.script!.bodies?.forEach((s, i) => lines.push(`Body ${i + 1}: ${s.text}`));
+                      gen.script!.ctas?.forEach((s, i) => lines.push(`CTA ${i + 1}: ${s.text}`));
+                      navigator.clipboard.writeText(lines.join("\n\n"));
+                      toast.success("Script copied to clipboard");
+                    }}
+                  >
+                    Copy to clipboard
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ---------------------------------------------------------------- */}
       {/*  Error Message (non-fatal during processing)                      */}
       {/* ---------------------------------------------------------------- */}
       {gen?.error_message && !isFailed && (

@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { Logo } from "@/components/ui/Logo";
+import { useGenerationNotifications } from "@/hooks/use-generation-notifications";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -161,6 +162,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const pageTitle = getPageTitle(pathname);
+  useGenerationNotifications();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">

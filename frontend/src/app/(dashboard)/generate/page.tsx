@@ -61,6 +61,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
+import { useWatchedGenerationsStore } from "@/stores/watched-generations";
 import { useProducts, useScrapeProduct } from "@/hooks/use-products";
 import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
 import { usePersonas, resolvePersonaImageUrl } from "@/hooks/use-personas";
@@ -277,6 +278,8 @@ export default function GeneratePage() {
 
   // Step 4, rendering timeline collapsible
   const [showTimeline, setShowTimeline] = useState(false);
+  // Tracks whether config changed after auto-fired script (enables "Regenerate with new settings")
+  const [scriptConfigChanged, setScriptConfigChanged] = useState(false);
 
   // Auto-fire composites when arriving at step 3 via localStorage restore
   // (handleNext sets the ref before advancing, so this only fires for cold restores)
@@ -313,6 +316,7 @@ export default function GeneratePage() {
   const editComposite = useEditCompositeImage();
   const generateScript = useGenerateScript();
   const approveAndGenerate = useApproveAndGenerate();
+  const watchedGenerationsStore = useWatchedGenerationsStore();
   const checkout = useCheckout();
   const buyCredits = useBuyCredits();
   const offer = useFirstPurchaseOffer();
@@ -351,8 +355,8 @@ export default function GeneratePage() {
     addingProduct || (!productsLoading && confirmedProducts.length === 0);
 
   function canProceed() {
-    if (store.step === 1) return !!store.productId;
-    if (store.step === 2) return !!store.personaId && !!store.format;
+    if (store.step === 1) return !!store.productId && !!store.format;
+    if (store.step === 2) return !!store.personaId;
     if (store.step === 3) return !!store.compositeImagePath;
     // Step 4 proceeds via "Generate Script" button, not the generic Next button
     return false;
@@ -491,9 +495,10 @@ export default function GeneratePage() {
     handleGenerateComposites(format);
   }
 
-  async function handleGenerateComposites(formatOverride?: "9:16" | "16:9") {
+  async function handleGenerateComposites(formatOverride?: "9:16" | "16:9", personaIdOverride?: string) {
     const format = formatOverride ?? store.format;
-    if (!store.productId || !store.personaId || !format) return;
+    const personaId = personaIdOverride ?? store.personaId;
+    if (!store.productId || !personaId || !format) return;
     setCompositeImages([]);
     setSelectedCompositeIdx(null);
     setShowPreviewEditor(false);
@@ -501,7 +506,7 @@ export default function GeneratePage() {
     setPreviewEditPrompt("");
 
     generateComposites.mutate(
-      { product_id: store.productId, persona_id: store.personaId, format },
+      { product_id: store.productId, persona_id: personaId, format },
       {
         onSuccess: (result) => {
           setCompositeImages(result.images);
@@ -517,7 +522,41 @@ export default function GeneratePage() {
   function handleSelectComposite(idx: number) {
     setSelectedCompositeIdx(idx);
     setShowPreviewEditor(false);
-    store.setCompositeImagePath(compositeImages[idx].path);
+    const path = compositeImages[idx].path;
+    store.setCompositeImagePath(path);
+    // Auto-fire script so it's ready (or nearly ready) when user reaches Step 4
+    if (store.productId && store.personaId && !generateScript.isPending) {
+      // Skip auto-fire if comment keyword CTA is selected but keyword is empty
+      if (store.ctaStyle === "comment_keyword" && !store.ctaCommentKeyword.trim()) return;
+      store.clearPendingScript();
+      setScriptConfigChanged(false);
+      generateScript.mutate(
+        {
+          product_id: store.productId,
+          persona_id: store.personaId,
+          mode: store.mode,
+          quality: store.quality,
+          composite_image_path: path,
+          cta_style: store.ctaStyle,
+          phase: "script",
+        },
+        {
+          onSuccess: (result) => {
+            if (result.script) {
+              trackScriptGenerated(store.mode, store.quality);
+              store.setPendingScript(
+                result.generation_id,
+                result.script,
+                result.credits_to_charge ?? effectiveCost,
+              );
+            }
+          },
+          onError: () => {
+            // Silent fail — user can manually generate script in Step 4
+          },
+        },
+      );
+    }
   }
 
   function handleApplyPreviewEdit() {
@@ -554,6 +593,7 @@ export default function GeneratePage() {
       return;
     }
     if (!store.productId || !store.personaId || !store.compositeImagePath) return;
+    setScriptConfigChanged(false);
 
     generateScript.mutate(
       {
@@ -608,6 +648,7 @@ export default function GeneratePage() {
         onSuccess: (result) => {
           const genId = store.pendingGenerationId!;
           trackVideoGenerationStarted(store.mode, store.quality);
+          watchedGenerationsStore.add(genId, selectedProduct?.name);
           store.reset();
           router.push(`/generate/${genId}`);
           toast.success("Generation started!");
@@ -888,7 +929,8 @@ export default function GeneratePage() {
                 </Tabs>
               )
             ) : confirmedProducts.length > 0 ? (
-              /* Product grid */
+              <>
+              {/* Product grid */}
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {confirmedProducts.map((product) => (
                   <div key={product.id} className="relative">
@@ -954,6 +996,47 @@ export default function GeneratePage() {
                   </div>
                 ))}
               </div>
+              {/* Format picker — choose before proceeding */}
+              <div>
+                <p className="mb-2 text-sm font-medium">Video format</p>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => store.setFormat("9:16")}
+                    className={cn(
+                      "flex items-center gap-2 rounded-xl border-2 px-4 py-3 transition-all",
+                      store.format === "9:16"
+                        ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                        : "border-border hover:border-muted-foreground/40 hover:bg-muted/30",
+                    )}
+                  >
+                    <Smartphone className="size-4 shrink-0" />
+                    <div className="text-left">
+                      <p className="text-sm font-semibold">Portrait</p>
+                      <p className="text-xs text-muted-foreground">9:16 · TikTok · Reels</p>
+                    </div>
+                    {store.format === "9:16" && <Check className="ml-1 size-3.5 text-primary" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => store.setFormat("16:9")}
+                    className={cn(
+                      "flex items-center gap-2 rounded-xl border-2 px-4 py-3 transition-all",
+                      store.format === "16:9"
+                        ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                        : "border-border hover:border-muted-foreground/40 hover:bg-muted/30",
+                    )}
+                  >
+                    <Monitor className="size-4 shrink-0" />
+                    <div className="text-left">
+                      <p className="text-sm font-semibold">Landscape</p>
+                      <p className="text-xs text-muted-foreground">16:9 · YouTube · Ads</p>
+                    </div>
+                    {store.format === "16:9" && <Check className="ml-1 size-3.5 text-primary" />}
+                  </button>
+                </div>
+              </div>
+              </>
             ) : null}
           </div>
         )}
@@ -962,55 +1045,6 @@ export default function GeneratePage() {
         {store.step === 2 && (
           <div className="flex flex-col gap-4">
             <h2 className="text-lg font-semibold">Select a Persona</h2>
-
-            {/* Format picker — user must choose before Next is enabled */}
-            <div>
-              <p className="mb-2 text-sm font-medium">Video format</p>
-              <div className="grid grid-cols-2 gap-3 sm:max-w-sm">
-                <button
-                  type="button"
-                  onClick={() => store.setFormat("9:16")}
-                  className={cn(
-                    "flex flex-col items-center gap-3 rounded-xl border-2 px-4 py-5 transition-all",
-                    store.format === "9:16"
-                      ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                      : "border-border hover:border-muted-foreground/40 hover:bg-muted/30",
-                  )}
-                >
-                  <div className={cn("h-12 w-7 rounded-md border-2 opacity-70", store.format === "9:16" ? "border-primary" : "border-muted-foreground")} />
-                  <div className="text-center">
-                    <p className="text-sm font-semibold">Portrait</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">9:16 · TikTok · Reels</p>
-                  </div>
-                  {store.format === "9:16" && (
-                    <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
-                      <Check className="size-3.5" /> Selected
-                    </div>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => store.setFormat("16:9")}
-                  className={cn(
-                    "flex flex-col items-center gap-3 rounded-xl border-2 px-4 py-5 transition-all",
-                    store.format === "16:9"
-                      ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                      : "border-border hover:border-muted-foreground/40 hover:bg-muted/30",
-                  )}
-                >
-                  <div className={cn("h-7 w-12 rounded-md border-2 opacity-70", store.format === "16:9" ? "border-primary" : "border-muted-foreground")} />
-                  <div className="text-center">
-                    <p className="text-sm font-semibold">Landscape</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">16:9 · YouTube · Ads</p>
-                  </div>
-                  {store.format === "16:9" && (
-                    <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
-                      <Check className="size-3.5" /> Selected
-                    </div>
-                  )}
-                </button>
-              </div>
-            </div>
 
             {personasLoading ? (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1025,7 +1059,12 @@ export default function GeneratePage() {
                   return (
                   <button
                     key={persona.id}
-                    onClick={() => hasImage && store.setPersonaId(persona.id)}
+                    onClick={() => {
+                      if (!hasImage) return;
+                      store.setPersonaId(persona.id);
+                      handleGenerateComposites(undefined, persona.id);
+                      generationFiredForFormat.current = store.format;
+                    }}
                     disabled={!hasImage}
                     className={cn("text-left", !hasImage && "cursor-not-allowed opacity-50")}
                   >
@@ -1353,13 +1392,6 @@ export default function GeneratePage() {
               </p>
             </div>
 
-            {generateScript.isPending ? (
-              <div className="flex flex-col items-center gap-4 py-20">
-                <Loader2 className="size-10 animate-spin text-primary" />
-                <p className="text-base font-medium">Generating your script...</p>
-                <p className="text-sm text-muted-foreground">This usually takes 15-30 seconds</p>
-              </div>
-            ) : (
             <div className="mx-auto w-full max-w-lg">
               <Card>
                 <CardContent className="flex flex-col gap-4 p-6">
@@ -1456,6 +1488,7 @@ export default function GeneratePage() {
                             }
                           }
                           store.setMode("single");
+                          setScriptConfigChanged(true);
                         }}
                         className={cn(
                           "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
@@ -1485,6 +1518,7 @@ export default function GeneratePage() {
                             }
                           }
                           store.setMode("triple");
+                          setScriptConfigChanged(true);
                         }}
                         className={cn(
                           "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
@@ -1516,7 +1550,7 @@ export default function GeneratePage() {
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => store.setQuality("standard")}
+                        onClick={() => { store.setQuality("standard"); setScriptConfigChanged(true); }}
                         className={cn(
                           "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
                           store.quality === "standard"
@@ -1533,7 +1567,7 @@ export default function GeneratePage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => store.setQuality("hd")}
+                        onClick={() => { store.setQuality("hd"); setScriptConfigChanged(true); }}
                         className={cn(
                           "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
                           store.quality === "hd"
@@ -1569,7 +1603,7 @@ export default function GeneratePage() {
                         <button
                           key={option.key}
                           type="button"
-                          onClick={() => store.setCtaStyle(option.key)}
+                          onClick={() => { store.setCtaStyle(option.key); setScriptConfigChanged(true); }}
                           className={cn(
                             "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
                             store.ctaStyle === option.key
@@ -1739,20 +1773,52 @@ export default function GeneratePage() {
                     </p>
                   </div>
 
-                  {/* Generate Script button */}
-                  <Button
-                    onClick={handleGenerateScript}
-                    disabled={generateScript.isPending || (requiresCommentKeyword && !commentKeyword)}
-                    size="lg"
-                    className="w-full"
-                  >
-                    <Sparkles className="size-4" />
-                    Generate Script
-                  </Button>
+                  {/* Generate Script button states */}
+                  {generateScript.isPending ? (
+                    <Button disabled size="lg" className="w-full">
+                      <Loader2 className="size-4 animate-spin" />
+                      Generating script…
+                    </Button>
+                  ) : store.pendingScript ? (
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        size="lg"
+                        className="w-full bg-emerald-600 hover:bg-emerald-700"
+                        onClick={() => store.setStep(5)}
+                      >
+                        <Check className="size-4" />
+                        Review Script →
+                      </Button>
+                      {scriptConfigChanged && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => {
+                            setScriptConfigChanged(false);
+                            handleGenerateScript();
+                          }}
+                          disabled={requiresCommentKeyword && !commentKeyword}
+                        >
+                          <RefreshCw className="size-3.5" />
+                          Regenerate with new settings
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={handleGenerateScript}
+                      disabled={requiresCommentKeyword && !commentKeyword}
+                      size="lg"
+                      className="w-full"
+                    >
+                      <Sparkles className="size-4" />
+                      Generate Script
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             </div>
-            )}
           </div>
         )}
 
