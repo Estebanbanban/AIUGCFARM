@@ -13,6 +13,19 @@ import { Badge } from '@/components/ui/badge';
 import { useConfirmProduct, useUpdateProduct } from '@/hooks/use-products';
 import type { Product, BrandSummary } from '@/types/database';
 
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 interface ScrapeResultsProps {
   products: Product[];
   brandSummary?: BrandSummary | null;
@@ -43,8 +56,8 @@ export function ScrapeResults({
   function startEditing(product: Product) {
     setEditingId(product.id);
     setEditState({
-      name: product.name,
-      description: product.description ?? '',
+      name: stripHtml(product.name),
+      description: stripHtml(product.description ?? ''),
       price: product.price != null ? String(product.price) : '',
     });
   }
@@ -89,7 +102,11 @@ export function ScrapeResults({
                 <span className="text-sm font-medium text-muted-foreground">
                   Tone:
                 </span>
-                <Badge variant="secondary">{brandSummary.tone}</Badge>
+                <Badge variant="secondary">
+                  {Array.isArray(brandSummary.tone)
+                    ? brandSummary.tone[0]
+                    : brandSummary.tone}
+                </Badge>
               </div>
             )}
             {brandSummary.demographic && (
@@ -97,7 +114,11 @@ export function ScrapeResults({
                 <span className="text-sm font-medium text-muted-foreground">
                   Demographic:
                 </span>
-                <Badge variant="secondary">{brandSummary.demographic}</Badge>
+                <Badge variant="secondary">
+                  {brandSummary.demographic.length > 30
+                    ? brandSummary.demographic.slice(0, 30) + '...'
+                    : brandSummary.demographic}
+                </Badge>
               </div>
             )}
             {brandSummary.selling_points &&
@@ -106,11 +127,16 @@ export function ScrapeResults({
                   <span className="text-sm font-medium text-muted-foreground">
                     Selling Points:
                   </span>
-                  {brandSummary.selling_points.map((point, i) => (
+                  {brandSummary.selling_points.slice(0, 3).map((point, i) => (
                     <Badge key={i} variant="outline">
                       {point}
                     </Badge>
                   ))}
+                  {brandSummary.selling_points.length > 3 && (
+                    <Badge variant="outline">
+                      +{brandSummary.selling_points.length - 3} more
+                    </Badge>
+                  )}
                 </div>
               )}
           </CardContent>
@@ -210,7 +236,7 @@ function ProductEditCard({
               >
                 <img
                   src={img}
-                  alt={`${product.name} ${i + 1}`}
+                  alt={`${stripHtml(product.name)} ${i + 1}`}
                   className="size-full object-cover"
                 />
               </div>
@@ -291,10 +317,10 @@ function ProductEditCard({
             <>
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h4 className="font-medium text-foreground">{product.name}</h4>
+                  <h4 className="font-medium text-foreground">{stripHtml(product.name)}</h4>
                   {product.description && (
                     <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                      {product.description}
+                      {stripHtml(product.description)}
                     </p>
                   )}
                 </div>

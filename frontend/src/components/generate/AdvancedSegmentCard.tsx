@@ -122,7 +122,7 @@ export function AdvancedSegmentCard({
           value={config.scriptText}
           onChange={(e) => onUpdate({ scriptText: e.target.value })}
           rows={3}
-          placeholder={`Write the ${SEGMENT_LABELS[segmentType].toLowerCase()} script...`}
+          placeholder="Script text will generate here — or type your own"
           className="resize-none text-sm"
         />
         <Button
@@ -144,6 +144,7 @@ export function AdvancedSegmentCard({
       {/* Emotion picker */}
       <div className="flex flex-col gap-1.5">
         <Label className="text-xs text-muted-foreground">Emotion</Label>
+        <p className="text-xs text-muted-foreground">Controls delivery tone for this segment</p>
         <EmotionPicker
           emotion={config.globalEmotion}
           intensity={config.globalIntensity}
@@ -177,8 +178,9 @@ export function AdvancedSegmentCard({
               className="size-full object-cover"
             />
           ) : (
-            <div className="flex size-full items-center justify-center">
+            <div className="flex size-full flex-col items-center justify-center gap-1">
               <ImageIcon className="size-4 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground text-center mt-1">Image will appear after composite generation</p>
             </div>
           )}
           {config.isRegeneratingImage && (
@@ -192,12 +194,14 @@ export function AdvancedSegmentCard({
             </div>
           )}
         </div>
+        <Label className="text-xs text-muted-foreground">Regenerate image with custom prompt</Label>
         <Input
           value={customImagePrompt}
           onChange={(e) => setCustomImagePrompt(e.target.value)}
-          placeholder="Custom scene prompt (optional)"
+          placeholder="e.g. 'product on wooden table, warm lighting'"
           className="text-xs"
         />
+        <p className="text-xs text-muted-foreground mt-1">AI-generates a new background/scene for this segment</p>
         <Button
           variant="outline"
           size="sm"

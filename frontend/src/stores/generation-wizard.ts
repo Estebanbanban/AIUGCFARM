@@ -22,7 +22,9 @@ interface GenerationWizardState {
     | "link_in_bio"
     | "link_in_comments"
     | "comment_keyword"
-    | "check_description";
+    | "check_description"
+    | "direct_website"
+    | "discount_code";
   ctaCommentKeyword: string;
   compositeImagePath: string | null;
   pendingGenerationId: string | null;
@@ -45,7 +47,9 @@ interface GenerationWizardState {
       | "link_in_bio"
       | "link_in_comments"
       | "comment_keyword"
-      | "check_description",
+      | "check_description"
+      | "direct_website"
+      | "discount_code",
   ) => void;
   setCtaCommentKeyword: (keyword: string) => void;
   setCompositeImagePath: (path: string | null) => void;
@@ -66,6 +70,8 @@ interface GenerationWizardState {
     creditsToCharge: number;
     productId: string;
     personaId: string;
+    mode: "single" | "triple";
+    quality: "standard" | "hd";
   }) => void;
   reset: () => void;
 }
@@ -163,13 +169,15 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
           if (!seg) return;
           Object.assign(seg, patch);
         }),
-      resumeFromGeneration: ({ generationId, script, creditsToCharge, productId, personaId }) =>
+      resumeFromGeneration: ({ generationId, script, creditsToCharge, productId, personaId, mode, quality }) =>
         set((state) => {
           state.pendingGenerationId = generationId;
           state.pendingScript = script;
           state.creditsToCharge = creditsToCharge;
           state.productId = productId;
           state.personaId = personaId;
+          state.mode = mode;
+          state.quality = quality;
           state.step = 5;
         }),
       reset: () =>
@@ -193,8 +201,15 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
     {
       name: "cinerads-generation-wizard",
       storage: createJSONStorage(() => {
-        // Safe SSR guard
-        if (typeof window === "undefined") return sessionStorage;
+        // Safe SSR guard — localStorage is not available on the server.
+        // Return a no-op StateStorage so Zustand persist doesn't crash during SSR.
+        if (typeof window === "undefined") {
+          return {
+            getItem: (_key: string) => null,
+            setItem: (_key: string, _value: string) => {},
+            removeItem: (_key: string) => {},
+          };
+        }
         return localStorage;
       }),
       // Don't persist action functions (Zustand handles this automatically)

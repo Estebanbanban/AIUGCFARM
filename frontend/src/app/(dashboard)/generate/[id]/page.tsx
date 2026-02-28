@@ -175,8 +175,8 @@ function ScriptSegmentCard({
         <Badge variant="outline" className="text-xs">
           {segment.duration_seconds}s
         </Badge>
-        <Badge variant="secondary" className="text-xs capitalize">
-          {segment.variant_label}
+        <Badge variant="secondary" className="text-xs">
+          {(segment.variant_label ?? '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
         </Badge>
         <span className="text-xs text-muted-foreground capitalize">{type}</span>
       </div>
@@ -228,7 +228,7 @@ function VideoSegmentCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-xl border-2 text-left transition-all",
+        "group relative flex w-full flex-col overflow-hidden rounded-xl border-2 text-left transition-all",
         isSelected
           ? "border-primary ring-2 ring-primary/30"
           : "border-border hover:border-muted-foreground/40"
@@ -283,8 +283,8 @@ function VideoSegmentCard({
         <div>
           <p className="text-sm font-medium text-foreground">{label}</p>
           <div className="mt-0.5 flex items-center gap-2">
-            <Badge variant="secondary" className="text-xs capitalize">
-              {video.variant_label}
+            <Badge variant="secondary" className="text-xs">
+              {(video.variant_label ?? '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
             </Badge>
             <span className="text-xs text-muted-foreground">
               {video.duration}s
@@ -461,7 +461,7 @@ function CombinationPreview({
 
   if (!hookVideo || !bodyVideo || !ctaVideo) {
     return (
-      <div className="flex aspect-[9/16] max-w-xs items-center justify-center rounded-xl bg-muted">
+      <div className="flex aspect-[9/16] w-full max-w-xs items-center justify-center rounded-xl bg-muted">
         <p className="text-sm text-muted-foreground">
           Select all segments to preview
         </p>
@@ -684,11 +684,16 @@ export default function GenerationDetailPage() {
   const [selectedCta, setSelectedCta] = useState(0);
   const [regeneratingKey, setRegeneratingKey] = useState<string | null>(null);
 
+  // Last checked timestamp
+  const [lastChecked, setLastChecked] = useState(new Date());
+  const [secondsAgo, setSecondsAgo] = useState(0);
+
   const status = (gen?.status as GenerationStatus) ?? "pending";
   const config = statusConfig[status] ?? statusConfig.scripting;
   const isComplete = status === "completed";
   const isFailed = status === "failed";
   const isProcessing = !isComplete && !isFailed;
+  const skeletonCount = gen?.mode === "triple" ? 9 : 3;
 
   const segments = gen?.segments ?? null;
   const script = gen?.script ?? null;
@@ -713,6 +718,22 @@ export default function GenerationDetailPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFailed]);
+
+  // Update lastChecked whenever generation data refreshes
+  useEffect(() => {
+    if (gen) {
+      setLastChecked(new Date());
+    }
+  }, [gen]);
+
+  // Tick secondsAgo every second while processing
+  useEffect(() => {
+    if (!isProcessing) return;
+    const interval = setInterval(() => {
+      setSecondsAgo(Math.floor((Date.now() - lastChecked.getTime()) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isProcessing, lastChecked]);
 
   /* ----- Download all segments ----- */
   function handleDownloadAll() {
@@ -922,7 +943,7 @@ export default function GenerationDetailPage() {
                           state === "done"
                             ? "bg-emerald-500/10 text-emerald-400"
                             : state === "active"
-                              ? "bg-primary/10 text-primary"
+                              ? "bg-primary/10 text-primary animate-pulse"
                               : "bg-muted text-muted-foreground"
                         )}
                       >
@@ -970,6 +991,11 @@ export default function GenerationDetailPage() {
                 );
               })}
             </div>
+
+            {/* Last checked indicator */}
+            <p className="text-xs text-muted-foreground">
+              Last checked {secondsAgo}s ago
+            </p>
           </CardContent>
         </Card>
       )}
@@ -997,7 +1023,7 @@ export default function GenerationDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="aspect-[9/16] max-w-xs overflow-hidden rounded-lg bg-muted">
+            <div className="aspect-[9/16] w-full max-w-xs overflow-hidden rounded-lg bg-muted">
               <img
                 src={gen.composite_image_url}
                 alt="POV composite"
@@ -1095,6 +1121,27 @@ export default function GenerationDetailPage() {
       )}
 
       {/* ---------------------------------------------------------------- */}
+      {/*  Skeleton segment cards (during generation)                       */}
+      {/* ---------------------------------------------------------------- */}
+      {isProcessing && (
+        <div>
+          <h2 className="mb-4 text-lg font-semibold text-foreground">
+            Video Segments
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: skeletonCount }).map((_, i) => (
+              <div key={i} className="rounded-xl border border-border bg-card p-4 space-y-3">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="aspect-video w-full rounded-lg" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-3/4" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ---------------------------------------------------------------- */}
       {/*  Segment grid (shown when completed)                              */}
       {/* ---------------------------------------------------------------- */}
       {isComplete && segments && (
@@ -1131,7 +1178,7 @@ export default function GenerationDetailPage() {
                 />
               ))}
               {(!segments.hooks || segments.hooks.length === 0) && (
-                <div className="flex aspect-[9/16] items-center justify-center rounded-xl border border-dashed border-border">
+                <div className="flex aspect-[9/16] w-full items-center justify-center rounded-xl border border-dashed border-border">
                   <p className="text-sm text-muted-foreground">
                     No hook segments
                   </p>
@@ -1154,7 +1201,7 @@ export default function GenerationDetailPage() {
                 />
               ))}
               {(!segments.bodies || segments.bodies.length === 0) && (
-                <div className="flex aspect-[9/16] items-center justify-center rounded-xl border border-dashed border-border">
+                <div className="flex aspect-[9/16] w-full items-center justify-center rounded-xl border border-dashed border-border">
                   <p className="text-sm text-muted-foreground">
                     No body segments
                   </p>
@@ -1177,7 +1224,7 @@ export default function GenerationDetailPage() {
                 />
               ))}
               {(!segments.ctas || segments.ctas.length === 0) && (
-                <div className="flex aspect-[9/16] items-center justify-center rounded-xl border border-dashed border-border">
+                <div className="flex aspect-[9/16] w-full items-center justify-center rounded-xl border border-dashed border-border">
                   <p className="text-sm text-muted-foreground">
                     No CTA segments
                   </p>
@@ -1228,9 +1275,8 @@ export default function GenerationDetailPage() {
                         <p className="text-sm font-medium text-foreground">
                           Hook {selectedHook + 1}
                         </p>
-                        <p className="text-xs capitalize text-muted-foreground">
-                          {segments.hooks?.[selectedHook]?.variant_label ??
-                            "N/A"}
+                        <p className="text-xs text-muted-foreground">
+                          {(segments.hooks?.[selectedHook]?.variant_label ?? 'N/A').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                         </p>
                       </div>
                     </div>
@@ -1245,9 +1291,8 @@ export default function GenerationDetailPage() {
                         <p className="text-sm font-medium text-foreground">
                           Body {selectedBody + 1}
                         </p>
-                        <p className="text-xs capitalize text-muted-foreground">
-                          {segments.bodies?.[selectedBody]?.variant_label ??
-                            "N/A"}
+                        <p className="text-xs text-muted-foreground">
+                          {(segments.bodies?.[selectedBody]?.variant_label ?? 'N/A').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                         </p>
                       </div>
                     </div>
@@ -1262,8 +1307,8 @@ export default function GenerationDetailPage() {
                         <p className="text-sm font-medium text-foreground">
                           CTA {selectedCta + 1}
                         </p>
-                        <p className="text-xs capitalize text-muted-foreground">
-                          {segments.ctas?.[selectedCta]?.variant_label ?? "N/A"}
+                        <p className="text-xs text-muted-foreground">
+                          {(segments.ctas?.[selectedCta]?.variant_label ?? 'N/A').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                         </p>
                       </div>
                     </div>

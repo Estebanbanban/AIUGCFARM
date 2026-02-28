@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 // Stripe coupon IDs (server-side validated — safe to reference client-side)
+// Stripe coupon ID for the new-user 30% discount offer.
+// To rotate: create a new coupon in Stripe Dashboard → copy the coupon ID → update this value.
+// Current coupon: 30% off, applies to first subscription purchase only.
 export const COUPON_30_OFF = "t9QmsQTe"; // 30% off any plan, once — NewUsers
 
 const OFFER_KEY_STARTED = "cr_offer_started_at";
