@@ -158,7 +158,7 @@ export function MarketingHeader() {
     <>
       <header className="fixed left-0 right-0 top-3 z-50 px-3 sm:px-5">
         <div
-          className={`relative mx-auto flex h-16 max-w-7xl items-center justify-between rounded-full border px-5 transition-all duration-300 sm:px-7 ${
+          className={`relative mx-auto grid h-16 max-w-7xl grid-cols-3 items-center rounded-full border px-5 transition-all duration-300 sm:px-7 ${
             scrolled
               ? "border-border/70 bg-background/75 shadow-[0_10px_24px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:shadow-[0_10px_24px_rgba(0,0,0,0.35)]"
               : "border-border/60 bg-background/60 backdrop-blur-xl"
@@ -170,20 +170,19 @@ export function MarketingHeader() {
             <Logo variant="full" size="md" theme="auto" />
           </Link>
 
-          <nav className="absolute inset-x-0 z-10 hidden items-center justify-center gap-8 md:flex pointer-events-none">
-
+          <nav className="relative z-10 hidden items-center justify-center gap-8 md:flex">
             {navItems.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
-                className="pointer-events-auto text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
+                className="text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
               >
                 {item.label}
               </Link>
             ))}
           </nav>
 
-          <div className="relative z-10 hidden items-center gap-3 md:flex">
+          <div className="relative z-10 hidden items-center justify-end gap-3 md:flex">
             <ThemeToggle />
             {authUser ? (
               <UserMenu user={authUser} />
@@ -205,7 +204,7 @@ export function MarketingHeader() {
             )}
           </div>
 
-          <div className="relative z-10 flex items-center gap-2 md:hidden">
+          <div className="relative z-10 col-start-3 flex items-center justify-end gap-2 md:hidden">
             <ThemeToggle />
             <button
               className="text-foreground"
