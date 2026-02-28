@@ -320,9 +320,9 @@ export default function GeneratePage() {
 
   // First-video 50% discount for new users
   const isFirstVideo = profile?.first_video_discount_used === false;
-  const effectiveCost = isFirstVideo ? Math.ceil(creditCost / 2) : creditCost;
+  const effectiveCost = isFirstVideo ? Math.floor(creditCost / 2) : creditCost;
 
-  const hasEnoughCredits = isUnlimitedCredits || creditsRemaining >= effectiveCost;
+  const hasEnoughCredits = creditsLoading || isUnlimitedCredits || creditsRemaining >= effectiveCost;
   const requiresCommentKeyword = store.ctaStyle === "comment_keyword";
   const commentKeyword = store.ctaCommentKeyword
     .trim()
@@ -342,9 +342,16 @@ export default function GeneratePage() {
 
   function handleNext() {
     if (store.step === 2) {
-      // Fire composites in background, don't await
-      handleGenerateComposites();
-      generationFiredForFormat.current = store.format ?? "9:16";
+      // Fire composites in background only if not already pending and not already
+      // generated for this format. generationFiredForFormat tracks the format used
+      // for the last fire; it is reset to null in handleBack so going back+forward
+      // always re-generates, but a double-tap or re-render cannot double-fire.
+      const alreadyFired =
+        generationFiredForFormat.current === (store.format ?? "9:16");
+      if (!generateComposites.isPending && (!compositeImages.length || !alreadyFired)) {
+        handleGenerateComposites();
+        generationFiredForFormat.current = store.format ?? "9:16";
+      }
     }
     if (store.step < 5) store.setStep(store.step + 1);
   }
@@ -1375,7 +1382,14 @@ export default function GeneratePage() {
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => store.setMode("single")}
+                        onClick={() => {
+                          if (store.advancedMode && store.advancedSegments && "single" !== store.mode) {
+                            if (!window.confirm("Switching modes will clear your advanced segment customizations. Continue?")) {
+                              return;
+                            }
+                          }
+                          store.setMode("single");
+                        }}
                         className={cn(
                           "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
                           store.mode === "single"
@@ -1397,7 +1411,14 @@ export default function GeneratePage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => store.setMode("triple")}
+                        onClick={() => {
+                          if (store.advancedMode && store.advancedSegments && "triple" !== store.mode) {
+                            if (!window.confirm("Switching modes will clear your advanced segment customizations. Continue?")) {
+                              return;
+                            }
+                          }
+                          store.setMode("triple");
+                        }}
                         className={cn(
                           "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
                           store.mode === "triple"
@@ -2054,13 +2075,13 @@ export default function GeneratePage() {
               <div>
                 <DialogTitle className="text-lg font-bold leading-tight">
                   {creditsRemaining > 0
-                    ? "Almost there — just need a few more credits"
-                    : "Your next video is one click away"}
+                    ? "Top up to keep going"
+                    : "Add credits to generate your video"}
                 </DialogTitle>
                 <DialogDescription className="mt-1 text-sm">
                   {creditsRemaining > 0
-                    ? `You have ${creditsRemaining} credit${creditsRemaining !== 1 ? "s" : ""}, but this generation needs ${effectiveCost}. Top up and keep going.`
-                    : "Traditional UGC creators charge $150–$500 per video. You're getting the same quality for under $5."}
+                    ? `You have ${creditsRemaining} credit${creditsRemaining !== 1 ? "s" : ""} — this generation needs ${effectiveCost}. Pick a plan or pack below.`
+                    : "Traditional UGC creators charge $150–$500 per video. You're getting the same quality for a fraction of the cost."}
                 </DialogDescription>
               </div>
             </div>

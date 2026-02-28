@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -500,7 +500,7 @@ function TextCard({
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
-export default function NewPersonaPage() {
+function NewPersonaPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
@@ -595,7 +595,7 @@ export default function NewPersonaPage() {
         },
       });
       toast.success("Persona saved!");
-      router.push(returnTo ?? "/personas");
+      router.push(returnTo?.startsWith("/") ? returnTo : "/personas");
       store.reset();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to save persona";
@@ -978,5 +978,13 @@ export default function NewPersonaPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function NewPersonaPage() {
+  return (
+    <Suspense>
+      <NewPersonaPageInner />
+    </Suspense>
   );
 }

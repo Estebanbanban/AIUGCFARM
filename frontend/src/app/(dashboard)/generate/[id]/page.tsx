@@ -228,7 +228,7 @@ function VideoSegmentCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-xl border-2 text-left transition-all",
+        "group relative flex w-full flex-col overflow-hidden rounded-xl border-2 text-left transition-all",
         isSelected
           ? "border-primary ring-2 ring-primary/30"
           : "border-border hover:border-muted-foreground/40"
