@@ -57,6 +57,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useQueryClient } from "@tanstack/react-query";
+import { createClient } from "@/lib/supabase/client";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { useProducts, useScrapeProduct } from "@/hooks/use-products";
 import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
@@ -191,9 +192,22 @@ export default function GeneratePage() {
   const store = useGenerationWizardStore();
   const [showPaywall, setShowPaywall] = useState(false);
 
-  // Reset wizard on mount so stale state from a previous session doesn't leak
+  // Validate persisted pendingGenerationId against DB on mount.
+  // If the generation no longer exists or moved past awaiting_approval, clear stale script.
   useEffect(() => {
-    store.reset();
+    if (!store.pendingGenerationId) return;
+    const supabase = createClient();
+    supabase
+      .from("generations")
+      .select("status")
+      .eq("id", store.pendingGenerationId)
+      .single()
+      .then(({ data }) => {
+        if (!data || data.status !== "awaiting_approval") {
+          store.clearPendingScript();
+          if (store.step === 5) store.setStep(4);
+        }
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

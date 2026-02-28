@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 interface PersonaBuilderState {
   name: string;
@@ -13,11 +14,11 @@ interface PersonaBuilderState {
   bodyType: string;
   clothingStyle: string;
   accessories: string[];
-  generatedImages: string[];
+  generatedImages: string[];       // signed URLs — NOT persisted (1hr expiry)
   selectedImageIndex: number | null;
-  isGenerating: boolean;
-  isSaving: boolean;
-  personaId: string | null;
+  isGenerating: boolean;           // transient — NOT persisted
+  isSaving: boolean;               // transient — NOT persisted
+  personaId: string | null;        // persisted — used to restore images from DB
   setField: (field: string, value: string) => void;
   toggleAccessory: (accessory: string) => void;
   setGeneratedImages: (urls: string[]) => void;
@@ -64,55 +65,84 @@ const initialState = {
 };
 
 export const usePersonaBuilderStore = create<PersonaBuilderState>()(
-  immer((set) => ({
-    ...initialState,
-    setField: (field, value) =>
-      set((state) => {
-        (state as Record<string, unknown>)[field] = value;
+  persist(
+    immer((set) => ({
+      ...initialState,
+      setField: (field, value) =>
+        set((state) => {
+          (state as Record<string, unknown>)[field] = value;
+        }),
+      toggleAccessory: (accessory) =>
+        set((state) => {
+          const idx = state.accessories.indexOf(accessory);
+          if (idx >= 0) state.accessories.splice(idx, 1);
+          else if (state.accessories.length < 5) state.accessories.push(accessory);
+        }),
+      setGeneratedImages: (urls) =>
+        set((state) => {
+          state.generatedImages = urls;
+          state.selectedImageIndex = null;
+        }),
+      selectImage: (index) =>
+        set((state) => {
+          state.selectedImageIndex = index;
+        }),
+      setIsGenerating: (val) =>
+        set((state) => {
+          state.isGenerating = val;
+        }),
+      setIsSaving: (val) =>
+        set((state) => {
+          state.isSaving = val;
+        }),
+      setPersonaId: (id) =>
+        set((state) => {
+          state.personaId = id;
+        }),
+      initFromPersona: (persona) =>
+        set(() => ({
+          ...initialState,
+          personaId: persona.id,
+          name: persona.name,
+          gender: persona.attributes.gender ?? initialState.gender,
+          ageRange: persona.attributes.age ?? initialState.ageRange,
+          ethnicity: persona.attributes.ethnicity ?? initialState.ethnicity,
+          skinTone: persona.attributes.skin_tone ?? initialState.skinTone,
+          hairColor: persona.attributes.hair_color ?? initialState.hairColor,
+          hairStyle: persona.attributes.hair_style ?? initialState.hairStyle,
+          eyeColor: persona.attributes.eye_color ?? initialState.eyeColor,
+          bodyType: persona.attributes.body_type ?? initialState.bodyType,
+          clothingStyle: persona.attributes.clothing_style ?? initialState.clothingStyle,
+          accessories: persona.attributes.accessories ?? [],
+        })),
+      reset: () => set(() => ({ ...initialState })),
+    })),
+    {
+      name: "cinerads-persona-builder",
+      storage: createJSONStorage(() => {
+        if (typeof window === "undefined") return sessionStorage;
+        return localStorage;
       }),
-    toggleAccessory: (accessory) =>
-      set((state) => {
-        const idx = state.accessories.indexOf(accessory);
-        if (idx >= 0) state.accessories.splice(idx, 1);
-        else if (state.accessories.length < 5) state.accessories.push(accessory);
+      // Exclude transient runtime state and signed URLs that expire after 1 hour.
+      // personaId IS persisted — the page uses it to re-fetch signed image URLs from DB.
+      partialize: (state) => ({
+        name: state.name,
+        gender: state.gender,
+        ageRange: state.ageRange,
+        ethnicity: state.ethnicity,
+        skinTone: state.skinTone,
+        hairColor: state.hairColor,
+        hairStyle: state.hairStyle,
+        eyeColor: state.eyeColor,
+        bodyType: state.bodyType,
+        clothingStyle: state.clothingStyle,
+        accessories: state.accessories,
+        personaId: state.personaId,
+        selectedImageIndex: state.selectedImageIndex,
+        // generatedImages: excluded — signed URLs expire after 1 hour
+        // isGenerating, isSaving: excluded — transient flags
       }),
-    setGeneratedImages: (urls) =>
-      set((state) => {
-        state.generatedImages = urls;
-        state.selectedImageIndex = null;
-      }),
-    selectImage: (index) =>
-      set((state) => {
-        state.selectedImageIndex = index;
-      }),
-    setIsGenerating: (val) =>
-      set((state) => {
-        state.isGenerating = val;
-      }),
-    setIsSaving: (val) =>
-      set((state) => {
-        state.isSaving = val;
-      }),
-    setPersonaId: (id) =>
-      set((state) => {
-        state.personaId = id;
-      }),
-    initFromPersona: (persona) =>
-      set(() => ({
-        ...initialState,
-        personaId: persona.id,
-        name: persona.name,
-        gender: persona.attributes.gender ?? initialState.gender,
-        ageRange: persona.attributes.age ?? initialState.ageRange,
-        ethnicity: persona.attributes.ethnicity ?? initialState.ethnicity,
-        skinTone: persona.attributes.skin_tone ?? initialState.skinTone,
-        hairColor: persona.attributes.hair_color ?? initialState.hairColor,
-        hairStyle: persona.attributes.hair_style ?? initialState.hairStyle,
-        eyeColor: persona.attributes.eye_color ?? initialState.eyeColor,
-        bodyType: persona.attributes.body_type ?? initialState.bodyType,
-        clothingStyle: persona.attributes.clothing_style ?? initialState.clothingStyle,
-        accessories: persona.attributes.accessories ?? [],
-      })),
-    reset: () => set(() => ({ ...initialState })),
-  }))
+      version: 1,
+    },
+  ),
 );
