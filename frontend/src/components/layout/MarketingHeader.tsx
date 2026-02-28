@@ -170,7 +170,7 @@ export function MarketingHeader() {
             <Logo variant="full" size="md" theme="auto" />
           </Link>
 
-          <nav className="relative z-10 hidden items-center gap-8 md:flex">
+          <nav className="absolute left-1/2 z-10 hidden -translate-x-1/2 items-center gap-8 md:flex">
             {navItems.map((item) => (
               <Link
                 key={item.label}
