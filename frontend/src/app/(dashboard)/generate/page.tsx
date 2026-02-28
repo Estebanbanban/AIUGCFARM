@@ -1600,13 +1600,6 @@ export default function GeneratePage() {
                 </p>
               </div>
 
-              {!hasEnoughCredits && !creditsLoading && (
-                <div className="rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
-                  You need {store.creditsToCharge ?? effectiveCost} credits but have{" "}
-                  {creditsRemaining}. Subscribe or upgrade to continue.
-                </div>
-              )}
-
               {/* Action buttons */}
               <div className="flex items-center justify-between pt-2">
                 <Button
@@ -1621,7 +1614,7 @@ export default function GeneratePage() {
                 </Button>
                 <Button
                   onClick={handleApproveAndGenerate}
-                  disabled={approveAndGenerate.isPending || (!hasEnoughCredits && !creditsLoading)}
+                  disabled={approveAndGenerate.isPending}
                   size="lg"
                 >
                   {approveAndGenerate.isPending ? (

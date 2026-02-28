@@ -97,7 +97,7 @@ export default function DashboardPage() {
   const planConfig = plan !== "free" ? PLANS[plan as keyof typeof PLANS] : null;
   const creditsRemaining = credits?.remaining ?? 0;
   const isUnlimitedCredits = credits?.is_unlimited === true;
-  const creditsTotal = planConfig?.credits ?? 9;
+  const creditsTotal = planConfig?.credits ?? 0;
 
   const recentGenerations = (generations ?? []).slice(0, 5);
   const draftGenerations = (generations ?? []).filter(
@@ -205,11 +205,13 @@ export default function DashboardPage() {
                 <>
                   {isUnlimitedCredits ? (
                     "Unlimited"
-                  ) : (
+                  ) : creditsTotal > 0 ? (
                     <>
                       {creditsRemaining}
                       <span className="text-lg text-muted-foreground">/{creditsTotal}</span>
                     </>
+                  ) : (
+                    creditsRemaining
                   )}
                 </>
               )}
