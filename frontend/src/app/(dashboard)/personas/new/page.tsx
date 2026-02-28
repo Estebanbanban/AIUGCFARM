@@ -10,7 +10,7 @@ import { resolvePersonaImageUrl } from "@/hooks/use-personas";
 import Image from "next/image";
 import {
   ArrowLeft, Loader2, Sparkles, Check, User, ImageIcon,
-  ChevronDown, ChevronUp, Eye, Palette, Clock, Shirt, Watch,
+  ChevronDown, ChevronUp, Eye, Palette, Clock, Shirt, Watch, Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -500,12 +500,27 @@ function TextCard({
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
+const GENERATING_MESSAGES = [
+  "Analyzing your selections...",
+  "Building facial features...",
+  "Styling your persona...",
+  "Adding finishing details...",
+  "Almost ready...",
+];
+
 function NewPersonaPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
   const store = usePersonaBuilderStore();
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<number>>(new Set());
+  const [msgIdx, setMsgIdx] = useState(0);
+
+  useEffect(() => {
+    if (!store.isGenerating) { setMsgIdx(0); return; }
+    const id = setInterval(() => setMsgIdx((i) => (i + 1) % GENERATING_MESSAGES.length), 2500);
+    return () => clearInterval(id);
+  }, [store.isGenerating]);
 
   // Restore generated images from DB when page loads with a persisted personaId
   // (signed URLs expire after 1hr, so we re-sign from the stored storage paths)
@@ -814,15 +829,33 @@ function NewPersonaPageInner() {
 
             {/* Generating skeleton */}
             {store.isGenerating && store.generatedImages.length === 0 && (
-              <div className="rounded-xl border border-border bg-card p-4">
-                <p className="mb-3 text-sm font-medium text-foreground">Generating Persona...</p>
+              <div className="rounded-xl border border-primary/20 bg-card p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <Wand2 className="size-4 animate-pulse text-primary" />
+                  <p className="text-sm font-semibold text-foreground">Generating Persona...</p>
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   {[0, 1, 2, 3].map((i) => (
-                    <div key={i} className="aspect-square animate-pulse rounded-xl bg-muted" />
+                    <div
+                      key={i}
+                      className="relative aspect-[3/4] overflow-hidden rounded-xl bg-muted"
+                      style={{ animationDelay: `${i * 200}ms` }}
+                    >
+                      <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-muted via-primary/5 to-muted" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Loader2
+                          className="size-6 animate-spin text-primary/30"
+                          style={{ animationDelay: `${i * 150}ms` }}
+                        />
+                      </div>
+                    </div>
                   ))}
                 </div>
-                <p className="mt-3 text-center text-xs text-muted-foreground">
-                  This may take up to 30 seconds...
+                <p className="mt-3 text-center text-xs text-muted-foreground transition-all duration-500">
+                  {GENERATING_MESSAGES[msgIdx]}
+                </p>
+                <p className="mt-1 text-center text-xs text-muted-foreground/60">
+                  Takes ~20–30 seconds
                 </p>
               </div>
             )}
@@ -864,7 +897,18 @@ function NewPersonaPageInner() {
 
             {/* Generated image picker */}
             {store.generatedImages.length > 0 && (
-              <div className="rounded-xl border border-border bg-card p-4">
+              <div className="relative rounded-xl border border-border bg-card p-4">
+                {store.isGenerating && (
+                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-xl bg-background/80 backdrop-blur-sm">
+                    <div className="flex size-14 items-center justify-center rounded-full bg-primary/10">
+                      <Wand2 className="size-7 animate-pulse text-primary" />
+                    </div>
+                    <p className="text-sm font-semibold text-foreground">Regenerating...</p>
+                    <p className="text-xs text-muted-foreground transition-all duration-500">
+                      {GENERATING_MESSAGES[msgIdx]}
+                    </p>
+                  </div>
+                )}
                 <p className="mb-3 text-sm font-semibold text-foreground">Choose Your Persona</p>
                 <div className="grid grid-cols-2 gap-3">
                   {store.generatedImages.map((url, index) => (
