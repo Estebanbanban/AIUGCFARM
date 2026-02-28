@@ -23,6 +23,9 @@ import {
   ChevronUp,
   Send,
   Scissors,
+  Layers,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -41,6 +44,7 @@ import { useGenerationStatus, useRegenerateSegment } from "@/hooks/use-generatio
 import type { GenerationStatus, ScriptSegment, SegmentVideo } from "@/types/database";
 import { trackVideoCompleted, trackVideoFailed, trackVideoDownloaded } from "@/lib/datafast";
 import { useVideoStitcher, STITCH_STATUS_LABELS } from "@/hooks/use-video-stitcher";
+import { useZipDownload } from "@/hooks/use-zip-download";
 
 /* -------------------------------------------------------------------------- */
 /*  Status configuration                                                      */
@@ -684,6 +688,21 @@ export default function GenerationDetailPage() {
   const [selectedCta, setSelectedCta] = useState(0);
   const [regeneratingKey, setRegeneratingKey] = useState<string | null>(null);
 
+  // ZIP download (Story A)
+  const {
+    downloadZip,
+    status: zipStatus,
+    fetchedCount,
+    totalCount: zipTotal,
+    isActive: isZipping,
+  } = useZipDownload();
+
+  // Batch export mode (Story C)
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedHooks, setSelectedHooks] = useState<Set<number>>(new Set([0]));
+  const [selectedBodies, setSelectedBodies] = useState<Set<number>>(new Set([0]));
+  const [selectedCtas, setSelectedCtas] = useState<Set<number>>(new Set([0]));
+
   // Last checked timestamp
   const [lastChecked, setLastChecked] = useState(new Date());
   const [secondsAgo, setSecondsAgo] = useState(0);
@@ -735,26 +754,16 @@ export default function GenerationDetailPage() {
     return () => clearInterval(interval);
   }, [isProcessing, lastChecked]);
 
-  /* ----- Download all segments ----- */
+  /* ----- Download all segments as ZIP (Story A) ----- */
   function handleDownloadAll() {
-    if (!segments) return;
+    if (!segments || isZipping) return;
     trackVideoDownloaded("all_segments");
-    const allVideos = [
-      ...(segments.hooks ?? []).map((v, i) => ({ ...v, label: `hook_${i + 1}` })),
-      ...(segments.bodies ?? []).map((v, i) => ({ ...v, label: `body_${i + 1}` })),
-      ...(segments.ctas ?? []).map((v, i) => ({ ...v, label: `cta_${i + 1}` })),
+    const entries = [
+      ...(segments.hooks ?? []).map((v, i) => ({ name: `hooks/hook_${i + 1}.mp4`, url: v.url })),
+      ...(segments.bodies ?? []).map((v, i) => ({ name: `bodies/body_${i + 1}.mp4`, url: v.url })),
+      ...(segments.ctas ?? []).map((v, i) => ({ name: `ctas/cta_${i + 1}.mp4`, url: v.url })),
     ];
-    // Use programmatic anchor click to avoid popup blocker
-    allVideos.forEach((v) => {
-      const a = document.createElement("a");
-      a.href = v.url;
-      a.download = `${generationId}_${v.label}.mp4`;
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    });
-    toast.success(`Downloading ${allVideos.length} segments`);
+    downloadZip(entries, `cinerades-${generationId.slice(0, 8)}-segments.zip`);
   }
 
   async function handleRegenerateSegment(
@@ -1193,7 +1202,7 @@ export default function GenerationDetailPage() {
       {/* ---------------------------------------------------------------- */}
       {isComplete && segments && (
         <>
-          {/* Download all button */}
+          {/* Download all + Batch Export toggle */}
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-foreground">
@@ -1203,10 +1212,36 @@ export default function GenerationDetailPage() {
                 Regenerate any single segment for 1 credit.
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={handleDownloadAll}>
-              <Download className="size-4" />
-              Download All Segments
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={batchMode ? "default" : "outline"}
+                size="sm"
+                onClick={() => setBatchMode((m) => !m)}
+              >
+                <Layers className="size-4" />
+                Batch Export
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadAll}
+                disabled={isZipping}
+              >
+                {isZipping ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    {zipStatus === "fetching"
+                      ? `Fetching… ${fetchedCount}/${zipTotal}`
+                      : "Zipping…"}
+                  </>
+                ) : (
+                  <>
+                    <Download className="size-4" />
+                    {zipStatus === "done" ? "Downloaded ✓" : "Download All Segments"}
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
 
           <div className="grid gap-6 md:grid-cols-3">

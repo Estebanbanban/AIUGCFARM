@@ -12,23 +12,27 @@ stepsCompleted:
   - 'step-e-01b-legacy-conversion'
   - 'step-e-02-review'
   - 'step-e-03-edit'
-lastEdited: '2026-02-26'
+  - 'step-e-04-implementation-sync'
+lastEdited: '2026-02-28'
 editHistory:
   - date: '2026-02-26'
     changes: 'Full restructure from legacy format to BMAD standard. Extracted 38 FRs from narrative. Created SMART success criteria. Converted UI flow to user journeys. Added domain requirements, innovation analysis, project-type requirements. Removed tech stack and epic breakdown sections (relocated to Architecture and Epics docs). Tightened all NFRs with measurement methods.'
+  - date: '2026-02-28'
+    changes: 'Synchronized PRD with implemented codebase (Feb 2026 audit). Updated credit model from segment-based to dollar-value (1 credit = $1). Updated all plan prices and credit allocations to match implementation. Moved Expert Mode, Scale tier, account deletion, email notifications from Phase 2/deferred to Phase 1. Added new FRs (FR39-FR50) for: script review/approval, Advanced Mode, per-segment regeneration, composite image editing, credit packs, admin panel, CTA style, format selection, video quality tiers, coupon system. Updated Phase 2 scope to reflect only genuinely unbuilt features. Updated pricing appendix with actual tiers, credit packs, and generation costs.'
 ---
 
 # Product Requirements Document  -  AI UGC Generator
 
 **Author:** Axel Ronsin
 **Date:** February 2026
-**Version:** 2.0  -  BMAD Standard
+**Version:** 3.0  -  Implementation-Synchronized
+**Product Name:** CineRads
 
 ---
 
 ## Executive Summary
 
-**Vision:** AI UGC Generator eliminates the cost, speed, and consistency bottleneck of UGC-style video ad production for e-commerce brands.
+**Vision:** AI UGC Generator (CineRads) eliminates the cost, speed, and consistency bottleneck of UGC-style video ad production for e-commerce brands.
 
 **Product:** A micro-SaaS platform where users paste their store URL, auto-import product data, build a custom AI persona via a Sims-like character creator, and generate short-form UGC video ads (Hook / Body / CTA structure) in minutes  -  not days.
 
@@ -40,9 +44,9 @@ editHistory:
 - E-commerce agencies managing multiple client accounts
 - Dropshippers needing fast, cheap video ads for product testing
 
-**Business Model:** Credit-based SaaS subscription. 1 credit = 1 video segment. Users generate hook, body, and CTA segments independently and combine them for exponential video variations (e.g., 3 hooks × 3 bodies × 3 CTAs = 27 unique videos from 9 credits). Two MVP tiers: Starter ($29/mo, 27 segment credits) and Growth ($79/mo, 90 segment credits). Paywall triggers after persona creation to maximize sunk-cost conversion.
+**Business Model:** Dollar-value credit-based SaaS with subscriptions and one-time credit packs. 1 credit = $1 value. Users generate video ads through a two-phase flow: AI script generation (free) followed by user-approved video generation (credits debited on approval). Credit costs vary by generation mode and quality tier: Standard single = 5 credits, Standard triple = 15 credits, HD single = 10 credits, HD triple = 30 credits. Three subscription tiers: Starter ($25/mo, 30 credits), Growth ($80/mo, 100 credits), Scale ($180/mo, 250 credits). One-time credit packs available: 10 credits ($12), 30 credits ($33), 100 credits ($95). First-video 50% discount replaces free trial credits.
 
-**Problem:** UGC creators cost $150–$500+ per video, take days-to-weeks, and deliver inconsistent quality. Brands needing 10–50+ variations per product face a production bottleneck that directly limits ad spend scaling.
+**Problem:** UGC creators cost $150-$500+ per video, take days-to-weeks, and deliver inconsistent quality. Brands needing 10-50+ variations per product face a production bottleneck that directly limits ad spend scaling.
 
 ---
 
@@ -53,12 +57,12 @@ All criteria measured from public launch date. Baselines are zero (greenfield pr
 | ID | Criterion | Target (Month 3) | Target (Month 6) | Measurement Method |
 |---|---|---|---|---|
 | SC1 | Landing page visitors who initiate a store scrape | 40% | 50% | Analytics: URL submit events / unique landing page sessions |
-| SC2 | Users who scrape → complete signup | 25% | 35% | Analytics: signup completion events / scrape initiation events |
-| SC3 | Signed-up users who convert to paid plan | 8% | 12% | Stripe: paying customers / total registered accounts |
+| SC2 | Users who scrape -> complete signup | 25% | 35% | Analytics: signup completion events / scrape initiation events |
+| SC3 | Signed-up users who convert to paid plan or pack | 8% | 12% | Stripe: paying customers / total registered accounts |
 | SC4 | Monthly Recurring Revenue | $5,000 | $25,000 | Stripe MRR dashboard |
 | SC5 | Monthly churn rate | < 15% | < 10% | Stripe: churned subscriptions / active subscriptions at period start |
 | SC6 | Average video generations per active user per month | 8 | 15 | Database: total generations / active users in period |
-| SC7 | Net Promoter Score | 30+ | 45+ | In-app NPS survey triggered after 5th generation |
+| SC7 | Net Promoter Score | 30+ | 45+ | In-app NPS survey triggered after 5th generation (deferred) |
 
 **Traceability:** SC1-SC2 validate the value-first funnel (UJ1). SC3-SC5 validate monetization (UJ3). SC6 validates core product utility (UJ2). SC7 validates overall satisfaction.
 
@@ -66,45 +70,64 @@ All criteria measured from public launch date. Baselines are zero (greenfield pr
 
 ## Product Scope
 
-### Phase 1: MVP (v1.0)
+### Phase 1: MVP (v1.0)  -  IMPLEMENTED
 
-Core value loop: Scrape → Persona → Generate → Download.
+Core value loop: Scrape -> Persona -> Script Review -> Generate -> Download.
 
 - Landing page with URL input CTA and marketing content
-- Website scraping: Shopify stores (primary), generic HTML fallback, manual upload fallback
+- Website scraping: Shopify stores (primary), generic HTML fallback (JSON-LD + OG tags), manual upload fallback
 - Authentication: Email + password, Google OAuth
-- AI-powered brand summary generation from scraped data
-- Persona creation: visual character builder with 9 configurable attributes (gender, skin tone, age, hair color, hair style, eye color, body type, clothing style, accessories)
-- AI persona image generation: 4 variants per request, user selects preferred
-- Easy Mode video generation: AI writes Hook/Body/CTA script from product data and brand tone
-- Segmented video pipeline: generates Hook, Body, CTA segments independently via Kling V2.6 (std, 720p)
-- 3 variants per segment type per generation (9 total segments) with prompt diversity
-- Modular video assembly: users combine any hook + body + CTA into custom videos (N×N×N combinations)
-- On-demand FFmpeg stitching of segment combinations at no additional credit cost
-- Segment review by type + combination builder + assembled video preview and MP4 download
-- Paywall at generation step with Stripe checkout
-- Starter ($29/mo, 27 segment credits) and Growth ($79/mo, 90 segment credits) tiers
-- User dashboard with generation history and video library
+- AI-powered brand summary generation from scraped data (tone, demographic, selling points via OpenRouter)
+- Persona creation: visual character builder with 8 configurable attributes (gender, ethnicity/skin_tone, age, hair color, hair style, eye color, body type, clothing style) plus accessories
+- AI persona image generation: 2 variants per request via Gemini/NanoBanana, user selects preferred. Free tier capped at 4 regenerations
+- Two-phase generation flow: AI writes script (phase 1, no credit charge) -> user reviews/edits script (step 5) -> user approves -> credits debited and video generation begins
+- Single mode (1 variant per segment type = 3 segments, 5cr standard / 10cr HD) and Triple mode (3 variants per type = 9 segments, 15cr standard / 30cr HD)
+- Standard quality (Kling v2.6) and HD quality (Kling v3)
+- Composite image generation: 4 previews per request (persona + product via NanoBanana/Gemini), user selects preferred
+- Advanced Mode: per-segment emotion/action control, inline emotion tags `[e:emotion:intensity]`, per-segment custom composite images, per-segment script regeneration
+- CTA style configuration: 8 options (auto, product_name_drop, link_in_bio, link_in_comments, comment_keyword, check_description, direct_website, discount_code)
+- Format selection: portrait (9:16) or landscape (16:9)
+- Segmented video pipeline: generates Hook, Body, CTA segments independently via Kling
+- Script review step with coherence review pass (OpenRouter two-pass: generation + quality scoring/revision)
+- Per-segment regeneration (1 credit per re-generation, refunded on failure)
+- Composite image editing via natural language prompts
+- Segment review by type + preview player on `/generate/[id]`
+- Download individual MP4 segments via signed URLs
+- Paywall triggers when credits insufficient (not subscription absence). Users with pack credits can generate without subscription
+- Three subscription tiers: Starter ($25/mo, 30cr), Growth ($80/mo, 100cr), Scale ($180/mo, 250cr)
+- One-time credit packs: Starter Pack (10cr, $12), Creator Pack (30cr, $33), Pro Pack (100cr, $95)
+- First-video 50% discount (replaces free trial credits). Discount restored on failure
+- Coupon system: allowlisted Stripe coupon IDs for promotional offers
+- CRO-optimized paywall dialog: aspirational copy, value framing, subscriptions-first layout, "Most popular" badge, per-video cost comparison
+- Post-checkout success modal with confetti animation
+- User dashboard with generation history, credit balance, recent generations
+- Video library with re-download via fresh signed URLs
+- Account settings page with billing management via Stripe portal
+- Account deletion: full cleanup (Stripe subscription cancellation, storage deletion across 4 buckets, all DB records, auth user)
+- Transactional email via Resend (signup OTP, recovery, magic link, email change) through Supabase Auth hook
+- Admin panel: user listing, ban/unban, credit adjustments, analytics dashboards (overview, revenue, funnel, usage). Admin users bypass credit checks entirely
+- Persona slots by tier: Free=1, Starter=1, Growth=3, Scale=10
+- Analytics tracking via DataFast
 
-### Phase 2: Growth (v1.1–v1.3)
+### Phase 2: Growth (v1.1-v1.3)
 
-Power user features and expanded reach.
-
-- Expert Mode: custom script editing per segment (Hook/Body/CTA), pacing control, background selection
-- Scale tier ($199/mo, 270 segment credits) with priority queue and API access
-- Shopify native app integration (OAuth + embedded admin)
-- Team/agency features: multi-seat accounts, shared personas, brand profiles
-- Video analytics: view counts, click-through tracking per video
-
-### Phase 3: Vision (v2.0+)
-
-Platform expansion and ecosystem.
+Features not yet implemented:
 
 - Direct publishing to TikTok, Meta, YouTube Shorts
 - A/B testing framework: auto-generate variations, track performance, suggest winners
 - Multi-language script generation (10+ languages)
 - Marketplace: community-created persona templates
 - White-label offering for agencies
+- FFmpeg stitching of segment combinations (deferred from Phase 1  -  not available in Deno Edge Functions)
+- Bulk zip download of segments
+- Shopify native app integration (OAuth + embedded admin)
+- Team/agency features: multi-seat accounts, shared personas, brand profiles
+- Video analytics: view counts, click-through tracking per video
+- Watermark on free-tier outputs
+- NPS survey integration
+- Redis-based rate limiting (currently in-memory)
+- Explicit pacing/duration slider per segment (currently auto-estimated from word count)
+- Background/environment selector UI (currently per-segment composite image selection only)
 
 ---
 
@@ -138,34 +161,37 @@ Platform expansion and ecosystem.
 | Step | Action | System Response | Pain Point Addressed |
 |---|---|---|---|
 | 1 | Prompted to sign up / log in | Auth gate with Email, Google OAuth options | Soft gate after value demonstrated |
-| 2 | Opens persona creator | Visual character builder with 9 attribute sliders/selectors | No design skills needed |
-| 3 | Configures persona attributes | Real-time preview updates as attributes change | WYSIWYG control |
-| 4 | Submits persona for generation | 4 AI-generated persona images returned in < 30s | Fast iteration, multiple options |
+| 2 | Opens persona creator | Visual character builder with 8 attribute selectors | No design skills needed |
+| 3 | Configures persona attributes | Attribute selectors for gender, ethnicity, age, hair color/style, eye color, body type, clothing | WYSIWYG control |
+| 4 | Submits persona for generation | 2 AI-generated persona images returned | Fast iteration, multiple options |
 | 5 | Selects preferred persona (or regenerates) | Selected image stored as persistent reference | Consistent brand spokesperson |
 | 6 | Selects a product from library | Product data and brand tone pre-loaded | No re-entry of product info |
-| 7 | Chooses Easy Mode, hits Generate | AI writes multiple Hook/Body/CTA script variants. Video pipeline generates segments independently | One-click from product to modular video segments |
-| 8 | Reviews generated segments, combines favorites | Segment picker by type (hooks, bodies, CTAs) + combination builder. Assembled videos preview in player | Mix-and-match segments for exponential combinations |
-| 9 | Downloads assembled video(s) as MP4 | Direct download, no watermark on paid plans | Ready for ad platform upload |
+| 7 | Selects composite format (9:16 or 16:9), reviews composite previews | 4 composite images generated (persona + product), user selects preferred | Visual control before generation |
+| 8 | Configures generation: mode (Single/Triple), quality (Standard/HD), CTA style | Credit cost displayed. Optional: Advanced Mode for per-segment emotion/action control | Flexible cost vs. volume tradeoff |
+| 9 | Hits "Generate Script" | AI writes Hook/Body/CTA script variants. Script review step shows editable segments | User approves before any charges |
+| 10 | Reviews/edits script, hits "Approve & Generate" | Credits debited, video pipeline generates segments independently | One-click from approval to video |
+| 11 | Views generation progress | Redirect to `/generate/[id]` with polling progress | Real-time feedback |
+| 12 | Downloads segments as MP4 | Direct download via signed URLs | Ready for ad platform upload |
 
-**Success:** User goes from persona creation to downloadable video ad in under 15 minutes. Gets 27 possible video combinations from a single batch generation.
+**Success:** User goes from persona creation to downloadable video ad with full script review control. Gets up to 27 possible video combinations from a triple-mode generation.
 
 ### UJ3: Free User  -  Paywall Conversion
 
-**Persona:** Sarah (continued). Has created persona and selected a product. Hits Generate for the first time.
+**Persona:** Sarah (continued). Has created persona and selected a product. Hits Generate but has insufficient credits.
 
-**Goal:** Convert from free exploration to paid subscriber.
+**Goal:** Convert from free exploration to paid subscriber or credit pack purchaser.
 
 **Journey:**
 
 | Step | Action | System Response | Pain Point Addressed |
 |---|---|---|---|
-| 1 | Hits "Generate Video" | Paywall modal appears: "Choose a plan to generate your first AI UGC video" | Triggered after maximum sunk-cost investment |
-| 2 | Reviews plan options | Starter and Growth tiers with feature comparison | Clear value-per-dollar |
-| 3 | Selects plan | Stripe checkout overlay | Trusted payment processing |
-| 4 | Completes payment | Immediate redirect to generation in progress | No delay between payment and value delivery |
-| 5 | Receives video segments | Segments ready for combination, preview, and download | Instant ROI justification |
+| 1 | Hits "Generate Script" or "Approve & Generate" with insufficient credits | Paywall dialog appears with aspirational copy and value framing ($150-$500 traditional UGC vs. per-video cost with CineRads) | Triggered after maximum sunk-cost investment |
+| 2 | Reviews plan options | Subscriptions displayed first (Starter, Growth, Scale) with feature comparison. Credit packs shown below as alternative. "Most popular" badge on Growth. Per-video cost comparison | Clear value-per-dollar, multiple purchase paths |
+| 3 | Selects plan or pack | Stripe checkout | Trusted payment processing |
+| 4 | Completes payment | Success modal with confetti, redirect to dashboard or generation | Instant positive reinforcement |
+| 5 | First video at 50% off | First generation costs half price | Low-risk first purchase experience |
 
-**Success:** Free trial (9 segment credits = 1 full batch of 3 hooks + 3 bodies + 3 CTAs = 27 possible combinations) available for users who need proof before committing. Paywall placement maximizes conversion by triggering after persona investment.
+**Success:** Multiple conversion paths (subscription for recurring value, packs for commitment-free). First-video discount reduces friction. Paywall placement after persona + product investment maximizes conversion.
 
 ### UJ4: Returning User  -  Bulk Generation Workflow
 
@@ -178,12 +204,12 @@ Platform expansion and ecosystem.
 | Step | Action | System Response | Pain Point Addressed |
 |---|---|---|---|
 | 1 | Logs in, views dashboard | Generation history, video library, credit balance displayed | Quick status overview |
-| 2 | Switches to client brand profile | Products and personas for that brand loaded | Multi-brand management |
+| 2 | Resumes a draft generation | "Resume" from dashboard hydrates wizard to step 5 with existing script | No lost work on interrupted sessions |
 | 3 | Selects product, selects existing persona | Pre-configured  -  no rebuild needed | Persona persistence saves time |
-| 4 | Generates video (Easy Mode) | 4 variations delivered | Consistent quality across clients |
-| 5 | Repeats for 3 more products | Batch workflow  -  select product, generate segments, combine, download | Volume production in minutes |
+| 4 | Generates video (Triple mode) | Script review -> approval -> 9 segments delivered | Consistent quality across clients |
+| 5 | Uses per-segment regeneration for weak segments | Re-generates individual segments (1 credit each) | Surgical improvement without full re-generation |
 
-**Success:** Marcus generates segments for 4 products and assembles 100+ unique video combinations in under 40 minutes.
+**Success:** Marcus generates segments for multiple products efficiently, using draft resume and per-segment regeneration to optimize output quality.
 
 ---
 
@@ -195,26 +221,29 @@ Platform expansion and ecosystem.
 - All payment processing delegated to PCI DSS Level 1 compliant processor (Stripe)
 - No credit card data stored, transmitted, or processed by application servers
 - Subscription management handled entirely via Stripe Billing API
+- Coupon system uses allowlisted Stripe coupon IDs only
 
 ### DR2: Data Privacy  -  Scraping
 - Scraped product data (names, images, descriptions, prices) stored only for authenticated users who confirm the import
 - Unconfirmed scrape data purged within 24 hours
 - Scraping respects robots.txt directives
 - Users must confirm they have rights to scraped store data (ToS agreement)
-- GDPR compliance: EU users can request full data deletion within 30 days
+- GDPR compliance: full account deletion implemented (delete-account Edge Function)
 - CCPA compliance: California users can opt out of data sale (no data is sold)
+- SSRF protection: URL validation on scraping inputs
 
 ### DR3: AI-Generated Content Regulations
 - Terms of Service: users accept full responsibility for AI-generated content usage
 - No real-person likeness replication  -  persona builder creates synthetic faces only
-- Watermark applied on free-tier outputs
+- Watermark on free-tier outputs (deferred  -  not yet implemented)
 - Generated content metadata includes AI-generation disclosure tag
 
 ### DR4: Data Encryption
-- All user data encrypted at rest (AES-256)
+- All user data encrypted at rest (AES-256 via Supabase/PostgreSQL)
 - All data in transit encrypted (TLS 1.3)
 - API keys and secrets stored in environment variables, never in source code
-- Uploaded product images stored in access-controlled cloud storage with signed URLs
+- Uploaded product images and generated assets stored in access-controlled Supabase Storage with signed URLs
+- HMAC-SHA256 signature verification on auth email webhook
 
 ---
 
@@ -224,7 +253,7 @@ Platform expansion and ecosystem.
 
 | Competitor | Approach | Limitation AI UGC Generator Addresses |
 |---|---|---|
-| Real UGC creators (Billo, Insense) | Human creators film custom videos | $150–$500/video, days turnaround, inconsistent quality |
+| Real UGC creators (Billo, Insense) | Human creators film custom videos | $150-$500/video, days turnaround, inconsistent quality |
 | Arcads | AI avatar video generation | No store scraping, no persistent persona builder, limited customization |
 | Creatify | AI ad generation from URLs | Generates ad creatives, not UGC-style persona videos. No character builder |
 | Synthesia | AI spokesperson videos | Corporate talking-head style, not UGC aesthetic. No e-commerce integration |
@@ -234,8 +263,10 @@ Platform expansion and ecosystem.
 1. **Zero-input product import**  -  paste URL, get structured product data + AI brand summary
 2. **Persistent AI persona**  -  build once, generate consistently across all products
 3. **UGC-optimized output**  -  Hook/Body/CTA structure designed for paid social conversion
-4. **Segmented generation**  -  avoids lip-sync degradation that plagues longer AI videos
-5. **Modular segment combinations**  -  3 variants per segment type (hook/body/CTA) yield 27 unique video combinations per batch, giving advertisers exponential creative variety from minimal generation cost
+4. **Two-phase generation with script review**  -  users approve AI scripts before any charge, with full editing capability
+5. **Segmented generation**  -  avoids lip-sync degradation that plagues longer AI videos
+6. **Advanced Mode**  -  per-segment emotion/action control with inline emotion tags for fine-grained creative direction
+7. **Flexible monetization**  -  subscriptions for committed users, credit packs for try-before-you-commit, first-video discount for conversion
 
 ---
 
@@ -245,16 +276,17 @@ Platform expansion and ecosystem.
 
 ### PT1: Multi-Tenancy
 - Each user account isolated with own products, personas, and generated videos
-- Brand profiles enable multiple stores per account (Growth: 3, Scale: unlimited)
-- Team seats share brand profile access with role-based permissions (Scale: 5 seats)
+- Persona slots scale by tier: Free=1, Starter=1, Growth=3, Scale=10
+- Admin users have unlimited credits and full user management capabilities
 
 ### PT2: Subscription Lifecycle
 - Free exploration (scraping + persona creation) without payment
-- Paywall at generation step
-- Plan upgrade/downgrade via self-service billing portal
-- Credit balance tracking with overage billing
-- Annual billing option with 20% discount
-- Cancellation with access through end of billing period
+- Paywall at generation step when credits insufficient
+- Plan upgrade/downgrade via self-service Stripe billing portal
+- Credit balance tracking with ledger audit trail
+- One-time credit pack purchases as alternative to subscription
+- Cancellation with credits cleared and profile downgraded to free
+- First-video 50% discount for new users (tracked via `first_video_discount_used`)
 
 ### PT3: Browser Compatibility
 - Chrome, Firefox, Safari, Edge  -  latest 2 major versions
@@ -263,10 +295,11 @@ Platform expansion and ecosystem.
 
 ### PT4: Async Job Processing
 - Video generation runs asynchronously (up to 10 minutes per generation)
-- Real-time progress indicator via WebSocket or polling
-- Email notification on generation completion
-- Job queue with priority lanes per subscription tier (Scale = high priority)
-- Failed jobs auto-retry up to 3 times before notifying user
+- Real-time progress indicator via polling (`video-status/` endpoint)
+- Transactional email notifications implemented via Resend (signup, recovery, magic link, email change)
+- Generation completion email notification (deferred)
+- Failed jobs: credits refunded automatically. First-video discount restored on failure
+- Atomic concurrency protection: `locking` status prevents double-approval race conditions
 
 ---
 
@@ -274,76 +307,93 @@ Platform expansion and ecosystem.
 
 ### Product Import & Scraping
 
-| ID | Requirement | Traces To |
-|---|---|---|
-| FR1 | Users can submit a store URL to initiate automatic product data scraping | UJ1.2 |
-| FR2 | Scraper extracts product name, images (primary + variants), description, price, and category/tags per product | UJ1.3 |
-| FR3 | System generates an AI-powered brand summary (tone of voice, target demographic, key selling points) from scraped product data | UJ1.3 |
-| FR4 | Users can review, inline-edit, and confirm imported product data before proceeding | UJ1.4 |
-| FR5 | Users can manually upload product images, name, and description when scraping fails or no website exists | UJ1 (fallback) |
-| FR6 | Scraping supports Shopify stores as primary target with generic HTML fallback for other platforms | UJ1.2 |
+| ID | Requirement | Status | Traces To |
+|---|---|---|---|
+| FR1 | Users can submit a store URL to initiate automatic product data scraping | Implemented | UJ1.2 |
+| FR2 | Scraper extracts product name, images (primary + variants), description, price, and category/tags per product | Implemented | UJ1.3 |
+| FR3 | System generates an AI-powered brand summary (tone of voice, target demographic, key selling points) from scraped product data via OpenRouter | Implemented | UJ1.3 |
+| FR4 | Users can review, inline-edit, and confirm imported product data before proceeding | Implemented | UJ1.4 |
+| FR5 | Users can manually upload product images, name, and description when scraping fails or no website exists (`upload-product/` with multipart/form-data) | Implemented | UJ1 (fallback) |
+| FR6 | Scraping supports Shopify stores as primary target (Shopify API), with generic HTML fallback (JSON-LD, then OG tags) | Implemented | UJ1.2 |
 
 ### Authentication & User Management
 
-| ID | Requirement | Traces To |
-|---|---|---|
-| FR7 | Users can create an account using email + password | UJ2.1 |
-| FR8 | Users can authenticate via Google OAuth | UJ2.1 |
-| FR9 | Authentication gate appears after product scraping (soft gate  -  value demonstrated first) | UJ1→UJ2 transition |
-| FR10 | Users can view and manage their account settings, subscription, and billing | UJ4.1 |
+| ID | Requirement | Status | Traces To |
+|---|---|---|---|
+| FR7 | Users can create an account using email + password | Implemented | UJ2.1 |
+| FR8 | Users can authenticate via Google OAuth | Implemented | UJ2.1 |
+| FR9 | Authentication gate appears after product scraping. Scraping works unauthenticated (affects rate limits); save requires auth | Implemented (partial) | UJ1->UJ2 transition |
+| FR10 | Users can view and manage their account settings, subscription, and billing via Stripe portal | Implemented | UJ4.1 |
 
 ### Persona Creation
 
-| ID | Requirement | Traces To |
-|---|---|---|
-| FR11 | Users can build an AI persona using a visual character builder with 9 configurable attributes: gender, skin tone, age range, hair color, hair style, eye color, body type, clothing style, accessories | UJ2.2, UJ2.3 |
-| FR12 | Each attribute provides predefined options selectable via visual controls (sliders, gradient pickers, option grids) | UJ2.3 |
-| FR13 | System generates 4 AI persona images from configured attributes | UJ2.4 |
-| FR14 | Users can select their preferred persona image from the 4 generated options | UJ2.4 |
-| FR15 | Selected persona image persists as reference for all future video generations | UJ2.5, UJ4.3 |
-| FR16 | Users can regenerate persona images by adjusting attributes and resubmitting | UJ2.4 (iteration) |
-| FR17 | Persona slots limited by subscription tier: Starter = 1, Growth = 3, Scale = 10 | PT1, Scope |
+| ID | Requirement | Status | Traces To |
+|---|---|---|---|
+| FR11 | Users can build an AI persona using a visual character builder with 8 configurable attributes: gender, ethnicity/skin_tone, age range, hair color, hair style, eye color, body type, clothing style (plus accessories) | Implemented | UJ2.2, UJ2.3 |
+| FR12 | Each attribute provides predefined options selectable via visual controls (option grids, selectors) | Implemented | UJ2.3 |
+| FR13 | System generates 2 AI persona images from configured attributes via Gemini/NanoBanana | Implemented (changed from 4 to 2) | UJ2.4 |
+| FR14 | Users can select their preferred persona image from the generated options | Implemented | UJ2.4 |
+| FR15 | Selected persona image persists as reference for all future video generations (stored as `selected_image_url`) | Implemented | UJ2.5, UJ4.3 |
+| FR16 | Users can regenerate persona images by adjusting attributes and resubmitting. Free tier capped at 4 regenerations | Implemented | UJ2.4 (iteration) |
+| FR17 | Persona slots limited by subscription tier: Free=1, Starter=1, Growth=3, Scale=10 | Implemented | PT1, Scope |
 
-### Video Generation  -  Easy Mode
+### Video Generation  -  Single & Triple Mode
 
-| ID | Requirement | Traces To |
-|---|---|---|
-| FR18 | Users can select a product from their library and initiate one-click video generation (Easy Mode) | UJ2.6, UJ2.7 |
-| FR19 | System generates multiple AI-written script variants per segment type: 3 Hook variants (3–5s each), 3 Body variants (5–10s each), and 3 CTA variants (3–5s each), tuned to the product's scraped description and brand tone | UJ2.7 |
-| FR20 | System generates a composite POV-style image of the persona holding/using the selected product | UJ2.7 |
-| FR21 | System generates video segments independently (Hook, Body, CTA) to maintain lip-sync quality (each segment < 10 seconds) | UJ2.7 |
-| FR22 | Body segments are bounded at 10 seconds maximum. The script generation LLM enforces this constraint (5–10s body duration cap)  -  no runtime splitting required. Body sub-segment splitting deferred to Phase 1.5 if needed. | UJ2.7 |
-| FR23 | **[Deferred  -  Phase 1.5]** System assembles user-selected segment combinations via on-demand FFmpeg stitching. MVP: individual segments delivered; client-side sequential preview only. FFmpeg not available in Deno Edge Functions. | UJ2.7 |
-| FR24 | Each Easy Mode generation produces 3 variants per segment type (3 hooks + 3 bodies + 3 CTAs = 9 segments), each with slight prompt diversity. Combinatorially yields 27 unique video outputs | UJ2.8 |
-| FR25 | Users can review generated segments by type (hooks, bodies, CTAs), select favorites, combine them into custom videos, and preview assembled combinations | UJ2.8 |
-| FR26 | Users can download individual generated video segments as MP4 files via signed URL. Bulk zip download deferred to Phase 1.5. | UJ2.9 |
+| ID | Requirement | Status | Traces To |
+|---|---|---|---|
+| FR18 | Users can select a product from their library and choose Single mode (1 variant per segment type = 3 segments) or Triple mode (3 variants per type = 9 segments) | Implemented | UJ2.6, UJ2.7 |
+| FR19 | System generates AI-written script variants per segment type tuned to the product's scraped description and brand tone. Credit cost varies: Standard single=5cr, Standard triple=15cr, HD single=10cr, HD triple=30cr. Script generated in two-phase flow: script phase (free) then approval (credits debited) | Implemented | UJ2.7 |
+| FR20 | System generates composite POV-style images of the persona holding/using the selected product. 4 previews generated per request; user selects preferred. Editing via natural language prompts supported | Implemented | UJ2.7 |
+| FR21 | System generates video segments independently (Hook, Body, CTA) via Kling v2.6 (Standard) or Kling v3 (HD) to maintain lip-sync quality (each segment < 10 seconds) | Implemented | UJ2.7 |
+| FR22 | Body segments are bounded at 10 seconds maximum. The script generation LLM enforces 5-9s body duration. Kling duration clamped to 5 or 10 | Implemented | UJ2.7 |
+| FR23 | FFmpeg stitching of segment combinations | **Deferred** (not available in Deno Edge Functions). Individual segments delivered; client-side sequential preview only | UJ2.7 |
+| FR24 | Each Triple mode generation produces 3 variants per segment type (3 hooks + 3 bodies + 3 CTAs = 9 segments). Single mode produces 1 variant per type (3 segments) | Implemented | UJ2.8 |
+| FR25 | Users can review generated segments by type (hooks, bodies, CTAs). Preview player exists on `/generate/[id]`. Combination builder UI deferred | Implemented (partial) | UJ2.8 |
+| FR26 | Users can download individual generated video segments as MP4 files via signed URL. Bulk zip download deferred | Implemented | UJ2.9 |
 
-### Video Generation  -  Expert Mode (Phase 2)
+### Video Generation  -  Advanced Mode (Script Editing & Per-Segment Control)
 
-| ID | Requirement | Traces To |
-|---|---|---|
-| FR27 | Users can edit or rewrite individual script segments (Hook, Body, CTA) before generation | Scope Phase 2 |
-| FR28 | Users can mix AI-generated and custom-written segments (e.g., AI hook + custom body) | Scope Phase 2 |
-| FR29 | Users can adjust pacing/duration per segment | Scope Phase 2 |
-| FR30 | Users can select background setting/environment for video generation | Scope Phase 2 |
+| ID | Requirement | Status | Traces To |
+|---|---|---|---|
+| FR27 | Users can edit or rewrite individual script segments (Hook, Body, CTA) before generation via script review step (wizard step 5) and `override_script` on approval | Implemented | UJ2.9 |
+| FR28 | Users can mix AI-generated and custom-written segments by editing individual segments in step 5 before approving | Implemented | UJ2.9 |
+| FR29 | Duration auto-estimated from word count at ~2.5 words/sec. No explicit user-facing duration slider | Implemented (partial) | UJ2.9 |
+| FR30 | Advanced Mode supports per-segment custom composite images (`image_path`) and action descriptions. No background environment selector UI | Implemented (partial) | UJ2.9 |
 
 ### Paywall & Billing
 
-| ID | Requirement | Traces To |
-|---|---|---|
-| FR31 | Paywall triggers when user initiates first video generation without an active subscription | UJ3.1 |
-| FR32 | Paywall displays plan comparison with Starter and Growth tiers (MVP), Scale tier (Phase 2) | UJ3.2 |
-| FR33 | Users complete subscription purchase via Stripe checkout | UJ3.3 |
-| FR34 | 9 free segment credits (1 full batch: 3 hooks + 3 bodies + 3 CTAs = 27 possible video combinations) available before paywall enforces payment | UJ3 (free trial) |
-| FR35 | Credit balance decrements by 1 per segment generated, displayed in dashboard | UJ4.1 |
-| FR36 | Overage charges apply when segment credits exhausted: $1.50/credit (Starter), $1.00/credit (Growth), $0.75/credit (Scale) | PT2 |
+| ID | Requirement | Status | Traces To |
+|---|---|---|---|
+| FR31 | Paywall triggers when user has insufficient credits for the selected generation configuration (not subscription absence  -  pack-only users can generate) | Implemented | UJ3.1 |
+| FR32 | Paywall displays plan comparison with all three tiers (Starter, Growth, Scale) plus credit packs, with CRO-optimized layout | Implemented | UJ3.2 |
+| FR33 | Users complete subscription or pack purchase via Stripe checkout | Implemented | UJ3.3 |
+| FR34 | First-video 50% discount (ceil(cost/2)) for new users. No free trial credits. Discount tracked via `profiles.first_video_discount_used`. Restored on generation failure | Implemented (changed from 9 free credits) | UJ3 |
+| FR35 | Credit balance tracking via `credit_balances` table + `credit-balance/` endpoint. Balance displayed in dashboard. Ledger tracks all credit movements | Implemented | UJ4.1 |
+| FR36 | Overage billing | **Not implemented**. Users must purchase credit packs or upgrade plan when credits exhausted | PT2 |
 
 ### Dashboard & Video Library
 
-| ID | Requirement | Traces To |
-|---|---|---|
-| FR37 | Users can view generation history with timestamps, product names, and video thumbnails | UJ4.1 |
-| FR38 | Users can re-download previously generated videos from their library | UJ4.1 |
+| ID | Requirement | Status | Traces To |
+|---|---|---|---|
+| FR37 | Users can view generation history with timestamps, product names via `generation-history/` endpoint + `/history` page + dashboard recent generations | Implemented | UJ4.1 |
+| FR38 | Users can re-download previously generated videos from `/generate/[id]` view with fresh signed URLs | Implemented | UJ4.1 |
+
+### New Functional Requirements (Implemented Beyond Original PRD)
+
+| ID | Requirement | Status | Traces To |
+|---|---|---|---|
+| FR39 | Two-phase script review/approval flow: phase "script" creates generation with `awaiting_approval` status and returns script + cost preview. Approval with `generation_id` debits credits and submits Kling jobs. Atomic `locking` status prevents double-approval | Implemented | UJ2.9, UJ2.10 |
+| FR40 | Advanced Mode panel: per-segment emotion selector (happy, excited, surprised, serious, neutral), intensity control (1-3), action descriptions, inline emotion tags `[e:emotion:intensity]`, per-segment custom composite images | Implemented | UJ2.8 |
+| FR41 | Per-segment regeneration: re-generate a single segment of a completed generation (1 credit). Resubmits to Kling with same composite and script. Failed regeneration refunds 1 credit | Implemented | UJ4.5 |
+| FR42 | Composite image editing: edit existing composite via natural language prompt (`edit-composite-image/` Edge Function using NanoBanana `editCompositeFromReference`) | Implemented | UJ2.7 |
+| FR43 | One-time credit packs: Starter Pack (10cr, $12), Creator Pack (30cr, $33), Pro Pack (100cr, $95). Priced higher per credit than subscriptions to incentivize recurring revenue | Implemented | UJ3.2, PT2 |
+| FR44 | Admin panel: full user listing, ban/unban, credit adjustments, analytics dashboards (overview, revenue, funnel, usage). Admin users (`profiles.role = 'admin'`) bypass credit checks with unlimited credits. Admin operations use service role key exclusively | Implemented | Operations |
+| FR45 | CTA style configuration: 8 options (auto, product_name_drop, link_in_bio, link_in_comments, comment_keyword, check_description, direct_website, discount_code). Feeds into script generation and per-segment script regeneration | Implemented | UJ2.8 |
+| FR46 | Format selection: portrait (9:16) or landscape (16:9) for composite image generation | Implemented | UJ2.7 |
+| FR47 | Video quality tiers: Standard (Kling v2.6, 5cr single / 15cr triple) and HD (Kling v3, 10cr single / 30cr triple). Stored in `generations.video_quality` and `generations.kling_model` | Implemented | UJ2.8 |
+| FR48 | Account deletion: full cleanup via `delete-account/` Edge Function. Cancels Stripe subscription, deletes storage objects across 4 buckets, deletes all DB records, deletes auth user | Implemented | DR2 |
+| FR49 | Transactional email via Resend: `send-email/` Supabase Auth Hook intercepts signup (6-digit OTP), recovery, magic link, email change. HMAC-SHA256 signature verification. Branded as CineRads | Implemented | NFR8, PT4 |
+| FR50 | Coupon system: allowlisted Stripe coupon IDs (30% off once for new users, 50% off once for Starter). Applied via `stripe-checkout/` Edge Function | Implemented | UJ3 |
 
 ---
 
@@ -354,9 +404,9 @@ Platform expansion and ecosystem.
 | ID | Requirement | Measurement |
 |---|---|---|
 | NFR1 | Website scraping completes in < 15 seconds for stores with up to 50 products | Server-side timer from URL submit to product data response, measured at p95 |
-| NFR2 | Persona image generation returns 4 images in < 30 seconds | Server-side timer from generation request to image delivery, measured at p95 |
+| NFR2 | Persona image generation returns 2 images in < 30 seconds | Server-side timer from generation request to image delivery, measured at p95 |
 | NFR3 | Video segment generation completes in < 3 minutes per segment | Job queue timer per segment, measured at p95 |
-| NFR4 | Total video generation (all segments + stitching) completes in < 10 minutes | End-to-end job timer from generation initiation to 4 outputs ready, measured at p95 |
+| NFR4 | Total video generation (all segments) completes in < 10 minutes | End-to-end job timer from approval to all segments ready, measured at p95 |
 | NFR5 | System supports at least 50 concurrent video generation jobs without degradation | Load testing with 50 simultaneous generation requests, all completing within NFR4 targets |
 
 ### Reliability
@@ -364,8 +414,8 @@ Platform expansion and ecosystem.
 | ID | Requirement | Measurement |
 |---|---|---|
 | NFR6 | 99.5% uptime for web application (excluding scheduled maintenance windows announced 24h in advance) | Uptime monitoring service (e.g., BetterUptime), measured monthly |
-| NFR7 | AI provider outages (image/video generation APIs) handled via job queuing with automatic retry (3 attempts, exponential backoff) | Job queue metrics: retry count, success-after-retry rate |
-| NFR8 | Users receive email notification when video generation completes or fails | Email delivery tracking: sent within 60 seconds of job completion |
+| NFR7 | AI provider outages (image/video generation APIs) handled via retry with exponential backoff (generic retry utility in `_shared/retry.ts`) | Retry metrics: retry count, success-after-retry rate |
+| NFR8 | Users receive transactional emails for auth events (signup OTP, recovery, magic link, email change) via Resend | Implemented. Generation completion email deferred |
 
 ### Security
 
@@ -373,17 +423,20 @@ Platform expansion and ecosystem.
 |---|---|---|
 | NFR9 | All user data encrypted at rest using AES-256 | Database encryption configuration audit, quarterly |
 | NFR10 | All data in transit encrypted via TLS 1.3 | SSL Labs scan: A+ rating, quarterly |
-| NFR11 | API rate limiting: max 10 scrape requests per IP per hour for unauthenticated users, max 60 per hour for authenticated users | Rate limiter metrics: blocked request count, false positive rate |
-| NFR12 | Authentication tokens expire after 24 hours of inactivity, refresh tokens after 30 days | Token expiry audit via automated test suite |
+| NFR11 | API rate limiting: in-memory rate limiter for unauthenticated scraping. Redis-based rate limiting deferred | Rate limiter metrics: blocked request count |
+| NFR12 | Authentication tokens managed by Supabase Auth with standard expiry policies | Token expiry audit via automated test suite |
 | NFR13 | No payment card data stored or processed by application  -  all payment handling via Stripe | PCI DSS self-assessment questionnaire (SAQ-A), annually |
+| NFR14 | SSRF protection on scraping endpoints via URL validation (`_shared/ssrf.ts`) | Implemented |
+| NFR15 | Webhook signature verification: Stripe webhook uses `stripe-signature` header; send-email uses HMAC-SHA256 | Implemented |
+| NFR16 | Admin RLS policies removed as security fix (caused data leakage). Admin panel uses service role key exclusively | Implemented |
 
 ### Scalability
 
 | ID | Requirement | Measurement |
 |---|---|---|
-| NFR14 | Video generation pipeline scales horizontally to handle 10x load growth without architecture changes | Load test: 500 concurrent jobs complete within 2x NFR4 targets |
-| NFR15 | Generated video assets served via CDN with < 200ms first-byte time globally | CDN analytics: TTFB at p95 across major regions (NA, EU, APAC) |
-| NFR16 | Database handles 10,000 registered users with < 100ms query response time for dashboard operations | Database query monitoring at p95, measured weekly |
+| NFR17 | Video generation pipeline scales via external APIs (Kling, NanoBanana/Gemini) with staggered requests to avoid rate limits | Composite generation uses staggered requests |
+| NFR18 | Generated video assets served from Supabase Storage with signed URLs | Signed URL generation on demand |
+| NFR19 | Database handles 10,000 registered users with < 100ms query response time for dashboard operations | Database query monitoring at p95, measured weekly |
 
 ---
 
@@ -391,12 +444,13 @@ Platform expansion and ecosystem.
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| AI lip-sync quality inconsistent across segments | High | High | Segment videos at < 10s each (FR21-FR22). Generate 4 variants (FR24). Allow regeneration (FR16) |
-| AI image/video provider API downtime or breaking changes | Medium | High | Abstract API layer behind internal interface. Queue + retry on failure (NFR7). Maintain fallback provider evaluation |
-| AI provider API rate limits constrain generation volume | Medium | Medium | Job queue with priority lanes (PT4). Negotiate enterprise rates. Monitor usage against limits |
-| Store scraping blocked by anti-bot measures | Medium | Low | Manual upload fallback (FR5). Shopify API integration in Phase 2. Respect robots.txt (DR2) |
-| Low conversion at paywall step | Medium | High | Free trial: 1 generation (FR34). Maximize investment before gate (UJ3). A/B test pricing in Phase 2 |
-| Copyright/likeness legal challenges | Low | High | ToS: user responsible for usage (DR3). No real-person replication. Watermark on free tier. Legal review pending (OQ4) |
+| AI lip-sync quality inconsistent across segments | High | High | Segment videos at < 10s each (FR21-FR22). Per-segment regeneration (FR41). Two quality tiers (FR47) |
+| AI image/video provider API downtime or breaking changes | Medium | High | Abstract API layer behind internal interface (`_shared/kling.ts`, `_shared/nanobanana.ts`). Retry with exponential backoff (NFR7) |
+| AI provider API rate limits constrain generation volume | Medium | Medium | Staggered requests for composite generation. Kling model fallback tracking. Monitor usage against limits |
+| Store scraping blocked by anti-bot measures | Medium | Low | Manual upload fallback (FR5). Shopify API integration (FR6). SSRF protection (NFR14) |
+| Low conversion at paywall step | Medium | High | First-video 50% discount (FR34). CRO-optimized paywall (FR32). Credit packs as low-commitment alternative (FR43). Coupon system (FR50). Post-checkout success modal |
+| Copyright/likeness legal challenges | Low | High | ToS: user responsible for usage (DR3). No real-person replication. Legal review pending (OQ4) |
+| Double-approval race condition on generation | Medium | Medium | Atomic `locking` status transition prevents concurrent approvals (FR39). Credits refunded on any pipeline failure |
 
 ---
 
@@ -404,34 +458,96 @@ Platform expansion and ecosystem.
 
 | # | Question | Owner | Status |
 |---|---|---|---|
-| OQ1 | Pricing validation: segment-based model ($29/$79/$199) confirmed based on Kling V2.6 COGS analysis (62-80% margin). Monitor competitor pricing for adjustments | Axel | Resolved |
-| OQ2 | AI image provider (NanoBanana) pricing at scale  -  enterprise deal negotiation | Axel | Open |
-| OQ3 | AI video provider (Kling 3.0) API availability and rate limits for commercial use | Axel | Open |
+| OQ1 | Pricing validation: dollar-value credit model ($25/$80/$180) implemented and differs from original segment-based model ($29/$79/$199). COGS analysis should be updated for Kling v2.6 and v3 pricing | Axel | **Resolved** (implemented, monitoring needed) |
+| OQ2 | AI image provider (NanoBanana/Gemini) pricing at scale  -  enterprise deal negotiation | Axel | Open |
+| OQ3 | AI video provider (Kling v2.6 and v3) API availability and rate limits for commercial use | Axel | Open |
 | OQ4 | Legal review: AI-generated likeness, Terms of Service, usage rights | TBD | Open |
 | OQ5 | Scraping legality per-region: GDPR, CCPA considerations for automated data collection | TBD | Open |
-| OQ6 | Free tier/freemium: should a limited free-forever plan exist alongside free trial? | Axel | Open |
+| OQ6 | Free tier/freemium: first-video discount implemented instead of free-forever plan. Monitor conversion impact vs. free trial credits | Axel | **Resolved** (first-video discount implemented) |
 | OQ7 | Multi-language script generation priority for Phase 2 | Axel | Open |
+| OQ8 | FFmpeg stitching: evaluate alternatives to Deno Edge Function limitation (external service, client-side, dedicated worker) | Axel | Open |
 
 ---
 
-## Appendix: Feature Map by Tier
+## Appendix A: Feature Map by Tier
 
-Retained from original PRD for reference. Tier features are reflected in FRs and Scope above.
+| Feature | Free | Starter | Growth | Scale |
+|---|---|---|---|---|
+| Monthly price | $0 | $25/mo | $80/mo | $180/mo |
+| Credits / month | 0 | 30 | 100 | 250 |
+| Credit value | - | $30 | $100 | $250 |
+| Standard videos (single, 5cr each) | - | 6 | 20 | 50 |
+| HD videos (single, 10cr each) | - | 3 | 10 | 25 |
+| First-video discount | 50% off | 50% off | 50% off | 50% off |
+| Persona slots | 1 | 1 | 3 | 10 |
+| Brand profiles | 1 | 1 | 3 | 10 |
+| Script review & editing | Yes | Yes | Yes | Yes |
+| Advanced Mode (emotion/action control) | Yes | Yes | Yes | Yes |
+| CTA style configuration | Yes | Yes | Yes | Yes |
+| Format selection (9:16, 16:9) | Yes | Yes | Yes | Yes |
+| Per-segment regeneration | Yes | Yes | Yes | Yes |
+| Composite image editing | Yes | Yes | Yes | Yes |
+| Export resolution | 720p | 720p | 1080p | 1080p |
+| Video model | - | Kling v2.6 (std) | Kling v2.6/v3 | Kling v2.6/v3 |
 
-| Feature | Starter | Growth | Scale |
+## Appendix B: Credit Cost Matrix
+
+| Mode | Quality | Model | Segments | Credit Cost | With First-Video Discount |
+|---|---|---|---|---|---|
+| Single | Standard | Kling v2.6 | 3 (1H+1B+1C) | 5 credits | 3 credits |
+| Single | HD | Kling v3 | 3 (1H+1B+1C) | 10 credits | 5 credits |
+| Triple | Standard | Kling v2.6 | 9 (3H+3B+3C) | 15 credits | 8 credits |
+| Triple | HD | Kling v3 | 9 (3H+3B+3C) | 30 credits | 15 credits |
+| Per-segment regeneration | Any | Same as original | 1 | 1 credit | N/A |
+
+## Appendix C: Credit Pack Pricing
+
+| Pack | Credits | Price | Per Credit | Equivalent Standard Videos |
+|---|---|---|---|---|
+| Starter Pack | 10 | $12 | $1.20 | 2 standard or 1 HD |
+| Creator Pack | 30 | $33 | $1.10 | 6 standard or 3 HD |
+| Pro Pack | 100 | $95 | $0.95 | 20 standard or 10 HD |
+
+Note: Subscription credit rate is $0.72-$0.83/credit. Pack rates ($0.95-$1.20/credit) are intentionally higher to incentivize subscriptions.
+
+## Appendix D: Edge Functions Inventory
+
+| Function | Purpose | Auth | Method |
 |---|---|---|---|
-| Monthly price | $29/mo | $79/mo | $199/mo |
-| Segment credits / month | 27 | 90 | 270 |
-| Full batches (3H+3B+3C) | 3 | 10 | 30 |
-| Max video combinations | 81 | 270 | 810 |
-| Overage rate (per credit) | $1.50 | $1.00 | $0.75 |
-| Persona slots | 1 | 3 | 10 |
-| Easy Mode | Yes | Yes | Yes |
-| Expert Mode | No | Yes | Yes |
-| Custom script editing | No | Yes | Yes |
-| Priority generation queue | No | No | Yes |
-| API access | No | No | Yes |
-| Team seats | 1 | 1 | 5 |
-| Brand profiles | 1 | 3 | Unlimited |
-| Export resolution | 720p | 720p | 720p |
-| Video model | Kling V2.6 std | Kling V2.6 std | Kling V2.6 std |
+| `scrape-product/` | Scrape products from URL (Shopify + generic), generate brand summary | Optional | POST |
+| `confirm-products/` | Confirm scraped products, apply inline edits | Required | POST |
+| `upload-product/` | Manual product upload with images (multipart) | Required | POST |
+| `generate-persona/` | Generate AI persona images (2 per call) from attributes + LLM scene prompt | Required | POST |
+| `select-persona-image/` | Set selected_image_url on persona | Required | POST |
+| `persona-images/` | Batch sign persona image storage paths | Required | POST |
+| `generate-composite-images/` | Generate 4 composite preview images (persona + product) | Required | POST |
+| `generate-segment-composite/` | Generate 1 composite for per-segment Advanced Mode | Required | POST |
+| `edit-composite-image/` | Edit composite image via natural language prompt | Required | POST |
+| `generate-segment-script/` | Generate a single segment script (hook/body/cta) | Required | POST |
+| `generate-video/` | Two-phase generation: phase="script" (create + script) or approval (debit + Kling) | Required | POST |
+| `video-status/` | Poll generation status, download/store completed Kling segments | Required | GET |
+| `regenerate-segment/` | Re-submit a single completed segment to Kling (1 credit) | Required | POST |
+| `generation-history/` | Paginated generation history with product/persona joins | Required | GET |
+| `credit-balance/` | Return credit balance, plan, admin unlimited flag | Required | GET |
+| `stripe-checkout/` | Create Stripe checkout session (subscription or pack) | Required | POST |
+| `stripe-webhook/` | Process Stripe webhooks (checkout, invoice, subscription) | Stripe signature | POST |
+| `stripe-portal/` | Create Stripe billing portal session | Required | POST |
+| `delete-account/` | Full account deletion (Stripe, storage, DB, auth) | Required | POST |
+| `send-email/` | Supabase Auth hook for transactional emails via Resend | HMAC signature | POST |
+
+**Total: 20 Edge Functions**
+
+## Appendix E: Generation Status Flow
+
+```
+awaiting_approval  -->  locking  -->  submitting_jobs  -->  generating_segments  -->  completed
+         |                  |               |                      |
+         |                  |               |                      └──> failed (refund)
+         |                  |               └──> failed (refund + revert discount)
+         |                  └──> failed (if insufficient credits: revert to awaiting_approval)
+         └──> failed (if script generation fails)
+```
+
+Status values: `pending`, `scripting`, `awaiting_approval`, `locking`, `submitting_jobs`, `generating_segments`, `completed`, `failed`
+
+Per-segment regeneration: `completed --> generating_segments --> completed` (1 credit refunded on failure)
