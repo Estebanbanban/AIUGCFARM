@@ -62,6 +62,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { useWatchedGenerationsStore } from "@/stores/watched-generations";
+import { VideoGenerationAnimation } from "@/components/landing/VideoGenerationAnimation";
 import { useProducts, useScrapeProduct } from "@/hooks/use-products";
 import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
 import { usePersonas, resolvePersonaImageUrl } from "@/hooks/use-personas";
@@ -226,6 +227,12 @@ function useResolvedPersonaImages(personas: Persona[] | undefined) {
   return imageMap;
 }
 
+const PLAN_BENEFITS: Record<PlanTier, string[]> = {
+  starter: ["Standard rendering queue", "Watermark-free exports", "Commercial use license", "Standard support"],
+  growth: ["Fast rendering priority", "Watermark-free exports", "Commercial use license", "Priority support", "API Access"],
+  scale: ["Highest rendering priority", "Watermark-free exports", "Commercial use license", "Dedicated manager", "Custom API limits"],
+};
+
 export default function GeneratePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -233,6 +240,10 @@ export default function GeneratePage() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallTab, setPaywallTab] = useState<"single" | "subscription">("single");
   const [paywallQuality, setPaywallQuality] = useState<"standard" | "hd">("standard");
+  // Sync paywall quality to whatever the user picked in Step 1 when dialog opens
+  useEffect(() => {
+    if (showPaywall) setPaywallQuality(store.quality);
+  }, [showPaywall, store.quality]);
 
   // Validate persisted pendingGenerationId against DB on mount.
   // If the generation no longer exists or moved past awaiting_approval, clear stale script.
@@ -481,9 +492,9 @@ export default function GeneratePage() {
     queryClient.invalidateQueries({ queryKey: ["products"] });
     if (firstId) {
       store.setProductId(firstId);
-      // Stay on Step 1 — user must pick a format before proceeding (format picker is in Step 1)
+      // Stay on Step 1 — user must pick a format and product before proceeding
     }
-    toast.success("Products imported! Choose a format to continue.");
+    toast.success("Products imported! Select one to continue.");
   }
 
   function handleManualUploadSuccess() {
@@ -849,56 +860,6 @@ export default function GeneratePage() {
         {/* ── Step 1: Product ───────────────────────────────────────────── */}
         {store.step === 1 && (
           <div className="flex flex-col gap-6">
-            {/* Format picker — big cards at the top of step 1 */}
-            <div>
-              <p className="mb-3 text-sm font-medium">Video format</p>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => store.setFormat("9:16")}
-                  className={cn(
-                    "flex flex-col items-center gap-3 rounded-xl border-2 p-5 transition-all",
-                    store.format === "9:16"
-                      ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                      : "border-border hover:border-muted-foreground/40 hover:bg-muted/30",
-                  )}
-                >
-                  <div className={cn(
-                    "flex items-center justify-center rounded-lg border-2 h-16 w-9",
-                    store.format === "9:16" ? "border-primary/40 bg-primary/5" : "border-border bg-muted/50",
-                  )}>
-                    <Smartphone className={cn("size-4", store.format === "9:16" ? "text-primary" : "text-muted-foreground")} />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-semibold">Portrait</p>
-                    <p className="text-xs text-muted-foreground">9:16 · TikTok · Reels</p>
-                  </div>
-                  {store.format === "9:16" && <Check className="size-3.5 text-primary" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => store.setFormat("16:9")}
-                  className={cn(
-                    "flex flex-col items-center gap-3 rounded-xl border-2 p-5 transition-all",
-                    store.format === "16:9"
-                      ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                      : "border-border hover:border-muted-foreground/40 hover:bg-muted/30",
-                  )}
-                >
-                  <div className={cn(
-                    "flex items-center justify-center rounded-lg border-2 h-9 w-16",
-                    store.format === "16:9" ? "border-primary/40 bg-primary/5" : "border-border bg-muted/50",
-                  )}>
-                    <Monitor className={cn("size-4", store.format === "16:9" ? "text-primary" : "text-muted-foreground")} />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-semibold">Landscape</p>
-                    <p className="text-xs text-muted-foreground">16:9 · YouTube · Ads</p>
-                  </div>
-                  {store.format === "16:9" && <Check className="size-3.5 text-primary" />}
-                </button>
-              </div>
-            </div>
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Select a Product</h2>
               {!showAddProductForm && confirmedProducts.length > 0 && (
@@ -1072,6 +1033,43 @@ export default function GeneratePage() {
                 ))}
               </div>
             ) : null}
+
+            {/* Format picker — compact inline, shown after products are loaded */}
+            {confirmedProducts.length > 0 && !showAddProductForm && (
+              <div className="flex items-center gap-3 pt-1">
+                <p className="shrink-0 text-sm font-medium text-muted-foreground">Format</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => store.setFormat("9:16")}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-sm transition-all",
+                      store.format === "9:16"
+                        ? "border-primary bg-primary/5 font-medium text-primary"
+                        : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/30",
+                    )}
+                  >
+                    <Smartphone className="size-3.5" />
+                    Portrait
+                    <span className="text-xs opacity-60">9:16</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => store.setFormat("16:9")}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-sm transition-all",
+                      store.format === "16:9"
+                        ? "border-primary bg-primary/5 font-medium text-primary"
+                        : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/30",
+                    )}
+                  >
+                    <Monitor className="size-3.5" />
+                    Landscape
+                    <span className="text-xs opacity-60">16:9</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1251,39 +1249,7 @@ export default function GeneratePage() {
                 </div>
 
                 {generateComposites.isPending ? (
-                  <div className="flex flex-col items-center gap-6 py-6">
-                    {/* Central animated indicator */}
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="relative flex size-16 items-center justify-center rounded-full bg-primary/10">
-                        <Sparkles className="size-7 animate-pulse text-primary" />
-                        <div className="absolute inset-0 animate-ping rounded-full bg-primary/10" />
-                      </div>
-                      <div className="text-center">
-                        <p className="text-sm font-semibold text-foreground">Generating preview</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground transition-all duration-500">
-                          {COMPOSITE_MESSAGES[compositeMsgIdx]}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground/60">~20 seconds</p>
-                      </div>
-                    </div>
-                    {/* Skeleton cards */}
-                    <div className="grid w-full grid-cols-4 gap-3">
-                      {[0, 1, 2, 3].map((i) => (
-                        <div
-                          key={i}
-                          className={cn(
-                            "relative overflow-hidden rounded-xl bg-muted",
-                            (store.format ?? "9:16") === "9:16" ? "aspect-[9/16]" : "aspect-video",
-                          )}
-                        >
-                          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-muted via-primary/5 to-muted" style={{ animationDelay: `${i * 200}ms` }} />
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <Loader2 className="size-5 animate-spin text-primary/25" style={{ animationDelay: `${i * 150}ms` }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  <VideoGenerationAnimation />
                 ) : (
                   <Button
                     variant="outline"
@@ -2279,7 +2245,7 @@ export default function GeneratePage() {
             <div className="bg-primary text-white px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm font-medium shrink-0">
               <div className="flex items-center gap-2">
                 <Flame className="size-4 shrink-0" />
-                <span>Limited Offer: 50% OFF your first video &amp; 30% OFF all plans.</span>
+                <span>Limited Offer: 50% OFF your first video & 30% OFF all plans.</span>
               </div>
               <div className="flex items-center gap-2 bg-black/15 px-2.5 py-0.5 rounded font-mono">
                 <Clock className="size-3 opacity-80" />
@@ -2327,7 +2293,7 @@ export default function GeneratePage() {
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  Subscribe &amp; Save
+                  Subscribe & Save
                   <span className={cn(
                     "text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold",
                     paywallTab === "subscription"
@@ -2444,11 +2410,6 @@ export default function GeneratePage() {
                     {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
                       const isGrowth = key === "growth";
                       const discountedMonthly = offer.isActive ? offer.discountedPrice(plan.price) : null;
-                      const PLAN_BENEFITS: Record<PlanTier, string[]> = {
-                        starter: ["Standard rendering queue", "Watermark-free exports", "Commercial use license", "Standard support"],
-                        growth: ["Fast rendering priority", "Watermark-free exports", "Commercial use license", "Priority support", "API Access"],
-                        scale: ["Highest rendering priority", "Watermark-free exports", "Commercial use license", "Dedicated manager", "Custom API limits"],
-                      };
                       return (
                         <div
                           key={key}

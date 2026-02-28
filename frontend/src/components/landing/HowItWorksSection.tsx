@@ -4,6 +4,7 @@ import { Link, Upload, Clapperboard } from "lucide-react";
 import { FadeInUp, StaggerContainer, staggerItem } from "@/lib/motion";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import { VideoGenerationAnimation } from "./VideoGenerationAnimation";
 
 const steps = [
   {
@@ -34,10 +35,7 @@ const steps = [
     title: "Get 27 Unique Video Ads",
     description:
       "AI writes Hook, Body, and CTA scripts for your product. Generate 3 segments of each type, then mix any combination for 27 ready-to-run TikTok and Meta ad creatives.",
-    mediaType: "video" as const,
-    mediaSrc:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    mediaAlt: "Generated video ad preview",
+    mediaType: "animation" as const,
   },
 ];
 
@@ -68,7 +66,7 @@ export function HowItWorksSection() {
                   <span className="text-primary font-mono text-xs font-bold">{step.number}</span>
                 </div>
 
-                <div className="relative w-full max-w-[280px] md:max-w-none aspect-[16/10] rounded-xl border border-border overflow-hidden mb-5 bg-card">
+                <div className="relative w-full max-w-[280px] md:max-w-none aspect-[10/7] rounded-xl border border-border overflow-hidden mb-5 bg-card">
                   {step.mediaType === "image" ? (
                     <Image
                       src={step.mediaSrc}
@@ -78,16 +76,7 @@ export function HowItWorksSection() {
                       sizes="(max-width: 768px) 90vw, 28vw"
                     />
                   ) : (
-                    <video
-                      className="h-full w-full object-cover"
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      preload="none"
-                    >
-                      <source src={step.mediaSrc} type="video/mp4" />
-                    </video>
+                    <VideoGenerationAnimation />
                   )}
                 </div>
 
