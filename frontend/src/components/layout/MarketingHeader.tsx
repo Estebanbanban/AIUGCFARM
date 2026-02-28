@@ -170,12 +170,13 @@ export function MarketingHeader() {
             <Logo variant="full" size="md" theme="auto" />
           </Link>
 
-          <nav className="absolute left-1/2 z-10 hidden -translate-x-1/2 items-center gap-8 md:flex">
+          <nav className="absolute inset-x-0 z-10 hidden items-center justify-center gap-8 md:flex pointer-events-none">
+
             {navItems.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
-                className="text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
+                className="pointer-events-auto text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
               >
                 {item.label}
               </Link>
