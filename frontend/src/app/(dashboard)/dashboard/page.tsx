@@ -9,7 +9,6 @@ import { createClient } from "@/lib/supabase/client";
 import {
   CreditCard,
   Clock,
-  Loader2,
   DollarSign,
   PlayCircle,
   CheckCircle2,
@@ -232,11 +231,11 @@ export default function DashboardPage() {
                   >
                     <div className="flex items-center gap-3">
                       {s.done ? (
-                        <CheckCircle2 className="size-4.5 text-emerald-500" />
+                        <CheckCircle2 className="size-4 text-emerald-500" />
                       ) : (
                         <Circle
                           className={cn(
-                            "size-4.5",
+                            "size-4",
                             s.active ? "text-primary" : "text-muted-foreground",
                           )}
                         />
