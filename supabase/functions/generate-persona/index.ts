@@ -7,11 +7,14 @@ import { callOpenRouter } from "../_shared/openrouter.ts";
 import { generateImagesFromPrompt, type GeneratedImage } from "../_shared/nanobanana.ts";
 
 const PERSONA_LIMITS: Record<string, number> = {
-  free: 0,
+  free: 1,
   starter: 1,
   growth: 3,
   scale: 10,
 };
+
+// Free-tier: max regeneration attempts per persona (2 images/call × 5 calls = 10 images)
+const FREE_REGEN_LIMIT = 4; // 4 regen calls after initial creation = 10 total images
 
 /* ------------------------------------------------------------------ */
 /*  Attribute validation                                              */
@@ -329,27 +332,43 @@ Deno.serve(async (req: Request) => {
     const validAttrs = attributes as PersonaAttributes;
     const isRegeneration = typeof persona_id === "string" && persona_id.length > 0;
 
+    // Fetch profile once — used for slot limit + regen rate limit
+    const { data: profile } = await sb
+      .from("profiles")
+      .select("plan, role")
+      .eq("id", userId)
+      .single();
+    const plan = profile?.plan ?? "free";
+    const isAdmin = profile?.role === "admin";
+
     // If regenerating, verify the persona exists and belongs to the user
+    let existingRegenCount = 0;
     if (isRegeneration) {
       const { data: existing } = await sb
         .from("personas")
-        .select("id, owner_id")
+        .select("id, owner_id, regen_count")
         .eq("id", persona_id)
         .single();
       if (!existing || existing.owner_id !== userId) {
         return json({ detail: "Persona not found" }, cors, 404);
       }
+      existingRegenCount = existing.regen_count ?? 0;
+      // Free-tier rate limit: cap at FREE_REGEN_LIMIT regenerations per persona
+      if (!isAdmin && plan === "free" && existingRegenCount >= FREE_REGEN_LIMIT) {
+        return json(
+          {
+            detail:
+              "You've reached the free-tier image limit for this persona. " +
+              "Upgrade to regenerate more images.",
+          },
+          cors,
+          429,
+        );
+      }
     }
 
-    // Check plan persona limits (skip for regeneration  -  not creating a new slot)
+    // Check plan persona slots (skip for regeneration — not creating a new slot)
     if (!isRegeneration) {
-      const { data: profile } = await sb
-        .from("profiles")
-        .select("plan, role")
-        .eq("id", userId)
-        .single();
-      const plan = profile?.plan ?? "free";
-      const isAdmin = profile?.role === "admin";
       const maxPersonas = PERSONA_LIMITS[plan] ?? 0;
 
       if (!isAdmin) {
@@ -362,7 +381,10 @@ Deno.serve(async (req: Request) => {
         if ((currentCount ?? 0) >= maxPersonas) {
           return json(
             {
-              detail: `Your ${plan} plan allows up to ${maxPersonas} persona(s). Upgrade to add more.`,
+              detail:
+                plan === "free"
+                  ? `You can create 1 persona on the free plan. Upgrade to add more.`
+                  : `Your ${plan} plan allows up to ${maxPersonas} persona(s). Upgrade to add more.`,
             },
             cors,
             403,
@@ -432,6 +454,7 @@ Deno.serve(async (req: Request) => {
           attributes: attributesToSave,
           generated_images: storagePaths,
           selected_image_url: null, // reset selection on regeneration
+          regen_count: existingRegenCount + 1,
         })
         .eq("id", persona_id)
         .eq("owner_id", userId)
@@ -449,6 +472,7 @@ Deno.serve(async (req: Request) => {
           generated_images: storagePaths,
           selected_image_url: null,
           is_active: true,
+          regen_count: 1,
         })
         .select("id, name, attributes, generated_images, selected_image_url")
         .single();

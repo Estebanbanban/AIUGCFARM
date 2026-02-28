@@ -606,7 +606,12 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
+      <div className={cn(
+        "grid gap-6",
+        store.generatedImages.length > 0
+          ? "lg:grid-cols-2"
+          : "lg:grid-cols-[1fr_300px]",
+      )}>
 
         {/* ── Left: Sims-style criteria builder ─────────────────────── */}
         <fieldset disabled={store.isGenerating || store.isSaving} className="min-w-0">
@@ -841,16 +846,16 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
             {store.generatedImages.length > 0 && (
               <div className="rounded-xl border border-border bg-card p-4">
                 <p className="mb-3 text-sm font-semibold text-foreground">Choose Your Persona</p>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-3">
                   {store.generatedImages.map((url, index) => (
                     <button
                       key={index}
                       type="button"
                       onClick={() => store.selectImage(index)}
                       className={cn(
-                        'relative aspect-square overflow-hidden rounded-xl transition-all',
+                        'relative aspect-[3/4] overflow-hidden rounded-xl transition-all',
                         store.selectedImageIndex === index
-                          ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+                          ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
                           : 'ring-1 ring-border hover:ring-primary/40',
                       )}
                     >
@@ -864,15 +869,15 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                           alt={`Persona option ${index + 1}`}
                           fill
                           className="object-cover"
-                          sizes="(max-width: 768px) 50vw, 140px"
+                          sizes="(max-width: 768px) 50vw, 280px"
                           onError={() =>
                             setImageLoadErrors((prev) => new Set(prev).add(index))
                           }
                         />
                       )}
                       {store.selectedImageIndex === index && (
-                        <div className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-primary">
-                          <Check className="size-3 text-primary-foreground" strokeWidth={3} />
+                        <div className="absolute right-2 top-2 flex size-6 items-center justify-center rounded-full bg-primary">
+                          <Check className="size-3.5 text-primary-foreground" strokeWidth={3} />
                         </div>
                       )}
                     </button>
