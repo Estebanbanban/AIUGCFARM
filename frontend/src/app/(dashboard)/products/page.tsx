@@ -244,8 +244,8 @@ export default function ProductsPage() {
 
       {/* Import Dialog with Tabs */}
       <Dialog open={showImportDialog} onOpenChange={handleDialogClose}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-lg">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Add Product</DialogTitle>
             <DialogDescription>
               Import a product from a URL or upload one manually.
@@ -253,11 +253,13 @@ export default function ProductsPage() {
           </DialogHeader>
 
           {showScrapeResults && scrapedProducts.length > 0 ? (
-            <ScrapeResults
-              products={scrapedProducts}
-              brandSummary={scrapedBrandSummary}
-              onConfirmed={handleScrapeConfirmed}
-            />
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <ScrapeResults
+                products={scrapedProducts}
+                brandSummary={scrapedBrandSummary}
+                onConfirmed={handleScrapeConfirmed}
+              />
+            </div>
           ) : (
             <Tabs defaultValue="import-url" className="w-full">
               <TabsList className="w-full">
