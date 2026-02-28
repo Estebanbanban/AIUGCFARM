@@ -38,6 +38,7 @@ import {
 import {
   usePersona,
   useDeletePersona,
+  useUpdatePersona,
   usePersonaGenerations,
   resolvePersonaImageUrl,
 } from "@/hooks/use-personas";
@@ -138,10 +139,35 @@ export default function PersonaDetailPage() {
     usePersonaGenerations(personaId);
 
   const deleteMutation = useDeletePersona(personaId);
+  const updateMutation = useUpdatePersona(personaId);
   const resolvedImage = useResolvedImage(persona?.selected_image_url);
   const builderStore = usePersonaBuilderStore();
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState("");
+
+  function startEditingName() {
+    setNameValue(persona?.name ?? "");
+    setIsEditingName(true);
+  }
+
+  function saveName() {
+    const trimmed = nameValue.trim();
+    if (!trimmed || trimmed === persona?.name) {
+      setIsEditingName(false);
+      return;
+    }
+    updateMutation.mutate({ name: trimmed }, {
+      onSuccess: () => {
+        toast.success("Name updated");
+        setIsEditingName(false);
+      },
+      onError: (err) => {
+        toast.error(err.message || "Failed to update name");
+      },
+    });
+  }
 
   function handleEditRegenerate() {
     if (!persona) return;
@@ -210,9 +236,28 @@ export default function PersonaDetailPage() {
               <ArrowLeft className="size-4" />
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {persona.name}
-          </h1>
+          {isEditingName ? (
+            <input
+              className="text-2xl font-bold tracking-tight bg-transparent border-b-2 border-primary outline-none min-w-0 w-48"
+              value={nameValue}
+              onChange={(e) => setNameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveName();
+                if (e.key === "Escape") setIsEditingName(false);
+              }}
+              onBlur={saveName}
+              autoFocus
+            />
+          ) : (
+            <button
+              className="group flex items-center gap-2 text-2xl font-bold tracking-tight hover:text-primary/80 transition-colors text-left"
+              onClick={startEditingName}
+              title="Click to rename"
+            >
+              {persona.name}
+              <Pencil className="size-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {/* Delete button with confirmation dialog */}
