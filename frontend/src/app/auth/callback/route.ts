@@ -46,10 +46,14 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}${next}`);
     }
     console.error("OTP verify failed:", error?.message);
+    // Return an actual error — do NOT fall through to the signup success message below.
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(error.message ?? "Email confirmation failed. Please try again.")}`
+    );
   }
 
-  // If this was a signup confirmation that failed PKCE (cross-browser link open),
-  // redirect to login with a helpful message rather than a generic error.
+  // If this was a signup confirmation link opened in a different browser (no tokenHash),
+  // redirect to login with a helpful message.
   if (type === "signup" || searchParams.get("type") === "signup") {
     return NextResponse.redirect(
       `${origin}/login?message=Email+confirmed.+Please+sign+in.`

@@ -275,6 +275,9 @@ export default function GeneratePage() {
 
   // Tracks which format was used to fire background composite generation
   const generationFiredForFormat = useRef<string | null>(null);
+  // Cancellation token for auto-fired script generation — incremented on each
+  // composite select so stale onSuccess callbacks from previous selections are discarded
+  const scriptAutoFireToken = useRef(0);
 
   // Step 4, rendering timeline collapsible
   const [showTimeline, setShowTimeline] = useState(false);
@@ -475,9 +478,9 @@ export default function GeneratePage() {
     queryClient.invalidateQueries({ queryKey: ["products"] });
     if (firstId) {
       store.setProductId(firstId);
-      store.setStep(2);
+      // Stay on Step 1 — user must pick a format before proceeding (format picker is in Step 1)
     }
-    toast.success("Products imported!");
+    toast.success("Products imported! Choose a format to continue.");
   }
 
   function handleManualUploadSuccess() {
@@ -540,8 +543,10 @@ export default function GeneratePage() {
     setShowPreviewEditor(false);
     const path = compositeImages[idx].path;
     store.setCompositeImagePath(path);
-    // Auto-fire script so it's ready (or nearly ready) when user reaches Step 4
-    if (store.productId && store.personaId && !generateScript.isPending) {
+    // Auto-fire script so it's ready (or nearly ready) when user reaches Step 4.
+    // Increment the token so any in-flight onSuccess for a previous composite is discarded.
+    const token = ++scriptAutoFireToken.current;
+    if (store.productId && store.personaId) {
       // Skip auto-fire if comment keyword CTA is selected but keyword is empty
       if (store.ctaStyle === "comment_keyword" && !store.ctaCommentKeyword.trim()) return;
       store.clearPendingScript();
@@ -558,6 +563,8 @@ export default function GeneratePage() {
         },
         {
           onSuccess: (result) => {
+            // Discard if user already selected a different composite
+            if (scriptAutoFireToken.current !== token) return;
             if (result.script) {
               trackScriptGenerated(store.mode, store.quality);
               store.setPendingScript(
@@ -1930,7 +1937,10 @@ export default function GeneratePage() {
                                 size="sm"
                                 disabled={generateScript.isPending}
                                 onClick={() => {
-                                  if (!store.productId || !store.personaId || !store.compositeImagePath) return;
+                                  if (!store.productId || !store.personaId || !store.compositeImagePath) {
+                                    toast.error("Please go back to Step 3 to select a scene image first.");
+                                    return;
+                                  }
                                   generateScript.mutate(
                                     {
                                       product_id: store.productId,

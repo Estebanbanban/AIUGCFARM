@@ -108,7 +108,7 @@ const pipelineStages: PipelineStage[] = [
     key: "submitting",
     label: "Submitting Video Jobs",
     icon: <Send className="size-4" />,
-    activeStatuses: ["submitting_jobs"],
+    activeStatuses: ["locking", "submitting_jobs"],
     doneStatuses: ["generating_segments", "completed"],
   },
   {
@@ -1033,8 +1033,9 @@ export default function GenerationDetailPage() {
                       gen.script!.hooks?.forEach((s, i) => lines.push(`Hook ${i + 1}: ${s.text}`));
                       gen.script!.bodies?.forEach((s, i) => lines.push(`Body ${i + 1}: ${s.text}`));
                       gen.script!.ctas?.forEach((s, i) => lines.push(`CTA ${i + 1}: ${s.text}`));
-                      navigator.clipboard.writeText(lines.join("\n\n"));
-                      toast.success("Script copied to clipboard");
+                      navigator.clipboard.writeText(lines.join("\n\n"))
+                        .then(() => toast.success("Script copied to clipboard"))
+                        .catch(() => toast.error("Could not copy to clipboard"));
                     }}
                   >
                     Copy to clipboard
