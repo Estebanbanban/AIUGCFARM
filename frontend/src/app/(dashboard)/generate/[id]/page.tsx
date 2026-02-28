@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -45,6 +45,7 @@ import type { GenerationStatus, ScriptSegment, SegmentVideo } from "@/types/data
 import { trackVideoCompleted, trackVideoFailed, trackVideoDownloaded } from "@/lib/datafast";
 import { useVideoStitcher, STITCH_STATUS_LABELS } from "@/hooks/use-video-stitcher";
 import { useZipDownload } from "@/hooks/use-zip-download";
+import { useBatchStitcher } from "@/hooks/use-batch-stitcher";
 
 /* -------------------------------------------------------------------------- */
 /*  Status configuration                                                      */
@@ -200,6 +201,7 @@ function VideoSegmentCard({
   onSelect,
   onRegenerate,
   isRegenerating,
+  multiSelect = false,
 }: {
   video: SegmentVideo;
   label: string;
@@ -207,6 +209,7 @@ function VideoSegmentCard({
   onSelect: () => void;
   onRegenerate: () => void;
   isRegenerating: boolean;
+  multiSelect?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -239,7 +242,16 @@ function VideoSegmentCard({
       )}
     >
       {/* Selection indicator */}
-      {isSelected && (
+      {multiSelect ? (
+        <div className={cn(
+          "absolute right-2 top-2 z-10 flex size-6 items-center justify-center rounded",
+          isSelected ? "bg-primary text-white" : "bg-black/40 text-white/60"
+        )}>
+          {isSelected
+            ? <CheckSquare className="size-4" />
+            : <Square className="size-4" />}
+        </div>
+      ) : isSelected && (
         <div className="absolute right-2 top-2 z-10 flex size-6 items-center justify-center rounded-full bg-primary">
           <Check className="size-3.5 text-white" />
         </div>
@@ -339,11 +351,13 @@ function CombinationPreview({
   bodyVideo,
   ctaVideo,
   generationId,
+  allSegmentEntries,
 }: {
   hookVideo: SegmentVideo | undefined;
   bodyVideo: SegmentVideo | undefined;
   ctaVideo: SegmentVideo | undefined;
   generationId: string;
+  allSegmentEntries: Array<{ name: string; url: string }>;
 }) {
   const hookRef = useRef<HTMLVideoElement>(null);
   const bodyRef = useRef<HTMLVideoElement>(null);
@@ -360,6 +374,14 @@ function CombinationPreview({
 
   const { stitch, reset, status: stitchStatus, stitchedUrl, error: stitchError } =
     useVideoStitcher();
+
+  const {
+    downloadZip: downloadPackZip,
+    status: packZipStatus,
+    fetchedCount: packFetched,
+    totalCount: packTotal,
+    isActive: isPackZipping,
+  } = useZipDownload();
 
   const isStitching =
     stitchStatus !== "idle" &&
@@ -454,6 +476,26 @@ function CombinationPreview({
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+  }
+
+  function handleDownloadPack() {
+    if (!stitchedUrl || !hookVideo || !bodyVideo || !ctaVideo || isPackZipping) return;
+    trackVideoDownloaded("pack");
+    // Derive combo label from selected video URLs for filename
+    const h = allSegmentEntries.filter(e => e.name.startsWith("hooks/")).findIndex(e => e.url === hookVideo.url);
+    const b = allSegmentEntries.filter(e => e.name.startsWith("bodies/")).findIndex(e => e.url === bodyVideo.url);
+    const c = allSegmentEntries.filter(e => e.name.startsWith("ctas/")).findIndex(e => e.url === ctaVideo.url);
+    const hi = h >= 0 ? h + 1 : 1;
+    const bi = b >= 0 ? b + 1 : 1;
+    const ci = c >= 0 ? c + 1 : 1;
+    const comboLabel = `hook${hi}-body${bi}-cta${ci}`;
+    downloadPackZip(
+      [
+        { name: `stitched/${comboLabel}.mp4`, url: stitchedUrl },
+        ...allSegmentEntries,
+      ],
+      `cinerades-${generationId.slice(0, 8)}-pack.zip`,
+    );
   }
 
   const segmentLabels: Record<string, string> = {
@@ -622,10 +664,33 @@ function CombinationPreview({
 
           <div className="flex shrink-0 items-center gap-2">
             {stitchStatus === "done" && stitchedUrl && (
-              <Button size="sm" variant="outline" onClick={handleDownloadStitched}>
-                <Download className="size-3.5" />
-                Download
-              </Button>
+              <>
+                <Button size="sm" variant="outline" onClick={handleDownloadStitched}>
+                  <Download className="size-3.5" />
+                  Download
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDownloadPack}
+                  disabled={isPackZipping}
+                  title="Download stitched video + all 9 raw segments as a ZIP"
+                >
+                  {isPackZipping ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" />
+                      {packZipStatus === "fetching"
+                        ? `Fetching… ${packFetched}/${packTotal}`
+                        : "Zipping…"}
+                    </>
+                  ) : (
+                    <>
+                      <Download className="size-3.5" />
+                      Download Pack
+                    </>
+                  )}
+                </Button>
+              </>
             )}
 
             <Button
@@ -703,6 +768,29 @@ export default function GenerationDetailPage() {
   const [selectedBodies, setSelectedBodies] = useState<Set<number>>(new Set([0]));
   const [selectedCtas, setSelectedCtas] = useState<Set<number>>(new Set([0]));
 
+  const { batchStitch, status: batchStatus, progress: batchProgress, currentLabel: batchCurrentLabel, error: batchError, isActive: isBatching } =
+    useBatchStitcher();
+
+  function toggleBatchSelection(
+    set: Set<number>,
+    setFn: React.Dispatch<React.SetStateAction<Set<number>>>,
+    index: number,
+  ) {
+    const next = new Set(set);
+    if (next.has(index)) {
+      if (next.size > 1) next.delete(index); // keep at least one
+    } else {
+      next.add(index);
+    }
+    setFn(next);
+  }
+
+  function formatEstimatedTime(seconds: number): string {
+    if (seconds < 60) return `~${seconds}s`;
+    const mins = (seconds / 60).toFixed(1);
+    return `~${mins} minutes`;
+  }
+
   // Last checked timestamp
   const [lastChecked, setLastChecked] = useState(new Date());
   const [secondsAgo, setSecondsAgo] = useState(0);
@@ -717,6 +805,29 @@ export default function GenerationDetailPage() {
   const segments = gen?.segments ?? null;
   const script = gen?.script ?? null;
   const progress = gen?.progress;
+
+  const combosToExport = useMemo(() => {
+    if (!batchMode || !segments) return [];
+    const combos: Array<{ hookUrl: string; bodyUrl: string; ctaUrl: string; label: string }> = [];
+    for (const h of selectedHooks) {
+      for (const b of selectedBodies) {
+        for (const c of selectedCtas) {
+          const hookVideo = segments.hooks?.[h];
+          const bodyVideo = segments.bodies?.[b];
+          const ctaVideo = segments.ctas?.[c];
+          if (hookVideo && bodyVideo && ctaVideo) {
+            combos.push({
+              hookUrl: hookVideo.url,
+              bodyUrl: bodyVideo.url,
+              ctaUrl: ctaVideo.url,
+              label: `hook${h + 1}-body${b + 1}-cta${c + 1}`,
+            });
+          }
+        }
+      }
+    }
+    return combos;
+  }, [batchMode, selectedHooks, selectedBodies, selectedCtas, segments]);
 
   // Collapse script when videos are ready
   useEffect(() => {
@@ -1253,10 +1364,15 @@ export default function GenerationDetailPage() {
                   key={i}
                   video={video}
                   label={`Hook ${i + 1}`}
-                  isSelected={selectedHook === i}
-                  onSelect={() => setSelectedHook(i)}
+                  isSelected={batchMode ? selectedHooks.has(i) : selectedHook === i}
+                  onSelect={() =>
+                    batchMode
+                      ? toggleBatchSelection(selectedHooks, setSelectedHooks, i)
+                      : setSelectedHook(i)
+                  }
                   onRegenerate={() => handleRegenerateSegment("hook", i + 1)}
                   isRegenerating={regeneratingKey === `hook_${i + 1}`}
+                  multiSelect={batchMode}
                 />
               ))}
               {(!segments.hooks || segments.hooks.length === 0) && (
@@ -1276,10 +1392,15 @@ export default function GenerationDetailPage() {
                   key={i}
                   video={video}
                   label={`Body ${i + 1}`}
-                  isSelected={selectedBody === i}
-                  onSelect={() => setSelectedBody(i)}
+                  isSelected={batchMode ? selectedBodies.has(i) : selectedBody === i}
+                  onSelect={() =>
+                    batchMode
+                      ? toggleBatchSelection(selectedBodies, setSelectedBodies, i)
+                      : setSelectedBody(i)
+                  }
                   onRegenerate={() => handleRegenerateSegment("body", i + 1)}
                   isRegenerating={regeneratingKey === `body_${i + 1}`}
+                  multiSelect={batchMode}
                 />
               ))}
               {(!segments.bodies || segments.bodies.length === 0) && (
@@ -1299,10 +1420,15 @@ export default function GenerationDetailPage() {
                   key={i}
                   video={video}
                   label={`CTA ${i + 1}`}
-                  isSelected={selectedCta === i}
-                  onSelect={() => setSelectedCta(i)}
+                  isSelected={batchMode ? selectedCtas.has(i) : selectedCta === i}
+                  onSelect={() =>
+                    batchMode
+                      ? toggleBatchSelection(selectedCtas, setSelectedCtas, i)
+                      : setSelectedCta(i)
+                  }
                   onRegenerate={() => handleRegenerateSegment("cta", i + 1)}
                   isRegenerating={regeneratingKey === `cta_${i + 1}`}
+                  multiSelect={batchMode}
                 />
               ))}
               {(!segments.ctas || segments.ctas.length === 0) && (
@@ -1314,6 +1440,98 @@ export default function GenerationDetailPage() {
               )}
             </div>
           </div>
+
+          {/* -------------------------------------------------------------- */}
+          {/*  Batch Export Panel (Story C)                                   */}
+          {/* -------------------------------------------------------------- */}
+          {batchMode && (
+            <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Batch Export</p>
+                    {combosToExport.length > 0 ? (
+                      <>
+                        <p className="text-xs text-muted-foreground">
+                          {selectedHooks.size} hook{selectedHooks.size !== 1 ? "s" : ""} ×{" "}
+                          {selectedBodies.size} bod{selectedBodies.size !== 1 ? "ies" : "y"} ×{" "}
+                          {selectedCtas.size} CTA{selectedCtas.size !== 1 ? "s" : ""} ={" "}
+                          <span className="font-medium text-foreground">{combosToExport.length} combinations</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Estimated time: {formatEstimatedTime(combosToExport.length * 25)}
+                          {combosToExport.length > 9 && (
+                            <span className="ml-1 text-amber-400">
+                              — Large export, stay on this tab
+                            </span>
+                          )}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Select segments above to build combinations</p>
+                    )}
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBatchMode(false)}
+                      disabled={isBatching}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => batchStitch(combosToExport, generationId)}
+                      disabled={combosToExport.length === 0 || isBatching || combosToExport.length > 27}
+                    >
+                      {isBatching ? (
+                        <>
+                          <Loader2 className="size-3.5 animate-spin" />
+                          {batchStatus === "zipping"
+                            ? "Zipping…"
+                            : `Stitching ${batchProgress.current}/${batchProgress.total}…`}
+                        </>
+                      ) : batchStatus === "done" ? (
+                        <>
+                          <Check className="size-3.5" />
+                          Exported ✓
+                        </>
+                      ) : (
+                        <>
+                          <Layers className="size-3.5" />
+                          {combosToExport.length > 0
+                            ? `Export ${combosToExport.length} Combo${combosToExport.length !== 1 ? "s" : ""} →`
+                            : "Export →"}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                {isBatching && batchStatus === "stitching" && batchProgress.total > 0 && (
+                  <div className="flex flex-col gap-1.5">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all"
+                        style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Stitching {batchProgress.current}/{batchProgress.total}
+                      {batchCurrentLabel && `: ${batchCurrentLabel}`}
+                    </p>
+                  </div>
+                )}
+
+                {batchError && (
+                  <p className="text-xs text-red-400">{batchError}</p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* -------------------------------------------------------------- */}
           {/*  Combination builder                                            */}
@@ -1338,6 +1556,11 @@ export default function GenerationDetailPage() {
                   bodyVideo={segments.bodies?.[selectedBody]}
                   ctaVideo={segments.ctas?.[selectedCta]}
                   generationId={generationId}
+                  allSegmentEntries={[
+                    ...(segments.hooks ?? []).map((v, i) => ({ name: `hooks/hook_${i + 1}.mp4`, url: v.url })),
+                    ...(segments.bodies ?? []).map((v, i) => ({ name: `bodies/body_${i + 1}.mp4`, url: v.url })),
+                    ...(segments.ctas ?? []).map((v, i) => ({ name: `ctas/cta_${i + 1}.mp4`, url: v.url })),
+                  ]}
                 />
 
                 {/* Selection summary */}

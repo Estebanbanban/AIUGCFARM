@@ -49,7 +49,7 @@ export function useZipDownload() {
         await new Promise<void>((resolve, reject) => {
           zip(files, { level: 0 }, (err, data) => {
             if (err) { reject(err); return; }
-            const blob = new Blob([data], { type: "application/zip" });
+            const blob = new Blob([data.buffer as ArrayBuffer], { type: "application/zip" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;

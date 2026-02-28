@@ -63,7 +63,7 @@ export function trackVideoFailed(mode: string) {
   track("video_failed", { mode });
 }
 
-export function trackVideoDownloaded(type: "stitched" | "all_segments") {
+export function trackVideoDownloaded(type: "stitched" | "all_segments" | "pack" | "batch") {
   track("video_downloaded", { type });
 }
 

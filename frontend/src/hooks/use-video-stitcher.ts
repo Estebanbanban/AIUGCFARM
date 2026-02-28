@@ -116,6 +116,61 @@ async function detectSpeechBounds(
   return getSpeechBounds(log, duration);
 }
 
+/** Clean up temp files in the FFmpeg virtual FS between batch calls */
+async function cleanupFFmpegFiles(ffmpeg: FFmpeg) {
+  const tempFiles = ["hook.mp4", "body.mp4", "cta.mp4", "hook_t.mp4", "body_t.mp4", "cta_t.mp4", "list.txt", "output.mp4"];
+  for (const f of tempFiles) {
+    try { await ffmpeg.deleteFile(f); } catch { /* ignore — file may not exist */ }
+  }
+}
+
+/**
+ * Non-hook version: returns a Blob directly.
+ * Used by useBatchStitcher to stitch combos sequentially without React state.
+ * Cleans up all temp files after each run to prevent WASM memory leaks.
+ */
+export async function stitchToBlob(
+  hookUrl: string,
+  bodyUrl: string,
+  ctaUrl: string,
+): Promise<Blob> {
+  const ffmpeg = await getFFmpeg();
+
+  // Clean up any leftover files from a previous run
+  await cleanupFFmpegFiles(ffmpeg);
+
+  await Promise.all([
+    ffmpeg.writeFile("hook.mp4", await fetchFile(hookUrl))
+      .catch(async () => ffmpeg.writeFile("hook.mp4", await fetchFile(hookUrl))),
+    ffmpeg.writeFile("body.mp4", await fetchFile(bodyUrl))
+      .catch(async () => ffmpeg.writeFile("body.mp4", await fetchFile(bodyUrl))),
+    ffmpeg.writeFile("cta.mp4", await fetchFile(ctaUrl))
+      .catch(async () => ffmpeg.writeFile("cta.mp4", await fetchFile(ctaUrl))),
+  ]);
+
+  const [hookB, bodyB, ctaB] = await Promise.all([
+    detectSpeechBounds(ffmpeg, "hook.mp4"),
+    detectSpeechBounds(ffmpeg, "body.mp4"),
+    detectSpeechBounds(ffmpeg, "cta.mp4"),
+  ]);
+
+  await ffmpeg.exec(["-i", "hook.mp4", "-ss", hookB.start.toFixed(3), "-to", hookB.end.toFixed(3), "-c", "copy", "hook_t.mp4"]);
+  await ffmpeg.exec(["-i", "body.mp4", "-ss", bodyB.start.toFixed(3), "-to", bodyB.end.toFixed(3), "-c", "copy", "body_t.mp4"]);
+  await ffmpeg.exec(["-i", "cta.mp4",  "-ss", ctaB.start.toFixed(3),  "-to", ctaB.end.toFixed(3),  "-c", "copy", "cta_t.mp4"]);
+
+  const manifest = "file 'hook_t.mp4'\nfile 'body_t.mp4'\nfile 'cta_t.mp4'\n";
+  await ffmpeg.writeFile("list.txt", new TextEncoder().encode(manifest));
+  await ffmpeg.exec(["-f", "concat", "-safe", "0", "-i", "list.txt", "-c", "copy", "output.mp4"]);
+
+  const data = (await ffmpeg.readFile("output.mp4")) as Uint8Array;
+  const blob = new Blob([data.buffer as ArrayBuffer], { type: "video/mp4" });
+
+  // Clean up immediately after reading output
+  await cleanupFFmpegFiles(ffmpeg);
+
+  return blob;
+}
+
 // ─── Public API ─────────────────────────────────────────────────────────────
 
 export type StitchStatus =
