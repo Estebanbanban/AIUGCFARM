@@ -48,10 +48,10 @@ const plans = [
     isAgency: false,
   },
   {
-    name: "Agency",
-    monthlyPrice: 199,
-    annualPrice: 159,
-    annualSavings: 480,
+    name: "Scale",
+    monthlyPrice: 180,
+    annualPrice: 144,
+    annualSavings: 432,
     description: "For agencies and large teams managing multiple brands.",
     perVideo: "$0.25/video",
     features: [

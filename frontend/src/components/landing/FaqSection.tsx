@@ -49,7 +49,7 @@ const faqs = [
   {
     question: "What video quality do I get?",
     answer:
-      "Starter plans export at 720p — ideal for TikTok and Instagram Reels. Growth and Agency plans export at 1080p for maximum quality on any platform.",
+      "Starter plans export at 720p — ideal for TikTok and Instagram Reels. Growth and Scale plans export at 1080p for maximum quality on any platform.",
   },
   {
     question: "Do you offer a refund?",
@@ -59,7 +59,7 @@ const faqs = [
   {
     question: "What's the difference between AI-Written Scripts and Custom Script Editor?",
     answer:
-      "AI-Written Scripts (all plans): CineRads automatically writes your Hook, Body, and CTA scripts from your product data and persona — no copywriting needed. Custom Script Editor (Growth & Agency): Write or edit scripts yourself before generation, perfect for brands with specific messaging or compliance requirements.",
+      "AI-Written Scripts (all plans): CineRads automatically writes your Hook, Body, and CTA scripts from your product data and persona — no copywriting needed. Custom Script Editor (Growth & Scale): Write or edit scripts yourself before generation, perfect for brands with specific messaging or compliance requirements.",
   },
   {
     question: "What's a segment credit?",

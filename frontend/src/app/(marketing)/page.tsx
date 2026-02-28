@@ -45,8 +45,8 @@ const jsonLd = {
         },
         {
           "@type": "Offer",
-          name: "Agency",
-          price: "199",
+          name: "Scale",
+          price: "180",
           priceCurrency: "USD",
           description:
             "Up to 810 unique video ads per month, 10 AI personas, unlimited brand profiles, API access, 5 team seats",
@@ -85,7 +85,7 @@ const jsonLd = {
           name: "Can I write my own scripts?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Yes. All plans include AI-Written Scripts. Growth and Agency plans also include the Custom Script Editor — write or edit your own Hook, Body, and CTA copy before generation.",
+            text: "Yes. All plans include AI-Written Scripts. Growth and Scale plans also include the Custom Script Editor — write or edit your own Hook, Body, and CTA copy before generation.",
           },
         },
         {

@@ -60,7 +60,7 @@ const PLAN_PERKS: Record<PlanTier, { icon: React.ElementType; headline: string; 
   scale: {
     icon: Sparkles,
     headline: "Full creative bandwidth. No limits. ✨",
-    sub: "You're running at agency scale now. Spin up campaigns faster than any creative team.",
+    sub: "You're running at full scale now. Spin up campaigns faster than any creative team.",
     highlight: "250 credits loaded · 50 standard or 25 HD videos",
     bullets: [
       "250 monthly credits (renews automatically)",
