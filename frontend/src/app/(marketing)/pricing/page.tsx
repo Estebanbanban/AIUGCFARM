@@ -9,13 +9,15 @@ export const metadata: Metadata = {
 };
 
 const comparisonRows = [
-  { feature: "Credits/month", starter: "27", growth: "90", scale: "300" },
+  { feature: "Credits/month", starter: "30", growth: "100", scale: "250" },
+  { feature: "Standard videos/mo", starter: "6", growth: "20", scale: "50" },
+  { feature: "HD videos/mo", starter: "3", growth: "10", scale: "25" },
   { feature: "AI personas", starter: "1", growth: "3", scale: "10" },
-  { feature: "Products", starter: "1", growth: "3", scale: "10" },
-  { feature: "Easy Mode", starter: true, growth: true, scale: true },
-  { feature: "Expert Mode", starter: false, growth: true, scale: true },
-  { feature: "Custom scripts", starter: false, growth: true, scale: true },
+  { feature: "Brand profiles", starter: "1", growth: "3", scale: "10" },
+  { feature: "AI-Written Scripts", starter: true, growth: true, scale: true },
+  { feature: "Custom Script Editor", starter: false, growth: true, scale: true },
   { feature: "Export resolution", starter: "720p", growth: "1080p", scale: "1080p" },
+  { feature: "Priority generation", starter: false, growth: true, scale: true },
   { feature: "Priority support", starter: false, growth: false, scale: true },
 ];
 

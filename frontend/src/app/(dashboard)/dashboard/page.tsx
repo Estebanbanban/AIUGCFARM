@@ -37,6 +37,8 @@ import {
 import { usePersonas } from "@/hooks/use-personas";
 import type { GenerationStatus } from "@/types/database";
 import { calculateGenerationCost } from "@/lib/generation-cost";
+import { Suspense } from "react";
+import { CheckoutSuccessHandler } from "@/components/checkout/CheckoutSuccessHandler";
 
 const statusColors: Record<GenerationStatus, string> = {
   pending: "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
@@ -117,6 +119,10 @@ export default function DashboardPage() {
       : 0;
 
   return (
+    <>
+    <Suspense>
+      <CheckoutSuccessHandler />
+    </Suspense>
     <div className="flex flex-col gap-6">
       <Card className="border-border bg-card">
         <CardContent className="flex flex-col gap-5 p-6 md:flex-row md:items-end md:justify-between md:p-7">
@@ -309,5 +315,6 @@ export default function DashboardPage() {
         )}
       </div>
     </div>
+    </>
   );
 }

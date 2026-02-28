@@ -33,14 +33,14 @@ const PACK_PRICE_IDS: Record<string, string | undefined> = {
 };
 
 const PACK_NAMES: Record<string, string> = {
-  pack_10: "10 Credits — Starter Pack ($12)",
-  pack_30: "30 Credits — Creator Pack ($33)",
-  pack_100: "100 Credits — Pro Pack ($95)",
+  pack_10: "10 Credits: Starter Pack ($12)",
+  pack_30: "30 Credits: Creator Pack ($33)",
+  pack_100: "100 Credits: Pro Pack ($95)",
 };
 
 /**
  * Allowlist of Stripe coupon IDs accepted from the client.
- * t9QmsQTe = NewUsers (30% off once) — first-paywall 30-min offer
+ * t9QmsQTe = NewUsers (30% off once): first-paywall 30-min offer
  * yGuI3xvT = 50percent (50% off once, Starter only) — first-video offer
  */
 const ALLOWED_COUPONS = new Set(["t9QmsQTe", "yGuI3xvT"]);
