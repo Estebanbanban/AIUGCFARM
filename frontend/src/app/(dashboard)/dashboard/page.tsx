@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import {
   Video,
@@ -17,6 +18,9 @@ import {
   Loader2,
   DollarSign,
   PlayCircle,
+  CheckCircle2,
+  Circle,
+  Sparkles,
 } from "lucide-react";
 import { cn, formatDate, formatCurrency } from "@/lib/utils";
 import { PLANS, CREDITS_PER_SINGLE, CREDITS_PER_BATCH, CREDITS_PER_SINGLE_HD, CREDITS_PER_BATCH_HD } from "@/lib/stripe";
@@ -36,6 +40,7 @@ import {
   type GenerationWithRelations,
 } from "@/hooks/use-generations";
 import { usePersonas } from "@/hooks/use-personas";
+import { useProducts } from "@/hooks/use-products";
 import type { GenerationStatus } from "@/types/database";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { useRouter } from "next/navigation";
@@ -59,26 +64,7 @@ function statusLabel(status: GenerationStatus): string {
   return "In Progress";
 }
 
-const quickActions = [
-  {
-    title: "Import Products",
-    description: "Add products directly from your store URL.",
-    href: "/products",
-    icon: Package,
-  },
-  {
-    title: "Create Persona",
-    description: "Set the look and voice for your AI creator.",
-    href: "/personas/new",
-    icon: UserPlus,
-  },
-  {
-    title: "Generate Video",
-    description: "Produce new ad variants from a single product.",
-    href: "/generate",
-    icon: Film,
-  },
-];
+// quickActions is now derived inside the component (context-aware)
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -92,7 +78,9 @@ export default function DashboardPage() {
     isLoading: boolean;
   };
   const { data: personas } = usePersonas();
+  const { data: products } = useProducts();
 
+  const confirmedProducts = products?.filter((p) => p.confirmed) ?? [];
   const plan = profile?.plan ?? "free";
   const planConfig = plan !== "free" ? PLANS[plan as keyof typeof PLANS] : null;
   const creditsRemaining = credits?.remaining ?? 0;
@@ -108,6 +96,17 @@ export default function DashboardPage() {
   ).length;
   const activePersonas = personas?.length ?? 0;
   const hasGenerations = recentGenerations.length > 0;
+  const isOnboarding = !generationsLoading && !hasGenerations;
+  const hasProducts = confirmedProducts.length > 0;
+  const hasPersonas = activePersonas > 0;
+
+  const lastCompletedGen = (generations ?? [])
+    .filter((g) => g.status === "completed")
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+  const daysSinceLast = lastCompletedGen
+    ? Math.floor((Date.now() - new Date(lastCompletedGen.created_at).getTime()) / 86400000)
+    : 999;
 
   function handleResumeDraft(gen: GenerationWithRelations) {
     if (!gen.script) {
@@ -124,6 +123,8 @@ export default function DashboardPage() {
       creditsToCharge,
       productId: gen.product_id,
       personaId: gen.persona_id,
+      mode: gen.mode,
+      quality: gen.video_quality as "standard" | "hd",
     });
     router.push("/generate");
   }
@@ -142,7 +143,7 @@ export default function DashboardPage() {
   const creditPercent = isUnlimitedCredits
     ? 100
     : creditsTotal > 0
-      ? Math.round((creditsRemaining / creditsTotal) * 100)
+      ? Math.min(100, Math.round((creditsRemaining / creditsTotal) * 100))
       : 0;
 
   return (
@@ -158,10 +159,12 @@ export default function DashboardPage() {
               Workspace Overview
             </p>
             <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              Welcome back, {firstName}
+              {isOnboarding ? "Welcome to AIUGC" : `Welcome back, ${firstName}`}
             </h2>
             <p className="max-w-xl text-sm text-muted-foreground">
-              Track your generation pipeline, manage credits, and launch the next ad batch.
+              {isOnboarding
+                ? "Create AI-powered UGC video ads in minutes. Let's get started."
+                : "Track your generation pipeline, manage credits, and launch the next ad batch."}
             </p>
           </div>
 
@@ -178,6 +181,94 @@ export default function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Onboarding path for new users */}
+      {isOnboarding && (
+        <Card className="border-primary/20 bg-primary/[0.02]">
+          <CardContent className="p-6">
+            <h3 className="mb-4 text-base font-semibold text-foreground">
+              3 steps to your first UGC video
+            </h3>
+            <div className="flex flex-col gap-3">
+              {[
+                {
+                  step: 1,
+                  label: "Import your product",
+                  done: hasProducts,
+                  active: !hasProducts,
+                  href: "/products",
+                  cta: "Import Product",
+                },
+                {
+                  step: 2,
+                  label: "Create an AI persona",
+                  done: hasPersonas,
+                  active: hasProducts && !hasPersonas,
+                  href: "/personas/new",
+                  cta: "Create Persona",
+                },
+                {
+                  step: 3,
+                  label: "Generate your video",
+                  done: false,
+                  active: hasProducts && hasPersonas,
+                  href: "/generate",
+                  cta: "Generate Video",
+                },
+              ].map((s) => (
+                <div
+                  key={s.step}
+                  className={cn(
+                    "flex items-center justify-between rounded-lg border px-4 py-3 transition-colors",
+                    s.active
+                      ? "border-primary/40 bg-primary/5"
+                      : s.done
+                        ? "border-border bg-background opacity-60"
+                        : "border-border bg-background",
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    {s.done ? (
+                      <CheckCircle2 className="size-5 text-emerald-500" />
+                    ) : (
+                      <Circle
+                        className={cn(
+                          "size-5",
+                          s.active ? "text-primary" : "text-muted-foreground",
+                        )}
+                      />
+                    )}
+                    <span
+                      className={cn(
+                        "text-sm font-medium",
+                        s.done
+                          ? "text-muted-foreground line-through"
+                          : s.active
+                            ? "text-foreground"
+                            : "text-muted-foreground",
+                      )}
+                    >
+                      {s.step}. {s.label}
+                    </span>
+                  </div>
+                  {!s.done && (
+                    <Button
+                      asChild
+                      size="sm"
+                      variant={s.active ? "default" : "ghost"}
+                    >
+                      <Link href={s.href}>
+                        {s.cta}
+                        {s.active && <ArrowRight className="size-3.5" />}
+                      </Link>
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card className="border-border bg-card">
@@ -222,6 +313,15 @@ export default function DashboardPage() {
                 className="h-1.5 bg-muted [&>[data-slot=progress-indicator]]:bg-primary"
               />
             )}
+            {!creditsLoading && creditsRemaining === 0 && !isUnlimitedCredits && (
+              <Button asChild variant="outline" size="sm" className="mt-1 w-full">
+                <Link href="/pricing">
+                  <Sparkles className="size-3.5" />
+                  Upgrade to start generating
+                  <ArrowRight className="size-3.5" />
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
 
@@ -238,26 +338,97 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <Card className="border-border bg-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-3">
-          {quickActions.map((action) => (
-            <Link key={action.title} href={action.href} className="group">
-              <div className="flex h-full flex-col gap-3 rounded-lg border border-border bg-background p-4 transition-colors hover:border-primary/40 hover:bg-muted/30">
-                <div className="flex size-9 items-center justify-center rounded-md bg-primary/10">
-                  <action.icon className="size-4 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">{action.title}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{action.description}</p>
-                </div>
+      {/* Re-engagement widget — only for returning users who haven't generated recently */}
+      {hasGenerations && lastCompletedGen && daysSinceLast >= 3 && (
+        <Card className="border-primary/20 bg-primary/[0.02]">
+          <CardContent className="flex items-center justify-between gap-4 p-5">
+            <div className="flex items-center gap-4">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                <Sparkles className="size-5 text-primary" />
               </div>
-            </Link>
-          ))}
-        </CardContent>
-      </Card>
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Ready to run another batch?
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Last generation: {lastCompletedGen.products?.name ?? "Untitled"} · {formatDate(lastCompletedGen.created_at)}
+                </p>
+              </div>
+            </div>
+            <Button asChild size="sm" className="shrink-0">
+              <Link href="/generate">
+                <Film className="size-4" />
+                Generate Again
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Quick Actions — context-aware ordering */}
+      {(() => {
+        const actions = [
+          {
+            title: "Generate Video",
+            description: "Produce new ad variants from a single product.",
+            href: "/generate",
+            icon: Film,
+            highlight: hasProducts && hasPersonas,
+            disabled: !hasProducts || !hasPersonas,
+          },
+          {
+            title: "Create Persona",
+            description: "Set the look and voice for your AI creator.",
+            href: "/personas/new",
+            icon: UserPlus,
+            highlight: hasProducts && !hasPersonas,
+            disabled: false,
+          },
+          {
+            title: "Import Products",
+            description: "Add products directly from your store URL.",
+            href: "/products",
+            icon: Package,
+            highlight: !hasProducts,
+            disabled: false,
+          },
+        ].sort((a, b) => (b.highlight ? 1 : 0) - (a.highlight ? 1 : 0));
+
+        return (
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-3">
+              {actions.map((action) => (
+                <Link
+                  key={action.title}
+                  href={action.disabled ? "#" : action.href}
+                  className={cn("group", action.disabled && "pointer-events-none opacity-50")}
+                  aria-disabled={action.disabled}
+                >
+                  <div
+                    className={cn(
+                      "flex h-full flex-col gap-3 rounded-lg border bg-background p-4 transition-colors",
+                      action.highlight
+                        ? "border-primary/40 bg-primary/5 hover:border-primary/60"
+                        : "border-border hover:border-primary/40 hover:bg-muted/30",
+                    )}
+                  >
+                    <div className="flex size-9 items-center justify-center rounded-md bg-primary/10">
+                      <action.icon className="size-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{action.title}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{action.description}</p>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {draftGenerations.length > 0 && (
         <div className="flex flex-col gap-3">
@@ -303,6 +474,7 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {(hasGenerations || generationsLoading) && (
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">Recent Generations</h2>
@@ -331,9 +503,23 @@ export default function DashboardPage() {
                 gen.kling_model,
               );
               const showCost = gen.status === "completed" && cost.totalBilledSeconds > 0;
+              const thumbSrc = gen.composite_image_url ?? null;
               return (
                 <Link key={gen.id} href={`/generate/${gen.id}`} className="group">
-                  <Card className="h-full border-border bg-card transition-colors hover:border-primary/40">
+                  <Card className="h-full overflow-hidden border-border bg-card transition-colors hover:border-primary/40">
+                    {thumbSrc ? (
+                      <div className="relative h-36 w-full overflow-hidden bg-muted">
+                        <Image
+                          src={thumbSrc}
+                          alt={gen.products?.name ?? "Generation preview"}
+                          fill
+                          className="object-cover transition-transform duration-300 group-hover:scale-105"
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-36 w-full bg-gradient-to-br from-primary/10 via-primary/5 to-muted" />
+                    )}
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between gap-2">
                         <CardTitle className="line-clamp-1 text-sm font-medium">
@@ -365,28 +551,9 @@ export default function DashboardPage() {
               );
             })}
           </div>
-        ) : (
-          <Card className="border-border bg-card">
-            <CardContent className="flex flex-col items-center gap-4 py-12">
-              <div className="flex size-14 items-center justify-center rounded-full bg-primary/10">
-                <Film className="size-7 text-primary" />
-              </div>
-              <div className="text-center">
-                <h3 className="font-semibold text-foreground">Create your first video ad</h3>
-                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                  Import a product, build a persona, and generate ad-ready variants in minutes.
-                </p>
-              </div>
-              <Button asChild>
-                <Link href="/generate">
-                  <Film className="size-4" />
-                  Get Started
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+        ) : null}
       </div>
+      )}
     </div>
     </>
   );

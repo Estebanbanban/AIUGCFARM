@@ -6,6 +6,19 @@ import { validateUrl } from "../_shared/ssrf.ts";
 import { rateLimit } from "../_shared/rate-limit.ts";
 import { callOpenRouter } from "../_shared/openrouter.ts";
 
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 interface ProductData {
   name: string;
   description: string;
@@ -92,7 +105,7 @@ async function tryShopify(origin: string): Promise<ProductData[] | null> {
         if (allProducts.length >= MAX_TOTAL) break;
         allProducts.push({
           name: p.title as string,
-          description: (p.body_html as string) ?? "",
+          description: stripHtml((p.body_html as string) ?? ""),
           price: p.variants
             ? parseFloat(
                 ((p.variants as Record<string, unknown>[])[0]
@@ -178,10 +191,7 @@ function parseJsonLd(html: string): ProductData[] {
         ) {
           products.push({
             name: item.name || "Unknown Product",
-            description: String(item.description || "").replace(
-              /<[^>]*>/g,
-              "",
-            ),
+            description: stripHtml(String(item.description || "")),
             price: item.offers?.price
               ? parseFloat(item.offers.price)
               : item.offers?.lowPrice

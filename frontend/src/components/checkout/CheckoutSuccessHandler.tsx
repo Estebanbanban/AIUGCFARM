@@ -25,12 +25,14 @@ export function CheckoutSuccessHandler() {
       trackPurchaseConfirmed("subscription", planParam);
       setPlan(planParam as PlanTier);
       setOpen(true);
+      router.replace("/dashboard");
     } else if (packParam && packParam in CREDIT_PACKS) {
       trackPurchaseConfirmed("credits", packParam);
       setPack(packParam as CreditPackKey);
       setOpen(true);
+      router.replace("/dashboard");
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   const handleClose = () => {
     setOpen(false);

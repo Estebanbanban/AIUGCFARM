@@ -29,7 +29,9 @@ interface GenerationInput {
     | "link_in_bio"
     | "link_in_comments"
     | "comment_keyword"
-    | "check_description";
+    | "check_description"
+    | "direct_website"
+    | "discount_code";
   cta_comment_keyword?: string;
   advanced_segments?: AdvancedSegmentsInput;
 }

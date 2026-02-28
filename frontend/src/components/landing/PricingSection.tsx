@@ -7,85 +7,61 @@ import { toast } from "sonner";
 import { ScaleIn, FadeInUp } from "@/lib/motion";
 import { createClient } from "@/lib/supabase/client";
 import { callEdge } from "@/lib/api";
+import { PLANS } from "@/lib/stripe";
 import type { PlanTier } from "@/lib/stripe";
 import { trackCtaClicked } from "@/lib/datafast";
 
-const plans: {
-  key: PlanTier;
-  name: string;
-  monthlyPrice: number;
-  annualPrice: number;
-  annualSavings: number;
-  description: string;
-  perVideo: string;
-  features: string[];
-  cta: string;
-  highlighted: boolean;
-  isAgency: boolean;
-}[] = [
+// Landing-page-only metadata that does not exist in stripe.ts.
+// Price, credits, name, and features always come from PLANS in stripe.ts.
+const PLAN_UI: Record<
+  PlanTier,
   {
-    key: "starter",
-    name: "Starter",
-    monthlyPrice: 25,
+    annualPrice: number;
+    annualSavings: number;
+    description: string;
+    perVideo: string;
+    cta: string;
+    highlighted: boolean;
+    isAgency: boolean;
+  }
+> = {
+  starter: {
     annualPrice: 20,
     annualSavings: 60,
     description: "Perfect for testing and launching your first UGC campaigns.",
     perVideo: "$0.83/credit",
-    features: [
-      "30 credits/month",
-      "6 standard or 3 HD videos",
-      "1 AI persona",
-      "1 brand profile",
-      "AI-Written Scripts",
-      "720p MP4 export",
-    ],
     cta: "Get Started",
     highlighted: false,
     isAgency: false,
   },
-  {
-    key: "growth",
-    name: "Growth",
-    monthlyPrice: 80,
+  growth: {
     annualPrice: 64,
     annualSavings: 192,
     description: "For brands scaling their ad creative output seriously.",
     perVideo: "$0.80/credit",
-    features: [
-      "100 credits/month",
-      "20 standard or 10 HD videos",
-      "3 AI personas",
-      "3 brand profiles",
-      "AI-Written Scripts + Custom Script Editor",
-      "1080p MP4 export",
-      "Priority generation",
-    ],
     cta: "Start Scaling",
     highlighted: true,
     isAgency: false,
   },
-  {
-    key: "scale",
-    name: "Scale",
-    monthlyPrice: 180,
+  scale: {
     annualPrice: 144,
     annualSavings: 432,
     description: "For agencies and large teams managing multiple brands.",
     perVideo: "$0.72/credit",
-    features: [
-      "250 credits/month",
-      "50 standard or 25 HD videos",
-      "10 AI personas",
-      "10 brand profiles",
-      "AI-Written Scripts + Custom Script Editor",
-      "1080p MP4 export",
-      "Priority support",
-    ],
     cta: "Go Unlimited",
     highlighted: false,
     isAgency: true,
   },
-];
+};
+
+// Derive the full plan list from stripe.ts, merging in landing-page-only fields.
+const plans = (Object.keys(PLANS) as PlanTier[]).map((key) => ({
+  key,
+  name: PLANS[key].name,
+  monthlyPrice: PLANS[key].price,
+  features: [...PLANS[key].features],
+  ...PLAN_UI[key],
+}));
 
 export function PricingSection() {
   const [annual, setAnnual] = useState(false);
