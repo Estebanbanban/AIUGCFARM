@@ -126,6 +126,8 @@ Deno.serve(async (req: Request) => {
 
       if (validatedCoupon) {
         sessionParams.discounts = [{ coupon: validatedCoupon }];
+      } else {
+        sessionParams.allow_promotion_codes = true;
       }
 
       const session = await stripe.checkout.sessions.create(sessionParams);
@@ -160,6 +162,8 @@ Deno.serve(async (req: Request) => {
 
     if (validatedCoupon) {
       sessionParams.discounts = [{ coupon: validatedCoupon }];
+    } else {
+      sessionParams.allow_promotion_codes = true;
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams);
