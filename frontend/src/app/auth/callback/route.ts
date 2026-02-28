@@ -8,6 +8,17 @@ export async function GET(request: Request) {
   const type = searchParams.get("type") as "email" | "recovery" | "magiclink" | "signup" | null;
   const next = searchParams.get("next") ?? "/dashboard";
 
+  // Supabase forwards provider errors (e.g. consent denied, email not verified)
+  // as ?error=...&error_description=... — handle before trying any exchange.
+  const providerError = searchParams.get("error");
+  if (providerError) {
+    const desc = searchParams.get("error_description") ?? providerError;
+    console.error("OAuth provider error:", providerError, desc);
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(desc)}`
+    );
+  }
+
   const supabase = await createClient();
 
   // PKCE flow (code exchange)
@@ -20,6 +31,12 @@ export async function GET(request: Request) {
     // a different browser than where signup was initiated). Fall through so
     // the user can still sign in manually.
     console.error("PKCE code exchange failed:", error?.message);
+
+    // For OAuth providers the user can just re-authenticate — send them to
+    // login with a clear message rather than a cryptic error code.
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(error.message ?? "Sign-in failed. Please try again.")}`
+    );
   }
 
   // OTP / token hash flow (email confirmation, magic link, recovery)
