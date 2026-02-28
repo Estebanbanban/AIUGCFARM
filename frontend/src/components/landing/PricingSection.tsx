@@ -1,12 +1,29 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { Check } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Check, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { ScaleIn, FadeInUp } from "@/lib/motion";
+import { createClient } from "@/lib/supabase/client";
+import { callEdge } from "@/lib/api";
+import type { PlanTier } from "@/lib/stripe";
 
-const plans = [
+const plans: {
+  key: PlanTier;
+  name: string;
+  monthlyPrice: number;
+  annualPrice: number;
+  annualSavings: number;
+  description: string;
+  perVideo: string;
+  features: string[];
+  cta: string;
+  highlighted: boolean;
+  isAgency: boolean;
+}[] = [
   {
+    key: "starter",
     name: "Starter",
     monthlyPrice: 25,
     annualPrice: 20,
@@ -21,12 +38,12 @@ const plans = [
       "AI-Written Scripts",
       "720p MP4 export",
     ],
-    cta: "Start Free, No Card Required",
-    href: "/signup",
+    cta: "Get Started",
     highlighted: false,
     isAgency: false,
   },
   {
+    key: "growth",
     name: "Growth",
     monthlyPrice: 80,
     annualPrice: 64,
@@ -43,11 +60,11 @@ const plans = [
       "Priority generation",
     ],
     cta: "Start Scaling",
-    href: "/signup",
     highlighted: true,
     isAgency: false,
   },
   {
+    key: "scale",
     name: "Scale",
     monthlyPrice: 180,
     annualPrice: 144,
@@ -64,7 +81,6 @@ const plans = [
       "Priority support",
     ],
     cta: "Go Unlimited",
-    href: "/signup",
     highlighted: false,
     isAgency: true,
   },
@@ -72,6 +88,34 @@ const plans = [
 
 export function PricingSection() {
   const [annual, setAnnual] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loadingPlan, setLoadingPlan] = useState<PlanTier | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsLoggedIn(!!session);
+    });
+  }, []);
+
+  async function handlePlanClick(planKey: PlanTier) {
+    if (!isLoggedIn) {
+      router.push(`/signup?plan=${planKey}`);
+      return;
+    }
+
+    setLoadingPlan(planKey);
+    try {
+      const res = await callEdge<{ data: { url: string } }>("stripe-checkout", {
+        body: { plan: planKey },
+      });
+      window.location.href = res.data.url;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Checkout failed. Please try again.");
+      setLoadingPlan(null);
+    }
+  }
 
   return (
     <section id="pricing" className="bg-background py-24 px-4 sm:px-6">
@@ -79,7 +123,7 @@ export function PricingSection() {
         <FadeInUp className="text-center mb-14">
           <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground mb-3">Pricing</p>
           <p className="text-sm text-[#888] mb-4">
-            Traditional UGC creators charge $150–$500 per video.
+            Traditional UGC creators charge $150-$500 per video.
           </p>
           <h2 className="text-[clamp(2rem,4vw,3rem)] font-semibold tracking-tight text-foreground">
             Simple, transparent pricing
@@ -124,6 +168,7 @@ export function PricingSection() {
         <div className="grid md:grid-cols-3 gap-4">
           {plans.map((plan, i) => {
             const price = annual ? plan.annualPrice : plan.monthlyPrice;
+            const isLoading = loadingPlan === plan.key;
             return (
               <ScaleIn key={plan.name} delay={i * 0.1}>
                 <div
@@ -172,9 +217,10 @@ export function PricingSection() {
                     ))}
                   </ul>
 
-                  <Link
-                    href={plan.href}
-                    className={`w-full py-3 rounded-full text-sm font-medium text-center transition-all duration-200 block ${
+                  <button
+                    onClick={() => handlePlanClick(plan.key)}
+                    disabled={!!loadingPlan}
+                    className={`w-full py-3 rounded-full text-sm font-medium text-center transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
                       plan.highlighted
                         ? "bg-primary text-white hover:bg-orange-600"
                         : plan.isAgency
@@ -182,8 +228,12 @@ export function PricingSection() {
                         : "border border-border text-foreground hover:border-primary/40"
                     }`}
                   >
-                    {plan.cta}
-                  </Link>
+                    {isLoading ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      plan.cta
+                    )}
+                  </button>
                 </div>
               </ScaleIn>
             );
@@ -192,10 +242,10 @@ export function PricingSection() {
 
         <FadeInUp delay={0.3}>
           <p className="text-center text-xs text-muted-foreground mt-8">
-            All plans include: Free trial (3 segments) · No watermarks · MP4 download · Cancel anytime
+            All plans include: No watermarks · MP4 download · Cancel anytime
           </p>
           <p className="text-center text-xs text-primary mt-3">
-            🔒 Beta pricing — lock in your rate forever. Prices increase at public launch.
+            Beta pricing — lock in your rate forever. Prices increase at public launch.
           </p>
         </FadeInUp>
       </div>
