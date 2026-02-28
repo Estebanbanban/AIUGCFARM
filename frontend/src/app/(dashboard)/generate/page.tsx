@@ -278,6 +278,24 @@ export default function GeneratePage() {
   // Step 4, rendering timeline collapsible
   const [showTimeline, setShowTimeline] = useState(false);
 
+  // Auto-fire composites when arriving at step 3 via localStorage restore
+  // (handleNext sets the ref before advancing, so this only fires for cold restores)
+  useEffect(() => {
+    if (
+      store.step === 3 &&
+      compositeImages.length === 0 &&
+      !generateComposites.isPending &&
+      !generationFiredForFormat.current &&
+      store.productId &&
+      store.personaId &&
+      store.format
+    ) {
+      handleGenerateComposites();
+      generationFiredForFormat.current = store.format;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.step]);
+
   // Step 5, collapsible alt variants
   const [showAltHooks, setShowAltHooks] = useState(false);
   const [showAltBodies, setShowAltBodies] = useState(false);
@@ -334,7 +352,7 @@ export default function GeneratePage() {
 
   function canProceed() {
     if (store.step === 1) return !!store.productId;
-    if (store.step === 2) return !!store.personaId;
+    if (store.step === 2) return !!store.personaId && !!store.format;
     if (store.step === 3) return !!store.compositeImagePath;
     // Step 4 proceeds via "Generate Script" button, not the generic Next button
     return false;
@@ -347,10 +365,10 @@ export default function GeneratePage() {
       // for the last fire; it is reset to null in handleBack so going back+forward
       // always re-generates, but a double-tap or re-render cannot double-fire.
       const alreadyFired =
-        generationFiredForFormat.current === (store.format ?? "9:16");
+        generationFiredForFormat.current === store.format;
       if (!generateComposites.isPending && (!compositeImages.length || !alreadyFired)) {
         handleGenerateComposites();
-        generationFiredForFormat.current = store.format ?? "9:16";
+        generationFiredForFormat.current = store.format;
       }
     }
     if (store.step < 5) store.setStep(store.step + 1);
@@ -462,16 +480,20 @@ export default function GeneratePage() {
 
   function handleFormatChange(format: "9:16" | "16:9") {
     store.setFormat(format);
-    // Clear composites when format changes so user regenerates with correct aspect ratio
+    // Clear composites and auto-regenerate with new format.
+    // Pass format explicitly to avoid stale store.format in the same call stack.
     setCompositeImages([]);
     setSelectedCompositeIdx(null);
     setShowPreviewEditor(false);
     store.setCompositeImagePath(null);
     setPreviewEditPrompt("");
+    generationFiredForFormat.current = format;
+    handleGenerateComposites(format);
   }
 
-  async function handleGenerateComposites() {
-    if (!store.productId || !store.personaId) return;
+  async function handleGenerateComposites(formatOverride?: "9:16" | "16:9") {
+    const format = formatOverride ?? store.format;
+    if (!store.productId || !store.personaId || !format) return;
     setCompositeImages([]);
     setSelectedCompositeIdx(null);
     setShowPreviewEditor(false);
@@ -479,7 +501,7 @@ export default function GeneratePage() {
     setPreviewEditPrompt("");
 
     generateComposites.mutate(
-      { product_id: store.productId, persona_id: store.personaId, format: store.format },
+      { product_id: store.productId, persona_id: store.personaId, format },
       {
         onSuccess: (result) => {
           setCompositeImages(result.images);
@@ -506,7 +528,7 @@ export default function GeneratePage() {
       {
         composite_image_path: store.compositeImagePath,
         edit_prompt: trimmedPrompt,
-        format: store.format,
+        format: store.format!,
       },
       {
         onSuccess: (result) => {
@@ -941,6 +963,55 @@ export default function GeneratePage() {
           <div className="flex flex-col gap-4">
             <h2 className="text-lg font-semibold">Select a Persona</h2>
 
+            {/* Format picker — user must choose before Next is enabled */}
+            <div>
+              <p className="mb-2 text-sm font-medium">Video format</p>
+              <div className="grid grid-cols-2 gap-3 sm:max-w-sm">
+                <button
+                  type="button"
+                  onClick={() => store.setFormat("9:16")}
+                  className={cn(
+                    "flex flex-col items-center gap-3 rounded-xl border-2 px-4 py-5 transition-all",
+                    store.format === "9:16"
+                      ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                      : "border-border hover:border-muted-foreground/40 hover:bg-muted/30",
+                  )}
+                >
+                  <div className={cn("h-12 w-7 rounded-md border-2 opacity-70", store.format === "9:16" ? "border-primary" : "border-muted-foreground")} />
+                  <div className="text-center">
+                    <p className="text-sm font-semibold">Portrait</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">9:16 · TikTok · Reels</p>
+                  </div>
+                  {store.format === "9:16" && (
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                      <Check className="size-3.5" /> Selected
+                    </div>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => store.setFormat("16:9")}
+                  className={cn(
+                    "flex flex-col items-center gap-3 rounded-xl border-2 px-4 py-5 transition-all",
+                    store.format === "16:9"
+                      ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                      : "border-border hover:border-muted-foreground/40 hover:bg-muted/30",
+                  )}
+                >
+                  <div className={cn("h-7 w-12 rounded-md border-2 opacity-70", store.format === "16:9" ? "border-primary" : "border-muted-foreground")} />
+                  <div className="text-center">
+                    <p className="text-sm font-semibold">Landscape</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">16:9 · YouTube · Ads</p>
+                  </div>
+                  {store.format === "16:9" && (
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                      <Check className="size-3.5" /> Selected
+                    </div>
+                  )}
+                </button>
+              </div>
+            </div>
+
             {personasLoading ? (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {[1, 2].map((i) => (
@@ -1027,13 +1098,46 @@ export default function GeneratePage() {
         {store.step === 3 && (
           <div className="flex flex-col gap-6">
             {compositeImages.length === 0 ? (
-              /* ── Before generation: skeleton while pending, format picker otherwise ── */
+              /* ── Before generation: compact toggle + skeleton while pending, fallback otherwise ── */
               <div className="flex flex-col gap-6">
                 <div>
-                  <h2 className="text-lg font-semibold">Choose a Video Format</h2>
+                  <h2 className="text-lg font-semibold">Preview your scene</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Pick the format for your ad. This sets the aspect ratio of your scene images and video.
+                    Your scene images are being prepared. Change format below if needed.
                   </p>
+                </div>
+
+                {/* Compact format toggle — always visible so user can change if needed */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-sm font-medium text-muted-foreground">Format:</span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleFormatChange("9:16")}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-all",
+                        store.format === "9:16"
+                          ? "border-primary bg-primary/5 font-medium text-primary"
+                          : "border-border text-muted-foreground hover:border-muted-foreground/40",
+                      )}
+                    >
+                      <Smartphone className="size-3.5" />
+                      Portrait
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleFormatChange("16:9")}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-all",
+                        store.format === "16:9"
+                          ? "border-primary bg-primary/5 font-medium text-primary"
+                          : "border-border text-muted-foreground hover:border-muted-foreground/40",
+                      )}
+                    >
+                      <Monitor className="size-3.5" />
+                      Landscape
+                    </button>
+                  </div>
                 </div>
 
                 {generateComposites.isPending ? (
@@ -1044,7 +1148,7 @@ export default function GeneratePage() {
                           key={i}
                           className={cn(
                             "animate-pulse rounded-xl bg-muted",
-                            store.format === "9:16" ? "aspect-[9/16]" : "aspect-video",
+                            (store.format ?? "9:16") === "9:16" ? "aspect-[9/16]" : "aspect-video",
                           )}
                         />
                       ))}
@@ -1054,51 +1158,14 @@ export default function GeneratePage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-4 sm:max-w-lg">
-                    <button
-                      type="button"
-                      onClick={() => handleFormatChange("9:16")}
-                      className={cn(
-                        "flex flex-col items-center gap-4 rounded-xl border-2 px-6 py-8 transition-all",
-                        store.format === "9:16"
-                          ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                          : "border-border hover:border-muted-foreground/40 hover:bg-muted/30",
-                      )}
-                    >
-                      <div className={cn("w-8 h-14 rounded-md border-2 opacity-70", store.format === "9:16" ? "border-primary" : "border-muted-foreground")} />
-                      <div className="text-center">
-                        <p className="text-base font-semibold">Portrait</p>
-                        <p className="mt-1 text-sm text-muted-foreground">9:16 · TikTok / Reels / Stories</p>
-                      </div>
-                      {store.format === "9:16" && (
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
-                          <Check className="size-3.5" /> Selected
-                        </div>
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleFormatChange("16:9")}
-                      className={cn(
-                        "flex flex-col items-center gap-4 rounded-xl border-2 px-6 py-8 transition-all",
-                        store.format === "16:9"
-                          ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                          : "border-border hover:border-muted-foreground/40 hover:bg-muted/30",
-                      )}
-                    >
-                      <div className={cn("w-14 h-8 rounded-md border-2 opacity-70", store.format === "16:9" ? "border-primary" : "border-muted-foreground")} />
-                      <div className="text-center">
-                        <p className="text-base font-semibold">Landscape</p>
-                        <p className="mt-1 text-sm text-muted-foreground">16:9 · YouTube / Facebook Ads</p>
-                      </div>
-                      {store.format === "16:9" && (
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
-                          <Check className="size-3.5" /> Selected
-                        </div>
-                      )}
-                    </button>
-                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleGenerateComposites()}
+                    disabled={!store.productId || !store.personaId || !store.format}
+                  >
+                    <ImageIcon className="mr-2 size-4" />
+                    Generate Preview
+                  </Button>
                 )}
               </div>
             ) : (
@@ -1139,7 +1206,7 @@ export default function GeneratePage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleGenerateComposites}
+                    onClick={() => handleGenerateComposites()}
                     disabled={generateComposites.isPending}
                     className="ml-auto"
                   >
@@ -2006,7 +2073,7 @@ export default function GeneratePage() {
                   segments={store.advancedSegments}
                   productId={store.productId!}
                   personaId={store.personaId!}
-                  format={store.format}
+                  format={store.format ?? "9:16"}
                   mainCompositeSignedUrl={
                     selectedCompositeIdx !== null
                       ? compositeImages[selectedCompositeIdx]?.signed_url ?? null

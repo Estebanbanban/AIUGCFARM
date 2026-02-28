@@ -15,7 +15,7 @@ interface GenerationWizardState {
   personaId: string | null;
   mode: "single" | "triple";
   quality: "standard" | "hd";
-  format: "9:16" | "16:9";
+  format: "9:16" | "16:9" | null;
   ctaStyle:
     | "auto"
     | "product_name_drop"
@@ -39,7 +39,7 @@ interface GenerationWizardState {
   setPersonaId: (id: string) => void;
   setMode: (mode: "single" | "triple") => void;
   setQuality: (quality: "standard" | "hd") => void;
-  setFormat: (format: "9:16" | "16:9") => void;
+  setFormat: (format: "9:16" | "16:9" | null) => void;
   setCtaStyle: (
     style:
       | "auto"
@@ -84,7 +84,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
       personaId: null,
       mode: "single",
       quality: "standard",
-      format: "9:16",
+      format: null,
       ctaStyle: "auto",
       ctaCommentKeyword: "",
       compositeImagePath: null,
@@ -187,7 +187,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
           personaId: null,
           mode: "single" as const,
           quality: "standard" as const,
-          format: "9:16" as const,
+          format: null,
           ctaStyle: "auto" as const,
           ctaCommentKeyword: "",
           compositeImagePath: null,
