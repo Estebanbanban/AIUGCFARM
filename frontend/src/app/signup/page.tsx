@@ -77,10 +77,13 @@ export default function SignupPage() {
   async function handleGoogleSignup() {
     trackSignup("google");
     const supabase = createClient();
+    const forceSelect = localStorage.getItem("force_account_select") === "1";
+    if (forceSelect) localStorage.removeItem("force_account_select");
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
+        ...(forceSelect ? { queryParams: { prompt: "select_account" } } : {}),
       },
     });
   }

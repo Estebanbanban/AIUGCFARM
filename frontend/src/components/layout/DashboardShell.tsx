@@ -67,7 +67,8 @@ function SidebarContent({
 
   async function handleSignOut() {
     const supabase = createClient();
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "global" });
+    localStorage.setItem("force_account_select", "1");
     router.push("/login");
     router.refresh();
   }
