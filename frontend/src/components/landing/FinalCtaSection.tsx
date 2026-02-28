@@ -16,7 +16,7 @@ export function FinalCtaSection() {
             Stop paying $500 per UGC video.<br />
             Start generating unlimited variations.
           </p>
-          <UrlInputCta />
+          <UrlInputCta location="final_cta" />
           <p className="text-xs text-muted-foreground mt-6">
             Join 500+ e-commerce brands using CineRads
           </p>

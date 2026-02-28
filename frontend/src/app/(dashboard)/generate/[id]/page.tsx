@@ -39,7 +39,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { useGenerationStatus, useRegenerateSegment } from "@/hooks/use-generations";
 import type { GenerationStatus, ScriptSegment, SegmentVideo } from "@/types/database";
-import { trackVideoCompleted } from "@/lib/datafast";
+import { trackVideoCompleted, trackVideoFailed, trackVideoDownloaded } from "@/lib/datafast";
 import { useVideoStitcher, STITCH_STATUS_LABELS } from "@/hooks/use-video-stitcher";
 
 /* -------------------------------------------------------------------------- */
@@ -442,6 +442,7 @@ function CombinationPreview({
 
   function handleDownloadStitched() {
     if (!stitchedUrl) return;
+    trackVideoDownloaded("stitched");
     const a = document.createElement("a");
     a.href = stitchedUrl;
     a.download = `${generationId}_stitched.mp4`;
@@ -697,14 +698,26 @@ export default function GenerationDetailPage() {
   useEffect(() => {
     if (isComplete && segments) {
       setScriptExpanded(false);
-      trackVideoCompleted(gen?.mode ?? "unknown");
+      const firstVideoKey = "cinerads-first-video-done";
+      const isFirst = !localStorage.getItem(firstVideoKey);
+      if (isFirst) localStorage.setItem(firstVideoKey, "1");
+      trackVideoCompleted(gen?.mode ?? "unknown", isFirst);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isComplete, segments]);
 
+  // Track failed generations
+  useEffect(() => {
+    if (isFailed) {
+      trackVideoFailed(gen?.mode ?? "unknown");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFailed]);
+
   /* ----- Download all segments ----- */
   function handleDownloadAll() {
     if (!segments) return;
+    trackVideoDownloaded("all_segments");
     const allVideos = [
       ...(segments.hooks ?? []).map((v, i) => ({ ...v, label: `hook_${i + 1}` })),
       ...(segments.bodies ?? []).map((v, i) => ({ ...v, label: `body_${i + 1}` })),
