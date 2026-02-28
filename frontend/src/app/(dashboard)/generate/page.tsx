@@ -458,12 +458,6 @@ export default function GeneratePage() {
   // ── Script generation (phase 1) ─────────────────────────────────────────
 
   async function handleGenerateScript() {
-    if (!hasEnoughCredits) {
-      trackPaywallShown("insufficient_credits");
-      offer.startOffer();
-      setShowPaywall(true);
-      return;
-    }
     if (requiresCommentKeyword && !commentKeyword) {
       toast.error("Add a comment keyword for the CTA style.");
       return;
@@ -1467,13 +1461,6 @@ export default function GeneratePage() {
                   {requiresCommentKeyword && !commentKeyword && (
                     <div className="rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
                       Add a comment keyword so we can write the CTA correctly.
-                    </div>
-                  )}
-
-                  {!hasEnoughCredits && !creditsLoading && (
-                    <div className="rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
-                      You need {creditCost} credits but have{" "}
-                      {creditsRemaining}. Subscribe or upgrade to continue.
                     </div>
                   )}
 

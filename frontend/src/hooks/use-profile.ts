@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/types/database";
 
 export const PERSONA_SLOT_LIMITS: Record<Profile["plan"], number> = {
-  free: 0,
+  free: 1,
   starter: 1,
   growth: 3,
   scale: 10,
