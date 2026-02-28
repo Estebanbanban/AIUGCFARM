@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Logo } from "@/components/ui/Logo";
 
 export const metadata: Metadata = {
-  title: "About — CineRads",
+  title: "About | CineRads",
   description:
     "CineRads is on a mission to make professional UGC video ads accessible to every e-commerce brand, without creators, studios, or waiting.",
 };
@@ -56,7 +56,7 @@ export default function AboutPage() {
             </h2>
             <p className="text-muted-foreground leading-relaxed">
               Paste your product URL, build your AI persona, and generate 27 unique
-              TikTok and Meta ad variations in under 10 minutes — at a fraction of
+              TikTok and Meta ad variations in under 10 minutes: at a fraction of
               the cost.
             </p>
           </div>
@@ -151,7 +151,7 @@ export default function AboutPage() {
             Ready to 10x your ad creative output?
           </h2>
           <p className="mt-3 text-muted-foreground">
-            Start free — no credit card required.
+            Start free: no credit card required.
           </p>
           <a
             href="/signup"

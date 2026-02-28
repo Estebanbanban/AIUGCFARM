@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Mail, MessageSquare, Twitter } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Contact — CineRads",
+  title: "Contact | CineRads",
   description: "Get in touch with the CineRads team. We're happy to help.",
 };
 
@@ -66,7 +66,7 @@ export default function ContactPage() {
         {/* FAQ note */}
         <div className="rounded-2xl border border-border bg-card/50 p-6">
           <p className="text-sm text-muted-foreground leading-relaxed">
-            <span className="font-semibold text-foreground">Before reaching out</span> — check our{" "}
+            <span className="font-semibold text-foreground">Before reaching out</span>: check our{" "}
             <a href="/#faq" className="text-primary hover:underline">
               FAQ section
             </a>{" "}

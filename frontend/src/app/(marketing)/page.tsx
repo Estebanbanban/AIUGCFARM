@@ -61,7 +61,7 @@ const jsonLd = {
           name: "What is a segment credit?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "One segment credit generates one video clip — either a Hook (3–5s), Body (5–10s), or CTA (3–5s). With 9 segments (3 of each type), you can mix and match 27 unique full-length video ads. Combining segments is always free.",
+            text: "One segment credit generates one video clip: either a Hook (3–5s), Body (5–10s), or CTA (3–5s). With 9 segments (3 of each type), you can mix and match 27 unique full-length video ads. Combining segments is always free.",
           },
         },
         {
@@ -85,7 +85,7 @@ const jsonLd = {
           name: "Can I write my own scripts?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Yes. All plans include AI-Written Scripts. Growth and Scale plans also include the Custom Script Editor — write or edit your own Hook, Body, and CTA copy before generation.",
+            text: "Yes. All plans include AI-Written Scripts. Growth and Scale plans also include the Custom Script Editor: write or edit your own Hook, Body, and CTA copy before generation.",
           },
         },
         {
@@ -101,7 +101,7 @@ const jsonLd = {
           name: "Is there a free trial?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Yes. Every new account gets 3 free segment credits — no credit card required. Generate your first video ad and see the quality before you commit.",
+            text: "Yes. Every new account gets 3 free segment credits: no credit card required. Generate your first video ad and see the quality before you commit.",
           },
         },
         {
@@ -125,7 +125,7 @@ const jsonLd = {
           name: "Do you offer a refund?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Yes — if your first generation isn't what you expected, we offer a 7-day money-back guarantee. No questions asked.",
+            text: "Yes: if your first generation isn't what you expected, we offer a 7-day money-back guarantee. No questions asked.",
           },
         },
       ],

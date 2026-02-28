@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — CineRads",
+  title: "Terms of Service | CineRads",
   description: "CineRads Terms of Service. Last updated February 28, 2026.",
 };
 

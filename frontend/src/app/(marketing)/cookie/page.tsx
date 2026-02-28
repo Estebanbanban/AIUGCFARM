@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Cookie Policy — CineRads",
+  title: "Cookie Policy | CineRads",
   description: "CineRads Cookie Policy. How we use cookies and similar technologies.",
 };
 
@@ -74,15 +74,15 @@ export default function CookiePage() {
             <p>Examples:</p>
             <ul>
               <li>
-                <strong>sb-access-token</strong> — Supabase authentication token that
+                <strong>sb-access-token</strong>: Supabase authentication token that
                 keeps you logged in
               </li>
               <li>
-                <strong>sb-refresh-token</strong> — Used to refresh your session
+                <strong>sb-refresh-token</strong>: Used to refresh your session
                 without requiring re-login
               </li>
               <li>
-                <strong>cinerads-theme</strong> — Stores your dark/light mode
+                <strong>cinerads-theme</strong>: Stores your dark/light mode
                 preference
               </li>
             </ul>
@@ -97,7 +97,7 @@ export default function CookiePage() {
             <p>PostHog may set the following cookies/localStorage keys:</p>
             <ul>
               <li>
-                <strong>ph_*</strong> — PostHog session and distinct user ID (anonymous)
+                <strong>ph_*</strong>: PostHog session and distinct user ID (anonymous)
               </li>
             </ul>
             <p>
@@ -122,11 +122,11 @@ export default function CookiePage() {
             </p>
             <ul>
               <li>
-                <strong>Accept all</strong> — enables analytics cookies in addition to
+                <strong>Accept all</strong>: enables analytics cookies in addition to
                 strictly necessary ones
               </li>
               <li>
-                <strong>Decline</strong> — only strictly necessary cookies will be
+                <strong>Decline</strong>: only strictly necessary cookies will be
                 active
               </li>
             </ul>
@@ -148,7 +148,7 @@ export default function CookiePage() {
             </p>
             <ul>
               <li>
-                <strong>Stripe</strong> — used during checkout to prevent fraud.
+                <strong>Stripe</strong>: used during checkout to prevent fraud.
                 Governed by{" "}
                 <a
                   href="https://stripe.com/privacy"

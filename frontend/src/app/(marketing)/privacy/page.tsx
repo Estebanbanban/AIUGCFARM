@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — CineRads",
+  title: "Privacy Policy | CineRads",
   description: "CineRads Privacy Policy. Last updated February 28, 2026.",
 };
 
@@ -73,7 +73,7 @@ export default function PrivacyPage() {
               <li>To analyze usage and improve product features</li>
               <li>To comply with legal obligations</li>
               <li>
-                To send product updates and offers — you can opt out at any time
+                To send product updates and offers: you can opt out at any time
               </li>
             </ul>
           </Section>
@@ -82,23 +82,23 @@ export default function PrivacyPage() {
             <p>We use the following third-party services to operate CineRads:</p>
             <ul>
               <li>
-                <strong>Supabase</strong> — authentication, database, and file storage
+                <strong>Supabase</strong>: authentication, database, and file storage
                 (EU/US data centers)
               </li>
               <li>
-                <strong>Stripe</strong> — payment processing and subscription
+                <strong>Stripe</strong>: payment processing and subscription
                 management
               </li>
               <li>
-                <strong>PostHog</strong> — product analytics (only with your consent via
+                <strong>PostHog</strong>: product analytics (only with your consent via
                 cookie banner)
               </li>
               <li>
-                <strong>OpenRouter / Kling AI</strong> — AI script and video generation
+                <strong>OpenRouter / Kling AI</strong>: AI script and video generation
                 (your content is processed but not used to train models)
               </li>
               <li>
-                <strong>Vercel</strong> — hosting and edge infrastructure
+                <strong>Vercel</strong>: hosting and edge infrastructure
               </li>
             </ul>
             <p>
@@ -142,7 +142,7 @@ export default function PrivacyPage() {
               <li>Request correction of inaccurate data</li>
               <li>Request deletion of your data (&quot;right to be forgotten&quot;)</li>
               <li>Object to or restrict processing of your data</li>
-              <li>Data portability — receive your data in a structured format</li>
+              <li>Data portability: receive your data in a structured format</li>
               <li>Withdraw consent at any time (where processing is consent-based)</li>
             </ul>
             <p>
@@ -161,7 +161,7 @@ export default function PrivacyPage() {
             <ul>
               <li>Encrypted data in transit (HTTPS/TLS)</li>
               <li>Row-level security on our database (Supabase RLS)</li>
-              <li>Access controls — only authenticated users can access their data</li>
+              <li>Access controls: only authenticated users can access their data</li>
               <li>Regular security reviews</li>
             </ul>
             <p>
