@@ -6,8 +6,6 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
-  ArrowRight,
   Check,
   ImageIcon,
   Loader2,
@@ -27,8 +25,9 @@ import {
   Clock,
   Flame,
   AlertCircle,
-  ChevronRight,
   ChevronDown,
+  ChevronRight,
+  Settings2,
 } from "lucide-react";
 import { useFirstPurchaseOffer, COUPON_30_OFF } from "@/hooks/use-first-purchase-offer";
 import { toast } from "sonner";
@@ -88,18 +87,9 @@ import {
   trackCreditsPurchased,
 } from "@/lib/datafast";
 import { AdvancedModePanel } from "@/components/generate/AdvancedModePanel";
-import { Switch } from "@/components/ui/switch";
 import { callEdge } from "@/lib/api";
 import type { GenerateSegmentScriptResponse } from "@/types/api";
 import type { AdvancedSegmentConfig, AdvancedSegmentsConfig } from "@/types/database";
-
-const steps = [
-  { number: 1, label: "Product" },
-  { number: 2, label: "Persona" },
-  { number: 3, label: "Preview" },
-  { number: 4, label: "Configure" },
-  { number: 5, label: "Review Script" },
-];
 
 const CTA_STYLE_OPTIONS = [
   {
@@ -157,7 +147,7 @@ const VARIANT_LABEL_MAP: Record<string, string> = {
   value_prop: "Value Prop",
   urgency: "Urgency",
   fomo: "FOMO",
-  problem_solution: "Problem \u2192 Solution",
+  problem_solution: "Problem → Solution",
   storytelling: "Story",
   social_proof: "Social Proof",
   question: "Question Hook",
@@ -210,7 +200,6 @@ function useResolvedPersonaImages(personas: Persona[] | undefined) {
     async function resolve() {
       const entries = await Promise.all(
         personas!.map(async (p) => {
-          // Try selected_image_url first, fall back to first generated image
           const raw = p.selected_image_url ?? p.generated_images?.[0] ?? null;
           const url = await resolvePersonaImageUrl(raw);
           return [p.id, url] as [string, string | null];
@@ -240,13 +229,12 @@ export default function GeneratePage() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallTab, setPaywallTab] = useState<"single" | "subscription">("single");
   const [paywallQuality, setPaywallQuality] = useState<"standard" | "hd">("standard");
-  // Sync paywall quality to whatever the user picked in Step 1 when dialog opens
+  // Sync paywall quality to whatever the user picked when dialog opens
   useEffect(() => {
     if (showPaywall) setPaywallQuality(store.quality);
   }, [showPaywall, store.quality]);
 
   // Validate persisted pendingGenerationId against DB on mount.
-  // If the generation no longer exists or moved past awaiting_approval, clear stale script.
   useEffect(() => {
     if (!store.pendingGenerationId) return;
     const supabase = createClient();
@@ -258,25 +246,25 @@ export default function GeneratePage() {
       .then(({ data }) => {
         if (!data || data.status !== "awaiting_approval") {
           store.clearPendingScript();
-          if (store.step === 5) store.setStep(4);
+          // Reset to section 3 (step 4) if we were on old step 5
+          if (store.step >= 5) store.setStep(4);
         }
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Step 1, product add state
+  // Product import state
   const [addingProduct, setAddingProduct] = useState(false);
   const [importUrl, setImportUrl] = useState("");
   const [scrapeError, setScrapeError] = useState<string | null>(null);
   const [scrapedProducts, setScrapedProducts] = useState<Product[]>([]);
-  const [scrapedBrandSummary, setScrapedBrandSummary] =
-    useState<BrandSummary | null>(null);
+  const [scrapedBrandSummary, setScrapedBrandSummary] = useState<BrandSummary | null>(null);
   const [showScrapeResults, setShowScrapeResults] = useState(false);
 
-  // Step 2, persona builder state (tab removed — persona creation is now a separate page)
+  // Persona limit paywall
   const [showPersonaLimitPaywall, setShowPersonaLimitPaywall] = useState(false);
 
-  // Step 3, composite preview state
+  // Composite preview state
   const [compositeImages, setCompositeImages] = useState<
     Array<{ path: string; signed_url: string }>
   >([]);
@@ -284,43 +272,16 @@ export default function GeneratePage() {
   const [showPreviewEditor, setShowPreviewEditor] = useState(false);
   const [previewEditPrompt, setPreviewEditPrompt] = useState("");
 
-  // Step 4, advanced mode state
+  // Advanced mode state
   const [isInitializingAdvanced, setIsInitializingAdvanced] = useState(false);
+
+  // Tracks config changed after auto-fired script
+  const [scriptConfigChanged, setScriptConfigChanged] = useState(false);
 
   // Tracks which format was used to fire background composite generation
   const generationFiredForFormat = useRef<string | null>(null);
-  // Cancellation token for auto-fired script generation — incremented on each
-  // composite select so stale onSuccess callbacks from previous selections are discarded
+  // Cancellation token for auto-fired script generation
   const scriptAutoFireToken = useRef(0);
-
-  // Step 4, rendering timeline collapsible
-  const [showTimeline, setShowTimeline] = useState(false);
-  // Tracks whether config changed after auto-fired script (enables "Regenerate with new settings")
-  const [scriptConfigChanged, setScriptConfigChanged] = useState(false);
-
-  // Auto-fire composites when arriving at step 3 via localStorage restore
-  // (handleNext sets the ref before advancing, so this only fires for cold restores)
-  useEffect(() => {
-    if (
-      store.step === 3 &&
-      compositeImages.length === 0 &&
-      !generateComposites.isPending &&
-      !generationFiredForFormat.current &&
-      store.productId &&
-      store.personaId &&
-      store.format
-    ) {
-      handleGenerateComposites();
-      generationFiredForFormat.current = store.format;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.step]);
-
-  // Step 5, collapsible alt variants
-  const [showAltHooks, setShowAltHooks] = useState(false);
-  const [showAltBodies, setShowAltBodies] = useState(false);
-  const [showAltCtas, setShowAltCtas] = useState(false);
-  const [showInlinePaywall, setShowInlinePaywall] = useState(false);
 
   const { data: products, isLoading: productsLoading } = useProducts();
   const productImageMap = useResolvedProductImages(products);
@@ -331,8 +292,39 @@ export default function GeneratePage() {
   const { data: profile, isLoading: profileLoading } = useProfile();
   const generateComposites = useGenerateCompositeImages();
   const editComposite = useEditCompositeImage();
+  const generateScript = useGenerateScript();
+  const approveAndGenerate = useApproveAndGenerate();
+  const watchedGenerationsStore = useWatchedGenerationsStore();
+  const checkout = useCheckout();
+  const buyCredits = useBuyCredits();
+  const offer = useFirstPurchaseOffer();
 
-  // Step 3 cycling progress messages while composites generate
+  // Auto-fire composites when arriving at Section 3 (step >= 4) via cold restore
+  useEffect(() => {
+    if (
+      store.step >= 4 &&
+      compositeImages.length === 0 &&
+      !generateComposites.isPending &&
+      !generationFiredForFormat.current &&
+      store.productId &&
+      store.personaId &&
+      store.format
+    ) {
+      handleGenerateComposites();
+      generationFiredForFormat.current = store.format;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.step]);
+
+  // Auto-select first composite when composites arrive
+  useEffect(() => {
+    if (compositeImages.length > 0 && selectedCompositeIdx === null) {
+      handleSelectComposite(0);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compositeImages.length]);
+
+  // Cycling progress messages while composites generate
   const COMPOSITE_MESSAGES = [
     "Placing your persona in the scene...",
     "Compositing product and persona...",
@@ -347,19 +339,11 @@ export default function GeneratePage() {
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generateComposites.isPending]);
-  const generateScript = useGenerateScript();
-  const approveAndGenerate = useApproveAndGenerate();
-  const watchedGenerationsStore = useWatchedGenerationsStore();
-  const checkout = useCheckout();
-  const buyCredits = useBuyCredits();
-  const offer = useFirstPurchaseOffer();
 
   const confirmedProducts = products?.filter((p) => p.confirmed) ?? [];
   const activePersonas = personas ?? [];
 
-  const selectedProduct = confirmedProducts.find(
-    (p) => p.id === store.productId,
-  );
+  const selectedProduct = confirmedProducts.find((p) => p.id === store.productId);
   const selectedPersona = activePersonas.find((p) => p.id === store.personaId);
 
   const creditsRemaining = credits?.remaining ?? 0;
@@ -373,51 +357,34 @@ export default function GeneratePage() {
         ? CREDITS_PER_SINGLE
         : CREDITS_PER_BATCH;
 
-  // First-video 50% discount for new users
   const isFirstVideo = profile?.first_video_discount_used === false;
   const effectiveCost = isFirstVideo ? Math.floor(creditCost / 2) : creditCost;
 
   const hasEnoughCredits = creditsLoading || isUnlimitedCredits || creditsRemaining >= effectiveCost;
   const requiresCommentKeyword = store.ctaStyle === "comment_keyword";
-  const commentKeyword = store.ctaCommentKeyword
-    .trim()
-    .replace(/[^a-zA-Z0-9 _-]/g, "");
+  const commentKeyword = store.ctaCommentKeyword.trim().replace(/[^a-zA-Z0-9 _-]/g, "");
 
-  // Derived view states, no effects needed
   const showAddProductForm =
     addingProduct || (!productsLoading && confirmedProducts.length === 0);
 
-  function canProceed() {
-    if (store.step === 1) return !!store.productId && !!store.format;
-    if (store.step === 2) return !!store.personaId;
-    if (store.step === 3) return !!store.compositeImagePath;
-    // Step 4 proceeds via "Generate Script" button, not the generic Next button
-    return false;
-  }
+  // ── Section navigation ────────────────────────────────────────────────
 
-  function handleNext() {
-    if (store.step === 2) {
-      // Fire composites in background only if not already pending and not already
-      // generated for this format. generationFiredForFormat tracks the format used
-      // for the last fire; it is reset to null in handleBack so going back+forward
-      // always re-generates, but a double-tap or re-render cannot double-fire.
-      const alreadyFired =
-        generationFiredForFormat.current === store.format;
-      if (!generateComposites.isPending && (!compositeImages.length || !alreadyFired)) {
-        handleGenerateComposites();
-        generationFiredForFormat.current = store.format;
-      }
+  function handleOpenSection(section: 1 | 2) {
+    // Clear state for sections after the one being re-opened
+    setCompositeImages([]);
+    setSelectedCompositeIdx(null);
+    setShowPreviewEditor(false);
+    setPreviewEditPrompt("");
+    store.setCompositeImagePath(null);
+    store.clearPendingScript();
+    generationFiredForFormat.current = null;
+    setScriptConfigChanged(false);
+    if (section === 1) {
+      // Also clear format so user explicitly re-chooses
+      store.setStep(1);
+    } else {
+      store.setStep(2);
     }
-    if (store.step < 5) store.setStep(store.step + 1);
-  }
-
-  function handleBack() {
-    if (store.step === 3) {
-      setCompositeImages([]);
-      store.setCompositeImagePath(null);
-      generationFiredForFormat.current = null;
-    }
-    if (store.step > 1) store.setStep(store.step - 1);
   }
 
   // ── Product import handlers ──────────────────────────────────────────────
@@ -471,13 +438,9 @@ export default function GeneratePage() {
       setShowScrapeResults(true);
       setImportUrl("");
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to import product";
+      const message = err instanceof Error ? err.message : "Failed to import product";
       setScrapeError(message);
-      toast.error(
-        message,
-        { action: { label: "Retry", onClick: handleScrape } },
-      );
+      toast.error(message, { action: { label: "Retry", onClick: handleScrape } });
     }
   }
 
@@ -492,7 +455,6 @@ export default function GeneratePage() {
     queryClient.invalidateQueries({ queryKey: ["products"] });
     if (firstId) {
       store.setProductId(firstId);
-      // Stay on Step 1 — user must pick a format and product before proceeding
     }
     toast.success("Products imported! Select one to continue.");
   }
@@ -501,7 +463,6 @@ export default function GeneratePage() {
     trackProductImported("manual");
     queryClient.invalidateQueries({ queryKey: ["products"] });
     setAddingProduct(false);
-    // Don't auto-advance, user needs to click their product in the grid
   }
 
   function handleCancelAddProduct() {
@@ -514,19 +475,6 @@ export default function GeneratePage() {
   }
 
   // ── Composite preview handlers ───────────────────────────────────────────
-
-  function handleFormatChange(format: "9:16" | "16:9") {
-    store.setFormat(format);
-    // Clear composites and auto-regenerate with new format.
-    // Pass format explicitly to avoid stale store.format in the same call stack.
-    setCompositeImages([]);
-    setSelectedCompositeIdx(null);
-    setShowPreviewEditor(false);
-    store.setCompositeImagePath(null);
-    setPreviewEditPrompt("");
-    generationFiredForFormat.current = format;
-    handleGenerateComposites(format);
-  }
 
   async function handleGenerateComposites(formatOverride?: "9:16" | "16:9", personaIdOverride?: string) {
     const format = formatOverride ?? store.format;
@@ -557,11 +505,9 @@ export default function GeneratePage() {
     setShowPreviewEditor(false);
     const path = compositeImages[idx].path;
     store.setCompositeImagePath(path);
-    // Auto-fire script so it's ready (or nearly ready) when user reaches Step 4.
-    // Increment the token so any in-flight onSuccess for a previous composite is discarded.
+    // Auto-fire script generation in background
     const token = ++scriptAutoFireToken.current;
     if (store.productId && store.personaId) {
-      // Skip auto-fire if comment keyword CTA is selected but keyword is empty
       if (store.ctaStyle === "comment_keyword" && !store.ctaCommentKeyword.trim()) return;
       store.clearPendingScript();
       setScriptConfigChanged(false);
@@ -577,7 +523,6 @@ export default function GeneratePage() {
         },
         {
           onSuccess: (result) => {
-            // Discard if user already selected a different composite
             if (scriptAutoFireToken.current !== token) return;
             if (result.script) {
               trackScriptGenerated(store.mode, store.quality);
@@ -589,7 +534,7 @@ export default function GeneratePage() {
             }
           },
           onError: () => {
-            // Silent fail — user can manually generate script in Step 4
+            // Silent fail — user can manually generate script
           },
         },
       );
@@ -622,7 +567,7 @@ export default function GeneratePage() {
     );
   }
 
-  // ── Script generation (phase 1) ─────────────────────────────────────────
+  // ── Script generation ─────────────────────────────────────────────────
 
   async function handleGenerateScript() {
     if (requiresCommentKeyword && !commentKeyword) {
@@ -652,7 +597,7 @@ export default function GeneratePage() {
               result.script,
               result.credits_to_charge ?? effectiveCost,
             );
-            store.setStep(5);
+            // Script now shows inline — no step change needed
           } else {
             toast.error("Script was not returned. Please try again.");
           }
@@ -664,14 +609,13 @@ export default function GeneratePage() {
     );
   }
 
-  // ── Approve & generate video (phase 2) ────────────────────────────────
+  // ── Approve & generate video ──────────────────────────────────────────
 
   async function handleApproveAndGenerate() {
     if (!store.pendingGenerationId || !store.pendingScript) return;
     if (!hasEnoughCredits) {
       trackPaywallShown("insufficient_credits");
       offer.startOffer();
-      setShowInlinePaywall(true);
       setShowPaywall(true);
       return;
     }
@@ -682,7 +626,7 @@ export default function GeneratePage() {
         override_script: store.pendingScript,
       },
       {
-        onSuccess: (result) => {
+        onSuccess: () => {
           const genId = store.pendingGenerationId!;
           trackVideoGenerationStarted(store.mode, store.quality);
           watchedGenerationsStore.add(genId, selectedProduct?.name);
@@ -697,8 +641,14 @@ export default function GeneratePage() {
     );
   }
 
-  function handleAdvancedModeToggle(enabled: boolean) {
-    store.setAdvancedMode(enabled);
+  // ── Advanced mode ──────────────────────────────────────────────────────
+
+  async function handleSwitchToAdvanced() {
+    store.setAdvancedMode(true);
+    // Auto-initialize if no segments yet
+    if (!store.advancedSegments && !isInitializingAdvanced) {
+      await handleInitializeAdvancedSegments();
+    }
   }
 
   async function handleInitializeAdvancedSegments() {
@@ -708,7 +658,6 @@ export default function GeneratePage() {
     const variantCount = store.mode === "single" ? 1 : 3;
     const segTypes = ["hook", "body", "cta"] as const;
 
-    // Fire variantCount × 3 parallel calls
     const calls = Array.from({ length: variantCount }, (_, vi) =>
       segTypes.map((segType) =>
         callEdge<GenerateSegmentScriptResponse>("generate-segment-script", {
@@ -750,8 +699,7 @@ export default function GeneratePage() {
       if (r.segType === "cta") ctas[r.variantIndex] = { ...defaultSeg(), scriptText: r.text };
     }
 
-    const segments: AdvancedSegmentsConfig = { hooks, bodies, ctas };
-    store.setAdvancedSegments(segments);
+    store.setAdvancedSegments({ hooks, bodies, ctas });
     setIsInitializingAdvanced(false);
   }
 
@@ -779,1468 +727,1069 @@ export default function GeneratePage() {
     });
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Section 1 is "complete" once the user has moved past it
+  const section1Complete = store.step >= 2;
+  // Section 2 is "complete" once the user is in Section 3
+  const section2Complete = store.step >= 4;
+  // Section 3 is unlocked
+  const section3Unlocked = store.step >= 4;
+
   return (
-    <div className="flex flex-col gap-6">
-      {/* Header */}
+    <div className="flex flex-col gap-4">
+      {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Generate UGC Video
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight">Generate UGC Video</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Create AI-powered video ads in a few simple steps.
             {!creditsLoading && (
               <span className="ml-2 font-medium text-foreground">
-                {isUnlimitedCredits
-                  ? "Unlimited credits"
-                  : `${creditsRemaining} credits remaining`}
+                {isUnlimitedCredits ? "Unlimited credits" : `${creditsRemaining} credits remaining`}
               </span>
             )}
           </p>
         </div>
       </div>
 
-      {/* Step Indicator */}
-      <div className="flex items-center justify-center gap-2 sm:gap-3">
-        {steps.map((s, i) => (
-          <div key={s.number} className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => {
-                // Allow going back to earlier steps, but when leaving step 5, clear pending script
-                if (s.number < store.step) {
-                  if (store.step === 5 && s.number < 5) {
-                    store.clearPendingScript();
-                  }
-                  store.setStep(s.number);
-                }
-              }}
-              className="flex items-center gap-2"
-            >
-              <div
-                className={cn(
-                  "flex size-8 items-center justify-center rounded-full text-sm font-medium transition-colors",
-                  store.step === s.number
-                    ? "bg-primary text-primary-foreground"
-                    : store.step > s.number
-                      ? "bg-primary/20 text-primary"
-                      : "bg-card text-muted-foreground",
-                )}
-              >
-                {store.step > s.number ? (
-                  <Check className="size-4" />
-                ) : (
-                  s.number
-                )}
-              </div>
-              <span
-                className={cn(
-                  "hidden text-sm font-medium sm:block",
-                  store.step === s.number
-                    ? "text-foreground"
-                    : "text-muted-foreground",
-                )}
-              >
-                {s.label}
-              </span>
-            </button>
-            {i < steps.length - 1 && (
-              <div
-                className={cn(
-                  "h-px w-6 sm:w-10",
-                  store.step > s.number ? "bg-primary" : "bg-border",
-                )}
-              />
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Step Content */}
-      <div className="min-h-[400px]">
-        {/* ── Step 1: Product ───────────────────────────────────────────── */}
-        {store.step === 1 && (
-          <div className="flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Select a Product</h2>
-              {!showAddProductForm && confirmedProducts.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setAddingProduct(true)}
-                >
-                  <Plus className="size-4" />
-                  Add Product
-                </Button>
-              )}
-              {showAddProductForm && confirmedProducts.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCancelAddProduct}
-                >
-                  ← Back to products
-                </Button>
-              )}
+      {/* ── Section 1: Product & Format ───────────────────────────────── */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        {/* Section header — always visible */}
+        <div
+          className={cn(
+            "flex items-center justify-between px-5 py-4",
+            section1Complete && "border-b-0",
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              "flex size-6 items-center justify-center rounded-full text-xs font-bold",
+              section1Complete
+                ? "bg-primary/15 text-primary"
+                : "bg-primary text-primary-foreground",
+            )}>
+              {section1Complete ? <Check className="size-3.5" /> : "1"}
             </div>
-
-            {productsLoading ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {[1, 2, 3].map((i) => (
-                  <Card key={i} className="h-48 animate-pulse bg-muted" />
-                ))}
-              </div>
-            ) : showAddProductForm ? (
-              /* Inline add-product form */
-              showScrapeResults && scrapedProducts.length > 0 ? (
-                <ScrapeResults
-                  products={scrapedProducts}
-                  brandSummary={scrapedBrandSummary}
-                  onConfirmed={handleScrapeConfirmed}
-                />
+            <span className="text-sm font-semibold">
+              {section1Complete && selectedProduct ? (
+                <span className="flex items-center gap-2 flex-wrap">
+                  <span className="text-foreground">{selectedProduct.name}</span>
+                  <Badge variant="secondary" className="text-xs font-medium">
+                    {store.format === "9:16" ? "Portrait 9:16" : "Landscape 16:9"}
+                  </Badge>
+                </span>
               ) : (
-                <Tabs defaultValue="import-url" className="w-full">
-                  <TabsList className="w-full">
-                    <TabsTrigger value="import-url" className="flex-1">
-                      <LinkIcon className="size-3.5" />
-                      Import from URL
-                    </TabsTrigger>
-                    <TabsTrigger value="upload" className="flex-1">
-                      <Upload className="size-3.5" />
-                      Upload Manually
-                    </TabsTrigger>
-                  </TabsList>
+                "Product & Format"
+              )}
+            </span>
+          </div>
+          {section1Complete && (
+            <button
+              type="button"
+              onClick={() => handleOpenSection(1)}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+            >
+              Change
+            </button>
+          )}
+        </div>
 
-                  <TabsContent value="import-url">
-                    <div className="flex flex-col gap-4 pt-2">
-                      <div className="flex flex-col gap-2">
-                        <Label htmlFor="product-url">Product URL</Label>
-                        <div className="relative">
-                          <LinkIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                          <Input
-                            id="product-url"
-                            placeholder="https://store.com/products/..."
-                            value={importUrl}
-                            onChange={(e) => setImportUrl(e.target.value)}
-                            className="pl-10"
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                handleScrape();
-                              }
-                            }}
-                          />
+        {/* Section 1 body — only shown when not complete */}
+        {!section1Complete && (
+          <div className="px-5 pb-5 flex flex-col gap-5">
+            {/* Product selector */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground">Select a product</p>
+                {!showAddProductForm && confirmedProducts.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={() => setAddingProduct(true)}>
+                    <Plus className="size-4" />
+                    Add Product
+                  </Button>
+                )}
+                {showAddProductForm && confirmedProducts.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={handleCancelAddProduct}>
+                    ← Back to products
+                  </Button>
+                )}
+              </div>
+
+              {productsLoading ? (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {[1, 2, 3].map((i) => (
+                    <Card key={i} className="h-40 animate-pulse bg-muted" />
+                  ))}
+                </div>
+              ) : showAddProductForm ? (
+                showScrapeResults && scrapedProducts.length > 0 ? (
+                  <ScrapeResults
+                    products={scrapedProducts}
+                    brandSummary={scrapedBrandSummary}
+                    onConfirmed={handleScrapeConfirmed}
+                  />
+                ) : (
+                  <Tabs defaultValue="import-url" className="w-full">
+                    <TabsList className="w-full">
+                      <TabsTrigger value="import-url" className="flex-1">
+                        <LinkIcon className="size-3.5" />
+                        Import from URL
+                      </TabsTrigger>
+                      <TabsTrigger value="upload" className="flex-1">
+                        <Upload className="size-3.5" />
+                        Upload Manually
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="import-url">
+                      <div className="flex flex-col gap-4 pt-2">
+                        <div className="flex flex-col gap-2">
+                          <Label htmlFor="product-url">Product URL</Label>
+                          <div className="relative">
+                            <LinkIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              id="product-url"
+                              placeholder="https://store.com/products/..."
+                              value={importUrl}
+                              onChange={(e) => setImportUrl(e.target.value)}
+                              className="pl-10"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") { e.preventDefault(); handleScrape(); }
+                              }}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Supports Shopify stores and most e-commerce product pages.
+                          </p>
+                          {scrapeError && (
+                            <p className="text-xs text-destructive">{scrapeError}</p>
+                          )}
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          Supports Shopify stores and most e-commerce product
-                          pages.
-                        </p>
-                        {scrapeError && (
-                          <p className="text-xs text-destructive">{scrapeError}</p>
-                        )}
+                        <Button onClick={handleScrape} disabled={!importUrl.trim() || scrapeProduct.isPending}>
+                          {scrapeProduct.isPending ? (
+                            <><Loader2 className="size-4 animate-spin" />Importing...</>
+                          ) : "Import"}
+                        </Button>
                       </div>
-                      <Button
-                        onClick={handleScrape}
-                        disabled={
-                          !importUrl.trim() || scrapeProduct.isPending
-                        }
+                    </TabsContent>
+                    <TabsContent value="upload">
+                      <div className="pt-2">
+                        <ManualUploadForm onSuccess={handleManualUploadSuccess} />
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                )
+              ) : confirmedProducts.length > 0 ? (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {confirmedProducts.map((product) => (
+                    <div key={product.id} className="relative">
+                      <button
+                        onClick={() => store.setProductId(product.id)}
+                        className="w-full text-left"
                       >
-                        {scrapeProduct.isPending ? (
-                          <>
-                            <Loader2 className="size-4 animate-spin" />
-                            Importing...
-                          </>
-                        ) : (
-                          "Import"
-                        )}
+                        <Card
+                          className={cn(
+                            "h-full transition-all",
+                            store.productId === product.id
+                              ? "border-primary ring-1 ring-primary/30"
+                              : "hover:border-muted-foreground/30",
+                          )}
+                        >
+                          <CardContent className="flex flex-col gap-3 p-5">
+                            <div className="flex aspect-video items-center justify-center rounded-lg bg-muted">
+                              {productImageMap[product.id] ? (
+                                <img
+                                  src={productImageMap[product.id]!}
+                                  alt={product.name}
+                                  className="size-full rounded-lg object-cover"
+                                />
+                              ) : (
+                                <ImageIcon className="size-8 text-muted-foreground" />
+                              )}
+                            </div>
+                            <div>
+                              <h3 className="font-medium">{product.name}</h3>
+                              {product.price && (
+                                <p className="mt-1 font-mono text-sm font-semibold">
+                                  {product.currency === "USD" ? "$" : product.currency}
+                                  {product.price}
+                                </p>
+                              )}
+                            </div>
+                            {store.productId === product.id && (
+                              <div className="flex items-center gap-1.5 text-xs text-primary">
+                                <Check className="size-3.5" />
+                                Selected
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </button>
+                      <Button
+                        asChild
+                        size="icon"
+                        variant="secondary"
+                        className="absolute right-3 top-3 size-8 rounded-full"
+                      >
+                        <Link
+                          href={`/products/${product.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Edit ${product.name}`}
+                          title="Edit product details and images"
+                        >
+                          <Pencil className="size-3.5" />
+                        </Link>
                       </Button>
                     </div>
-                  </TabsContent>
+                  ))}
+                </div>
+              ) : null}
+            </div>
 
-                  <TabsContent value="upload">
-                    <div className="pt-2">
-                      <ManualUploadForm
-                        onSuccess={handleManualUploadSuccess}
-                      />
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              )
-            ) : confirmedProducts.length > 0 ? (
-              /* Product grid */
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {confirmedProducts.map((product) => (
-                  <div key={product.id} className="relative">
-                    <button
-                      onClick={() => store.setProductId(product.id)}
-                      className="w-full text-left"
-                    >
-                      <Card
-                        className={cn(
-                          "h-full transition-all",
-                          store.productId === product.id
-                            ? "border-primary ring-1 ring-primary/30"
-                            : "hover:border-muted-foreground/30",
-                        )}
-                      >
-                        <CardContent className="flex flex-col gap-3 p-5">
-                          <div className="flex aspect-video items-center justify-center rounded-lg bg-muted">
-                            {productImageMap[product.id] ? (
-                              <img
-                                src={productImageMap[product.id]!}
-                                alt={product.name}
-                                className="size-full rounded-lg object-cover"
-                              />
-                            ) : (
-                              <ImageIcon className="size-8 text-muted-foreground" />
-                            )}
-                          </div>
-                          <div>
-                            <h3 className="font-medium">{product.name}</h3>
-                            {product.price && (
-                              <p className="mt-1 font-mono text-sm font-semibold">
-                                {product.currency === "USD"
-                                  ? "$"
-                                  : product.currency}
-                                {product.price}
-                              </p>
-                            )}
-                          </div>
-                          {store.productId === product.id && (
-                            <div className="flex items-center gap-1.5 text-xs text-primary">
-                              <Check className="size-3.5" />
-                              Selected
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </button>
-                    <Button
-                      asChild
-                      size="icon"
-                      variant="secondary"
-                      className="absolute right-3 top-3 size-8 rounded-full"
-                    >
-                      <Link
-                        href={`/products/${product.id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        aria-label={`Edit ${product.name}`}
-                        title="Edit product details and images"
-                      >
-                        <Pencil className="size-3.5" />
-                      </Link>
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            {/* Format picker — compact inline, shown after products are loaded */}
+            {/* Format picker — shown once products are loaded */}
             {confirmedProducts.length > 0 && !showAddProductForm && (
-              <div className="flex items-center gap-3 pt-1">
-                <p className="shrink-0 text-sm font-medium text-muted-foreground">Format</p>
+              <div className="flex flex-col gap-2">
+                <p className="text-sm font-medium text-muted-foreground">Format</p>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => store.setFormat("9:16")}
                     className={cn(
-                      "flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-sm transition-all",
+                      "flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-sm transition-all",
                       store.format === "9:16"
                         ? "border-primary bg-primary/5 font-medium text-primary"
                         : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/30",
                     )}
                   >
-                    <Smartphone className="size-3.5" />
-                    Portrait
-                    <span className="text-xs opacity-60">9:16</span>
+                    <Smartphone className="size-4" />
+                    <div className="text-left">
+                      <p className="font-medium leading-none">Portrait</p>
+                      <p className="text-xs opacity-60 mt-0.5">9:16 · TikTok, Reels</p>
+                    </div>
                   </button>
                   <button
                     type="button"
                     onClick={() => store.setFormat("16:9")}
                     className={cn(
-                      "flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-sm transition-all",
+                      "flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-sm transition-all",
                       store.format === "16:9"
                         ? "border-primary bg-primary/5 font-medium text-primary"
                         : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/30",
                     )}
                   >
-                    <Monitor className="size-3.5" />
-                    Landscape
-                    <span className="text-xs opacity-60">16:9</span>
+                    <Monitor className="size-4" />
+                    <div className="text-left">
+                      <p className="font-medium leading-none">Landscape</p>
+                      <p className="text-xs opacity-60 mt-0.5">16:9 · YouTube, Meta</p>
+                    </div>
                   </button>
                 </div>
               </div>
             )}
+
+            {/* Continue button */}
+            {confirmedProducts.length > 0 && !showAddProductForm && (
+              <Button
+                onClick={() => store.setStep(2)}
+                disabled={!store.productId || !store.format}
+                className="w-full sm:w-auto"
+              >
+                Continue
+                <ChevronRight className="size-4" />
+              </Button>
+            )}
           </div>
         )}
+      </div>
 
-        {/* ── Step 2: Persona ───────────────────────────────────────────── */}
-        {store.step === 2 && (
-          <div className="flex flex-col gap-4">
-            <h2 className="text-lg font-semibold">Select a Persona</h2>
-
-            {personasLoading ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {[1, 2].map((i) => (
-                  <Card key={i} className="h-48 animate-pulse bg-muted" />
-                ))}
+      {/* ── Section 2: Persona ────────────────────────────────────────── */}
+      {store.step >= 2 && (
+        <div className="rounded-xl border border-border overflow-hidden">
+          {/* Section header */}
+          <div className="flex items-center justify-between px-5 py-4">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "flex size-6 items-center justify-center rounded-full text-xs font-bold",
+                section2Complete
+                  ? "bg-primary/15 text-primary"
+                  : "bg-primary text-primary-foreground",
+              )}>
+                {section2Complete ? <Check className="size-3.5" /> : "2"}
               </div>
-            ) : activePersonas.length > 0 ? (
-              (() => {
-                const plan = profile?.plan as PlanTier | undefined;
-                const personaLimit = plan && PLANS[plan] ? PLANS[plan].personas : 1;
-                // Only enforce limit once profile has loaded to avoid false paywall on race condition
-                const atLimit = !profileLoading && activePersonas.length >= personaLimit;
-                return (
+              <span className="text-sm font-semibold">
+                {section2Complete && selectedPersona ? (
+                  <span className="flex items-center gap-2">
+                    {personaImageMap[selectedPersona.id] && (
+                      <img
+                        src={personaImageMap[selectedPersona.id]!}
+                        alt={selectedPersona.name}
+                        className="size-5 rounded-full object-cover"
+                      />
+                    )}
+                    <span className="text-foreground">{selectedPersona.name}</span>
+                  </span>
+                ) : (
+                  "AI Spokesperson"
+                )}
+              </span>
+            </div>
+            {section2Complete && (
+              <button
+                type="button"
+                onClick={() => handleOpenSection(2)}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+              >
+                Change
+              </button>
+            )}
+          </div>
+
+          {/* Section 2 body — only shown when not complete */}
+          {!section2Complete && (
+            <div className="px-5 pb-5 flex flex-col gap-4">
+              {personasLoading ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {activePersonas.map((persona) => {
-                    const hasImage = !!(persona.selected_image_url || persona.generated_images?.[0]);
-                    return (
-                    <button
-                      key={persona.id}
-                      onClick={() => {
-                        if (!hasImage) return;
-                        store.setPersonaId(persona.id);
-                        handleGenerateComposites(undefined, persona.id);
-                        generationFiredForFormat.current = store.format;
-                      }}
-                      disabled={!hasImage}
-                      className={cn("text-left", !hasImage && "cursor-not-allowed opacity-50")}
-                    >
-                      <Card
-                        className={cn(
-                          "h-full transition-all",
-                          store.personaId === persona.id
-                            ? "border-primary ring-1 ring-primary/30"
-                            : hasImage
-                            ? "hover:border-muted-foreground/30"
-                            : "",
-                        )}
+                  {[1, 2].map((i) => (
+                    <Card key={i} className="h-40 animate-pulse bg-muted" />
+                  ))}
+                </div>
+              ) : activePersonas.length > 0 ? (
+                (() => {
+                  const plan = profile?.plan as PlanTier | undefined;
+                  const personaLimit = plan && PLANS[plan] ? PLANS[plan].personas : 1;
+                  const atLimit = !profileLoading && activePersonas.length >= personaLimit;
+                  return (
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {activePersonas.map((persona) => {
+                        const hasImage = !!(persona.selected_image_url || persona.generated_images?.[0]);
+                        return (
+                          <button
+                            key={persona.id}
+                            onClick={() => {
+                              if (!hasImage) return;
+                              store.setPersonaId(persona.id);
+                              // Fire composites in background and advance to Section 3
+                              handleGenerateComposites(undefined, persona.id);
+                              generationFiredForFormat.current = store.format;
+                              store.setStep(4);
+                            }}
+                            disabled={!hasImage}
+                            className={cn("text-left", !hasImage && "cursor-not-allowed opacity-50")}
+                          >
+                            <Card
+                              className={cn(
+                                "h-full transition-all",
+                                store.personaId === persona.id
+                                  ? "border-primary ring-1 ring-primary/30"
+                                  : hasImage
+                                  ? "hover:border-muted-foreground/30"
+                                  : "",
+                              )}
+                            >
+                              <CardContent className="flex flex-col items-center gap-3 p-6">
+                                <div className="flex size-20 items-center justify-center rounded-full bg-muted">
+                                  {personaImageMap[persona.id] ? (
+                                    <img
+                                      src={personaImageMap[persona.id]!}
+                                      alt={persona.name}
+                                      className="size-full rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <User className="size-8 text-muted-foreground" />
+                                  )}
+                                </div>
+                                <div className="text-center">
+                                  <h3 className="font-medium">{persona.name}</h3>
+                                  <p className="text-xs text-muted-foreground">
+                                    {persona.attributes.gender} / {persona.attributes.age} / {persona.attributes.clothing_style}
+                                  </p>
+                                </div>
+                                {!hasImage ? (
+                                  <div className="flex items-center gap-1.5 text-xs text-amber-500">
+                                    <AlertCircle className="size-3.5" />
+                                    Needs image — visit Personas
+                                  </div>
+                                ) : store.personaId === persona.id ? (
+                                  <div className="flex items-center gap-1.5 text-xs text-primary">
+                                    <Check className="size-3.5" />
+                                    Selected
+                                  </div>
+                                ) : null}
+                              </CardContent>
+                            </Card>
+                          </button>
+                        );
+                      })}
+
+                      {/* New Persona card */}
+                      <button
+                        className="text-left"
+                        onClick={() => {
+                          if (atLimit) {
+                            offer.startOffer();
+                            setShowPersonaLimitPaywall(true);
+                          } else {
+                            router.push("/personas/new?returnTo=/generate");
+                          }
+                        }}
                       >
-                        <CardContent className="flex flex-col items-center gap-3 p-6">
-                          <div className="flex size-20 items-center justify-center rounded-full bg-muted">
-                            {personaImageMap[persona.id] ? (
-                              <img
-                                src={personaImageMap[persona.id]!}
-                                alt={persona.name}
-                                className="size-full rounded-full object-cover"
-                              />
-                            ) : (
-                              <User className="size-8 text-muted-foreground" />
-                            )}
-                          </div>
-                          <div className="text-center">
-                            <h3 className="font-medium">{persona.name}</h3>
-                            <p className="text-xs text-muted-foreground">
-                              {persona.attributes.gender} /{" "}
-                              {persona.attributes.age} /{" "}
-                              {persona.attributes.clothing_style}
-                            </p>
-                          </div>
-                          {!hasImage ? (
-                            <div className="flex items-center gap-1.5 text-xs text-amber-500">
-                              <AlertCircle className="size-3.5" />
-                              Needs image — visit Personas
+                        <Card className="h-full border-dashed transition-all hover:border-muted-foreground/40">
+                          <CardContent className="flex flex-col items-center justify-center gap-3 p-6 h-full min-h-[200px]">
+                            <div className="flex size-14 items-center justify-center rounded-full bg-muted">
+                              <Plus className="size-6 text-muted-foreground" />
                             </div>
-                          ) : store.personaId === persona.id ? (
-                            <div className="flex items-center gap-1.5 text-xs text-primary">
-                              <Check className="size-3.5" />
-                              Selected
+                            <div className="text-center">
+                              <p className="text-sm font-medium">New Persona</p>
+                              {atLimit && (
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                  {personaLimit}/{personaLimit} used · upgrade to add more
+                                </p>
+                              )}
                             </div>
-                          ) : null}
-                        </CardContent>
-                      </Card>
-                    </button>
-                    );
-                  })}
+                          </CardContent>
+                        </Card>
+                      </button>
+                    </div>
+                  );
+                })()
+              ) : (
+                <Card className="border-border bg-card">
+                  <CardContent className="flex flex-col items-center gap-3 py-10">
+                    <User className="size-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      No personas yet — create one first before generating a video.
+                    </p>
+                    <Button asChild variant="outline" size="sm">
+                      <Link href="/personas/new?returnTo=/generate">
+                        Create your first persona →
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
-                  {/* ── New Persona card ───────────────────────────────── */}
-                  <button
-                    className="text-left"
-                    onClick={() => {
-                      if (atLimit) {
-                        offer.startOffer();
-                        setShowPersonaLimitPaywall(true);
-                      } else {
-                        router.push("/personas/new?returnTo=/generate");
-                      }
-                    }}
-                  >
-                    <Card className="h-full border-dashed transition-all hover:border-muted-foreground/40">
-                      <CardContent className="flex flex-col items-center justify-center gap-3 p-6 h-full min-h-[200px]">
-                        <div className="flex size-14 items-center justify-center rounded-full bg-muted">
-                          <Plus className="size-6 text-muted-foreground" />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm font-medium">New Persona</p>
-                          {atLimit && (
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                              {personaLimit}/{personaLimit} used · upgrade to add more
-                            </p>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </button>
-                </div>
-                );
-              })()
-            ) : (
-              <Card className="border-border bg-card">
-                <CardContent className="flex flex-col items-center gap-3 py-10">
-                  <User className="size-8 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    No personas yet — create one first before generating a video.
-                  </p>
-                  <Button asChild variant="outline" size="sm">
-                    <Link href="/personas/new?returnTo=/generate">
-                      Create your first persona →
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+      {/* ── Section 3: Settings & Generate ───────────────────────────── */}
+      {section3Unlocked && (
+        <div className="rounded-xl border border-border overflow-hidden">
+          {/* Section header */}
+          <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+            <div className="flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
+              3
+            </div>
+            <span className="text-sm font-semibold">Settings & Generate</span>
           </div>
-        )}
 
-        {/* ── Step 3: Preview ───────────────────────────────────────────── */}
-        {store.step === 3 && (
-          <div className="flex flex-col gap-6">
-            {compositeImages.length === 0 ? (
-              /* ── Before generation: compact toggle + skeleton while pending, fallback otherwise ── */
-              <div className="flex flex-col gap-6">
+          <div className="p-5 flex flex-col gap-5">
+            {/* ── Easy / Advanced mode tab ──────────────────────────── */}
+            <div className="flex rounded-lg border border-border bg-muted/40 p-1 gap-1">
+              <button
+                type="button"
+                onClick={() => store.setAdvancedMode(false)}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all",
+                  !store.advancedMode
+                    ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Zap className="size-4" />
+                Easy Mode
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!store.advancedMode) {
+                    handleSwitchToAdvanced();
+                  }
+                }}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all",
+                  store.advancedMode
+                    ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Settings2 className="size-4" />
+                Advanced
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                  Pro
+                </Badge>
+              </button>
+            </div>
+
+            {/* ── Easy Mode ─────────────────────────────────────────── */}
+            {!store.advancedMode && (
+              <div className="flex flex-col gap-5">
+                {/* Mode selector */}
                 <div>
-                  <h2 className="text-lg font-semibold">Preview your scene</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Your scene images are being prepared. Change format below if needed.
-                  </p>
-                </div>
-
-                {/* Compact format toggle — always visible so user can change if needed */}
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-sm font-medium text-muted-foreground">Format:</span>
-                  <div className="flex gap-2">
+                  <p className="mb-2 text-sm font-medium">Generation mode</p>
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => handleFormatChange("9:16")}
+                      onClick={() => {
+                        store.setMode("single");
+                        setScriptConfigChanged(true);
+                      }}
                       className={cn(
-                        "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-all",
-                        store.format === "9:16"
-                          ? "border-primary bg-primary/5 font-medium text-primary"
-                          : "border-border text-muted-foreground hover:border-muted-foreground/40",
+                        "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                        store.mode === "single"
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-muted-foreground/30",
                       )}
                     >
-                      <Smartphone className="size-3.5" />
-                      Portrait
+                      <div className="flex w-full items-center justify-between">
+                        <p className="text-sm font-semibold">Single</p>
+                        <p className="text-sm font-bold text-primary">
+                          {store.quality === "hd" ? CREDITS_PER_SINGLE_HD : CREDITS_PER_SINGLE} cr
+                        </p>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">1 complete video · fastest</p>
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleFormatChange("16:9")}
+                      onClick={() => {
+                        store.setMode("triple");
+                        setScriptConfigChanged(true);
+                      }}
                       className={cn(
-                        "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-all",
-                        store.format === "16:9"
-                          ? "border-primary bg-primary/5 font-medium text-primary"
-                          : "border-border text-muted-foreground hover:border-muted-foreground/40",
+                        "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                        store.mode === "triple"
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-muted-foreground/30",
                       )}
                     >
-                      <Monitor className="size-3.5" />
-                      Landscape
+                      <div className="flex w-full items-center justify-between">
+                        <p className="text-sm font-semibold">3×</p>
+                        <p className="text-sm font-bold text-primary">
+                          {store.quality === "hd" ? CREDITS_PER_BATCH_HD : CREDITS_PER_BATCH} cr
+                        </p>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">27 combos · pick your best</p>
                     </button>
                   </div>
                 </div>
 
-                {generateComposites.isPending ? (
-                  <VideoGenerationAnimation />
-                ) : (
+                {/* Quality selector */}
+                <div>
+                  <p className="mb-2 text-sm font-medium">Video quality</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { store.setQuality("standard"); setScriptConfigChanged(true); }}
+                      className={cn(
+                        "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                        store.quality === "standard"
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-muted-foreground/30",
+                      )}
+                    >
+                      <p className="text-sm font-semibold">Kling 2.6</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">Faster · great for testing</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { store.setQuality("hd"); setScriptConfigChanged(true); }}
+                      className={cn(
+                        "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                        store.quality === "hd"
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-muted-foreground/30",
+                      )}
+                    >
+                      <div className="flex w-full items-center justify-between">
+                        <p className="text-sm font-semibold">Kling V3</p>
+                        <Badge variant="secondary" className="text-[10px]">2× cr</Badge>
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted-foreground">Best quality · final ads</p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* CTA style */}
+                <div>
+                  <p className="mb-2 text-sm font-medium">CTA style</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {CTA_STYLE_OPTIONS.map((option) => (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => { store.setCtaStyle(option.key); setScriptConfigChanged(true); }}
+                        className={cn(
+                          "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                          store.ctaStyle === option.key
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-muted-foreground/30",
+                        )}
+                      >
+                        <p className="text-sm font-semibold">{option.label}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{option.description}</p>
+                      </button>
+                    ))}
+                  </div>
+                  {requiresCommentKeyword && (
+                    <div className="mt-3">
+                      <Label htmlFor="cta-comment-keyword" className="text-xs text-muted-foreground">
+                        Keyword viewers should comment
+                      </Label>
+                      <Input
+                        id="cta-comment-keyword"
+                        value={store.ctaCommentKeyword}
+                        onChange={(e) => store.setCtaCommentKeyword(e.target.value.replace(/[^a-zA-Z0-9 _-]/g, ""))}
+                        placeholder='e.g. "link" or "deal"'
+                        className="mt-1"
+                        maxLength={30}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* Credit cost */}
+                <div className={cn(
+                  "rounded-xl border px-4 py-3",
+                  hasEnoughCredits ? "border-border bg-muted/30" : "border-amber-500/30 bg-amber-500/10",
+                )}>
+                  {hasEnoughCredits ? (
+                    <p className="text-sm text-muted-foreground">
+                      This will use{" "}
+                      <span className="font-bold text-foreground">{effectiveCost} credits</span>
+                      {!isUnlimitedCredits && <span> ({creditsRemaining} remaining)</span>}
+                      {isFirstVideo && (
+                        <span className="ml-2 text-xs text-amber-500 font-medium">
+                          ✦ 50% first-video discount applied
+                        </span>
+                      )}
+                    </p>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="size-4 text-amber-500 shrink-0" />
+                      <p className="text-sm text-amber-600 dark:text-amber-400">
+                        Not enough credits — you'll be prompted to top up.{" "}
+                        {!isUnlimitedCredits && (
+                          <span className="text-xs">
+                            Need {effectiveCost} ({creditsRemaining} remaining)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {requiresCommentKeyword && !commentKeyword && (
+                  <div className="rounded-xl bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
+                    Add a comment keyword above to generate the CTA correctly.
+                  </div>
+                )}
+
+                {/* Composites generating indicator */}
+                {generateComposites.isPending && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground rounded-xl bg-muted/50 px-4 py-3">
+                    <Loader2 className="size-4 animate-spin shrink-0" />
+                    <span>{COMPOSITE_MESSAGES[compositeMsgIdx]}</span>
+                  </div>
+                )}
+
+                {/* Scene preview (compact) */}
+                {!generateComposites.isPending && compositeImages.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Scene preview</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleGenerateComposites()}
+                        disabled={generateComposites.isPending}
+                        className="text-xs text-muted-foreground h-7"
+                      >
+                        <RefreshCw className="size-3 mr-1" />
+                        Regenerate
+                      </Button>
+                    </div>
+                    <div className={cn(
+                      "grid gap-2",
+                      store.format === "9:16" ? "grid-cols-4" : "grid-cols-2",
+                    )}>
+                      {compositeImages.map((img, i) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            setSelectedCompositeIdx(i);
+                            setShowPreviewEditor(false);
+                            const path = compositeImages[i].path;
+                            store.setCompositeImagePath(path);
+                          }}
+                          className="group relative overflow-hidden rounded-lg focus:outline-none"
+                        >
+                          <div className={cn(
+                            "relative overflow-hidden rounded-lg border-2 transition-all",
+                            store.format === "9:16" ? "aspect-[9/16]" : "aspect-video",
+                            selectedCompositeIdx === i
+                              ? "border-primary ring-2 ring-primary/30"
+                              : "border-transparent group-hover:border-muted-foreground/40",
+                          )}>
+                            <img src={img.signed_url} alt={`Preview ${i + 1}`} className="size-full object-cover" />
+                            {selectedCompositeIdx === i && (
+                              <div className="absolute inset-0 flex items-end justify-center bg-primary/10 pb-2">
+                                <div className="flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
+                                  <Check className="size-2.5" />
+                                  Selected
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Quick edit */}
+                    {selectedCompositeIdx !== null && compositeImages[selectedCompositeIdx] && (
+                      <div className="rounded-lg border border-border bg-muted/20 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">Quick edit (optional)</p>
+                            <p className="text-xs text-muted-foreground">Adjust outfit, background, or lighting.</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowPreviewEditor((prev) => !prev)}
+                          >
+                            <Sparkles className="size-3.5" />
+                            {showPreviewEditor ? "Hide" : "Edit"}
+                          </Button>
+                        </div>
+                        {showPreviewEditor && (
+                          <div className="mt-3 flex flex-col gap-3">
+                            <Textarea
+                              value={previewEditPrompt}
+                              onChange={(e) => setPreviewEditPrompt(e.target.value)}
+                              placeholder="Example: Change the outfit to a black hoodie and make the background a cozy cafe."
+                              maxLength={500}
+                              rows={2}
+                            />
+                            <div className="flex items-center justify-end gap-2">
+                              <Button type="button" variant="ghost" size="sm" onClick={() => setShowPreviewEditor(false)} disabled={editComposite.isPending}>
+                                Cancel
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={handleApplyPreviewEdit}
+                                disabled={editComposite.isPending || !store.compositeImagePath || previewEditPrompt.trim().length === 0}
+                              >
+                                {editComposite.isPending ? (
+                                  <><Loader2 className="size-3.5 animate-spin" />Applying...</>
+                                ) : (
+                                  <><Sparkles className="size-3.5" />Apply Edit</>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* No composites + not pending — fallback generate button */}
+                {!generateComposites.isPending && compositeImages.length === 0 && (
                   <Button
                     variant="outline"
                     onClick={() => handleGenerateComposites()}
                     disabled={!store.productId || !store.personaId || !store.format}
                   >
-                    <ImageIcon className="mr-2 size-4" />
-                    Generate Preview
+                    <ImageIcon className="size-4" />
+                    Generate Scene Preview
                   </Button>
                 )}
-              </div>
-            ) : (
-              /* ── After generation: compact controls + full-width image grid ── */
-              <div className="flex flex-col gap-4">
-                {/* Compact header bar */}
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-sm font-medium text-muted-foreground">Format:</span>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleFormatChange("9:16")}
-                      className={cn(
-                        "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-all",
-                        store.format === "9:16"
-                          ? "border-primary bg-primary/5 font-medium text-primary"
-                          : "border-border text-muted-foreground hover:border-muted-foreground/40",
-                      )}
-                    >
-                      <Smartphone className="size-3.5" />
-                      Portrait
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleFormatChange("16:9")}
-                      className={cn(
-                        "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-all",
-                        store.format === "16:9"
-                          ? "border-primary bg-primary/5 font-medium text-primary"
-                          : "border-border text-muted-foreground hover:border-muted-foreground/40",
-                      )}
-                    >
-                      <Monitor className="size-3.5" />
-                      Landscape
-                    </button>
-                  </div>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleGenerateComposites()}
-                    disabled={generateComposites.isPending}
-                    className="ml-auto"
-                  >
-                    {generateComposites.isPending ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="size-3.5" />
-                    )}
-                    Regenerate
+                <Separator />
+
+                {/* ── Script / Generate area ────────────────────────── */}
+                {generateScript.isPending ? (
+                  <Button disabled size="lg" className="w-full">
+                    <Loader2 className="size-4 animate-spin" />
+                    Generating script…
                   </Button>
-                </div>
-
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    Click an image to select it — this becomes the base for your video.
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Select an image, then use Quick Edit to adjust outfit, background, or lighting
-                  </p>
-                </div>
-
-                {/* Full-width image grid: 4-col for portrait (tall), 2-col for landscape (wide) */}
-                <div className={cn(
-                  "grid gap-3",
-                  store.format === "9:16" ? "grid-cols-4" : "grid-cols-2",
-                )}>
-                  {compositeImages.map((img, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleSelectComposite(i)}
-                      className="group relative overflow-hidden rounded-xl focus:outline-none"
-                    >
-                      <div
-                        className={cn(
-                          "relative overflow-hidden rounded-xl border-2 transition-all",
-                          store.format === "9:16" ? "aspect-[9/16]" : "aspect-video",
-                          selectedCompositeIdx === i
-                            ? "border-primary ring-2 ring-primary/30"
-                            : "border-transparent group-hover:border-muted-foreground/40",
-                        )}
-                      >
-                        <img
-                          src={img.signed_url}
-                          alt={`Preview ${i + 1}`}
-                          className="size-full object-cover"
-                        />
-                        {selectedCompositeIdx === i && (
-                          <div className="absolute inset-0 flex items-end justify-center bg-primary/10 pb-3">
-                            <div className="flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
-                              <Check className="size-3" />
-                              Selected
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-
-                {selectedCompositeIdx !== null && compositeImages[selectedCompositeIdx] && (
-                  <div className="rounded-lg border border-border bg-muted/20 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium">Quick edit (optional)</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Adjust the selected preview before generating your videos.
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowPreviewEditor((prev) => !prev)}
-                      >
-                        <Sparkles className="size-3.5" />
-                        {showPreviewEditor ? "Hide Edit" : "Edit Selected"}
-                      </Button>
-                    </div>
-
-                    {showPreviewEditor && (
-                      <div className="mt-3 flex flex-col gap-3">
-                        <Textarea
-                          id="preview-edit-prompt"
-                          value={previewEditPrompt}
-                          onChange={(e) => setPreviewEditPrompt(e.target.value)}
-                          placeholder="Example: Change the outfit to a black hoodie and make the background a cozy cafe at sunset."
-                          maxLength={500}
-                        />
-
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-xs text-muted-foreground">
-                            Uses the selected preview image as the reference.
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setShowPreviewEditor(false)}
-                              disabled={editComposite.isPending}
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={handleApplyPreviewEdit}
-                              disabled={
-                                editComposite.isPending ||
-                                !store.compositeImagePath ||
-                                previewEditPrompt.trim().length === 0
-                              }
-                            >
-                              {editComposite.isPending ? (
-                                <>
-                                  <Loader2 className="size-3.5 animate-spin" />
-                                  Applying Edit...
-                                </>
-                              ) : (
-                                <>
-                                  <Sparkles className="size-3.5" />
-                                  Apply Edit
-                                </>
-                              )}
-                            </Button>
-                          </div>
+                ) : store.pendingScript ? (
+                  <div className="flex flex-col gap-4">
+                    {/* Script config changed warning */}
+                    {scriptConfigChanged && (
+                      <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+                        <AlertCircle className="size-4 text-amber-500 shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-sm text-amber-600 dark:text-amber-400">Settings changed — regenerate script to reflect updates.</p>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Step 4: Configure ──────────────────────────────────────────── */}
-        {store.step === 4 && (
-          <div className="flex flex-col gap-6">
-            <div>
-              <h2 className="text-lg font-semibold">Configure & Generate Script</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Ready to generate · ~4 min to your video
-              </p>
-            </div>
-
-            <div className="mx-auto w-full max-w-lg">
-              <Card>
-                <CardContent className="flex flex-col gap-4 p-6">
-                  {/* Product summary — clickable to go back to step 1 */}
-                  <button
-                    type="button"
-                    onClick={() => store.setStep(1)}
-                    className="flex w-full items-center gap-3 rounded-lg px-1 py-1 text-left transition-colors hover:bg-muted/50"
-                  >
-                    <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
-                      {selectedProduct && productImageMap[selectedProduct.id] ? (
-                        <img
-                          src={productImageMap[selectedProduct.id]!}
-                          alt={selectedProduct.name}
-                          className="size-full object-cover"
-                        />
-                      ) : (
-                        <Package className="size-4 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground">Product</p>
-                      <p className="truncate text-sm font-medium">
-                        {selectedProduct?.name || "Not selected"}
-                      </p>
-                    </div>
-                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                  </button>
-
-                  {/* Persona summary — clickable to go back to step 2 */}
-                  <button
-                    type="button"
-                    onClick={() => store.setStep(2)}
-                    className="flex w-full items-center gap-3 rounded-lg px-1 py-1 text-left transition-colors hover:bg-muted/50"
-                  >
-                    <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
-                      {selectedPersona && personaImageMap[selectedPersona.id] ? (
-                        <img
-                          src={personaImageMap[selectedPersona.id]!}
-                          alt={selectedPersona.name}
-                          className="size-full object-cover"
-                        />
-                      ) : (
-                        <User className="size-4 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground">Persona</p>
-                      <p className="truncate text-sm font-medium">
-                        {selectedPersona?.name || "Not selected"}
-                      </p>
-                    </div>
-                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                  </button>
-
-                  {/* Selected composite preview */}
-                  {store.compositeImagePath && selectedCompositeIdx !== null && compositeImages[selectedCompositeIdx] && (
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={cn(
-                          "shrink-0 overflow-hidden rounded-lg bg-muted",
-                          store.format === "9:16" ? "h-16 w-9" : "h-10 w-16",
-                        )}
-                      >
-                        <img
-                          src={compositeImages[selectedCompositeIdx].signed_url}
-                          alt="Selected scene"
-                          className="size-full object-cover"
-                        />
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Scene</p>
-                        <p className="text-sm font-medium">
-                          {store.format === "9:16" ? "Portrait 9:16" : "Landscape 16:9"}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  <Separator />
-
-                  {/* Mode selector */}
-                  <div>
-                    <p className="mb-2 text-sm text-muted-foreground">
-                      Generation mode
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (store.advancedMode && store.advancedSegments && "single" !== store.mode) {
-                            if (!window.confirm("Switching modes will clear your advanced segment customizations. Continue?")) {
-                              return;
-                            }
-                          }
-                          store.setMode("single");
-                          setScriptConfigChanged(true);
-                        }}
-                        className={cn(
-                          "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
-                          store.mode === "single"
-                            ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                            : "border-border hover:border-muted-foreground/30",
-                        )}
-                      >
-                        <div className="flex w-full items-center justify-between">
-                          <p className="text-sm font-semibold text-foreground">
-                            Single
-                          </p>
-                          <p className="text-sm font-bold text-primary">
-                            {store.quality === "hd" ? CREDITS_PER_SINGLE_HD : CREDITS_PER_SINGLE} credits
-                          </p>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          1 complete video — fastest option
-                        </p>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (store.advancedMode && store.advancedSegments && "triple" !== store.mode) {
-                            if (!window.confirm("Switching modes will clear your advanced segment customizations. Continue?")) {
-                              return;
-                            }
-                          }
-                          store.setMode("triple");
-                          setScriptConfigChanged(true);
-                        }}
-                        className={cn(
-                          "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
-                          store.mode === "triple"
-                            ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                            : "border-border hover:border-muted-foreground/30",
-                        )}
-                      >
-                        <div className="flex w-full items-center justify-between">
-                          <p className="text-sm font-semibold text-foreground">
-                            3x
-                          </p>
-                          <p className="text-sm font-bold text-primary">
-                            {store.quality === "hd" ? CREDITS_PER_BATCH_HD : CREDITS_PER_BATCH} credits
-                          </p>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          27 combinations (3 hooks x 3 bodies x 3 CTAs) — pick your best before rendering
-                        </p>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Quality selector */}
-                  <div>
-                    <p className="mb-2 text-sm text-muted-foreground">
-                      Video quality
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => { store.setQuality("standard"); setScriptConfigChanged(true); }}
-                        className={cn(
-                          "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
-                          store.quality === "standard"
-                            ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                            : "border-border hover:border-muted-foreground/30",
-                        )}
-                      >
-                        <p className="text-sm font-semibold text-foreground">
-                          Kling 2.6
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          Faster generation, great for testing
-                        </p>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { store.setQuality("hd"); setScriptConfigChanged(true); }}
-                        className={cn(
-                          "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
-                          store.quality === "hd"
-                            ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                            : "border-border hover:border-muted-foreground/30",
-                        )}
-                      >
-                        <div className="flex w-full items-center justify-between">
-                          <p className="text-sm font-semibold text-foreground">
-                            Kling V3
-                          </p>
-                          <Badge
-                            variant="secondary"
-                            className="text-[10px]"
-                          >
-                            2x credits
-                          </Badge>
-                        </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          Best motion quality, ideal for final ads (2x credits)
-                        </p>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* CTA style selector */}
-                  <div>
-                    <p className="mb-2 text-sm text-muted-foreground">
-                      CTA style
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {CTA_STYLE_OPTIONS.map((option) => (
-                        <button
-                          key={option.key}
-                          type="button"
-                          onClick={() => { store.setCtaStyle(option.key); setScriptConfigChanged(true); }}
-                          className={cn(
-                            "flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-all",
-                            store.ctaStyle === option.key
-                              ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                              : "border-border hover:border-muted-foreground/30",
-                          )}
-                        >
-                          <p className="text-sm font-semibold text-foreground">
-                            {option.label}
-                          </p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {option.description}
-                          </p>
-                          {option.example && (
-                            <p className="mt-1 text-xs italic text-muted-foreground/70">
-                              {option.example}
-                            </p>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-
-                    {requiresCommentKeyword && (
-                      <div className="mt-3">
-                        <Label htmlFor="cta-comment-keyword" className="text-xs text-muted-foreground">
-                          Keyword viewers should comment
-                        </Label>
-                        <Input
-                          id="cta-comment-keyword"
-                          value={store.ctaCommentKeyword}
-                          onChange={(e) =>
-                            store.setCtaCommentKeyword(
-                              e.target.value.replace(/[^a-zA-Z0-9 _-]/g, ""),
-                            )}
-                          placeholder='e.g. "link" or "deal"'
-                          className="mt-1"
-                          maxLength={30}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <Separator />
-
-                  {/* Advanced Mode toggle */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-sm font-medium">Advanced Mode</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Customize script, emotion, and image per segment.
-                      </p>
-                    </div>
-                    <Switch
-                      checked={store.advancedMode}
-                      onCheckedChange={handleAdvancedModeToggle}
-                      disabled={isInitializingAdvanced || !store.productId || !store.personaId}
-                    />
-                  </div>
-
-                  {store.advancedMode && !store.advancedSegments && !isInitializingAdvanced && (
-                    <div className="flex flex-col gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
-                      <p className="text-sm font-medium text-foreground">
-                        Advanced mode enabled — customize each segment individually
-                      </p>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={handleInitializeAdvancedSegments}
-                        disabled={!store.productId || !store.personaId}
-                      >
-                        Customize Segments
-                        <ArrowRight className="ml-1 size-3.5" />
-                      </Button>
-                    </div>
-                  )}
-
-                  {isInitializingAdvanced && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="size-4 animate-spin" />
-                      Generating scripts…
-                    </div>
-                  )}
-
-                  {/* Info */}
-                  <div className="rounded-lg bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
-                    {store.mode === "single"
-                      ? "You'll get 1 complete video combination."
-                      : "You'll get 27 possible combinations (3x3x3)."}
-                  </div>
-
-                  {/* What happens next? collapsible */}
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => setShowTimeline((v) => !v)}
-                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <ChevronDown className={cn("size-3.5 transition-transform", showTimeline && "rotate-180")} />
-                      What happens next?
-                    </button>
-                    {showTimeline && (
-                      <div className="mt-3 flex flex-col gap-2 rounded-lg border border-border bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
-                        <div className="flex items-start gap-3">
-                          <span className="shrink-0 font-semibold text-foreground">①</span>
-                          <div className="flex flex-1 items-center justify-between gap-2">
-                            <span>Generate Script</span>
-                            <span className="font-mono text-muted-foreground/70">~15 seconds</span>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <span className="shrink-0 font-semibold text-foreground">②</span>
-                          <div className="flex flex-1 items-center justify-between gap-2">
-                            <span>Queue video segments</span>
-                            <span className="font-mono text-muted-foreground/70">
-                              {store.mode === "single" ? "1 video" : "9–27 combos"}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <span className="shrink-0 font-semibold text-foreground">③</span>
-                          <div className="flex flex-1 items-center justify-between gap-2">
-                            <span>Kling AI renders</span>
-                            <span className="font-mono text-muted-foreground/70">~3–4 min total (parallel)</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {requiresCommentKeyword && !commentKeyword && (
-                    <div className="rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
-                      Add a comment keyword so we can write the CTA correctly.
-                    </div>
-                  )}
-
-                  {/* Credit cost display */}
-                  <div
-                    className={cn(
-                      "rounded-lg border px-4 py-3",
-                      hasEnoughCredits
-                        ? "border-border bg-muted/30"
-                        : "border-amber-500/30 bg-amber-500/10",
-                    )}
-                  >
-                    <p className={cn(
-                      "text-sm",
-                      hasEnoughCredits ? "text-muted-foreground" : "text-amber-600 dark:text-amber-400",
-                    )}>
-                      {hasEnoughCredits ? (
-                        <>
-                          This will use{" "}
-                          <span className="font-bold text-foreground">{effectiveCost} credits</span>
-                          {!isUnlimitedCredits && (
-                            <span> ({creditsRemaining} remaining)</span>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          Not enough credits — you'll be prompted to top up
-                          {!isUnlimitedCredits && (
-                            <span className="block mt-0.5 text-xs">
-                              Need <span className="font-bold">{effectiveCost}</span> credits ({creditsRemaining} remaining)
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </p>
-                  </div>
-
-                  {/* Generate Script button states */}
-                  {generateScript.isPending ? (
-                    <Button disabled size="lg" className="w-full">
-                      <Loader2 className="size-4 animate-spin" />
-                      Generating script…
-                    </Button>
-                  ) : store.pendingScript ? (
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        size="lg"
-                        className="w-full bg-emerald-600 hover:bg-emerald-700"
-                        onClick={() => store.setStep(5)}
-                      >
-                        <Check className="size-4" />
-                        Review Script →
-                      </Button>
-                      {scriptConfigChanged && (
                         <Button
                           variant="outline"
                           size="sm"
-                          className="w-full"
-                          onClick={() => {
-                            setScriptConfigChanged(false);
-                            handleGenerateScript();
-                          }}
+                          onClick={() => { setScriptConfigChanged(false); handleGenerateScript(); }}
                           disabled={requiresCommentKeyword && !commentKeyword}
+                          className="shrink-0 text-xs"
                         >
                           <RefreshCw className="size-3.5" />
-                          Regenerate with new settings
+                          Regenerate
                         </Button>
-                      )}
+                      </div>
+                    )}
+
+                    {/* Script review — inline */}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Check className="size-4 text-emerald-500" />
+                        <p className="text-sm font-semibold">Script ready — review & edit</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Edit any segment before generating your video.
+                      </p>
+
+                      {(["hooks", "bodies", "ctas"] as const).map((sectionType, sectionIdx) => {
+                        const segments = store.pendingScript![sectionType];
+                        const singularLabel = sectionType === "hooks" ? "Hook" : sectionType === "bodies" ? "Body" : "CTA";
+                        const sectionLabel = sectionType === "hooks" ? "Hooks" : sectionType === "bodies" ? "Bodies" : "CTAs";
+
+                        return (
+                          <div key={sectionType} className="flex flex-col gap-2">
+                            {sectionIdx > 0 && <Separator className="my-1" />}
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{sectionLabel}</p>
+                              <Badge variant="outline" className="text-[10px]">
+                                {segments.length} {segments.length === 1 ? "variant" : "variants"}
+                              </Badge>
+                            </div>
+
+                            {segments.map((segment: ScriptSegment, idx: number) => (
+                              <Card key={`${sectionType}-${idx}`} className="border-border">
+                                <CardContent className="flex flex-col gap-2 p-3">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5">
+                                      <p className="text-xs font-semibold text-foreground">
+                                        {singularLabel} {segments.length > 1 ? idx + 1 : ""}
+                                      </p>
+                                      <Badge variant="secondary" className="text-[10px]">
+                                        {formatVariantLabel(segment.variant_label)}
+                                      </Badge>
+                                      <Badge variant="outline" className="text-[10px]">
+                                        {segment.duration_seconds}s
+                                      </Badge>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2 text-[10px] text-muted-foreground"
+                                      disabled={generateScript.isPending}
+                                      onClick={() => {
+                                        if (!store.productId || !store.personaId || !store.compositeImagePath) return;
+                                        generateScript.mutate(
+                                          {
+                                            product_id: store.productId,
+                                            persona_id: store.personaId,
+                                            mode: store.mode,
+                                            quality: store.quality,
+                                            composite_image_path: store.compositeImagePath,
+                                            cta_style: store.ctaStyle,
+                                            cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
+                                            phase: "script",
+                                          },
+                                          {
+                                            onSuccess: (result) => {
+                                              if (result.script) {
+                                                const newSegments = result.script[sectionType];
+                                                if (newSegments?.[idx]) {
+                                                  store.updateScriptSection(sectionType, idx, newSegments[idx].text);
+                                                }
+                                              }
+                                              if (result.generation_id) {
+                                                store.setPendingScript(
+                                                  result.generation_id,
+                                                  store.pendingScript!,
+                                                  store.creditsToCharge ?? 0,
+                                                );
+                                              }
+                                            },
+                                            onError: (err) => { toast.error(err.message || "Failed to regenerate"); },
+                                          },
+                                        );
+                                      }}
+                                    >
+                                      {generateScript.isPending ? (
+                                        <Loader2 className="size-3 animate-spin" />
+                                      ) : (
+                                        <RefreshCw className="size-3" />
+                                      )}
+                                      Regen
+                                    </Button>
+                                  </div>
+                                  <Textarea
+                                    value={segment.text}
+                                    onChange={(e) => store.updateScriptSection(sectionType, idx, e.target.value)}
+                                    rows={3}
+                                    className="resize-none text-sm"
+                                  />
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        );
+                      })}
                     </div>
-                  ) : (
+
+                    {/* Generate Video */}
                     <Button
-                      onClick={handleGenerateScript}
-                      disabled={requiresCommentKeyword && !commentKeyword}
+                      onClick={handleApproveAndGenerate}
+                      disabled={approveAndGenerate.isPending}
                       size="lg"
                       className="w-full"
                     >
-                      <Sparkles className="size-4" />
-                      Generate Script
+                      {approveAndGenerate.isPending ? (
+                        <><Loader2 className="size-4 animate-spin" />Starting generation...</>
+                      ) : (
+                        <><Zap className="size-4" />Generate Video</>
+                      )}
                     </Button>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        )}
-
-        {/* ── Step 5: Review Script ──────────────────────────────────────── */}
-        {store.step === 5 && store.pendingScript && (
-          <div className="flex flex-col gap-6">
-            <h2 className="text-lg font-semibold">Review Script</h2>
-
-            {/* Insufficient credits banner — visible immediately on Step 5 */}
-            {!hasEnoughCredits && (
-              <div className="flex items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3">
-                <AlertCircle className="size-5 text-amber-500 shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
-                    Not enough credits
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    You need <span className="font-bold">{effectiveCost}</span> credits but only have{" "}
-                    <span className="font-bold">{creditsRemaining}</span>. Top up below or via the Generate button.
-                  </p>
-                </div>
+                  </div>
+                ) : (
+                  <Button
+                    onClick={handleGenerateScript}
+                    disabled={
+                      (requiresCommentKeyword && !commentKeyword) ||
+                      generateComposites.isPending ||
+                      !store.compositeImagePath
+                    }
+                    size="lg"
+                    className="w-full"
+                  >
+                    <Sparkles className="size-4" />
+                    {!store.compositeImagePath && generateComposites.isPending
+                      ? "Preparing scene…"
+                      : "Generate Script"}
+                  </Button>
+                )}
               </div>
             )}
 
-            <div className="mx-auto w-full max-w-2xl flex flex-col gap-6">
-              {/* Script sections — collapsible */}
-              {(["hooks", "bodies", "ctas"] as const).map((sectionType, sectionIdx) => {
-                const segments = store.pendingScript![sectionType];
-                const sectionLabel = sectionType === "hooks" ? "Hooks" : sectionType === "bodies" ? "Bodies" : "CTAs";
-                const singularLabel = sectionType === "hooks" ? "Hook" : sectionType === "bodies" ? "Body" : "CTA";
-                const showAlts = sectionType === "hooks" ? showAltHooks : sectionType === "bodies" ? showAltBodies : showAltCtas;
-                const setShowAlts = sectionType === "hooks" ? setShowAltHooks : sectionType === "bodies" ? setShowAltBodies : setShowAltCtas;
+            {/* ── Advanced Mode ─────────────────────────────────────── */}
+            {store.advancedMode && (
+              <div className="flex flex-col gap-5">
+                {isInitializingAdvanced ? (
+                  <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-muted/40 py-12">
+                    <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                    <div className="text-center">
+                      <p className="text-sm font-medium">Generating scripts for all segments…</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {store.mode === "triple" ? "9 segments" : "3 segments"} · usually takes ~20 seconds
+                      </p>
+                    </div>
+                  </div>
+                ) : store.advancedSegments ? (
+                  <>
+                    <div className="rounded-xl bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+                      {store.mode === "triple"
+                        ? "Customize each of the 9 segments — 3 variants × 3 types. Mix any combo for 27 unique videos."
+                        : "Customize your Hook, Body, and CTA individually for full creative control."}
+                    </div>
+                    <AdvancedModePanel
+                      mode={store.mode}
+                      segments={store.advancedSegments}
+                      productId={store.productId!}
+                      personaId={store.personaId!}
+                      format={store.format ?? "9:16"}
+                      mainCompositeSignedUrl={
+                        selectedCompositeIdx !== null
+                          ? compositeImages[selectedCompositeIdx]?.signed_url ?? null
+                          : null
+                      }
+                      onSegmentUpdate={(type, index, patch) => store.updateAdvancedSegment(type, index, patch)}
+                    />
 
-                return (
-                  <div key={sectionType}>
-                    {/* Section header */}
-                    {sectionIdx > 0 && <Separator className="mb-4" />}
-                    <div className="mb-3 flex items-center gap-2">
-                      <h3 className="text-sm font-semibold">{sectionLabel}</h3>
-                      <Badge variant="outline" className="text-xs">
-                        {segments.length} {segments.length === 1 ? "variant" : "variants"}
-                      </Badge>
+                    <Separator />
+
+                    {/* Credit cost */}
+                    <div className={cn(
+                      "rounded-xl border px-4 py-3",
+                      hasEnoughCredits ? "border-border bg-muted/30" : "border-amber-500/30 bg-amber-500/10",
+                    )}>
+                      {hasEnoughCredits ? (
+                        <p className="text-sm text-muted-foreground">
+                          This will use{" "}
+                          <span className="font-bold text-foreground">{effectiveCost} credits</span>
+                          {!isUnlimitedCredits && <span> ({creditsRemaining} remaining)</span>}
+                        </p>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="size-4 text-amber-500 shrink-0" />
+                          <p className="text-sm text-amber-600 dark:text-amber-400">
+                            Not enough credits — you'll be prompted to top up.
+                          </p>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Cards: first always visible, rest toggled */}
-                    {segments.map((segment: ScriptSegment, idx: number) => {
-                      if (idx > 0 && !showAlts) return null;
-                      const cardLabel = idx === 0 ? "(Primary)" : `(Alt ${idx})`;
-
-                      return (
-                        <Card key={`${sectionType}-${idx}`} className="mb-3">
-                          <CardContent className="flex flex-col gap-3 p-4">
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm font-semibold text-foreground">
-                                {singularLabel}{" "}
-                                <span className="font-normal text-muted-foreground">{cardLabel}</span>
-                              </p>
-                              <div className="flex items-center gap-2">
-                                <Badge variant="secondary" className="text-xs">
-                                  {formatVariantLabel(segment.variant_label)}
-                                </Badge>
-                                <Badge variant="outline" className="text-xs">
-                                  {segment.duration_seconds}s
-                                </Badge>
-                              </div>
-                            </div>
-                            <Textarea
-                              value={segment.text}
-                              onChange={(e) => store.updateScriptSection(sectionType, idx, e.target.value)}
-                              rows={3}
-                              className="resize-none text-sm"
-                            />
-                            <div className="flex justify-end">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={generateScript.isPending}
-                                onClick={() => {
-                                  if (!store.productId || !store.personaId || !store.compositeImagePath) {
-                                    toast.error("Please go back to Step 3 to select a scene image first.");
-                                    return;
-                                  }
-                                  generateScript.mutate(
-                                    {
-                                      product_id: store.productId,
-                                      persona_id: store.personaId,
-                                      mode: store.mode,
-                                      quality: store.quality,
-                                      composite_image_path: store.compositeImagePath,
-                                      cta_style: store.ctaStyle,
-                                      cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
-                                      phase: "script",
-                                    },
-                                    {
-                                      onSuccess: (result) => {
-                                        if (result.script) {
-                                          const newSegments = result.script[sectionType];
-                                          if (newSegments?.[idx]) {
-                                            store.updateScriptSection(sectionType, idx, newSegments[idx].text);
-                                          }
-                                        }
-                                        if (result.generation_id) {
-                                          store.setPendingScript(
-                                            result.generation_id,
-                                            store.pendingScript!,
-                                            store.creditsToCharge ?? 0,
-                                          );
-                                        }
-                                      },
-                                      onError: (err) => {
-                                        toast.error(err.message || "Failed to regenerate");
-                                      },
-                                    },
-                                  );
-                                }}
-                              >
-                                {generateScript.isPending ? (
-                                  <Loader2 className="size-3.5 animate-spin" />
-                                ) : (
-                                  <RefreshCw className="size-3.5" />
-                                )}
-                                Regenerate {singularLabel}
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-
-                    {/* Show alternatives toggle */}
-                    {segments.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowAlts(!showAlts)}
-                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    {/* Generate buttons for advanced mode */}
+                    {generateScript.isPending ? (
+                      <Button disabled size="lg" className="w-full">
+                        <Loader2 className="size-4 animate-spin" />
+                        Generating script…
+                      </Button>
+                    ) : store.pendingScript ? (
+                      <Button
+                        onClick={handleApproveAndGenerate}
+                        disabled={approveAndGenerate.isPending}
+                        size="lg"
+                        className="w-full"
                       >
-                        <ChevronDown className={cn("size-3.5 transition-transform", showAlts && "rotate-180")} />
-                        {showAlts ? "Hide alternatives" : `Show ${segments.length - 1} alternative${segments.length > 2 ? "s" : ""}`}
-                      </button>
+                        {approveAndGenerate.isPending ? (
+                          <><Loader2 className="size-4 animate-spin" />Starting generation...</>
+                        ) : (
+                          <><Zap className="size-4" />Generate Video</>
+                        )}
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={handleGenerateScript}
+                        disabled={
+                          !store.compositeImagePath ||
+                          generateComposites.isPending
+                        }
+                        size="lg"
+                        className="w-full"
+                      >
+                        <Sparkles className="size-4" />
+                        {!store.compositeImagePath && generateComposites.isPending
+                          ? "Preparing scene…"
+                          : "Generate Script"}
+                      </Button>
                     )}
-                  </div>
-                );
-              })}
-
-              {/* Action buttons */}
-              <div className="flex items-center justify-between pt-2">
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    store.clearPendingScript();
-                    store.setStep(4);
-                  }}
-                >
-                  <ArrowLeft className="size-4" />
-                  Back
-                </Button>
-                <Button
-                  onClick={handleApproveAndGenerate}
-                  disabled={approveAndGenerate.isPending}
-                  size="lg"
-                >
-                  {approveAndGenerate.isPending ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin" />
-                      Starting generation...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="size-4" />
-                      Generate Video
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* ── Inline paywall (shown when user clicks Generate with insufficient credits) ── */}
-            {showInlinePaywall && !hasEnoughCredits && (
-              <div className="rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/5 via-background to-background p-5">
-                <div className="flex items-center gap-2 mb-4">
-                  <TrendingUp className="size-5 text-primary" />
-                  <h3 className="text-base font-semibold">Top up to continue</h3>
-                </div>
-
-                {/* First-video discount badge */}
-                {isFirstVideo && (
-                  <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 mb-4 flex items-center gap-2">
-                    <Star className="size-3.5 text-amber-400 shrink-0" fill="currentColor" />
-                    <p className="text-xs font-semibold text-amber-300">First video — 50% off credits (applied automatically)</p>
+                  </>
+                ) : (
+                  /* No segments yet and not initializing — re-init option */
+                  <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-10">
+                    <Settings2 className="size-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Advanced segments failed to generate.</p>
+                    <Button variant="outline" size="sm" onClick={handleInitializeAdvancedSegments}>
+                      Retry
+                    </Button>
                   </div>
                 )}
-
-                {/* Countdown banner for first-purchase offer */}
-                {offer.isActive && (
-                  <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-primary to-orange-500 rounded-lg px-4 py-2.5 mb-4">
-                    <div className="flex items-center gap-2">
-                      <Flame className="size-4 text-white shrink-0" />
-                      <p className="text-sm font-semibold text-white">30% off — new user offer</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-black/20 rounded-md px-2 py-0.5">
-                      <Clock className="size-3 text-white/80" />
-                      <span className="font-mono text-sm font-bold text-white tabular-nums">{offer.timeDisplay}</span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Subscriptions column */}
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                      Subscribe — best value
-                    </p>
-                    <div className="flex flex-col gap-2">
-                      {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
-                        const isGrowth = key === "growth";
-                        const discountedMonthly = offer.isActive ? offer.discountedPrice(plan.price) : null;
-                        return (
-                          <div
-                            key={key}
-                            className={cn(
-                              "relative flex items-center justify-between rounded-lg border px-3 py-2.5",
-                              isGrowth
-                                ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
-                                : "border-border hover:border-primary/30",
-                            )}
-                          >
-                            {isGrowth && (
-                              <div className="absolute -top-2 left-3">
-                                <span className="bg-primary text-white text-[10px] font-semibold rounded-full px-2 py-0.5">
-                                  Most popular
-                                </span>
-                              </div>
-                            )}
-                            <div>
-                              <p className="text-sm font-semibold">{plan.name}</p>
-                              <p className="text-[11px] text-muted-foreground">{plan.credits} cr/mo</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="text-right">
-                                {discountedMonthly !== null ? (
-                                  <>
-                                    <p className="text-sm font-bold text-primary">${discountedMonthly}</p>
-                                    <p className="text-[10px] line-through text-muted-foreground/60">${plan.price}</p>
-                                  </>
-                                ) : (
-                                  <p className="text-sm font-bold">${plan.price}<span className="text-[10px] font-normal text-muted-foreground">/mo</span></p>
-                                )}
-                              </div>
-                              <Button
-                                size="sm"
-                                variant={isGrowth ? "default" : "outline"}
-                                onClick={() => handleCheckout(key)}
-                                disabled={checkout.isPending}
-                                className="shrink-0 text-xs h-8"
-                              >
-                                {checkout.isPending ? <Loader2 className="size-3 animate-spin" /> : "Choose"}
-                              </Button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Credit packs column */}
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                      One-time packs
-                    </p>
-                    <div className="flex flex-col gap-2">
-                      {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => {
-                        const discountedPackPrice = offer.isActive ? offer.discountedPrice(pack.price) : null;
-                        return (
-                          <div
-                            key={key}
-                            className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5 hover:border-primary/30 transition-colors"
-                          >
-                            <div>
-                              <p className="text-sm font-medium">{pack.credits} credits</p>
-                              <p className="text-[11px] text-muted-foreground">{pack.description}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="text-right">
-                                {discountedPackPrice !== null ? (
-                                  <>
-                                    <p className="text-sm font-bold text-primary">${discountedPackPrice}</p>
-                                    <p className="text-[10px] line-through text-muted-foreground/60">${pack.price}</p>
-                                  </>
-                                ) : (
-                                  <p className="text-sm font-semibold">${pack.price}</p>
-                                )}
-                              </div>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleBuyPack(key)}
-                                disabled={buyCredits.isPending}
-                                className="border border-border text-xs h-8"
-                              >
-                                {buyCredits.isPending ? <Loader2 className="size-3 animate-spin" /> : "Buy"}
-                              </Button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                <p className="text-center text-[11px] text-muted-foreground mt-3">
-                  No commitment on packs · Cancel subscriptions anytime
-                </p>
-              </div>
-            )}
-
-            {/* Advanced Mode Panel — full width below the card */}
-            {store.advancedMode && store.advancedSegments && !isInitializingAdvanced && (
-              <div className="mt-4">
-                <AdvancedModePanel
-                  mode={store.mode}
-                  segments={store.advancedSegments}
-                  productId={store.productId!}
-                  personaId={store.personaId!}
-                  format={store.format ?? "9:16"}
-                  mainCompositeSignedUrl={
-                    selectedCompositeIdx !== null
-                      ? compositeImages[selectedCompositeIdx]?.signed_url ?? null
-                      : null
-                  }
-                  onSegmentUpdate={(type, index, patch) =>
-                    store.updateAdvancedSegment(type, index, patch)
-                  }
-                />
               </div>
             )}
           </div>
-        )}
-
-      </div>
-
-      {/* Navigation buttons */}
-      {store.step < 5 && (
-      <div className="flex items-center justify-between border-t border-border pt-4">
-        <Button
-          variant="secondary"
-          onClick={handleBack}
-          disabled={store.step === 1}
-        >
-          <ArrowLeft className="size-4" />
-          Back
-        </Button>
-
-        {store.step < 4 && (
-          <Button onClick={handleNext} disabled={!canProceed()}>
-            Next
-            <ArrowRight className="size-4" />
-          </Button>
-        )}
-      </div>
+        </div>
       )}
 
-      {/* Paywall dialog */}
+      {/* ── Paywall dialog ────────────────────────────────────────────── */}
       <Dialog open={showPaywall} onOpenChange={setShowPaywall}>
         <DialogContent className="sm:max-w-4xl p-0 overflow-hidden max-h-[92vh] flex flex-col">
           <DialogTitle className="sr-only">Upgrade to generate videos</DialogTitle>
           <DialogDescription className="sr-only">Choose a plan or credit pack to start generating video ads.</DialogDescription>
 
-          {/* Promo banner */}
           {offer.isActive && (
             <div className="bg-primary text-white px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm font-medium shrink-0">
               <div className="flex items-center gap-2">
@@ -2254,9 +1803,7 @@ export default function GeneratePage() {
             </div>
           )}
 
-          {/* Scrollable content */}
           <div className="overflow-y-auto flex-1">
-            {/* Header */}
             <div className="text-center max-w-2xl mx-auto pt-10 pb-6 px-6">
               <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground mb-3 tracking-tight">
                 Scale your ad production.
@@ -2268,7 +1815,6 @@ export default function GeneratePage() {
               </p>
             </div>
 
-            {/* Tab toggle */}
             <div className="flex justify-center mb-8 px-4">
               <div className="bg-muted/80 p-1.5 rounded-full inline-flex border border-border shadow-sm">
                 <button
@@ -2308,7 +1854,6 @@ export default function GeneratePage() {
 
             <div className="px-6 pb-10">
               {paywallTab === "single" ? (
-                /* ── Single video widget ─────────────────────────────────── */
                 <div className="max-w-md mx-auto bg-card p-8 rounded-2xl border border-border shadow-sm">
                   <div className="mb-6">
                     <h3 className="text-xl font-bold text-foreground mb-1">Single Video</h3>
@@ -2319,15 +1864,12 @@ export default function GeneratePage() {
                   </div>
 
                   <div className="space-y-3 mb-6">
-                    {/* Standard / Cling 2.6 */}
                     <button
                       type="button"
                       onClick={() => setPaywallQuality("standard")}
                       className={cn(
                         "w-full p-5 rounded-2xl border-2 transition-all duration-200 text-left",
-                        paywallQuality === "standard"
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-muted-foreground/40",
+                        paywallQuality === "standard" ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/40",
                       )}
                     >
                       <div className="flex justify-between items-center">
@@ -2338,7 +1880,7 @@ export default function GeneratePage() {
                           )}>
                             {paywallQuality === "standard" && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
                           </div>
-                          <span className="font-semibold text-foreground">Cling 2.6 · Standard</span>
+                          <span className="font-semibold text-foreground">Kling 2.6 · Standard</span>
                         </div>
                         <div className="flex items-center gap-2">
                           {isFirstVideo && (
@@ -2351,15 +1893,12 @@ export default function GeneratePage() {
                       </div>
                     </button>
 
-                    {/* HD / Cling 3.0 */}
                     <button
                       type="button"
                       onClick={() => setPaywallQuality("hd")}
                       className={cn(
                         "w-full p-5 rounded-2xl border-2 transition-all duration-200 text-left",
-                        paywallQuality === "hd"
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-muted-foreground/40",
+                        paywallQuality === "hd" ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/40",
                       )}
                     >
                       <div className="flex justify-between items-center">
@@ -2371,7 +1910,7 @@ export default function GeneratePage() {
                             {paywallQuality === "hd" && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
                           </div>
                           <div>
-                            <span className="font-semibold text-foreground">Cling 3.0 · HD</span>
+                            <span className="font-semibold text-foreground">Kling 3.0 · HD</span>
                             <span className="ml-2 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Best Quality</span>
                           </div>
                         </div>
@@ -2395,16 +1934,13 @@ export default function GeneratePage() {
                     }}
                     disabled={buyCredits.isPending}
                   >
-                    {buyCredits.isPending
-                      ? <Loader2 className="size-4 animate-spin" />
-                      : "Generate Video →"}
+                    {buyCredits.isPending ? <Loader2 className="size-4 animate-spin" /> : "Generate Video →"}
                   </Button>
                   <p className="text-center text-xs text-muted-foreground mt-3">
                     Buying 10 credits · Unused credits carry over for future videos
                   </p>
                 </div>
               ) : (
-                /* ── Subscription plans ──────────────────────────────────── */
                 <>
                   <div className="grid md:grid-cols-3 gap-5 lg:gap-6">
                     {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
@@ -2458,16 +1994,13 @@ export default function GeneratePage() {
                             onClick={() => handleCheckout(key)}
                             disabled={checkout.isPending}
                           >
-                            {checkout.isPending
-                              ? <Loader2 className="size-4 animate-spin" />
-                              : `Choose ${plan.name}`}
+                            {checkout.isPending ? <Loader2 className="size-4 animate-spin" /> : `Choose ${plan.name}`}
                           </Button>
                         </div>
                       );
                     })}
                   </div>
 
-                  {/* One-time credit packs */}
                   <div className="mt-12 text-center max-w-2xl mx-auto">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-5">
                       Or buy one-time credit packs
@@ -2510,12 +2043,11 @@ export default function GeneratePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Persona limit paywall dialog */}
+      {/* ── Persona limit paywall dialog ─────────────────────────────── */}
       <Dialog open={showPersonaLimitPaywall} onOpenChange={setShowPersonaLimitPaywall}>
         <DialogContent className="sm:max-w-4xl p-0 overflow-hidden max-h-[92vh] flex flex-col">
           <DialogTitle className="sr-only">Upgrade to create more personas</DialogTitle>
 
-          {/* Promo banner */}
           {offer.isActive && (
             <div className="bg-primary text-white px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm font-medium shrink-0">
               <div className="flex items-center gap-2">
@@ -2530,7 +2062,6 @@ export default function GeneratePage() {
           )}
 
           <div className="overflow-y-auto flex-1 px-6 py-8 sm:px-10">
-            {/* Header */}
             <div className="text-center mb-8">
               <div className="inline-flex size-14 items-center justify-center rounded-full bg-primary/10 mb-4">
                 <User className="size-7 text-primary" />
@@ -2549,75 +2080,71 @@ export default function GeneratePage() {
               </p>
             </div>
 
-            {/* Plan cards */}
             {(() => {
               const currentPlan = profile?.plan as PlanTier | undefined;
               const currentLimit = currentPlan && PLANS[currentPlan] ? PLANS[currentPlan].personas : 1;
               return (
-              <div className="grid gap-4 sm:grid-cols-3 max-w-3xl mx-auto">
-                {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
-                  const isGrowth = key === "growth";
-                  const discountedMonthly = offer.isActive ? offer.discountedPrice(plan.price) : null;
-                  const isCurrentPlan = currentPlan === key;
-                  // Disable plans that don't unlock more personas than current plan
-                  const isDowngrade = plan.personas <= currentLimit && !isCurrentPlan;
-                  const isDisabled = checkout.isPending || isCurrentPlan || isDowngrade;
-                  return (
-                    <div
-                      key={key}
-                      className={cn(
-                        "relative rounded-2xl border p-5 flex flex-col gap-4",
-                        isGrowth
-                          ? "border-primary/40 bg-primary/5 shadow-md"
-                          : "border-border bg-card",
-                        isDowngrade && "opacity-40",
-                      )}
-                    >
-                      {isGrowth && (
-                        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-0.5 text-xs">
-                          Most popular
-                        </Badge>
-                      )}
-                      <div>
-                        <p className="font-semibold text-base">{plan.name}</p>
-                        <div className="mt-1 flex items-baseline gap-1">
-                          {discountedMonthly !== null ? (
-                            <>
-                              <span className="text-2xl font-bold">${discountedMonthly}</span>
-                              <span className="text-sm text-muted-foreground line-through">${plan.price}</span>
-                              <span className="text-xs text-muted-foreground">/mo</span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-2xl font-bold">${plan.price}</span>
-                              <span className="text-xs text-muted-foreground">/mo</span>
-                            </>
-                          )}
-                        </div>
-                        <p className="mt-1 text-xs text-orange-500 font-medium">
-                          Up to {plan.personas} persona{plan.personas !== 1 ? "s" : ""}
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant={isGrowth ? "default" : "outline"}
-                        className="w-full font-bold"
-                        onClick={() => {
-                          setShowPersonaLimitPaywall(false);
-                          handleCheckout(key);
-                        }}
-                        disabled={isDisabled}
+                <div className="grid gap-4 sm:grid-cols-3 max-w-3xl mx-auto">
+                  {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
+                    const isGrowth = key === "growth";
+                    const discountedMonthly = offer.isActive ? offer.discountedPrice(plan.price) : null;
+                    const isCurrentPlan = currentPlan === key;
+                    const isDowngrade = plan.personas <= currentLimit && !isCurrentPlan;
+                    const isDisabled = checkout.isPending || isCurrentPlan || isDowngrade;
+                    return (
+                      <div
+                        key={key}
+                        className={cn(
+                          "relative rounded-2xl border p-5 flex flex-col gap-4",
+                          isGrowth ? "border-primary/40 bg-primary/5 shadow-md" : "border-border bg-card",
+                          isDowngrade && "opacity-40",
+                        )}
                       >
-                        {isCurrentPlan
-                          ? "Current plan"
-                          : checkout.isPending
-                          ? <Loader2 className="size-4 animate-spin" />
-                          : `Choose ${plan.name}`}
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
+                        {isGrowth && (
+                          <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-0.5 text-xs">
+                            Most popular
+                          </Badge>
+                        )}
+                        <div>
+                          <p className="font-semibold text-base">{plan.name}</p>
+                          <div className="mt-1 flex items-baseline gap-1">
+                            {discountedMonthly !== null ? (
+                              <>
+                                <span className="text-2xl font-bold">${discountedMonthly}</span>
+                                <span className="text-sm text-muted-foreground line-through">${plan.price}</span>
+                                <span className="text-xs text-muted-foreground">/mo</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-2xl font-bold">${plan.price}</span>
+                                <span className="text-xs text-muted-foreground">/mo</span>
+                              </>
+                            )}
+                          </div>
+                          <p className="mt-1 text-xs text-orange-500 font-medium">
+                            Up to {plan.personas} persona{plan.personas !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant={isGrowth ? "default" : "outline"}
+                          className="w-full font-bold"
+                          onClick={() => {
+                            setShowPersonaLimitPaywall(false);
+                            handleCheckout(key);
+                          }}
+                          disabled={isDisabled}
+                        >
+                          {isCurrentPlan
+                            ? "Current plan"
+                            : checkout.isPending
+                            ? <Loader2 className="size-4 animate-spin" />
+                            : `Choose ${plan.name}`}
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
               );
             })()}
 

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Info } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Tooltip,
   TooltipContent,
@@ -67,7 +66,7 @@ export function AdvancedModePanel({
 
   // Triple mode: tabbed on mobile, 3-column grid on lg+
   const variantColumn = (variantIdx: number) => (
-    <div key={variantIdx} className="flex min-w-[280px] flex-col gap-4">
+    <div key={variantIdx} className="flex flex-col gap-4">
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
         Variant {variantIdx + 1}
         {variantIdx === 0 && (
@@ -126,13 +125,11 @@ export function AdvancedModePanel({
         {variantColumn(activeVariant)}
       </div>
 
-      {/* Desktop: 3-column horizontal scroll */}
+      {/* Desktop: 3-column grid */}
       <div className="hidden lg:block">
-        <ScrollArea className="w-full">
-          <div className="grid min-w-[840px] grid-cols-3 gap-4">
-            {[0, 1, 2].map((variantIdx) => variantColumn(variantIdx))}
-          </div>
-        </ScrollArea>
+        <div className="grid grid-cols-3 gap-4">
+          {[0, 1, 2].map((variantIdx) => variantColumn(variantIdx))}
+        </div>
       </div>
     </>
   );
