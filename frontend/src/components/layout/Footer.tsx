@@ -3,19 +3,20 @@ import { Logo } from "@/components/ui/Logo";
 
 const links = {
   Product: [
-    { label: "Features", href: "#features" },
-    { label: "Pricing", href: "#pricing" },
+    { label: "Features", href: "/#features" },
+    { label: "Pricing", href: "/pricing" },
     { label: "Blog", href: "/blog" },
-    { label: "FAQ", href: "#faq" },
+    { label: "FAQ", href: "/#faq" },
   ],
   Company: [
-    { label: "About", href: "#" },
+    { label: "About", href: "/about" },
     { label: "Blog", href: "/blog" },
-    { label: "Contact", href: "mailto:hello@cinerads.com" },
+    { label: "Contact", href: "/contact" },
   ],
   Legal: [
-    { label: "Terms", href: "#" },
-    { label: "Privacy", href: "#" },
+    { label: "Terms", href: "/terms" },
+    { label: "Privacy", href: "/privacy" },
+    { label: "Cookies", href: "/cookie" },
   ],
 };
 
