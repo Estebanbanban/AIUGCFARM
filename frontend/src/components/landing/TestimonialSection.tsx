@@ -14,8 +14,8 @@ export function TestimonialSection() {
             minutes.
           </blockquote>
           <div className="mt-8">
-            <p className="text-sm font-semibold text-white">Axel Ronsin</p>
-            <p className="text-sm text-[#888] mt-1">Founder, CineRads</p>
+            <p className="text-sm font-semibold text-white">Esteban &amp; Antoine</p>
+            <p className="text-sm text-[#888] mt-1">Founders, CineRads</p>
           </div>
         </FadeInUp>
       </div>
