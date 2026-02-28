@@ -231,6 +231,8 @@ export default function GeneratePage() {
   const queryClient = useQueryClient();
   const store = useGenerationWizardStore();
   const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallTab, setPaywallTab] = useState<"single" | "subscription">("single");
+  const [paywallQuality, setPaywallQuality] = useState<"standard" | "hd">("standard");
 
   // Validate persisted pendingGenerationId against DB on mount.
   // If the generation no longer exists or moved past awaiting_approval, clear stale script.
@@ -261,6 +263,7 @@ export default function GeneratePage() {
   const [showScrapeResults, setShowScrapeResults] = useState(false);
 
   // Step 2, persona builder state (tab removed — persona creation is now a separate page)
+  const [showPersonaLimitPaywall, setShowPersonaLimitPaywall] = useState(false);
 
   // Step 3, composite preview state
   const [compositeImages, setCompositeImages] = useState<
@@ -845,7 +848,57 @@ export default function GeneratePage() {
       <div className="min-h-[400px]">
         {/* ── Step 1: Product ───────────────────────────────────────────── */}
         {store.step === 1 && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-6">
+            {/* Format picker — big cards at the top of step 1 */}
+            <div>
+              <p className="mb-3 text-sm font-medium">Video format</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => store.setFormat("9:16")}
+                  className={cn(
+                    "flex flex-col items-center gap-3 rounded-xl border-2 p-5 transition-all",
+                    store.format === "9:16"
+                      ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                      : "border-border hover:border-muted-foreground/40 hover:bg-muted/30",
+                  )}
+                >
+                  <div className={cn(
+                    "flex items-center justify-center rounded-lg border-2 h-16 w-9",
+                    store.format === "9:16" ? "border-primary/40 bg-primary/5" : "border-border bg-muted/50",
+                  )}>
+                    <Smartphone className={cn("size-4", store.format === "9:16" ? "text-primary" : "text-muted-foreground")} />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold">Portrait</p>
+                    <p className="text-xs text-muted-foreground">9:16 · TikTok · Reels</p>
+                  </div>
+                  {store.format === "9:16" && <Check className="size-3.5 text-primary" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => store.setFormat("16:9")}
+                  className={cn(
+                    "flex flex-col items-center gap-3 rounded-xl border-2 p-5 transition-all",
+                    store.format === "16:9"
+                      ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                      : "border-border hover:border-muted-foreground/40 hover:bg-muted/30",
+                  )}
+                >
+                  <div className={cn(
+                    "flex items-center justify-center rounded-lg border-2 h-9 w-16",
+                    store.format === "16:9" ? "border-primary/40 bg-primary/5" : "border-border bg-muted/50",
+                  )}>
+                    <Monitor className={cn("size-4", store.format === "16:9" ? "text-primary" : "text-muted-foreground")} />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold">Landscape</p>
+                    <p className="text-xs text-muted-foreground">16:9 · YouTube · Ads</p>
+                  </div>
+                  {store.format === "16:9" && <Check className="size-3.5 text-primary" />}
+                </button>
+              </div>
+            </div>
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Select a Product</h2>
               {!showAddProductForm && confirmedProducts.length > 0 && (
@@ -952,8 +1005,7 @@ export default function GeneratePage() {
                 </Tabs>
               )
             ) : confirmedProducts.length > 0 ? (
-              <>
-              {/* Product grid */}
+              /* Product grid */
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {confirmedProducts.map((product) => (
                   <div key={product.id} className="relative">
@@ -1019,47 +1071,6 @@ export default function GeneratePage() {
                   </div>
                 ))}
               </div>
-              {/* Format picker — choose before proceeding */}
-              <div>
-                <p className="mb-2 text-sm font-medium">Video format</p>
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => store.setFormat("9:16")}
-                    className={cn(
-                      "flex items-center gap-2 rounded-xl border-2 px-4 py-3 transition-all",
-                      store.format === "9:16"
-                        ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                        : "border-border hover:border-muted-foreground/40 hover:bg-muted/30",
-                    )}
-                  >
-                    <Smartphone className="size-4 shrink-0" />
-                    <div className="text-left">
-                      <p className="text-sm font-semibold">Portrait</p>
-                      <p className="text-xs text-muted-foreground">9:16 · TikTok · Reels</p>
-                    </div>
-                    {store.format === "9:16" && <Check className="ml-1 size-3.5 text-primary" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => store.setFormat("16:9")}
-                    className={cn(
-                      "flex items-center gap-2 rounded-xl border-2 px-4 py-3 transition-all",
-                      store.format === "16:9"
-                        ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                        : "border-border hover:border-muted-foreground/40 hover:bg-muted/30",
-                    )}
-                  >
-                    <Monitor className="size-4 shrink-0" />
-                    <div className="text-left">
-                      <p className="text-sm font-semibold">Landscape</p>
-                      <p className="text-xs text-muted-foreground">16:9 · YouTube · Ads</p>
-                    </div>
-                    {store.format === "16:9" && <Check className="ml-1 size-3.5 text-primary" />}
-                  </button>
-                </div>
-              </div>
-              </>
             ) : null}
           </div>
         )}
@@ -1076,68 +1087,104 @@ export default function GeneratePage() {
                 ))}
               </div>
             ) : activePersonas.length > 0 ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {activePersonas.map((persona) => {
-                  const hasImage = !!(persona.selected_image_url || persona.generated_images?.[0]);
-                  return (
-                  <button
-                    key={persona.id}
-                    onClick={() => {
-                      if (!hasImage) return;
-                      store.setPersonaId(persona.id);
-                      handleGenerateComposites(undefined, persona.id);
-                      generationFiredForFormat.current = store.format;
-                    }}
-                    disabled={!hasImage}
-                    className={cn("text-left", !hasImage && "cursor-not-allowed opacity-50")}
-                  >
-                    <Card
-                      className={cn(
-                        "h-full transition-all",
-                        store.personaId === persona.id
-                          ? "border-primary ring-1 ring-primary/30"
-                          : hasImage
-                          ? "hover:border-muted-foreground/30"
-                          : "",
-                      )}
+              (() => {
+                const plan = profile?.plan as PlanTier | undefined;
+                const personaLimit = plan && PLANS[plan] ? PLANS[plan].personas : 1;
+                const atLimit = activePersonas.length >= personaLimit;
+                return (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {activePersonas.map((persona) => {
+                    const hasImage = !!(persona.selected_image_url || persona.generated_images?.[0]);
+                    return (
+                    <button
+                      key={persona.id}
+                      onClick={() => {
+                        if (!hasImage) return;
+                        store.setPersonaId(persona.id);
+                        handleGenerateComposites(undefined, persona.id);
+                        generationFiredForFormat.current = store.format;
+                      }}
+                      disabled={!hasImage}
+                      className={cn("text-left", !hasImage && "cursor-not-allowed opacity-50")}
                     >
-                      <CardContent className="flex flex-col items-center gap-3 p-6">
-                        <div className="flex size-20 items-center justify-center rounded-full bg-muted">
-                          {personaImageMap[persona.id] ? (
-                            <img
-                              src={personaImageMap[persona.id]!}
-                              alt={persona.name}
-                              className="size-full rounded-full object-cover"
-                            />
-                          ) : (
-                            <User className="size-8 text-muted-foreground" />
-                          )}
+                      <Card
+                        className={cn(
+                          "h-full transition-all",
+                          store.personaId === persona.id
+                            ? "border-primary ring-1 ring-primary/30"
+                            : hasImage
+                            ? "hover:border-muted-foreground/30"
+                            : "",
+                        )}
+                      >
+                        <CardContent className="flex flex-col items-center gap-3 p-6">
+                          <div className="flex size-20 items-center justify-center rounded-full bg-muted">
+                            {personaImageMap[persona.id] ? (
+                              <img
+                                src={personaImageMap[persona.id]!}
+                                alt={persona.name}
+                                className="size-full rounded-full object-cover"
+                              />
+                            ) : (
+                              <User className="size-8 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div className="text-center">
+                            <h3 className="font-medium">{persona.name}</h3>
+                            <p className="text-xs text-muted-foreground">
+                              {persona.attributes.gender} /{" "}
+                              {persona.attributes.age} /{" "}
+                              {persona.attributes.clothing_style}
+                            </p>
+                          </div>
+                          {!hasImage ? (
+                            <div className="flex items-center gap-1.5 text-xs text-amber-500">
+                              <AlertCircle className="size-3.5" />
+                              Needs image — visit Personas
+                            </div>
+                          ) : store.personaId === persona.id ? (
+                            <div className="flex items-center gap-1.5 text-xs text-primary">
+                              <Check className="size-3.5" />
+                              Selected
+                            </div>
+                          ) : null}
+                        </CardContent>
+                      </Card>
+                    </button>
+                    );
+                  })}
+
+                  {/* ── New Persona card ───────────────────────────────── */}
+                  <button
+                    className="text-left"
+                    onClick={() => {
+                      if (atLimit) {
+                        offer.startOffer();
+                        setShowPersonaLimitPaywall(true);
+                      } else {
+                        router.push("/personas/new?returnTo=/generate");
+                      }
+                    }}
+                  >
+                    <Card className="h-full border-dashed transition-all hover:border-muted-foreground/40">
+                      <CardContent className="flex flex-col items-center justify-center gap-3 p-6 h-full min-h-[200px]">
+                        <div className="flex size-14 items-center justify-center rounded-full bg-muted">
+                          <Plus className="size-6 text-muted-foreground" />
                         </div>
                         <div className="text-center">
-                          <h3 className="font-medium">{persona.name}</h3>
-                          <p className="text-xs text-muted-foreground">
-                            {persona.attributes.gender} /{" "}
-                            {persona.attributes.age} /{" "}
-                            {persona.attributes.clothing_style}
-                          </p>
+                          <p className="text-sm font-medium">New Persona</p>
+                          {atLimit && (
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {personaLimit}/{personaLimit} used · upgrade to add more
+                            </p>
+                          )}
                         </div>
-                        {!hasImage ? (
-                          <div className="flex items-center gap-1.5 text-xs text-amber-500">
-                            <AlertCircle className="size-3.5" />
-                            Needs image — visit Personas
-                          </div>
-                        ) : store.personaId === persona.id ? (
-                          <div className="flex items-center gap-1.5 text-xs text-primary">
-                            <Check className="size-3.5" />
-                            Selected
-                          </div>
-                        ) : null}
                       </CardContent>
                     </Card>
                   </button>
-                  );
-                })}
-              </div>
+                </div>
+                );
+              })()
             ) : (
               <Card className="border-border bg-card">
                 <CardContent className="flex flex-col items-center gap-3 py-10">
@@ -2222,193 +2269,387 @@ export default function GeneratePage() {
 
       {/* Paywall dialog */}
       <Dialog open={showPaywall} onOpenChange={setShowPaywall}>
-        <DialogContent className="sm:max-w-lg p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-4xl p-0 overflow-hidden max-h-[92vh] flex flex-col">
+          <DialogTitle className="sr-only">Upgrade to generate videos</DialogTitle>
+          <DialogDescription className="sr-only">Choose a plan or credit pack to start generating video ads.</DialogDescription>
 
-          {/* ── Countdown banner (first-paywall offer) ───────────────────── */}
+          {/* Promo banner */}
           {offer.isActive && (
-            <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-primary to-orange-500 px-5 py-3">
+            <div className="bg-primary text-white px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm font-medium shrink-0">
               <div className="flex items-center gap-2">
-                <Flame className="size-4 text-white shrink-0" />
-                <p className="text-sm font-semibold text-white">
-                  New user offer — 30% off everything
-                </p>
+                <Flame className="size-4 shrink-0" />
+                <span>Limited Offer: 50% OFF your first video &amp; 30% OFF all plans.</span>
               </div>
-              <div className="flex items-center gap-1.5 bg-black/20 rounded-md px-2.5 py-1 shrink-0">
-                <Clock className="size-3 text-white/80" />
-                <span className="font-mono text-sm font-bold text-white tabular-nums">
-                  {offer.timeDisplay}
-                </span>
+              <div className="flex items-center gap-2 bg-black/15 px-2.5 py-0.5 rounded font-mono">
+                <Clock className="size-3 opacity-80" />
+                <span className="tabular-nums">{offer.timeDisplay}</span>
               </div>
             </div>
           )}
 
-          {/* ── Hero ─────────────────────────────────────────────────────── */}
-          <div className="bg-gradient-to-br from-primary/15 via-primary/5 to-background px-6 pt-5 pb-4">
-            <div className="flex items-start gap-3 mb-4">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/20">
-                <TrendingUp className="size-5 text-primary" />
-              </div>
-              <div>
-                <DialogTitle className="text-lg font-bold leading-tight">
-                  {creditsRemaining > 0
-                    ? "Top up to keep going"
-                    : "Add credits to generate your video"}
-                </DialogTitle>
-                <DialogDescription className="mt-1 text-sm">
-                  {creditsRemaining > 0
-                    ? `You have ${creditsRemaining} credit${creditsRemaining !== 1 ? "s" : ""} — this generation needs ${effectiveCost}. Pick a plan or pack below.`
-                    : "Traditional UGC creators charge $150–$500 per video. You're getting the same quality for a fraction of the cost."}
-                </DialogDescription>
+          {/* Scrollable content */}
+          <div className="overflow-y-auto flex-1">
+            {/* Header */}
+            <div className="text-center max-w-2xl mx-auto pt-10 pb-6 px-6">
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground mb-3 tracking-tight">
+                Scale your ad production.
+              </h2>
+              <p className="text-muted-foreground font-medium">
+                Traditional UGC costs{" "}
+                <span className="line-through decoration-muted-foreground/50">$150–$500</span>.
+                {" "}Get the same quality instantly for a fraction of the cost.
+              </p>
+            </div>
+
+            {/* Tab toggle */}
+            <div className="flex justify-center mb-8 px-4">
+              <div className="bg-muted/80 p-1.5 rounded-full inline-flex border border-border shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setPaywallTab("single")}
+                  className={cn(
+                    "px-8 py-2.5 text-sm font-bold rounded-full transition-all duration-200",
+                    paywallTab === "single"
+                      ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Try 1 Video
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaywallTab("subscription")}
+                  className={cn(
+                    "flex items-center gap-2 px-8 py-2.5 text-sm font-bold rounded-full transition-all duration-200",
+                    paywallTab === "subscription"
+                      ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Subscribe &amp; Save
+                  <span className={cn(
+                    "text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold",
+                    paywallTab === "subscription"
+                      ? "bg-primary/10 text-primary"
+                      : "bg-muted-foreground/20 text-muted-foreground",
+                  )}>
+                    -30%
+                  </span>
+                </button>
               </div>
             </div>
 
-            {/* First-video credit discount (backend reduction — separate from price offer) */}
-            {isFirstVideo && (
-              <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-3 flex items-start gap-2.5">
-                <Star className="size-4 text-amber-400 shrink-0 mt-0.5" fill="currentColor" />
-                <div>
-                  <p className="text-sm font-semibold text-amber-300">First video — 50% off credits</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Your first generation costs half the credits. Applies automatically.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
+            <div className="px-6 pb-10">
+              {paywallTab === "single" ? (
+                /* ── Single video widget ─────────────────────────────────── */
+                <div className="max-w-md mx-auto bg-card p-8 rounded-2xl border border-border shadow-sm">
+                  <div className="mb-6">
+                    <h3 className="text-xl font-bold text-foreground mb-1">Single Video</h3>
+                    <p className="text-muted-foreground text-sm leading-relaxed">
+                      Experience the quality before committing.
+                      {isFirstVideo && " Your first generation automatically includes a 50% discount."}
+                    </p>
+                  </div>
 
-          <div className="flex flex-col gap-5 px-6 py-5">
-            {/* Subscription plans */}
-            <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Subscribe — best value per credit
-                </p>
-                <span className="text-xs text-muted-foreground">vs $150–$500/video traditional</span>
-              </div>
-              <div className="flex flex-col gap-2">
-                {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
-                  const isGrowth = key === "growth";
-                  const discountedMonthly = offer.isActive ? offer.discountedPrice(plan.price) : null;
-                  return (
-                    <div
-                      key={key}
+                  <div className="space-y-3 mb-6">
+                    {/* Standard / Cling 2.6 */}
+                    <button
+                      type="button"
+                      onClick={() => setPaywallQuality("standard")}
                       className={cn(
-                        "relative flex items-center justify-between rounded-xl border px-4 py-3 transition-colors",
-                        isGrowth
-                          ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
-                          : "border-border hover:border-primary/30",
+                        "w-full p-5 rounded-2xl border-2 transition-all duration-200 text-left",
+                        paywallQuality === "standard"
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-muted-foreground/40",
                       )}
                     >
-                      {isGrowth && (
-                        <div className="absolute -top-2.5 left-4">
-                          <span className="bg-primary text-white text-[10px] font-semibold rounded-full px-2 py-0.5">
-                            Most popular
-                          </span>
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-5 h-5 rounded-full border flex items-center justify-center shrink-0",
+                            paywallQuality === "standard" ? "border-primary" : "border-muted-foreground/40",
+                          )}>
+                            {paywallQuality === "standard" && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
+                          </div>
+                          <span className="font-semibold text-foreground">Cling 2.6 · Standard</span>
                         </div>
-                      )}
-                      <div>
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold">{plan.name}</p>
-                          <span className="text-xs text-muted-foreground">
-                            {plan.credits} cr/mo
+                          {isFirstVideo && (
+                            <span className="text-sm text-muted-foreground line-through font-medium">${CREDITS_PER_SINGLE}.00</span>
+                          )}
+                          <span className="font-bold text-foreground text-lg">
+                            ${isFirstVideo ? (CREDITS_PER_SINGLE / 2).toFixed(2) : `${CREDITS_PER_SINGLE}.00`}
                           </span>
                         </div>
-                        <p className="text-xs text-emerald-400 mt-0.5">
-                          ≈ ${(plan.price / (plan.credits / 5)).toFixed(2)}/video vs $150–$500 traditional
-                        </p>
                       </div>
-                      <div className="flex items-center gap-3 ml-4">
-                        <div className="text-right">
-                          {discountedMonthly !== null ? (
-                            <>
-                              <div className="flex items-baseline gap-1 justify-end">
-                                <p className="text-base font-bold text-primary">${discountedMonthly}</p>
-                                <p className="text-[10px] text-muted-foreground">/mo</p>
-                              </div>
-                              <p className="text-[10px] line-through text-muted-foreground/60">
-                                ${plan.price}/mo
-                              </p>
-                            </>
-                          ) : (
-                            <>
-                              <p className="text-sm font-bold">${plan.price}</p>
-                              <p className="text-[10px] text-muted-foreground">/mo</p>
-                            </>
-                          )}
+                    </button>
+
+                    {/* HD / Cling 3.0 */}
+                    <button
+                      type="button"
+                      onClick={() => setPaywallQuality("hd")}
+                      className={cn(
+                        "w-full p-5 rounded-2xl border-2 transition-all duration-200 text-left",
+                        paywallQuality === "hd"
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-muted-foreground/40",
+                      )}
+                    >
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-5 h-5 rounded-full border flex items-center justify-center shrink-0",
+                            paywallQuality === "hd" ? "border-primary" : "border-muted-foreground/40",
+                          )}>
+                            {paywallQuality === "hd" && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
+                          </div>
+                          <div>
+                            <span className="font-semibold text-foreground">Cling 3.0 · HD</span>
+                            <span className="ml-2 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Best Quality</span>
+                          </div>
                         </div>
-                        <Button
-                          size="sm"
-                          variant={isGrowth ? "default" : "outline"}
-                          onClick={() => handleCheckout(key)}
-                          disabled={checkout.isPending}
-                          className="shrink-0"
-                        >
-                          {checkout.isPending ? (
-                            <Loader2 className="size-3 animate-spin" />
-                          ) : (
-                            isGrowth ? "Start now →" : "Choose"
+                        <div className="flex items-center gap-2">
+                          {isFirstVideo && (
+                            <span className="text-sm text-muted-foreground line-through font-medium">${CREDITS_PER_SINGLE_HD}.00</span>
                           )}
-                        </Button>
+                          <span className="font-bold text-foreground text-lg">
+                            ${isFirstVideo ? (CREDITS_PER_SINGLE_HD / 2).toFixed(2) : `${CREDITS_PER_SINGLE_HD}.00`}
+                          </span>
+                        </div>
                       </div>
+                    </button>
+                  </div>
+
+                  <Button
+                    className="w-full py-6 text-base font-bold"
+                    onClick={() => {
+                      store.setQuality(paywallQuality);
+                      handleBuyPack("pack_10");
+                    }}
+                    disabled={buyCredits.isPending}
+                  >
+                    {buyCredits.isPending
+                      ? <Loader2 className="size-4 animate-spin" />
+                      : "Generate Video →"}
+                  </Button>
+                  <p className="text-center text-xs text-muted-foreground mt-3">
+                    Buying 10 credits · Unused credits carry over for future videos
+                  </p>
+                </div>
+              ) : (
+                /* ── Subscription plans ──────────────────────────────────── */
+                <>
+                  <div className="grid md:grid-cols-3 gap-5 lg:gap-6">
+                    {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
+                      const isGrowth = key === "growth";
+                      const discountedMonthly = offer.isActive ? offer.discountedPrice(plan.price) : null;
+                      const PLAN_BENEFITS: Record<PlanTier, string[]> = {
+                        starter: ["Standard rendering queue", "Watermark-free exports", "Commercial use license", "Standard support"],
+                        growth: ["Fast rendering priority", "Watermark-free exports", "Commercial use license", "Priority support", "API Access"],
+                        scale: ["Highest rendering priority", "Watermark-free exports", "Commercial use license", "Dedicated manager", "Custom API limits"],
+                      };
+                      return (
+                        <div
+                          key={key}
+                          className={cn(
+                            "bg-card rounded-2xl p-7 relative flex flex-col",
+                            isGrowth ? "border-2 border-primary shadow-lg" : "border border-border shadow-sm",
+                          )}
+                        >
+                          {isGrowth && (
+                            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-primary text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm whitespace-nowrap">
+                              Most Popular
+                            </div>
+                          )}
+                          <div className="mb-6">
+                            <h3 className="text-xl font-bold text-foreground tracking-tight mb-1">{plan.name}</h3>
+                            <p className="text-muted-foreground text-sm font-medium">{plan.credits} credits / mo</p>
+                          </div>
+                          <div className="mb-6">
+                            <div className="flex items-end gap-2 mb-1">
+                              <span className="text-4xl font-extrabold text-foreground tracking-tighter">
+                                ${discountedMonthly ?? plan.price}
+                              </span>
+                              <span className="text-muted-foreground font-medium mb-1">/mo</span>
+                            </div>
+                            {discountedMonthly !== null && (
+                              <div className="flex items-center gap-2 text-sm font-medium">
+                                <span className="line-through text-muted-foreground">${plan.price}/mo</span>
+                                <span className="text-primary bg-primary/10 px-2 py-0.5 rounded-md text-xs font-bold">30% OFF</span>
+                              </div>
+                            )}
+                            <div className="mt-3 inline-flex bg-muted border border-border text-muted-foreground text-xs font-bold px-3 py-1.5 rounded-lg">
+                              ≈ ${(plan.price / (plan.credits / CREDITS_PER_SINGLE)).toFixed(2)}/video
+                            </div>
+                          </div>
+                          <ul className="space-y-3 mb-8 flex-grow">
+                            {PLAN_BENEFITS[key].map((benefit, i) => (
+                              <li key={i} className="flex items-start gap-2.5 text-sm text-muted-foreground font-medium leading-tight">
+                                <Check className="size-4 text-primary shrink-0 mt-0.5" />
+                                {benefit}
+                              </li>
+                            ))}
+                          </ul>
+                          <Button
+                            variant={isGrowth ? "default" : "outline"}
+                            className="w-full py-5 font-bold"
+                            onClick={() => handleCheckout(key)}
+                            disabled={checkout.isPending}
+                          >
+                            {checkout.isPending
+                              ? <Loader2 className="size-4 animate-spin" />
+                              : `Choose ${plan.name}`}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* One-time credit packs */}
+                  <div className="mt-12 text-center max-w-2xl mx-auto">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-5">
+                      Or buy one-time credit packs
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-3">
+                      {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => {
+                        const discountedPackPrice = offer.isActive ? offer.discountedPrice(pack.price) : null;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => handleBuyPack(key)}
+                            disabled={buyCredits.isPending}
+                            className="px-6 py-3 rounded-xl border border-border bg-card hover:border-muted-foreground/40 transition-colors text-sm disabled:opacity-50"
+                          >
+                            <span className="font-bold text-foreground">{pack.credits} credits</span>
+                            {" "}
+                            <span className="text-muted-foreground">
+                              — {discountedPackPrice !== null ? (
+                                <>
+                                  <span className="line-through">${pack.price}</span>{" "}
+                                  <span className="text-primary font-semibold">${discountedPackPrice}</span>
+                                </>
+                              ) : (
+                                `$${pack.price}`
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
-                  );
-                })}
+                    <p className="mt-5 text-xs text-muted-foreground">
+                      No commitment on packs · Cancel subscriptions anytime
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Persona limit paywall dialog */}
+      <Dialog open={showPersonaLimitPaywall} onOpenChange={setShowPersonaLimitPaywall}>
+        <DialogContent className="sm:max-w-4xl p-0 overflow-hidden max-h-[92vh] flex flex-col">
+          <DialogTitle className="sr-only">Upgrade to create more personas</DialogTitle>
+
+          {/* Promo banner */}
+          {offer.isActive && (
+            <div className="bg-primary text-white px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm font-medium shrink-0">
+              <div className="flex items-center gap-2">
+                <Flame className="size-4" />
+                <span>Limited-time offer — 30% off your first plan</span>
+              </div>
+              <div className="flex items-center gap-2 bg-black/15 px-2.5 py-0.5 rounded font-mono">
+                <Clock className="size-3 opacity-80" />
+                <span className="tabular-nums">{offer.timeDisplay}</span>
               </div>
             </div>
+          )}
 
-            <div className="flex items-center gap-3">
-              <div className="flex-1 border-t border-border" />
-              <span className="text-xs text-muted-foreground">or buy a one-time pack</span>
-              <div className="flex-1 border-t border-border" />
+          <div className="overflow-y-auto flex-1 px-6 py-8 sm:px-10">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <div className="inline-flex size-14 items-center justify-center rounded-full bg-primary/10 mb-4">
+                <User className="size-7 text-primary" />
+              </div>
+              <h2 className="text-2xl font-bold tracking-tight">
+                {offer.isActive ? "Unlock More Personas — 30% Off" : "Unlock More Personas"}
+              </h2>
+              <p className="mt-2 text-muted-foreground max-w-md mx-auto">
+                {(() => {
+                  const plan = profile?.plan as PlanTier | undefined;
+                  const personaLimit = plan && PLANS[plan] ? PLANS[plan].personas : 1;
+                  return plan
+                    ? `Your ${PLANS[plan as PlanTier]?.name ?? "current"} plan is limited to ${personaLimit} persona${personaLimit !== 1 ? "s" : ""}. Upgrade to create more.`
+                    : "The free plan is limited to 1 persona. Upgrade to create more.";
+                })()}
+              </p>
             </div>
 
-            {/* Credit packs */}
-            <div className="flex flex-col gap-1.5">
-              {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => {
-                const discountedPackPrice = offer.isActive ? offer.discountedPrice(pack.price) : null;
+            {/* Plan cards */}
+            <div className="grid gap-4 sm:grid-cols-3 max-w-3xl mx-auto">
+              {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
+                const isGrowth = key === "growth";
+                const discountedMonthly = offer.isActive ? offer.discountedPrice(plan.price) : null;
+                const isCurrentPlan = (profile?.plan as PlanTier | undefined) === key;
                 return (
                   <div
                     key={key}
-                    className="flex items-center justify-between rounded-lg border border-border px-4 py-2.5 hover:border-primary/30 transition-colors"
+                    className={cn(
+                      "relative rounded-2xl border p-5 flex flex-col gap-4",
+                      isGrowth
+                        ? "border-primary/40 bg-primary/5 shadow-md"
+                        : "border-border bg-card",
+                    )}
                   >
+                    {isGrowth && (
+                      <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-0.5 text-xs">
+                        Most popular
+                      </Badge>
+                    )}
                     <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium">{pack.credits} credits</p>
-                        {"badge" in pack && pack.badge && (
-                          <Badge variant="secondary" className="text-[10px]">{pack.badge}</Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {pack.description}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        {discountedPackPrice !== null ? (
+                      <p className="font-semibold text-base">{plan.name}</p>
+                      <div className="mt-1 flex items-baseline gap-1">
+                        {discountedMonthly !== null ? (
                           <>
-                            <p className="text-sm font-bold text-primary">${discountedPackPrice}</p>
-                            <p className="text-[10px] line-through text-muted-foreground/60">${pack.price}</p>
+                            <span className="text-2xl font-bold">${discountedMonthly}</span>
+                            <span className="text-sm text-muted-foreground line-through">${plan.price}</span>
+                            <span className="text-xs text-muted-foreground">/mo</span>
                           </>
                         ) : (
-                          <p className="text-sm font-semibold">${pack.price}</p>
+                          <>
+                            <span className="text-2xl font-bold">${plan.price}</span>
+                            <span className="text-xs text-muted-foreground">/mo</span>
+                          </>
                         )}
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleBuyPack(key)}
-                        disabled={buyCredits.isPending}
-                        className="border border-border"
-                      >
-                        {buyCredits.isPending ? <Loader2 className="size-3 animate-spin" /> : "Buy"}
-                      </Button>
+                      <p className="mt-1 text-xs text-orange-500 font-medium">
+                        Up to {plan.personas} persona{plan.personas !== 1 ? "s" : ""}
+                      </p>
                     </div>
+                    <Button
+                      size="sm"
+                      variant={isGrowth ? "default" : "outline"}
+                      className="w-full font-bold"
+                      onClick={() => {
+                        setShowPersonaLimitPaywall(false);
+                        handleCheckout(key);
+                      }}
+                      disabled={checkout.isPending || isCurrentPlan}
+                    >
+                      {isCurrentPlan
+                        ? "Current plan"
+                        : checkout.isPending
+                        ? <Loader2 className="size-4 animate-spin" />
+                        : `Choose ${plan.name}`}
+                    </Button>
                   </div>
                 );
               })}
             </div>
 
-            <p className="text-center text-[11px] text-muted-foreground -mt-1">
+            <p className="mt-6 text-center text-xs text-muted-foreground">
               No commitment on packs · Cancel subscriptions anytime
             </p>
           </div>
