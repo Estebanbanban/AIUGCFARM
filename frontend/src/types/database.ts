@@ -145,6 +145,7 @@ export interface Generation {
   mode: "single" | "triple";
   video_quality: "standard" | "hd";
   kling_model: "kling-v2-6" | "kling-v3" | "kling-v3-0" | null;
+  language: string;
   status: GenerationStatus;
   script: GenerationScript | null;
   composite_image_url: string | null;

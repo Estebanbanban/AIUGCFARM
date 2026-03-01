@@ -26,6 +26,7 @@ interface GenerationWizardState {
     | "direct_website"
     | "discount_code";
   ctaCommentKeyword: string;
+  language: string;
   compositeImagePath: string | null;
   pendingGenerationId: string | null;
   pendingScript: PendingScript | null;
@@ -52,6 +53,7 @@ interface GenerationWizardState {
       | "discount_code",
   ) => void;
   setCtaCommentKeyword: (keyword: string) => void;
+  setLanguage: (lang: string) => void;
   setCompositeImagePath: (path: string | null) => void;
   setPendingScript: (id: string, script: PendingScript, credits: number) => void;
   updateScriptSection: (type: "hooks" | "bodies" | "ctas", index: number, text: string) => void;
@@ -87,6 +89,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
       format: null,
       ctaStyle: "auto",
       ctaCommentKeyword: "",
+      language: "en",
       compositeImagePath: null,
       pendingGenerationId: null,
       pendingScript: null,
@@ -128,6 +131,10 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
       setCtaCommentKeyword: (keyword) =>
         set((state) => {
           state.ctaCommentKeyword = keyword;
+        }),
+      setLanguage: (lang) =>
+        set((state) => {
+          state.language = lang;
         }),
       setCompositeImagePath: (path) =>
         set((state) => {
@@ -190,6 +197,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
           format: null,
           ctaStyle: "auto" as const,
           ctaCommentKeyword: "",
+          language: "en" as const,
           compositeImagePath: null,
           pendingGenerationId: null,
           pendingScript: null,
@@ -223,6 +231,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
         format: state.format,
         ctaStyle: state.ctaStyle,
         ctaCommentKeyword: state.ctaCommentKeyword,
+        language: state.language,
         compositeImagePath: state.compositeImagePath,
         pendingGenerationId: state.pendingGenerationId,
         pendingScript: state.pendingScript,

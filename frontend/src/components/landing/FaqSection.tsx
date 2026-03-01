@@ -44,27 +44,27 @@ const faqs = [
   {
     question: "Who owns the generated content?",
     answer:
-      "You do. All videos generated on CineRads are yours to use commercially without restriction. We retain no rights to your content.",
+      "You do. All videos generated on Cinerads are yours to use commercially without restriction. We retain no rights to your content.",
   },
   {
     question: "What video quality do I get?",
     answer:
-      "Starter plans export at 720p — ideal for TikTok and Instagram Reels. Growth and Scale plans export at 1080p for maximum quality on any platform.",
+      "Starter plans export at 720p, ideal for TikTok and Instagram Reels. Growth and Scale plans export at 1080p for maximum quality on any platform.",
   },
   {
     question: "Do you offer a refund?",
     answer:
-      "Yes — if your first generation isn't what you expected, we offer a 7-day money-back guarantee. No questions asked. Just contact us at support@cinerads.com.",
+      "Yes. If your first generation isn't what you expected, we offer a 7-day money-back guarantee. No questions asked. Contact us at support@cinerads.com.",
   },
   {
     question: "What's the difference between AI-Written Scripts and Custom Script Editor?",
     answer:
-      "AI-Written Scripts (all plans): CineRads automatically writes your Hook, Body, and CTA scripts from your product data and persona — no copywriting needed. Custom Script Editor (Growth & Scale): Write or edit scripts yourself before generation, perfect for brands with specific messaging or compliance requirements.",
+      "AI-Written Scripts (all plans): Cinerads automatically writes your Hook, Body, and CTA scripts from your product data and persona. No copywriting needed. Custom Script Editor (Growth & Scale): Write or edit scripts yourself before generation, perfect for brands with specific messaging or compliance requirements.",
   },
   {
     question: "What's a segment credit?",
     answer:
-      "One segment credit generates one video clip — either a Hook (3–5s), Body (5–10s), or CTA (3–5s). With 9 segments (3 of each type), you can mix and match 27 unique full-length video ads. Combining segments is always free and uses no credits.",
+      "One segment credit generates one video clip: a Hook (3-5s), Body (5-10s), or CTA (3-5s). With 9 segments (3 of each type), you can mix and match 27 unique full-length video ads. Combining segments is always free and uses no credits.",
   },
 ];
 
@@ -72,12 +72,14 @@ export function FaqSection() {
   const [open, setOpen] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="bg-background-secondary py-24 px-4 sm:px-6">
+    <section id="faq" className="bg-background py-24 px-4 sm:px-6">
       <div className="max-w-2xl mx-auto">
         <FadeInUp className="text-center mb-12">
           <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground mb-3">FAQ</p>
           <h2 className="text-[clamp(2rem,4vw,3rem)] font-semibold tracking-tight text-foreground">
-            Frequently Asked Questions
+            Frequently{" "}
+            <span className="font-serif italic text-primary">Asked</span>{" "}
+            Questions
           </h2>
         </FadeInUp>
 

@@ -31,7 +31,7 @@ export const PLANS = {
     resolution: "720p",
     features: [
       "30 credits/month ($30 value)",
-      "6 standard videos or 3 HD videos",
+      "6 Kling 2.6 or 3 Kling 3.0 videos",
       "1 AI persona",
       "1 brand profile",
       "AI-Written Scripts",
@@ -47,7 +47,7 @@ export const PLANS = {
     resolution: "1080p",
     features: [
       "100 credits/month ($100 value)",
-      "20 standard videos or 10 HD videos",
+      "20 Kling 2.6 or 10 Kling 3.0 videos",
       "3 AI personas",
       "3 brand profiles",
       "AI-Written Scripts + Custom Script Editor",
@@ -64,7 +64,7 @@ export const PLANS = {
     resolution: "1080p",
     features: [
       "250 credits/month ($250 value)",
-      "50 standard videos or 25 HD videos",
+      "50 Kling 2.6 or 25 Kling 3.0 videos",
       "10 AI personas",
       "10 brand profiles",
       "AI-Written Scripts + Custom Script Editor",
@@ -86,21 +86,21 @@ export const CREDIT_PACKS = {
     credits: 10,
     price: 12,
     pricePerCredit: 1.2,
-    description: "2 standard videos or 1 HD video",
+    description: "2 Kling 2.6 or 1 Kling 3.0 video",
   },
   pack_30: {
     name: "Creator Pack",
     credits: 30,
     price: 33,
     pricePerCredit: 1.1,
-    description: "6 standard videos or 3 HD videos",
+    description: "6 Kling 2.6 or 3 Kling 3.0 videos",
   },
   pack_100: {
     name: "Pro Pack",
     credits: 100,
     price: 95,
     pricePerCredit: 0.95,
-    description: "20 standard videos or 10 HD videos",
+    description: "20 Kling 2.6 or 10 Kling 3.0 videos",
     badge: "Best value",
   },
 } as const;

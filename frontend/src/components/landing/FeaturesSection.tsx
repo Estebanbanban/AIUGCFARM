@@ -315,9 +315,9 @@ function AnimationSegmentMixer() {
 
 const features = [
   {
-    title: "Zero-Input Product Import",
+    title: ["Zero-Input Product ", "Import"],
     description:
-      "Paste any Shopify or e-commerce URL. CineRads extracts products, images, prices, and descriptions — then generates a complete brand profile with AI. No CSV uploads, no data entry.",
+      "Paste any Shopify or e-commerce URL. Cinerads extracts products, images, prices, and descriptions, then generates a complete brand profile with AI. No CSV uploads, no data entry.",
     subtext: "Works with Shopify, WooCommerce, and any public product page.",
     bullets: [
       "Auto-detect product data from any URL",
@@ -328,9 +328,9 @@ const features = [
     reversed: false,
   },
   {
-    title: "Your AI Brand Spokesperson",
+    title: ["Your AI Brand ", "Spokesperson"],
     description:
-      "Design a virtual spokesperson with 9 customizable attributes — skin tone, hair, clothing, age, and more. Save once and reuse the same face across every campaign for brand consistency.",
+      "Design a virtual spokesperson with 9 customizable attributes: skin tone, hair, clothing, age, and more. Save once and reuse the same face across every campaign for brand consistency.",
     subtext: "Create multiple personas per brand.",
     bullets: [
       "9 customizable persona attributes",
@@ -341,9 +341,9 @@ const features = [
     reversed: true,
   },
   {
-    title: "Hook-Body-CTA Scripts, Written For You",
+    title: ["Scripts ", "Written For You"],
     description:
-      "AI writes attention-grabbing hooks, benefit-driven bodies, and urgency CTAs — all tuned to your product data and brand voice. Each segment is generated as a short, crisp video clip. No copywriting skills needed.",
+      "AI writes attention-grabbing hooks, benefit-driven bodies, and urgency CTAs tuned to your product data and brand voice. Each segment is generated as a short, crisp video clip. No copywriting skills needed.",
     subtext: "Under 10s per segment for perfect lip-sync.",
     bullets: [
       "AI-generated scripts tuned to your product",
@@ -354,9 +354,9 @@ const features = [
     reversed: false,
   },
   {
-    title: "27 Ad Combos From 9 Segments",
+    title: ["27 Ad Combos From ", "9 Segments"],
     description:
-      "Generate 3 hooks, 3 bodies, and 3 CTAs. Mix and match any combination for 27 unique video ads from a single generation. Assembly is instant — no extra credits.",
+      "Generate 3 hooks, 3 bodies, and 3 CTAs. Mix and match any combination for 27 unique video ads from a single generation. Assembly is instant, no extra credits.",
     subtext: "A/B test hooks, bodies, and CTAs at scale.",
     bullets: [
       "27 unique ad combinations per batch",
@@ -374,15 +374,22 @@ const features = [
 
 export function FeaturesSection() {
   return (
-    <section id="features" className="py-24 md:py-32">
+    <section id="features" className="py-20 md:py-24">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
-        <h2 className="text-[clamp(2rem,4vw,3rem)] font-semibold tracking-tight text-foreground text-center mb-20">
-          Everything You Need to Create UGC Video Ads at Scale
-        </h2>
+        {/* Section heading */}
+        <div className="text-center mb-10">
+          <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground mb-3">Features</p>
+          <h2 className="text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-tight text-foreground">
+            Everything You Need to Create{" "}
+            <span className="font-serif italic text-primary">UGC Video Ads</span>{" "}
+            at Scale
+          </h2>
+        </div>
+
         {features.map((feature, i) => (
           <div
             key={i}
-            className={`flex flex-col gap-12 md:gap-16 py-24 first:pt-0 last:pb-0 ${
+            className={`flex flex-col gap-10 md:gap-12 py-14 first:pt-0 last:pb-0 ${
               feature.reversed ? "md:flex-row-reverse" : "md:flex-row"
             } items-center`}
           >
@@ -393,12 +400,13 @@ export function FeaturesSection() {
                 feature.reversed ? slideInRight.animate : slideInLeft.animate
               }
               viewport={{ once: true }}
-              className="flex-1 space-y-6"
+              className="flex-1 space-y-5"
             >
-              <h3 className="text-3xl md:text-4xl font-bold tracking-tight">
-                {feature.title}
+              <h3 className="text-2xl md:text-3xl font-bold tracking-tight">
+                {feature.title[0]}
+                <span className="font-serif italic text-primary">{feature.title[1]}</span>
               </h3>
-              <p className="text-muted-foreground text-lg leading-relaxed">
+              <p className="text-muted-foreground text-base leading-relaxed">
                 {feature.description}
               </p>
               {feature.subtext && (
@@ -406,7 +414,7 @@ export function FeaturesSection() {
                   {feature.subtext}
                 </p>
               )}
-              <ul className="space-y-3">
+              <ul className="space-y-2.5">
                 {feature.bullets.map((bullet) => (
                   <li key={bullet} className="flex items-center gap-3 text-sm">
                     <div className="size-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0">

@@ -282,7 +282,19 @@ Deno.serve(async (req: Request) => {
           klingResult = await checkKlingJob(jobIds[jobKey]);
         } catch (err) {
           console.error(`Kling check failed for ${jobKey}:`, err);
-          // Treat transient errors as still-in-progress, not failure
+          // Distinguish permanent 4xx errors (quota exhausted, auth failure, bad request)
+          // from transient ones (5xx, 429 rate limit, network flap).
+          // Permanent errors must fail the generation immediately — they will never resolve.
+          const errMsg = err instanceof Error ? err.message : String(err);
+          const statusMatch = errMsg.match(/Kling status error (\d{3})/);
+          const httpStatus = statusMatch ? parseInt(statusMatch[1], 10) : 0;
+          const isPermanent = httpStatus >= 400 && httpStatus < 500 && httpStatus !== 429;
+          if (isPermanent) {
+            anyFailed = true;
+            failedMessage = `Kling API error (${httpStatus}) — ${errMsg}`;
+            break; // No point checking remaining jobs
+          }
+          // Transient: treat as still-in-progress
           continue;
         }
 

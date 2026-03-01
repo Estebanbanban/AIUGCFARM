@@ -104,7 +104,9 @@ export function PricingSection() {
             Traditional UGC creators charge $150-$500 per video.
           </p>
           <h2 className="text-[clamp(2rem,4vw,3rem)] font-semibold tracking-tight text-foreground">
-            Simple, transparent pricing
+            Simple,{" "}
+            <span className="font-serif italic text-primary">transparent</span>{" "}
+            pricing
           </h2>
           <p className="text-muted-foreground mt-3 text-base">
             Start free. Scale when you&apos;re ready.
@@ -223,7 +225,7 @@ export function PricingSection() {
             All plans include: No watermarks · MP4 download · Cancel anytime
           </p>
           <p className="text-center text-xs text-primary mt-3">
-            Beta pricing — lock in your rate forever. Prices increase at public launch.
+            Beta pricing: lock in your rate forever. Prices increase at public launch.
           </p>
         </FadeInUp>
       </div>

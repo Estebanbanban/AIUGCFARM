@@ -27,7 +27,7 @@ export function Footer() {
         <div className="mb-12 grid grid-cols-2 gap-8 md:grid-cols-4">
           <div className="col-span-2 md:col-span-1">
             <Link href="/">
-              <Logo variant="full" size="sm" theme="dark" />
+              <Logo variant="full" size="sm" theme="auto" />
             </Link>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               AI-generated UGC video ads for e-commerce brands.
@@ -57,7 +57,7 @@ export function Footer() {
 
         <div className="border-t border-border pt-8">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} CineRads. All rights reserved.
+            &copy; {new Date().getFullYear()} Cinerads. All rights reserved.
           </p>
         </div>
       </div>

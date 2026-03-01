@@ -5,6 +5,12 @@ import { getAdminClient } from "../_shared/supabase.ts";
 import { callOpenRouter } from "../_shared/openrouter.ts";
 import { withRetry } from "../_shared/retry.ts";
 
+const LANGUAGE_NAMES: Record<string, string> = {
+  es: "Spanish", fr: "French", de: "German", it: "Italian",
+  pt: "Portuguese", ja: "Japanese", zh: "Mandarin Chinese",
+  ar: "Arabic", ru: "Russian",
+};
+
 type SegmentType = "hook" | "body" | "cta";
 
 const SEGMENT_SYSTEM_PROMPTS: Record<SegmentType, string> = {
@@ -45,6 +51,7 @@ function buildUserPrompt(
   variantIndex: number,
   ctaStyle?: string,
   ctaCommentKeyword?: string,
+  language = "en",
 ): string {
   const brandSummary = (product.brand_summary ?? {}) as Record<string, unknown>;
   let base = `Product: ${product.name}
@@ -60,6 +67,10 @@ Variant index: ${variantIndex + 1} (use a DIFFERENT angle than the most obvious 
     if (ctaStyle === "comment_keyword" && ctaCommentKeyword) {
       base += ` — keyword: "${ctaCommentKeyword}"`;
     }
+  }
+
+  if (language !== "en") {
+    base += `\n\nWrite ENTIRELY in ${LANGUAGE_NAMES[language]}. No English.`;
   }
 
   return base;
@@ -90,7 +101,11 @@ Deno.serve(async (req: Request) => {
       variant_index = 0,
       cta_style,
       cta_comment_keyword,
+      language = "en",
     } = await req.json();
+
+    const VALID_LANGUAGES = new Set(["en","es","fr","de","it","pt","ja","zh","ar","ru"]);
+    const resolvedLanguage = VALID_LANGUAGES.has(language) ? language : "en";
 
     if (!product_id) return json({ detail: "product_id is required" }, cors, 400);
     if (!persona_id) return json({ detail: "persona_id is required" }, cors, 400);
@@ -125,11 +140,15 @@ Deno.serve(async (req: Request) => {
     const seg = segment_type as SegmentType;
     const [minDur, maxDur] = DURATION_BOUNDS[seg];
 
+    const systemPrompt = resolvedLanguage !== "en"
+      ? SEGMENT_SYSTEM_PROMPTS[seg] + `\n\nCRITICAL: Write the script text ENTIRELY in ${LANGUAGE_NAMES[resolvedLanguage]}. No English.`
+      : SEGMENT_SYSTEM_PROMPTS[seg];
+
     const rawContent = await withRetry(() =>
       callOpenRouter(
         [
-          { role: "system", content: SEGMENT_SYSTEM_PROMPTS[seg] },
-          { role: "user", content: buildUserPrompt(product, seg, variant_index, cta_style, cta_comment_keyword) },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: buildUserPrompt(product, seg, variant_index, cta_style, cta_comment_keyword, resolvedLanguage) },
         ],
         { maxTokens: 300, timeoutMs: 20000, jsonMode: true },
       )

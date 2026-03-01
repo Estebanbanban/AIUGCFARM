@@ -16,7 +16,7 @@ export function UrlInputCta({ location = "hero" }: { location?: "hero" | "final_
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-xl mx-auto">
+    <form onSubmit={handleSubmit} className="max-w-2xl mx-auto">
       <div
         className="relative flex items-center rounded-full border border-border bg-card/90 transition-all duration-200 focus-within:border-primary/50 focus-within:shadow-[0_0_20px_rgba(249,115,22,0.14)]"
       >
@@ -25,7 +25,7 @@ export function UrlInputCta({ location = "hero" }: { location?: "hero" | "final_
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Paste your product or store URL..."
-          className="h-14 w-full rounded-full bg-transparent pl-5 pr-[150px] text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+          className="h-14 w-full rounded-full bg-transparent pl-6 pr-[180px] text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
         />
         <button
           type="submit"
