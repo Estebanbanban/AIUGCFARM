@@ -126,6 +126,8 @@ export default function DashboardPage() {
       creditsToCharge,
       productId: gen.product_id,
       personaId: gen.persona_id,
+      mode: gen.mode,
+      quality: gen.video_quality,
     });
     router.push("/generate");
   }
