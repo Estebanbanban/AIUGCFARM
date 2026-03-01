@@ -791,7 +791,7 @@ export default function GeneratePage() {
   }
 
   async function handleCheckout(plan: PlanTier) {
-    const couponId = offer.isActive ? COUPON_30_OFF : undefined;
+    const couponId = COUPON_30_OFF;
     checkout.mutate({ plan, couponId }, {
       onSuccess: (url) => {
         trackCheckoutStarted(plan);
@@ -803,7 +803,7 @@ export default function GeneratePage() {
   }
 
   async function handleBuyPack(pack: CreditPackKey | SingleVideoPackKey) {
-    const couponId = offer.isActive ? COUPON_30_OFF : undefined;
+    const couponId = COUPON_30_OFF;
     buyCredits.mutate({ pack, couponId }, {
       onSuccess: (url) => {
         if (pack in { pack_10: 1, pack_30: 1, pack_100: 1 }) {
@@ -2058,7 +2058,7 @@ export default function GeneratePage() {
                   <div className="grid md:grid-cols-3 gap-5 lg:gap-6">
                     {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
                       const isGrowth = key === "growth";
-                      const discountedMonthly = offer.isActive ? offer.discountedPrice(plan.price) : null;
+                      const discountedMonthly = offer.discountedPrice(plan.price);
                       return (
                         <div
                           key={key}
@@ -2079,16 +2079,14 @@ export default function GeneratePage() {
                           <div className="mb-6">
                             <div className="flex items-end gap-2 mb-1">
                               <span className="text-4xl font-extrabold text-foreground tracking-tighter">
-                                ${discountedMonthly ?? plan.price}
+                                ${discountedMonthly}
                               </span>
                               <span className="text-muted-foreground font-medium mb-1">/mo</span>
                             </div>
-                            {discountedMonthly !== null && (
-                              <div className="flex items-center gap-2 text-sm font-medium">
-                                <span className="line-through text-muted-foreground">${plan.price}/mo</span>
-                                <span className="text-primary bg-primary/10 px-2 py-0.5 rounded-md text-xs font-bold">30% OFF</span>
-                              </div>
-                            )}
+                            <div className="flex items-center gap-2 text-sm font-medium">
+                              <span className="line-through text-muted-foreground">${plan.price}/mo</span>
+                              <span className="text-primary bg-primary/10 px-2 py-0.5 rounded-md text-xs font-bold">-30%</span>
+                            </div>
                             <div className="mt-3 inline-flex bg-muted border border-border text-muted-foreground text-xs font-bold px-3 py-1.5 rounded-lg">
                               ≈ ${(plan.price / (plan.credits / CREDITS_PER_SINGLE)).toFixed(2)}/video
                             </div>
@@ -2120,7 +2118,7 @@ export default function GeneratePage() {
                     </p>
                     <div className="flex flex-wrap justify-center gap-3">
                       {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => {
-                        const discountedPackPrice = offer.isActive ? offer.discountedPrice(pack.price) : null;
+                        const discountedPackPrice = offer.discountedPrice(pack.price);
                         return (
                           <button
                             key={key}
@@ -2132,14 +2130,9 @@ export default function GeneratePage() {
                             <span className="font-bold text-foreground">{pack.credits} credits</span>
                             {" "}
                             <span className="text-muted-foreground">
-                              - {discountedPackPrice !== null ? (
-                                <>
-                                  <span className="line-through">${pack.price}</span>{" "}
-                                  <span className="text-primary font-semibold">${discountedPackPrice}</span>
-                                </>
-                              ) : (
-                                `$${pack.price}`
-                              )}
+                              -{" "}
+                              <span className="line-through">${pack.price}</span>{" "}
+                              <span className="text-primary font-semibold">${discountedPackPrice}</span>
                             </span>
                           </button>
                         );
@@ -2200,7 +2193,7 @@ export default function GeneratePage() {
                 <div className="grid gap-4 sm:grid-cols-3 max-w-3xl mx-auto">
                   {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
                     const isGrowth = key === "growth";
-                    const discountedMonthly = offer.isActive ? offer.discountedPrice(plan.price) : null;
+                    const discountedMonthly = offer.discountedPrice(plan.price);
                     const isCurrentPlan = currentPlan === key;
                     const isDowngrade = plan.personas <= currentLimit && !isCurrentPlan;
                     const isDisabled = checkout.isPending || isCurrentPlan || isDowngrade;
@@ -2221,18 +2214,9 @@ export default function GeneratePage() {
                         <div>
                           <p className="font-semibold text-base">{plan.name}</p>
                           <div className="mt-1 flex items-baseline gap-1">
-                            {discountedMonthly !== null ? (
-                              <>
-                                <span className="text-2xl font-bold">${discountedMonthly}</span>
-                                <span className="text-sm text-muted-foreground line-through">${plan.price}</span>
-                                <span className="text-xs text-muted-foreground">/mo</span>
-                              </>
-                            ) : (
-                              <>
-                                <span className="text-2xl font-bold">${plan.price}</span>
-                                <span className="text-xs text-muted-foreground">/mo</span>
-                              </>
-                            )}
+                            <span className="text-2xl font-bold">${discountedMonthly}</span>
+                            <span className="text-sm text-muted-foreground line-through">${plan.price}</span>
+                            <span className="text-xs text-muted-foreground">/mo</span>
                           </div>
                           <p className="mt-1 text-xs text-orange-500 font-medium">
                             Up to {plan.personas} persona{plan.personas !== 1 ? "s" : ""}
