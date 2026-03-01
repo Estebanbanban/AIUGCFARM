@@ -962,6 +962,17 @@ export default function GeneratePage() {
               ) : null}
             </div>
 
+            {/* Continue button at bottom of product grid */}
+            {confirmedProducts.length > 0 && !showAddProductForm && !productsLoading && (
+              <Button
+                onClick={() => setSection1SubStep(2)}
+                disabled={!store.productId}
+                className="w-full sm:w-auto"
+              >
+                Continue
+                <ChevronRight className="size-4" />
+              </Button>
+            )}
           </div>
         )}
 
