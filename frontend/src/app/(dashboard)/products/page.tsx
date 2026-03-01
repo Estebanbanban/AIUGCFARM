@@ -27,10 +27,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProducts, useScrapeProduct, useDeleteProduct } from '@/hooks/use-products';
+import { useProfile, PRODUCT_SLOT_LIMITS } from '@/hooks/use-profile';
 import { ProductCard } from '@/components/products/ProductCard';
 import { ScrapeResults } from '@/components/products/ScrapeResults';
 import { ManualUploadForm } from '@/components/products/ManualUploadForm';
 import { isExternalUrl, getSignedImageUrls } from '@/lib/storage';
+import { Badge } from '@/components/ui/badge';
 import type { Product, BrandSummary } from '@/types/database';
 
 /** Batch resolve first image for all products (1 API call instead of N) */
@@ -86,6 +88,7 @@ function ProductCardSkeleton() {
 
 export default function ProductsPage() {
   const { data: products, isLoading, error } = useProducts();
+  const { data: profile } = useProfile();
   const scrapeProduct = useScrapeProduct();
   const queryClient = useQueryClient();
 
@@ -98,6 +101,11 @@ export default function ProductsPage() {
 
   const productImageMap = useResolvedProductImages(products);
   const hasProducts = (products?.length ?? 0) > 0;
+  const plan = profile?.plan ?? 'free';
+  const isAdmin = profile?.role === 'admin';
+  const productLimit = PRODUCT_SLOT_LIMITS[plan];
+  const productCount = products?.length ?? 0;
+  const atProductLimit = !isAdmin && productCount >= productLimit;
 
   async function handleScrape() {
     if (!importUrl.trim()) return;
@@ -195,11 +203,35 @@ export default function ProductsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={() => setShowImportDialog(true)}>
+          {atProductLimit && (
+            <Badge variant="outline" className="text-xs text-muted-foreground">
+              {productCount}/{productLimit} products
+            </Badge>
+          )}
+          <Button
+            variant="secondary"
+            disabled={atProductLimit}
+            onClick={() => {
+              if (atProductLimit) {
+                toast.error(`You've reached the ${productLimit} product limit for your ${plan} plan. Upgrade to add more.`);
+                return;
+              }
+              setShowImportDialog(true);
+            }}
+          >
             <LinkIcon className="size-4" />
             Import Product
           </Button>
-          <Button>
+          <Button
+            disabled={atProductLimit}
+            onClick={() => {
+              if (atProductLimit) {
+                toast.error(`You've reached the ${productLimit} product limit for your ${plan} plan. Upgrade to add more.`);
+                return;
+              }
+              setShowImportDialog(true);
+            }}
+          >
             <Plus className="size-4" />
             Add Manually
           </Button>

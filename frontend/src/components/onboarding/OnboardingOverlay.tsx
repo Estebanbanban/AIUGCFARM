@@ -103,6 +103,14 @@ export function OnboardingOverlay() {
   useEffect(() => {
     setSkipped(localStorage.getItem(SKIP_KEY) === "true");
     setHydrated(true);
+
+    function handleResume() {
+      localStorage.removeItem(SKIP_KEY);
+      setSkipped(false);
+      setView("checklist");
+    }
+    window.addEventListener("onboarding:resume", handleResume);
+    return () => window.removeEventListener("onboarding:resume", handleResume);
   }, []);
 
   // Auto-dismiss banner when the generation step completes

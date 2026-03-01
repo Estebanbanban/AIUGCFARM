@@ -539,13 +539,20 @@ Deno.serve(async (req: Request) => {
         return json({ detail: "Generation has no script to approve" }, cors, 400);
       }
 
-      // ── Compute effective cost + check credits ──────────────────
+      // ── Plan-based validation for approve flow ──────────────────
       const { data: profileData } = await sb
         .from("profiles")
-        .select("first_video_discount_used")
+        .select("plan, role, first_video_discount_used")
         .eq("id", userId)
         .single();
 
+      const approveIsAdmin = profileData?.role === "admin";
+      if (resolvedQuality === "hd" && !approveIsAdmin && !new Set(["growth", "scale"]).has((profileData?.plan as string) ?? "free")) {
+        await sb.from("generations").update({ status: "awaiting_approval" }).eq("id", generation_id);
+        return json({ detail: "HD quality requires Growth or Scale plan." }, cors, 403);
+      }
+
+      // ── Compute effective cost + check credits ──────────────────
       const isFirstVideo = profileData?.first_video_discount_used === false;
       const effectiveCost = isFirstVideo ? Math.ceil(creditCost / 2) : creditCost;
 
@@ -694,6 +701,36 @@ Deno.serve(async (req: Request) => {
     }
 
     const { variantCount, creditCost, klingModel } = computeCosts(resolvedMode, resolvedQuality);
+
+    // ── 1b. Fetch profile for plan-based validation ────────────────
+    const { data: planProfile } = await sb
+      .from("profiles")
+      .select("plan, role")
+      .eq("id", userId)
+      .single();
+
+    const userPlan = (planProfile?.plan as string) ?? "free";
+    const isAdmin = planProfile?.role === "admin";
+    const HD_PLANS = new Set(["growth", "scale"]);
+    const ADVANCED_PLANS = new Set(["growth", "scale"]);
+
+    // ── 1c. Enforce HD quality restriction ─────────────────────────
+    if (resolvedQuality === "hd" && !isAdmin && !HD_PLANS.has(userPlan)) {
+      return json(
+        { detail: "HD quality (Kling V3) requires Growth or Scale plan. Upgrade to unlock." },
+        cors,
+        403,
+      );
+    }
+
+    // ── 1d. Enforce advanced mode restriction ──────────────────────
+    if (advanced_segments && !isAdmin && !ADVANCED_PLANS.has(userPlan)) {
+      return json(
+        { detail: "Advanced script editor requires Growth or Scale plan. Upgrade to unlock." },
+        cors,
+        403,
+      );
+    }
 
     // ── 2. Verify product ownership (confirmed = true) ────────────
 
