@@ -63,7 +63,7 @@ import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { useWatchedGenerationsStore } from "@/stores/watched-generations";
 import { VideoGenerationAnimation } from "@/components/landing/VideoGenerationAnimation";
 import { useProducts, useScrapeProduct } from "@/hooks/use-products";
-import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
+import { isExternalUrl, getSignedImageUrl, getSignedImageUrls } from "@/lib/storage";
 import { usePersonas, resolvePersonaImageUrl } from "@/hooks/use-personas";
 import type { Persona, Product, BrandSummary, ScriptSegment } from "@/types/database";
 import { useCredits } from "@/hooks/use-credits";
@@ -170,22 +170,39 @@ function useResolvedProductImages(
     if (!products || products.length === 0) return;
     let cancelled = false;
     async function resolve() {
-      const entries = await Promise.all(
-        products!.map(async (p) => {
-          const raw = p.images?.[0];
-          if (!raw) return [p.id, null] as [string, null];
-          const url = isExternalUrl(raw)
-            ? raw
-            : await getSignedImageUrl("product-images", raw);
-          return [p.id, url] as [string, string | null];
-        }),
-      );
-      if (!cancelled) setImageMap(Object.fromEntries(entries));
+      const result: Record<string, string | null> = {};
+      const pathsToSign: { productId: string; path: string }[] = [];
+
+      // Pass 1: resolve external URLs immediately
+      for (const p of products!) {
+        const raw = p.images?.[0];
+        if (!raw) {
+          result[p.id] = null;
+        } else if (isExternalUrl(raw)) {
+          result[p.id] = raw;
+        } else {
+          result[p.id] = null;
+          pathsToSign.push({ productId: p.id, path: raw });
+        }
+      }
+      if (!cancelled) setImageMap({ ...result });
+
+      // Pass 2: batch-sign all internal paths in a single request
+      if (pathsToSign.length > 0) {
+        const signedUrls = await getSignedImageUrls(
+          "product-images",
+          pathsToSign.map((p) => p.path),
+        );
+        if (!cancelled) {
+          signedUrls.forEach((url, i) => {
+            result[pathsToSign[i].productId] = url;
+          });
+          setImageMap({ ...result });
+        }
+      }
     }
     resolve();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [products]);
 
   return imageMap;
@@ -198,19 +215,39 @@ function useResolvedPersonaImages(personas: Persona[] | undefined) {
     if (!personas || personas.length === 0) return;
     let cancelled = false;
     async function resolve() {
-      const entries = await Promise.all(
-        personas!.map(async (p) => {
-          const raw = p.selected_image_url ?? p.generated_images?.[0] ?? null;
-          const url = await resolvePersonaImageUrl(raw);
-          return [p.id, url] as [string, string | null];
-        }),
-      );
-      if (!cancelled) setImageMap(Object.fromEntries(entries));
+      const result: Record<string, string | null> = {};
+      const pathsToSign: { personaId: string; path: string }[] = [];
+
+      // Pass 1: resolve external URLs immediately (no API call needed)
+      for (const p of personas!) {
+        const raw = p.selected_image_url ?? p.generated_images?.[0] ?? null;
+        if (!raw) {
+          result[p.id] = null;
+        } else if (raw.startsWith("http")) {
+          result[p.id] = raw;
+        } else {
+          result[p.id] = null;
+          pathsToSign.push({ personaId: p.id, path: raw });
+        }
+      }
+      if (!cancelled) setImageMap({ ...result });
+
+      // Pass 2: batch-sign all internal paths in a single request
+      if (pathsToSign.length > 0) {
+        const supabase = createClient();
+        const { data } = await supabase.storage
+          .from("persona-images")
+          .createSignedUrls(pathsToSign.map((p) => p.path), 3600);
+        if (data && !cancelled) {
+          data.forEach((item, i) => {
+            result[pathsToSign[i].personaId] = item.signedUrl ?? null;
+          });
+          setImageMap({ ...result });
+        }
+      }
     }
     resolve();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [personas]);
 
   return imageMap;
