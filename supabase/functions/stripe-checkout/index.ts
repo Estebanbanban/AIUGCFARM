@@ -37,9 +37,9 @@ const PACK_PRICE_IDS: Record<string, string | undefined> = {
   pack_10: Deno.env.get("STRIPE_PRICE_PACK_10"),
   pack_30: Deno.env.get("STRIPE_PRICE_PACK_30"),
   pack_100: Deno.env.get("STRIPE_PRICE_PACK_100"),
-  // Single-video paywall purchases
-  single_standard: Deno.env.get("STRIPE_PRICE_SINGLE_STANDARD"),
-  single_hd: Deno.env.get("STRIPE_PRICE_SINGLE_HD"),
+  // Single-video paywall purchases (price IDs are not secrets — hardcoded as fallback)
+  single_standard: Deno.env.get("STRIPE_PRICE_SINGLE_STANDARD") ?? "price_1T65y1DofGNcXNHKBXaliSF2",
+  single_hd:       Deno.env.get("STRIPE_PRICE_SINGLE_HD")       ?? "price_1T65zBDofGNcXNHKMYvxgyuw",
 };
 
 const PACK_NAMES: Record<string, string> = {
