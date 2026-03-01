@@ -807,29 +807,17 @@ export default function GeneratePage() {
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">Select a product</p>
-                <div className="flex items-center gap-2">
-                  {!showAddProductForm && confirmedProducts.length > 0 && (
-                    <Button variant="outline" size="sm" onClick={() => setAddingProduct(true)}>
-                      <Plus className="size-4" />
-                      Add Product
-                    </Button>
-                  )}
-                  {showAddProductForm && confirmedProducts.length > 0 && (
-                    <Button variant="ghost" size="sm" onClick={handleCancelAddProduct}>
-                      ← Back to products
-                    </Button>
-                  )}
-                  {confirmedProducts.length > 0 && !showAddProductForm && (
-                    <Button
-                      size="sm"
-                      onClick={() => setSection1SubStep(2)}
-                      disabled={!store.productId}
-                    >
-                      Continue
-                      <ChevronRight className="size-4" />
-                    </Button>
-                  )}
-                </div>
+                {!showAddProductForm && confirmedProducts.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={() => setAddingProduct(true)}>
+                    <Plus className="size-4" />
+                    Add Product
+                  </Button>
+                )}
+                {showAddProductForm && confirmedProducts.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={handleCancelAddProduct}>
+                    ← Back to products
+                  </Button>
+                )}
               </div>
 
               {productsLoading ? (
@@ -962,17 +950,6 @@ export default function GeneratePage() {
               ) : null}
             </div>
 
-            {/* Continue button at bottom of product grid */}
-            {confirmedProducts.length > 0 && !showAddProductForm && !productsLoading && (
-              <Button
-                onClick={() => setSection1SubStep(2)}
-                disabled={!store.productId}
-                className="w-full sm:w-auto"
-              >
-                Continue
-                <ChevronRight className="size-4" />
-              </Button>
-            )}
           </div>
         )}
 
@@ -1034,6 +1011,20 @@ export default function GeneratePage() {
           </div>
         )}
       </div>
+
+      {/* ── Sticky Continue — Section 1 product step ──────────────────── */}
+      {!section1Complete && section1SubStep === 1 && confirmedProducts.length > 0 && !showAddProductForm && !productsLoading && (
+        <div className="sticky bottom-4 z-20 flex justify-end pointer-events-none">
+          <Button
+            onClick={() => setSection1SubStep(2)}
+            disabled={!store.productId}
+            className="pointer-events-auto shadow-lg"
+          >
+            Continue
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
+      )}
 
       {/* ── Section 2: Persona ────────────────────────────────────────── */}
       {store.step >= 2 && (
