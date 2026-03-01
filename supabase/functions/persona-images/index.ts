@@ -46,14 +46,17 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "Access denied to one or more requested images" }, cors, 403);
     }
 
-    // Generate signed URLs for all requested paths
+    // Generate signed URLs for all requested paths (batch)
+    const { data: signedData } = await sb.storage
+      .from("persona-images")
+      .createSignedUrls(paths as string[], SIGNED_URL_EXPIRY_SECONDS);
+
     const urls: Record<string, string> = {};
-    for (const path of paths as string[]) {
-      const { data } = await sb.storage
-        .from("persona-images")
-        .createSignedUrl(path, SIGNED_URL_EXPIRY_SECONDS);
-      if (data?.signedUrl) {
-        urls[path] = data.signedUrl;
+    if (signedData) {
+      for (const item of signedData) {
+        if (item.signedUrl && item.path) {
+          urls[item.path] = item.signedUrl;
+        }
       }
     }
 

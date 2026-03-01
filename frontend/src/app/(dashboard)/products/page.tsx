@@ -1,8 +1,6 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -32,7 +30,41 @@ import { useProducts, useScrapeProduct, useDeleteProduct } from '@/hooks/use-pro
 import { ProductCard } from '@/components/products/ProductCard';
 import { ScrapeResults } from '@/components/products/ScrapeResults';
 import { ManualUploadForm } from '@/components/products/ManualUploadForm';
+import { isExternalUrl, getSignedImageUrls } from '@/lib/storage';
 import type { Product, BrandSummary } from '@/types/database';
+
+/** Batch resolve first image for all products (1 API call instead of N) */
+function useResolvedProductImages(products: Product[] | undefined) {
+  const [imageMap, setImageMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!products || products.length === 0) return;
+
+    let cancelled = false;
+    const external: [string, string][] = [];
+    const internal: [string, string][] = [];
+
+    for (const p of products) {
+      const firstImage = p.images?.[0];
+      if (!firstImage) continue;
+      if (isExternalUrl(firstImage)) external.push([p.id, firstImage]);
+      else internal.push([p.id, firstImage]);
+    }
+
+    const paths = internal.map(([, path]) => path);
+    getSignedImageUrls('product-images', paths).then((urls) => {
+      if (cancelled) return;
+      const map: Record<string, string> = {};
+      external.forEach(([id, url]) => { map[id] = url; });
+      internal.forEach(([id], i) => { map[id] = urls[i]; });
+      setImageMap(map);
+    });
+
+    return () => { cancelled = true; };
+  }, [products]);
+
+  return imageMap;
+}
 
 function ProductCardSkeleton() {
   return (
@@ -64,6 +96,7 @@ export default function ProductsPage() {
   const [scrapedBrandSummary, setScrapedBrandSummary] = useState<BrandSummary | null>(null);
   const [showScrapeResults, setShowScrapeResults] = useState(false);
 
+  const productImageMap = useResolvedProductImages(products);
   const hasProducts = (products?.length ?? 0) > 0;
 
   async function handleScrape() {
@@ -206,6 +239,7 @@ export default function ProductsPage() {
             <DeleteProductWrapper
               key={product.id}
               product={product}
+              resolvedImageUrl={productImageMap[product.id]}
             />
           ))}
         </div>
@@ -339,7 +373,7 @@ export default function ProductsPage() {
   );
 }
 
-function DeleteProductWrapper({ product }: { product: Product }) {
+function DeleteProductWrapper({ product, resolvedImageUrl }: { product: Product; resolvedImageUrl?: string }) {
   const deleteProduct = useDeleteProduct(product.id);
 
   async function handleDelete(id: string) {
@@ -353,5 +387,5 @@ function DeleteProductWrapper({ product }: { product: Product }) {
     }
   }
 
-  return <ProductCard product={product} onDelete={handleDelete} />;
+  return <ProductCard product={product} onDelete={handleDelete} resolvedImageUrl={resolvedImageUrl} />;
 }

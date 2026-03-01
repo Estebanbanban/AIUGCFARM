@@ -1,7 +1,5 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -1276,6 +1274,8 @@ export default function GenerationDetailPage() {
                 src={gen.composite_image_url}
                 alt="POV composite"
                 className="size-full object-cover"
+                loading="lazy"
+                decoding="async"
               />
             </div>
           </CardContent>

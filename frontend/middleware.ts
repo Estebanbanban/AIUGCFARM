@@ -38,13 +38,25 @@ export async function middleware(request: NextRequest) {
     if (!user) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-    if (!profile || profile.role !== 'admin') {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+
+    // Check short-lived cookie to avoid DB query on every admin navigation
+    const adminVerified = request.cookies.get('x-admin-verified')?.value === '1'
+    if (!adminVerified) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      if (!profile || profile.role !== 'admin') {
+        return NextResponse.redirect(new URL('/dashboard', request.url))
+      }
+      // Cache the admin verification for 5 minutes
+      supabaseResponse.cookies.set('x-admin-verified', '1', {
+        path: '/',
+        maxAge: 300, // 5 minutes
+        httpOnly: true,
+        sameSite: 'lax',
+      })
     }
   }
 

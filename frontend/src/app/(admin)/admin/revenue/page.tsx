@@ -1,3 +1,4 @@
+import nextDynamic from "next/dynamic";
 import {
   getMRRBreakdown,
   getChurnThisMonth,
@@ -6,7 +7,11 @@ import {
   getOverviewStats,
 } from "@/lib/admin/queries";
 import { StatCard } from "@/components/admin/StatCard";
-import { RevenueChart } from "@/components/admin/RevenueChart";
+
+const RevenueChart = nextDynamic(
+  () => import("@/components/admin/RevenueChart").then((m) => m.RevenueChart),
+  { loading: () => <div className="h-[180px] w-full animate-pulse rounded-lg bg-muted" /> },
+);
 
 export const dynamic = "force-dynamic";
 

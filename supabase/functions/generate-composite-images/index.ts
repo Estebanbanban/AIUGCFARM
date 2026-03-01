@@ -28,26 +28,16 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "format must be '9:16' or '16:9'" }, cors, 400);
     }
 
-    // Verify product ownership
-    const { data: product, error: prodErr } = await sb
-      .from("products")
-      .select("*")
-      .eq("id", product_id)
-      .eq("owner_id", userId)
-      .eq("confirmed", true)
-      .single();
+    // Verify product + persona ownership in parallel
+    const [productResult, personaResult] = await Promise.all([
+      sb.from("products").select("*").eq("id", product_id).eq("owner_id", userId).eq("confirmed", true).single(),
+      sb.from("personas").select("*").eq("id", persona_id).eq("owner_id", userId).eq("is_active", true).single(),
+    ]);
+    const { data: product, error: prodErr } = productResult;
     if (prodErr || !product) {
       return json({ detail: "Product not found or not confirmed" }, cors, 404);
     }
-
-    // Verify persona ownership + has selected image
-    const { data: persona, error: persErr } = await sb
-      .from("personas")
-      .select("*")
-      .eq("id", persona_id)
-      .eq("owner_id", userId)
-      .eq("is_active", true)
-      .single();
+    const { data: persona, error: persErr } = personaResult;
     if (persErr || !persona) {
       return json({ detail: "Persona not found or inactive" }, cors, 404);
     }
@@ -73,22 +63,22 @@ Deno.serve(async (req: Request) => {
       throw new Error("Product has no images available");
     }
 
-    const resolvedProductImageUrls: string[] = [];
-    for (const imagePath of productImagePaths) {
-      if (imagePath.startsWith("http")) {
-        resolvedProductImageUrls.push(imagePath);
-        continue;
-      }
+    // Batch sign product image URLs
+    const httpUrls = productImagePaths.filter((p) => p.startsWith("http"));
+    const storagePaths = productImagePaths.filter((p) => !p.startsWith("http"));
 
-      const { data: signedData, error: signErr } = await sb
+    let signedStorageUrls: string[] = [];
+    if (storagePaths.length > 0) {
+      const { data: batchSigned, error: batchErr } = await sb
         .storage
         .from("product-images")
-        .createSignedUrl(imagePath, 600);
-      if (signErr || !signedData?.signedUrl) {
-        throw new Error(`Failed to sign product image URL: ${signErr?.message}`);
+        .createSignedUrls(storagePaths, 600);
+      if (batchErr || !batchSigned) {
+        throw new Error(`Failed to batch sign product image URLs: ${batchErr?.message}`);
       }
-      resolvedProductImageUrls.push(signedData.signedUrl);
+      signedStorageUrls = batchSigned.map((s) => s.signedUrl);
     }
+    const resolvedProductImageUrls = [...httpUrls, ...signedStorageUrls];
 
     // Scene prompt from persona attributes (for context)
     const scenePrompt = (persona.attributes as Record<string, unknown>)
@@ -123,36 +113,48 @@ Deno.serve(async (req: Request) => {
     );
     const compositeResults = await Promise.allSettled(staggeredTasks);
 
-    // Upload successful composites
-    const results: Array<{ path: string; signed_url: string }> = [];
+    // Upload successful composites in parallel
+    const uploadTasks = compositeResults
+      .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof generateCompositeFromImages>>> => {
+        if (r.status === "rejected") {
+          console.error("Composite generation failed:", r.reason);
+          return false;
+        }
+        return true;
+      })
+      .map(async (r) => {
+        const composite = r.value;
+        const ext = composite.mimeType.includes("png") ? "png" : "jpg";
+        const storagePath = `${userId}/preview/${crypto.randomUUID()}.${ext}`;
 
-    for (const result of compositeResults) {
-      if (result.status === "rejected") {
-        console.error("Composite generation failed:", result.reason);
-        continue;
-      }
-      const composite = result.value;
-      const ext = composite.mimeType.includes("png") ? "png" : "jpg";
-      const storagePath = `${userId}/preview/${crypto.randomUUID()}.${ext}`;
+        const { error: uploadErr } = await sb.storage
+          .from("composite-images")
+          .upload(storagePath, composite.data, {
+            contentType: composite.mimeType,
+            upsert: false,
+          });
 
-      const { error: uploadErr } = await sb.storage
+        if (uploadErr) {
+          console.error(`Composite upload failed: ${uploadErr.message}`);
+          return null;
+        }
+
+        return storagePath;
+      });
+
+    const uploadedPaths = (await Promise.all(uploadTasks)).filter((p): p is string => p !== null);
+
+    // Batch sign all uploaded composite URLs
+    let results: Array<{ path: string; signed_url: string }> = [];
+    if (uploadedPaths.length > 0) {
+      const { data: signedBatch } = await sb.storage
         .from("composite-images")
-        .upload(storagePath, composite.data, {
-          contentType: composite.mimeType,
-          upsert: false,
-        });
+        .createSignedUrls(uploadedPaths, 3600);
 
-      if (uploadErr) {
-        console.error(`Composite upload failed: ${uploadErr.message}`);
-        continue;
-      }
-
-      const { data: signedData } = await sb.storage
-        .from("composite-images")
-        .createSignedUrl(storagePath, 3600); // 1h for user to preview
-
-      if (signedData?.signedUrl) {
-        results.push({ path: storagePath, signed_url: signedData.signedUrl });
+      if (signedBatch) {
+        results = signedBatch
+          .filter((s) => s.signedUrl)
+          .map((s) => ({ path: s.path!, signed_url: s.signedUrl }));
       }
     }
 

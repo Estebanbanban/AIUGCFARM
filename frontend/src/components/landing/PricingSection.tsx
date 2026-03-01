@@ -71,7 +71,7 @@ export function PricingSection() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: unknown } }) => {
       setIsLoggedIn(!!session);
     });
   }, []);

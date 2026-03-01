@@ -1,7 +1,5 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -255,7 +253,7 @@ function useResolvedPersonaImages(personas: Persona[] | undefined) {
           .from("persona-images")
           .createSignedUrls(pathsToSign.map((p) => p.path), 3600);
         if (data && !cancelled) {
-          data.forEach((item, i) => {
+          data.forEach((item: { signedUrl?: string | null }, i: number) => {
             result[pathsToSign[i].personaId] = item.signedUrl ?? null;
           });
           setImageMap({ ...result });
@@ -296,7 +294,7 @@ export default function GeneratePage() {
       .select("status")
       .eq("id", store.pendingGenerationId)
       .single()
-      .then(({ data }) => {
+      .then(({ data }: { data: { status: string } | null }) => {
         if (!data || data.status !== "awaiting_approval") {
           store.clearPendingScript();
           // Reset to section 3 (step 4) if we were on old step 5
@@ -985,6 +983,8 @@ export default function GeneratePage() {
                                   src={productImageMap[product.id]!}
                                   alt={product.name}
                                   className="size-full rounded-lg object-cover"
+                                  loading="lazy"
+                                  decoding="async"
                                 />
                               ) : (
                                 <ImageIcon className="size-8 text-muted-foreground" />
@@ -1127,6 +1127,8 @@ export default function GeneratePage() {
                         src={personaImageMap[selectedPersona.id]!}
                         alt={selectedPersona.name}
                         className="size-5 rounded-full object-cover"
+                        loading="lazy"
+                        decoding="async"
                       />
                     )}
                     <span className="text-foreground">{selectedPersona.name}</span>
@@ -1196,6 +1198,8 @@ export default function GeneratePage() {
                                       src={personaImageMap[persona.id]!}
                                       alt={persona.name}
                                       className="size-full rounded-full object-cover"
+                                      loading="lazy"
+                                      decoding="async"
                                     />
                                   ) : (
                                     <User className="size-8 text-muted-foreground" />
@@ -1546,7 +1550,7 @@ export default function GeneratePage() {
                               ? "border-primary ring-2 ring-primary/30"
                               : "border-transparent group-hover:border-muted-foreground/40",
                           )}>
-                            <img src={img.signed_url} alt={`Preview ${i + 1}`} className="size-full object-cover" />
+                            <img src={img.signed_url} alt={`Preview ${i + 1}`} className="size-full object-cover" loading="lazy" decoding="async" />
                             {selectedCompositeIdx === i && (
                               <div className="absolute inset-0 flex items-end justify-center bg-primary/10 pb-2">
                                 <div className="flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
