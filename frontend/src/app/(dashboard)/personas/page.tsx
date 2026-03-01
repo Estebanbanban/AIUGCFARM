@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Users, User, Trash2, Loader2 } from "lucide-react";
+import { Plus, Users, User, Trash2, Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -135,6 +136,22 @@ export default function PersonasPage() {
           </Button>
         )}
       </div>
+
+      {/* Upgrade banner when at persona limit */}
+      {!isLoading && atLimit && (
+        <Alert className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/50">
+          <Lock className="size-4 text-amber-600 dark:text-amber-400" />
+          <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-amber-800 dark:text-amber-200">
+              You&apos;ve reached your persona limit ({slotsUsed}/{slotLimit}).
+              Upgrade your plan to create more AI personas.
+            </span>
+            <Button asChild size="sm" variant="default" className="w-fit shrink-0">
+              <Link href="/settings/billing">Upgrade Plan</Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Error state */}
       {personasError && (

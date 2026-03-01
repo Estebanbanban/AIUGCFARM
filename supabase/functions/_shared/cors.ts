@@ -15,7 +15,7 @@ export function getCorsHeaders(req: Request): HeadersInit {
   const allowedOrigins = parseAllowedOrigins();
 
   // If ALLOWED_ORIGIN is set, only allow those origins.
-  // If unset, reflect the request origin (browser-safe with credentials), fallback to *.
+  // If unset, allow localhost for development but block arbitrary origins in production.
   let allowOrigin = "*";
   if (allowedOrigins.size > 0) {
     if (requestOrigin && allowedOrigins.has(requestOrigin)) {
@@ -23,7 +23,11 @@ export function getCorsHeaders(req: Request): HeadersInit {
     } else {
       allowOrigin = [...allowedOrigins][0]!;
     }
-  } else if (requestOrigin) {
+  } else if (
+    requestOrigin &&
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(requestOrigin)
+  ) {
+    // Dev-only: reflect localhost origins so credentials work during development
     allowOrigin = requestOrigin;
   }
 

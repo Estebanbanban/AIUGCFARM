@@ -195,7 +195,7 @@ export default function BillingPage() {
           </div>
         </div>
 
-        {/* Progress bar — only for subscribed users */}
+        {/* Progress bar - only for subscribed users */}
         {plan !== "free" && !isUnlimitedCredits && creditsTotal > 0 && (
           <div className="mt-5">
             <Progress
@@ -221,7 +221,7 @@ export default function BillingPage() {
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Monthly Plans</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Subscribe for the best per-credit rate — always cheaper than one-time packs.
+            Subscribe for the best per-credit rate - always cheaper than one-time packs.
           </p>
         </div>
 
@@ -440,7 +440,7 @@ export default function BillingPage() {
             </div>
             <p className="text-xs leading-relaxed text-muted-foreground">
               <strong className="text-foreground">10 credits</strong> = 1 complete HD ad
-              rendered with Kling v3 — sharper, more cinematic.
+              rendered with Kling v3 - sharper, more cinematic.
             </p>
           </div>
 
@@ -466,7 +466,7 @@ export default function BillingPage() {
           </p>
           <p className="text-sm text-muted-foreground">
             One 15-credit batch gives you 27 mix-and-match video combinations to A/B test across
-            TikTok, Reels, and Shorts — finding your winning creative in days, not weeks.
+            TikTok, Reels, and Shorts - finding your winning creative in days, not weeks.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {["15 cr → 27 combos", "$0.56/combo (standard)", "vs $5/single video"].map((tag) => (

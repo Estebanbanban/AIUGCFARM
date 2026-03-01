@@ -106,7 +106,7 @@ export function useEditCompositeImage() {
   });
 }
 
-/** Generate script only (phase: "script") — no credits charged. */
+/** Generate script only (phase: "script") - no credits charged. */
 export function useGenerateScript() {
   return useMutation({
     mutationFn: async (input: GenerationInput & { phase: "script" }) => {
@@ -153,7 +153,7 @@ export function useCreateGeneration() {
       queryClient.invalidateQueries({ queryKey: ["generations"] });
     },
     onError: () => {
-      // Refresh credits even on error — debit may have been attempted then refunded
+      // Refresh credits even on error - debit may have been attempted then refunded
       queryClient.invalidateQueries({ queryKey: ["credits"] });
     },
   });

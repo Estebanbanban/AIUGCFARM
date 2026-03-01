@@ -1543,11 +1543,11 @@ export default function GenerationDetailPage() {
                           Estimated time: {formatEstimatedTime(combosToExport.length * 25)}
                           {combosToExport.length > 27 ? (
                             <span className="ml-1 text-red-400">
-                              — Max 27 combinations
+                              - Max 27 combinations
                             </span>
                           ) : combosToExport.length > 9 && (
                             <span className="ml-1 text-amber-400">
-                              — Large export, stay on this tab
+                              - Large export, stay on this tab
                             </span>
                           )}
                         </p>

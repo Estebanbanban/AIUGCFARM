@@ -17,16 +17,18 @@ const PLAN_CREDITS: Record<string, number> = {
   scale: 250,
 };
 
-/** Credit amounts per one-time pack purchase (matches CREDIT_PACKS in lib/stripe.ts). */
+/** Credit amounts per one-time pack purchase (matches CREDIT_PACKS + SINGLE_VIDEO_PACKS in lib/stripe.ts). */
 const PACK_CREDITS: Record<string, number> = {
-  pack_10: 10,   // $12
-  pack_30: 30,   // $33
-  pack_100: 100, // $95
+  pack_10: 10,          // $12
+  pack_30: 30,          // $33
+  pack_100: 100,        // $95
+  single_standard: 5,   // $5  -- single standard video (Kling 2.6)
+  single_hd: 10,        // $10 -- single HD video (Kling 3.0)
 };
 
-/** NOTE: No auth middleware  -  this endpoint uses Stripe webhook signature verification. */
+/** NOTE: No auth middleware -- this endpoint uses Stripe webhook signature verification. */
 Deno.serve(async (req: Request) => {
-  // No CORS needed for webhooks  -  Stripe calls this server-to-server
+  // No CORS needed for webhooks -- Stripe calls this server-to-server
   const headers: HeadersInit = { "Content-Type": "application/json" };
 
   if (req.method !== "POST") {
@@ -68,6 +70,10 @@ Deno.serve(async (req: Request) => {
       return json({ data: { received: true, duplicate: true } }, headers);
     }
 
+    // Track whether any critical DB operation failed so we can return 500
+    // and let Stripe retry the event
+    let processingError: string | null = null;
+
     // Process event
     switch (event.type) {
       case "checkout.session.completed": {
@@ -79,7 +85,7 @@ Deno.serve(async (req: Request) => {
           break;
         }
 
-        // ── One-time credit pack purchase ──────────────────────────────────────
+        // -- One-time credit pack purchase --
         if (session.mode === "payment") {
           const pack = session.metadata?.pack;
           if (!pack) {
@@ -101,19 +107,25 @@ Deno.serve(async (req: Request) => {
               { owner_id: userId, remaining: newBalance },
               { onConflict: "owner_id" },
             );
-            if (balErr) console.error("checkout: pack credit upsert failed:", balErr);
+            if (balErr) {
+              console.error("checkout: pack credit upsert failed:", balErr);
+              processingError = balErr.message;
+            }
 
             const { error: ledgerErr } = await sb.from("credit_ledger").insert({
               owner_id: userId,
               amount: credits,
               reason: "credit_pack_purchase",
             });
-            if (ledgerErr) console.error("checkout: pack ledger insert failed:", ledgerErr);
+            if (ledgerErr) {
+              console.error("checkout: pack ledger insert failed:", ledgerErr);
+              processingError = ledgerErr.message;
+            }
           }
           break;
         }
 
-        // ── Subscription checkout ──────────────────────────────────────────────
+        // -- Subscription checkout --
         const plan = session.metadata?.plan;
         if (!plan) {
           console.error("checkout.session.completed missing plan metadata:", session.id);
@@ -141,14 +153,20 @@ Deno.serve(async (req: Request) => {
           },
           { onConflict: "owner_id" },
         );
-        if (subErr) console.error("checkout: subscription upsert failed:", subErr);
+        if (subErr) {
+          console.error("checkout: subscription upsert failed:", subErr);
+          processingError = subErr.message;
+        }
 
         // Update profile plan
         const { error: profileErr } = await sb
           .from("profiles")
           .update({ plan })
           .eq("id", userId);
-        if (profileErr) console.error("checkout: profile update failed:", profileErr);
+        if (profileErr) {
+          console.error("checkout: profile update failed:", profileErr);
+          processingError = profileErr.message;
+        }
 
         // Grant initial credits for the plan (ADD to existing, don't overwrite)
         const credits = PLAN_CREDITS[plan] ?? 0;
@@ -165,14 +183,20 @@ Deno.serve(async (req: Request) => {
             { owner_id: userId, remaining: newBalance },
             { onConflict: "owner_id" },
           );
-          if (balErr) console.error("checkout: credit balance upsert failed:", balErr);
+          if (balErr) {
+            console.error("checkout: credit balance upsert failed:", balErr);
+            processingError = balErr.message;
+          }
 
           const { error: ledgerErr } = await sb.from("credit_ledger").insert({
             owner_id: userId,
             amount: credits,
             reason: "subscription_purchase",
           });
-          if (ledgerErr) console.error("checkout: credit ledger insert failed:", ledgerErr);
+          if (ledgerErr) {
+            console.error("checkout: credit ledger insert failed:", ledgerErr);
+            processingError = ledgerErr.message;
+          }
         }
 
         break;
@@ -202,21 +226,35 @@ Deno.serve(async (req: Request) => {
           break;
         }
 
-        // Grant renewal credits (reset to plan amount)
+        // Grant renewal credits (ADD to existing balance, don't overwrite)
         const credits = PLAN_CREDITS[sub.plan] ?? 0;
         if (credits > 0) {
+          const { data: existing } = await sb
+            .from("credit_balances")
+            .select("remaining")
+            .eq("owner_id", sub.owner_id)
+            .maybeSingle();
+
+          const newBalance = (existing?.remaining ?? 0) + credits;
+
           const { error: balErr } = await sb.from("credit_balances").upsert(
-            { owner_id: sub.owner_id, remaining: credits },
+            { owner_id: sub.owner_id, remaining: newBalance },
             { onConflict: "owner_id" },
           );
-          if (balErr) console.error("invoice.paid: credit balance upsert failed:", balErr);
+          if (balErr) {
+            console.error("invoice.paid: credit balance upsert failed:", balErr);
+            processingError = balErr.message;
+          }
 
           const { error: ledgerErr } = await sb.from("credit_ledger").insert({
             owner_id: sub.owner_id,
             amount: credits,
             reason: "subscription_renewal",
           });
-          if (ledgerErr) console.error("invoice.paid: credit ledger insert failed:", ledgerErr);
+          if (ledgerErr) {
+            console.error("invoice.paid: credit ledger insert failed:", ledgerErr);
+            processingError = ledgerErr.message;
+          }
         }
 
         break;
@@ -231,14 +269,18 @@ Deno.serve(async (req: Request) => {
         const priceId = planItem?.price?.id;
 
         // Try price ID lookup first (most reliable), then metadata fallback
+        // Annual price IDs are hardcoded as fallbacks since env vars may not be available
         let plan: string | null = null;
         if (priceId) {
-          const priceStarter = Deno.env.get("STRIPE_PRICE_STARTER");
-          const priceGrowth = Deno.env.get("STRIPE_PRICE_GROWTH");
-          const priceScale = Deno.env.get("STRIPE_PRICE_SCALE");
-          if (priceId === priceStarter) plan = "starter";
-          else if (priceId === priceGrowth) plan = "growth";
-          else if (priceId === priceScale) plan = "scale";
+          const priceStarter        = Deno.env.get("STRIPE_PRICE_STARTER");
+          const priceGrowth         = Deno.env.get("STRIPE_PRICE_GROWTH");
+          const priceScale          = Deno.env.get("STRIPE_PRICE_SCALE");
+          const priceStarterAnnual  = Deno.env.get("STRIPE_PRICE_STARTER_ANNUAL") ?? "price_1T661MDofGNcXNHKPIpj3KOE";
+          const priceGrowthAnnual   = Deno.env.get("STRIPE_PRICE_GROWTH_ANNUAL")  ?? "price_1T662PDofGNcXNHKinIVq4Ft";
+          const priceScaleAnnual    = Deno.env.get("STRIPE_PRICE_SCALE_ANNUAL")   ?? "price_1T663BDofGNcXNHKAymouo25";
+          if (priceId === priceStarter || priceId === priceStarterAnnual) plan = "starter";
+          else if (priceId === priceGrowth || priceId === priceGrowthAnnual) plan = "growth";
+          else if (priceId === priceScale || priceId === priceScaleAnnual) plan = "scale";
         }
         // Fallback to metadata
         if (!plan) {
@@ -259,7 +301,7 @@ Deno.serve(async (req: Request) => {
           ? "canceled"
           : "incomplete";
 
-        await sb
+        const { error: updateErr } = await sb
           .from("subscriptions")
           .update({
             plan,
@@ -273,6 +315,11 @@ Deno.serve(async (req: Request) => {
           })
           .eq("stripe_subscription_id", stripeSubId);
 
+        if (updateErr) {
+          console.error("subscription.updated: subscription update failed:", updateErr);
+          processingError = updateErr.message;
+        }
+
         // Update profile plan if subscription is still active
         if (plan && status === "active") {
           const { data: sub } = await sb
@@ -282,10 +329,15 @@ Deno.serve(async (req: Request) => {
             .single();
 
           if (sub) {
-            await sb
+            const { error: profileErr } = await sb
               .from("profiles")
               .update({ plan })
               .eq("id", sub.owner_id);
+
+            if (profileErr) {
+              console.error("subscription.updated: profile update failed:", profileErr);
+              processingError = profileErr.message;
+            }
           }
         }
 
@@ -297,10 +349,15 @@ Deno.serve(async (req: Request) => {
         const stripeSubId = subscription.id;
 
         // Mark subscription as canceled
-        await sb
+        const { error: cancelErr } = await sb
           .from("subscriptions")
           .update({ status: "canceled" })
           .eq("stripe_subscription_id", stripeSubId);
+
+        if (cancelErr) {
+          console.error("subscription.deleted: subscription cancel failed:", cancelErr);
+          processingError = cancelErr.message;
+        }
 
         // Downgrade profile to free
         const { data: sub } = await sb
@@ -310,15 +367,150 @@ Deno.serve(async (req: Request) => {
           .single();
 
         if (sub) {
-          await sb
+          const { error: profileErr } = await sb
             .from("profiles")
             .update({ plan: "free" })
             .eq("id", sub.owner_id);
 
+          if (profileErr) {
+            console.error("subscription.deleted: profile downgrade failed:", profileErr);
+            processingError = profileErr.message;
+          }
+
           // Clear remaining credits
-          await sb.from("credit_balances").upsert(
+          const { error: balErr } = await sb.from("credit_balances").upsert(
             { owner_id: sub.owner_id, remaining: 0 },
             { onConflict: "owner_id" },
+          );
+
+          if (balErr) {
+            console.error("subscription.deleted: credit balance clear failed:", balErr);
+            processingError = balErr.message;
+          }
+        }
+
+        break;
+      }
+
+      case "charge.refunded": {
+        const charge = event.data.object as Stripe.Charge;
+        const paymentIntentId =
+          typeof charge.payment_intent === "string"
+            ? charge.payment_intent
+            : charge.payment_intent?.id;
+
+        if (!paymentIntentId) {
+          console.error("charge.refunded: no payment_intent on charge:", charge.id);
+          break;
+        }
+
+        // Find the checkout session that created this payment to get metadata
+        const sessions = await stripe.checkout.sessions.list({
+          payment_intent: paymentIntentId,
+          limit: 1,
+        });
+
+        const session = sessions.data[0];
+        if (!session) {
+          console.error("charge.refunded: no checkout session for payment_intent:", paymentIntentId);
+          break;
+        }
+
+        const userId = session.metadata?.supabase_user_id;
+        if (!userId) {
+          console.error("charge.refunded: no supabase_user_id in session metadata:", session.id);
+          break;
+        }
+
+        // Determine credits to reverse from original purchase
+        let creditsToDeduct = 0;
+        const pack = session.metadata?.pack;
+        const plan = session.metadata?.plan;
+
+        if (pack && PACK_CREDITS[pack]) {
+          creditsToDeduct = PACK_CREDITS[pack];
+        } else if (plan && PLAN_CREDITS[plan]) {
+          creditsToDeduct = PLAN_CREDITS[plan];
+        } else {
+          console.error("charge.refunded: could not determine credits for session:", session.id);
+          break;
+        }
+
+        // For partial refunds, prorate credits proportionally
+        if (charge.amount > 0 && charge.amount_refunded < charge.amount) {
+          creditsToDeduct = Math.round(
+            creditsToDeduct * (charge.amount_refunded / charge.amount),
+          );
+        }
+
+        // Deduct credits (floor at 0)
+        const { data: existing } = await sb
+          .from("credit_balances")
+          .select("remaining")
+          .eq("owner_id", userId)
+          .maybeSingle();
+
+        const currentBalance = existing?.remaining ?? 0;
+        const newBalance = Math.max(0, currentBalance - creditsToDeduct);
+
+        const { error: balErr } = await sb.from("credit_balances").upsert(
+          { owner_id: userId, remaining: newBalance },
+          { onConflict: "owner_id" },
+        );
+        if (balErr) {
+          console.error("charge.refunded: credit balance deduction failed:", balErr);
+          processingError = balErr.message;
+        }
+
+        const { error: ledgerErr } = await sb.from("credit_ledger").insert({
+          owner_id: userId,
+          amount: -creditsToDeduct,
+          reason: "refund",
+        });
+        if (ledgerErr) {
+          console.error("charge.refunded: credit ledger insert failed:", ledgerErr);
+          processingError = ledgerErr.message;
+        }
+
+        break;
+      }
+
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subscriptionId =
+          typeof invoice.subscription === "string"
+            ? invoice.subscription
+            : invoice.subscription?.id;
+
+        if (!subscriptionId) {
+          console.log("invoice.payment_failed: no subscription_id, skipping");
+          break;
+        }
+
+        const { data: sub } = await sb
+          .from("subscriptions")
+          .select("owner_id")
+          .eq("stripe_subscription_id", subscriptionId)
+          .single();
+
+        if (sub) {
+          console.warn(
+            `invoice.payment_failed: subscription ${subscriptionId} for user ${sub.owner_id}`,
+          );
+
+          // Mark subscription as past_due so the user cannot keep generating
+          const { error: statusErr } = await sb
+            .from("subscriptions")
+            .update({ status: "past_due" })
+            .eq("stripe_subscription_id", subscriptionId);
+
+          if (statusErr) {
+            console.error("invoice.payment_failed: subscription status update failed:", statusErr);
+            processingError = statusErr.message;
+          }
+        } else {
+          console.warn(
+            `invoice.payment_failed: subscription ${subscriptionId} not found in DB`,
           );
         }
 
@@ -329,7 +521,17 @@ Deno.serve(async (req: Request) => {
         console.log(`Unhandled Stripe event type: ${event.type}`);
     }
 
-    // Log the event for idempotency
+    // If a critical DB operation failed, return 500 so Stripe retries the event.
+    // Don't insert audit_log so the idempotency guard won't block the retry.
+    if (processingError) {
+      console.error(
+        `stripe-webhook: returning 500 for ${event.type} due to DB error:`,
+        processingError,
+      );
+      return json({ detail: "Processing failed, will retry" }, headers, 500);
+    }
+
+    // Log the event for idempotency (only on success)
     await sb.from("audit_logs").insert({
       action: `stripe.${event.type}`,
       event_id: event.id,

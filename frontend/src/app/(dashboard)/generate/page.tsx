@@ -26,6 +26,7 @@ import {
   Flame,
   AlertCircle,
   ChevronDown,
+  ChevronUp,
   ChevronRight,
   Settings2,
 } from "lucide-react";
@@ -41,6 +42,7 @@ import {
   CREDITS_PER_BATCH_HD,
   type PlanTier,
   type CreditPackKey,
+  type SingleVideoPackKey,
 } from "@/lib/stripe";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +51,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -63,7 +66,7 @@ import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { useWatchedGenerationsStore } from "@/stores/watched-generations";
 import { VideoGenerationAnimation } from "@/components/landing/VideoGenerationAnimation";
 import { useProducts, useScrapeProduct } from "@/hooks/use-products";
-import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
+import { isExternalUrl, getSignedImageUrl, getSignedImageUrls } from "@/lib/storage";
 import { usePersonas, resolvePersonaImageUrl } from "@/hooks/use-personas";
 import type { Persona, Product, BrandSummary, ScriptSegment } from "@/types/database";
 import { useCredits } from "@/hooks/use-credits";
@@ -183,22 +186,39 @@ function useResolvedProductImages(
     if (!products || products.length === 0) return;
     let cancelled = false;
     async function resolve() {
-      const entries = await Promise.all(
-        products!.map(async (p) => {
-          const raw = p.images?.[0];
-          if (!raw) return [p.id, null] as [string, null];
-          const url = isExternalUrl(raw)
-            ? raw
-            : await getSignedImageUrl("product-images", raw);
-          return [p.id, url] as [string, string | null];
-        }),
-      );
-      if (!cancelled) setImageMap(Object.fromEntries(entries));
+      const result: Record<string, string | null> = {};
+      const pathsToSign: { productId: string; path: string }[] = [];
+
+      // Pass 1: resolve external URLs immediately
+      for (const p of products!) {
+        const raw = p.images?.[0];
+        if (!raw) {
+          result[p.id] = null;
+        } else if (isExternalUrl(raw)) {
+          result[p.id] = raw;
+        } else {
+          result[p.id] = null;
+          pathsToSign.push({ productId: p.id, path: raw });
+        }
+      }
+      if (!cancelled) setImageMap({ ...result });
+
+      // Pass 2: batch-sign all internal paths in a single request
+      if (pathsToSign.length > 0) {
+        const signedUrls = await getSignedImageUrls(
+          "product-images",
+          pathsToSign.map((p) => p.path),
+        );
+        if (!cancelled) {
+          signedUrls.forEach((url, i) => {
+            result[pathsToSign[i].productId] = url;
+          });
+          setImageMap({ ...result });
+        }
+      }
     }
     resolve();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [products]);
 
   return imageMap;
@@ -211,19 +231,39 @@ function useResolvedPersonaImages(personas: Persona[] | undefined) {
     if (!personas || personas.length === 0) return;
     let cancelled = false;
     async function resolve() {
-      const entries = await Promise.all(
-        personas!.map(async (p) => {
-          const raw = p.selected_image_url ?? p.generated_images?.[0] ?? null;
-          const url = await resolvePersonaImageUrl(raw);
-          return [p.id, url] as [string, string | null];
-        }),
-      );
-      if (!cancelled) setImageMap(Object.fromEntries(entries));
+      const result: Record<string, string | null> = {};
+      const pathsToSign: { personaId: string; path: string }[] = [];
+
+      // Pass 1: resolve external URLs immediately (no API call needed)
+      for (const p of personas!) {
+        const raw = p.selected_image_url ?? p.generated_images?.[0] ?? null;
+        if (!raw) {
+          result[p.id] = null;
+        } else if (raw.startsWith("http")) {
+          result[p.id] = raw;
+        } else {
+          result[p.id] = null;
+          pathsToSign.push({ personaId: p.id, path: raw });
+        }
+      }
+      if (!cancelled) setImageMap({ ...result });
+
+      // Pass 2: batch-sign all internal paths in a single request
+      if (pathsToSign.length > 0) {
+        const supabase = createClient();
+        const { data } = await supabase.storage
+          .from("persona-images")
+          .createSignedUrls(pathsToSign.map((p) => p.path), 3600);
+        if (data && !cancelled) {
+          data.forEach((item, i) => {
+            result[pathsToSign[i].personaId] = item.signedUrl ?? null;
+          });
+          setImageMap({ ...result });
+        }
+      }
     }
     resolve();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [personas]);
 
   return imageMap;
@@ -273,6 +313,8 @@ export default function GeneratePage() {
   const [scrapedProducts, setScrapedProducts] = useState<Product[]>([]);
   const [scrapedBrandSummary, setScrapedBrandSummary] = useState<BrandSummary | null>(null);
   const [showScrapeResults, setShowScrapeResults] = useState(false);
+  // Section 1 sub-steps: 1 = product selection, 2 = format selection
+  const [section1SubStep, setSection1SubStep] = useState<1 | 2>(1);
 
   // Persona limit paywall
   const [showPersonaLimitPaywall, setShowPersonaLimitPaywall] = useState(false);
@@ -284,6 +326,7 @@ export default function GeneratePage() {
   const [selectedCompositeIdx, setSelectedCompositeIdx] = useState<number | null>(null);
   const [showPreviewEditor, setShowPreviewEditor] = useState(false);
   const [previewEditPrompt, setPreviewEditPrompt] = useState("");
+  const [ctaOpen, setCtaOpen] = useState(false);
 
   // Advanced mode state
   const [isInitializingAdvanced, setIsInitializingAdvanced] = useState(false);
@@ -395,6 +438,7 @@ export default function GeneratePage() {
     if (section === 1) {
       // Also clear format so user explicitly re-chooses
       store.setStep(1);
+      setSection1SubStep(1);
     } else {
       store.setStep(2);
     }
@@ -612,7 +656,7 @@ export default function GeneratePage() {
               result.script,
               result.credits_to_charge ?? effectiveCost,
             );
-            // Script now shows inline — no step change needed
+            // Script now shows inline - no step change needed
           } else {
             toast.error("Script was not returned. Please try again.");
           }
@@ -751,11 +795,13 @@ export default function GeneratePage() {
     });
   }
 
-  async function handleBuyPack(pack: CreditPackKey) {
+  async function handleBuyPack(pack: CreditPackKey | SingleVideoPackKey) {
     const couponId = offer.isActive ? COUPON_30_OFF : undefined;
     buyCredits.mutate({ pack, couponId }, {
       onSuccess: (url) => {
-        trackCreditsPurchased(pack);
+        if (pack in { pack_10: 1, pack_30: 1, pack_100: 1 }) {
+          trackCreditsPurchased(pack as CreditPackKey);
+        }
         if (couponId) offer.markUsed();
         window.location.href = url;
       },
@@ -793,7 +839,7 @@ export default function GeneratePage() {
 
       {/* ── Section 1: Product & Format ───────────────────────────────── */}
       <div className="rounded-xl border border-border overflow-hidden">
-        {/* Section header — always visible */}
+        {/* Section header - always visible */}
         <div
           className={cn(
             "flex items-center justify-between px-5 py-4",
@@ -818,7 +864,7 @@ export default function GeneratePage() {
                   </Badge>
                 </span>
               ) : (
-                "Product & Format"
+                section1SubStep === 2 ? "Select Format" : "Select Product"
               )}
             </span>
           </div>
@@ -833,8 +879,8 @@ export default function GeneratePage() {
           )}
         </div>
 
-        {/* Section 1 body — only shown when not complete */}
-        {!section1Complete && (
+        {/* Section 1 sub-step 1: Product selection */}
+        {!section1Complete && section1SubStep === 1 && (
           <div className="px-5 pb-5 flex flex-col gap-5">
             {/* Product selector */}
             <div className="flex flex-col gap-3">
@@ -983,61 +1029,81 @@ export default function GeneratePage() {
               ) : null}
             </div>
 
-            {/* Format picker — shown once products are loaded */}
-            {confirmedProducts.length > 0 && !showAddProductForm && (
-              <div className="flex flex-col gap-2">
-                <p className="text-sm font-medium text-muted-foreground">Format</p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => store.setFormat("9:16")}
-                    className={cn(
-                      "flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-sm transition-all",
-                      store.format === "9:16"
-                        ? "border-primary bg-primary/5 font-medium text-primary"
-                        : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/30",
-                    )}
-                  >
-                    <Smartphone className="size-4" />
-                    <div className="text-left">
-                      <p className="font-medium leading-none">Portrait</p>
-                      <p className="text-xs opacity-60 mt-0.5">9:16 · TikTok, Reels</p>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => store.setFormat("16:9")}
-                    className={cn(
-                      "flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-sm transition-all",
-                      store.format === "16:9"
-                        ? "border-primary bg-primary/5 font-medium text-primary"
-                        : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/30",
-                    )}
-                  >
-                    <Monitor className="size-4" />
-                    <div className="text-left">
-                      <p className="font-medium leading-none">Landscape</p>
-                      <p className="text-xs opacity-60 mt-0.5">16:9 · YouTube, Meta</p>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            )}
+          </div>
+        )}
 
-            {/* Continue button */}
-            {confirmedProducts.length > 0 && !showAddProductForm && (
-              <Button
-                onClick={() => store.setStep(2)}
-                disabled={!store.productId || !store.format}
-                className="w-full sm:w-auto"
+        {/* Section 1 sub-step 2: Format selection */}
+        {!section1Complete && section1SubStep === 2 && (
+          <div className="border-t border-border px-5 pb-5 pt-4 flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSection1SubStep(1)}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
               >
-                Continue
-                <ChevronRight className="size-4" />
-              </Button>
-            )}
+                ← Back
+              </button>
+              <p className="text-sm font-medium text-muted-foreground">Choose format</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => store.setFormat("9:16")}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-sm transition-all",
+                  store.format === "9:16"
+                    ? "border-primary bg-primary/5 font-medium text-primary"
+                    : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/30",
+                )}
+              >
+                <Smartphone className="size-4" />
+                <div className="text-left">
+                  <p className="font-medium leading-none">Portrait</p>
+                  <p className="text-xs opacity-60 mt-0.5">9:16 · TikTok, Reels</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => store.setFormat("16:9")}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-sm transition-all",
+                  store.format === "16:9"
+                    ? "border-primary bg-primary/5 font-medium text-primary"
+                    : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/30",
+                )}
+              >
+                <Monitor className="size-4" />
+                <div className="text-left">
+                  <p className="font-medium leading-none">Landscape</p>
+                  <p className="text-xs opacity-60 mt-0.5">16:9 · YouTube, Meta</p>
+                </div>
+              </button>
+            </div>
+            <Button
+              onClick={() => store.setStep(2)}
+              disabled={!store.format}
+              className="w-full sm:w-auto"
+            >
+              Continue
+              <ChevronRight className="size-4" />
+            </Button>
           </div>
         )}
       </div>
+
+      {/* ── Sticky Continue - Section 1 product step ──────────────────── */}
+      {!section1Complete && section1SubStep === 1 && confirmedProducts.length > 0 && !showAddProductForm && !productsLoading && (
+        <div className="sticky bottom-4 z-20 flex justify-end pointer-events-none">
+          <Button
+            onClick={() => setSection1SubStep(2)}
+            disabled={!store.productId}
+            className="pointer-events-auto shadow-lg"
+          >
+            Continue
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
+      )}
 
       {/* ── Section 2: Persona ────────────────────────────────────────── */}
       {store.step >= 2 && (
@@ -1081,7 +1147,7 @@ export default function GeneratePage() {
             )}
           </div>
 
-          {/* Section 2 body — only shown when not complete */}
+          {/* Section 2 body - only shown when not complete */}
           {!section2Complete && (
             <div className="px-5 pb-5 flex flex-col gap-4">
               {personasLoading ? (
@@ -1144,7 +1210,7 @@ export default function GeneratePage() {
                                 {!hasImage ? (
                                   <div className="flex items-center gap-1.5 text-xs text-amber-500">
                                     <AlertCircle className="size-3.5" />
-                                    Needs image — visit Personas
+                                    Needs image - visit Personas
                                   </div>
                                 ) : store.personaId === persona.id ? (
                                   <div className="flex items-center gap-1.5 text-xs text-primary">
@@ -1194,7 +1260,7 @@ export default function GeneratePage() {
                   <CardContent className="flex flex-col items-center gap-3 py-10">
                     <User className="size-8 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
-                      No personas yet — create one first before generating a video.
+                      No personas yet - create one first before generating a video.
                     </p>
                     <Button asChild variant="outline" size="sm">
                       <Link href="/personas/new?returnTo=/generate">
@@ -1368,76 +1434,64 @@ export default function GeneratePage() {
                   </div>
                 </div>
 
-                {/* CTA style */}
-                <div>
-                  <p className="mb-2 text-sm font-medium">CTA style</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {CTA_STYLE_OPTIONS.map((option) => (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => { store.setCtaStyle(option.key); setScriptConfigChanged(true); }}
-                        className={cn(
-                          "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
-                          store.ctaStyle === option.key
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:border-muted-foreground/30",
+                {/* CTA style - collapsible */}
+                <Collapsible open={ctaOpen} onOpenChange={setCtaOpen}>
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between rounded-xl border-2 border-border px-4 py-3 text-left transition-all hover:border-muted-foreground/30"
+                    >
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">Customize CTA</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">
+                          {CTA_STYLE_OPTIONS.find((o) => o.key === store.ctaStyle)?.label ?? "Auto"}
+                        </Badge>
+                        {ctaOpen ? (
+                          <ChevronUp className="size-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="size-4 text-muted-foreground" />
                         )}
-                      >
-                        <p className="text-sm font-semibold">{option.label}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">{option.description}</p>
-                      </button>
-                    ))}
-                  </div>
-                  {requiresCommentKeyword && (
-                    <div className="mt-3">
-                      <Label htmlFor="cta-comment-keyword" className="text-xs text-muted-foreground">
-                        Keyword viewers should comment
-                      </Label>
-                      <Input
-                        id="cta-comment-keyword"
-                        value={store.ctaCommentKeyword}
-                        onChange={(e) => store.setCtaCommentKeyword(e.target.value.replace(/[^a-zA-Z0-9 _-]/g, ""))}
-                        placeholder='e.g. "link" or "deal"'
-                        className="mt-1"
-                        maxLength={30}
-                      />
+                      </div>
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      {CTA_STYLE_OPTIONS.map((option) => (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => { store.setCtaStyle(option.key); setScriptConfigChanged(true); }}
+                          className={cn(
+                            "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                            store.ctaStyle === option.key
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-muted-foreground/30",
+                          )}
+                        >
+                          <p className="text-sm font-semibold">{option.label}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">{option.description}</p>
+                        </button>
+                      ))}
                     </div>
-                  )}
-                </div>
-
-                <Separator />
-
-                {/* Credit cost */}
-                <div className={cn(
-                  "rounded-xl border px-4 py-3",
-                  hasEnoughCredits ? "border-border bg-muted/30" : "border-amber-500/30 bg-amber-500/10",
-                )}>
-                  {hasEnoughCredits ? (
-                    <p className="text-sm text-muted-foreground">
-                      This will use{" "}
-                      <span className="font-bold text-foreground">{effectiveCost} credits</span>
-                      {!isUnlimitedCredits && <span> ({creditsRemaining} remaining)</span>}
-                      {isFirstVideo && (
-                        <span className="ml-2 text-xs text-amber-500 font-medium">
-                          ✦ 50% first-video discount applied
-                        </span>
-                      )}
-                    </p>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="size-4 text-amber-500 shrink-0" />
-                      <p className="text-sm text-amber-600 dark:text-amber-400">
-                        Not enough credits — you'll be prompted to top up.{" "}
-                        {!isUnlimitedCredits && (
-                          <span className="text-xs">
-                            Need {effectiveCost} ({creditsRemaining} remaining)
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  )}
-                </div>
+                    {requiresCommentKeyword && (
+                      <div className="mt-3">
+                        <Label htmlFor="cta-comment-keyword" className="text-xs text-muted-foreground">
+                          Keyword viewers should comment
+                        </Label>
+                        <Input
+                          id="cta-comment-keyword"
+                          value={store.ctaCommentKeyword}
+                          onChange={(e) => store.setCtaCommentKeyword(e.target.value.replace(/[^a-zA-Z0-9 _-]/g, ""))}
+                          placeholder='e.g. "link" or "deal"'
+                          className="mt-1"
+                          maxLength={30}
+                        />
+                      </div>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
 
                 {requiresCommentKeyword && !commentKeyword && (
                   <div className="rounded-xl bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
@@ -1557,7 +1611,7 @@ export default function GeneratePage() {
                   </div>
                 )}
 
-                {/* No composites + not pending — fallback generate button */}
+                {/* No composites + not pending - fallback generate button */}
                 {!generateComposites.isPending && compositeImages.length === 0 && (
                   <Button
                     variant="outline"
@@ -1569,7 +1623,36 @@ export default function GeneratePage() {
                   </Button>
                 )}
 
-                <Separator />
+                {/* Credit cost */}
+                <div className={cn(
+                  "rounded-xl border px-4 py-3",
+                  hasEnoughCredits ? "border-border bg-muted/30" : "border-amber-500/30 bg-amber-500/10",
+                )}>
+                  {hasEnoughCredits ? (
+                    <p className="text-sm text-muted-foreground">
+                      This will use{" "}
+                      <span className="font-bold text-foreground">{effectiveCost} credits</span>
+                      {!isUnlimitedCredits && <span> ({creditsRemaining} remaining)</span>}
+                      {isFirstVideo && (
+                        <span className="ml-2 text-xs text-amber-500 font-medium">
+                          ✦ 50% first-video discount applied
+                        </span>
+                      )}
+                    </p>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="size-4 text-amber-500 shrink-0" />
+                      <p className="text-sm text-amber-600 dark:text-amber-400">
+                        Not enough credits - you'll be prompted to top up.{" "}
+                        {!isUnlimitedCredits && (
+                          <span className="text-xs">
+                            Need {effectiveCost} ({creditsRemaining} remaining)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 {/* ── Script / Generate area ────────────────────────── */}
                 {generateScript.isPending ? (
@@ -1584,7 +1667,7 @@ export default function GeneratePage() {
                       <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
                         <AlertCircle className="size-4 text-amber-500 shrink-0" />
                         <div className="flex-1">
-                          <p className="text-sm text-amber-600 dark:text-amber-400">Settings changed — regenerate script to reflect updates.</p>
+                          <p className="text-sm text-amber-600 dark:text-amber-400">Settings changed - regenerate script to reflect updates.</p>
                         </div>
                         <Button
                           variant="outline"
@@ -1599,11 +1682,11 @@ export default function GeneratePage() {
                       </div>
                     )}
 
-                    {/* Script review — inline */}
+                    {/* Script review - inline */}
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2 mb-1">
                         <Check className="size-4 text-emerald-500" />
-                        <p className="text-sm font-semibold">Script ready — review & edit</p>
+                        <p className="text-sm font-semibold">Script ready - review & edit</p>
                       </div>
                       <p className="text-xs text-muted-foreground mb-3">
                         Edit any segment before generating your video.
@@ -1756,7 +1839,7 @@ export default function GeneratePage() {
                   <>
                     <div className="rounded-xl bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
                       {store.mode === "triple"
-                        ? "Customize each of the 9 segments — 3 variants × 3 types. Mix any combo for 27 unique videos."
+                        ? "Customize each of the 9 segments - 3 variants × 3 types. Mix any combo for 27 unique videos."
                         : "Customize your Hook, Body, and CTA individually for full creative control."}
                     </div>
                     <AdvancedModePanel
@@ -1790,7 +1873,7 @@ export default function GeneratePage() {
                         <div className="flex items-center gap-2">
                           <AlertCircle className="size-4 text-amber-500 shrink-0" />
                           <p className="text-sm text-amber-600 dark:text-amber-400">
-                            Not enough credits — you'll be prompted to top up.
+                            Not enough credits - you'll be prompted to top up.
                           </p>
                         </div>
                       )}
@@ -1833,7 +1916,7 @@ export default function GeneratePage() {
                     )}
                   </>
                 ) : (
-                  /* No segments yet and not initializing — re-init option */
+                  /* No segments yet and not initializing - re-init option */
                   <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-10">
                     <Settings2 className="size-8 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">Advanced segments failed to generate.</p>
@@ -1994,14 +2077,14 @@ export default function GeneratePage() {
                     className="w-full py-6 text-base font-bold"
                     onClick={() => {
                       store.setQuality(paywallQuality);
-                      handleBuyPack("pack_10");
+                      handleBuyPack(paywallQuality === "hd" ? "single_hd" : "single_standard");
                     }}
                     disabled={buyCredits.isPending}
                   >
                     {buyCredits.isPending ? <Loader2 className="size-4 animate-spin" /> : "Generate Video →"}
                   </Button>
                   <p className="text-center text-xs text-muted-foreground mt-3">
-                    Buying 10 credits · Unused credits carry over for future videos
+                    Buying {paywallQuality === "hd" ? "10" : "5"} credits · Unused credits carry over for future videos
                   </p>
                 </div>
               ) : (
@@ -2083,7 +2166,7 @@ export default function GeneratePage() {
                             <span className="font-bold text-foreground">{pack.credits} credits</span>
                             {" "}
                             <span className="text-muted-foreground">
-                              — {discountedPackPrice !== null ? (
+                              - {discountedPackPrice !== null ? (
                                 <>
                                   <span className="line-through">${pack.price}</span>{" "}
                                   <span className="text-primary font-semibold">${discountedPackPrice}</span>
@@ -2116,7 +2199,7 @@ export default function GeneratePage() {
             <div className="bg-primary text-primary-foreground px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm font-medium shrink-0">
               <div className="flex items-center gap-2">
                 <Flame className="size-4" />
-                <span>Limited-time offer — 30% off your first plan</span>
+                <span>Limited-time offer - 30% off your first plan</span>
               </div>
               <div className="flex items-center gap-2 bg-black/15 px-2.5 py-0.5 rounded font-mono">
                 <Clock className="size-3 opacity-80" />
@@ -2131,7 +2214,7 @@ export default function GeneratePage() {
                 <User className="size-7 text-primary" />
               </div>
               <h2 className="text-2xl font-bold tracking-tight">
-                {offer.isActive ? "Unlock More Personas — 30% Off" : "Unlock More Personas"}
+                {offer.isActive ? "Unlock More Personas - 30% Off" : "Unlock More Personas"}
               </h2>
               <p className="mt-2 text-muted-foreground max-w-md mx-auto">
                 {(() => {

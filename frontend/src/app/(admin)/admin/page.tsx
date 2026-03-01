@@ -53,7 +53,7 @@ export default async function AdminOverviewPage() {
       </div>
 
       <div className="rounded-xl border border-border bg-card p-5">
-        <p className="text-sm font-medium text-foreground mb-4">Nouvelles inscriptions — 30 derniers jours</p>
+        <p className="text-sm font-medium text-foreground mb-4">Nouvelles inscriptions - 30 derniers jours</p>
         <OverviewChart data={timeseries} />
       </div>
     </div>

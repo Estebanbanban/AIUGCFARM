@@ -34,9 +34,30 @@ Deno.serve(async (req: Request) => {
 
     if (error) throw new Error(`DB error: ${error.message}`);
 
-    if (!subscription?.stripe_customer_id) {
+    let customerId = subscription?.stripe_customer_id;
+
+    // Fallback: look up Stripe customer by email for pack-only buyers
+    if (!customerId) {
+      const { data: profile } = await sb
+        .from("profiles")
+        .select("email")
+        .eq("id", userId)
+        .single();
+
+      if (profile?.email) {
+        const customers = await stripe.customers.list({
+          email: profile.email,
+          limit: 1,
+        });
+        if (customers.data.length > 0) {
+          customerId = customers.data[0].id;
+        }
+      }
+    }
+
+    if (!customerId) {
       return json(
-        { detail: "No active subscription found. Subscribe to a plan first." },
+        { detail: "No billing account found. Make a purchase first." },
         cors,
         404,
       );
@@ -44,7 +65,7 @@ Deno.serve(async (req: Request) => {
 
     // Create billing portal session
     const portalSession = await stripe.billingPortal.sessions.create({
-      customer: subscription.stripe_customer_id,
+      customer: customerId,
       return_url: `${FRONTEND_URL}/settings`,
     });
 

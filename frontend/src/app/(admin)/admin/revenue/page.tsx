@@ -11,9 +11,9 @@ import { RevenueChart } from "@/components/admin/RevenueChart";
 export const dynamic = "force-dynamic";
 
 const PLAN_LABEL: Record<string, string> = {
-  starter: "Starter — $25",
-  growth: "Growth — $80",
-  scale: "Scale — $180",
+  starter: "Starter - $25",
+  growth: "Growth - $80",
+  scale: "Scale - $180",
 };
 
 export default async function RevenuePage() {
@@ -78,7 +78,7 @@ export default async function RevenuePage() {
             <tbody>
               {(recentSubs as any[]).map((s) => (
                 <tr key={s.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                  <td className="px-5 py-3 text-foreground">{(s.profiles as any)?.email ?? "—"}</td>
+                  <td className="px-5 py-3 text-foreground">{(s.profiles as any)?.email ?? "-"}</td>
                   <td className="px-5 py-3 text-muted-foreground capitalize">{s.plan}</td>
                   <td className="px-5 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${

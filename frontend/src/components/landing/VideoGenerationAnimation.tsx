@@ -1,4 +1,4 @@
-// SVG animation for the "How It Works" step 3 — shows the video generation
+// SVG animation for the "How It Works" step 3 - shows the video generation
 // loading sequence with 4 morphing scenes (graphs, checkout, printing money, viral).
 // Rendered via dangerouslySetInnerHTML to preserve CSS class-based animations
 // exactly as authored in SVG/CSS without JSX attribute conversion.

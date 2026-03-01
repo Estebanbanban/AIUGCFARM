@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { callEdge } from "@/lib/api";
-import type { PlanTier, CreditPackKey } from "@/lib/stripe";
+import type { PlanTier, CreditPackKey, SingleVideoPackKey } from "@/lib/stripe";
 
 interface CheckoutResponse {
   data: { url: string };
@@ -10,11 +10,12 @@ interface CheckoutResponse {
 
 interface CheckoutPlanArgs {
   plan: PlanTier;
+  billing?: "monthly" | "annual";
   couponId?: string;
 }
 
 interface CheckoutPackArgs {
-  pack: CreditPackKey;
+  pack: CreditPackKey | SingleVideoPackKey;
   couponId?: string;
 }
 
@@ -22,9 +23,9 @@ export function useCheckout() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ plan, couponId }: CheckoutPlanArgs) => {
+    mutationFn: async ({ plan, billing, couponId }: CheckoutPlanArgs) => {
       const res = await callEdge<CheckoutResponse>("stripe-checkout", {
-        body: { plan, ...(couponId ? { couponId } : {}) },
+        body: { plan, ...(billing ? { billing } : {}), ...(couponId ? { couponId } : {}) },
       });
       return res.data.url;
     },

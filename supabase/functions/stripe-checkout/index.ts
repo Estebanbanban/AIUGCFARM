@@ -12,17 +12,18 @@ const stripe = new Stripe(STRIPE_SECRET_KEY, {
   httpClient: Stripe.createFetchHttpClient(),
 });
 
-/** Subscription plan → Stripe recurring Price ID */
-const PLAN_PRICE_IDS: Record<string, string | undefined> = {
+/** Subscription plan → Stripe recurring Price ID (monthly) */
+const PLAN_PRICE_IDS_MONTHLY: Record<string, string | undefined> = {
   starter: Deno.env.get("STRIPE_PRICE_STARTER"),
-  growth: Deno.env.get("STRIPE_PRICE_GROWTH"),
-  scale: Deno.env.get("STRIPE_PRICE_SCALE"),
+  growth:  Deno.env.get("STRIPE_PRICE_GROWTH"),
+  scale:   Deno.env.get("STRIPE_PRICE_SCALE"),
 };
 
-const PLAN_NAMES: Record<string, string> = {
-  starter: "Starter ($25/mo)",
-  growth: "Growth ($80/mo)",
-  scale: "Scale ($180/mo)",
+/** Subscription plan → Stripe recurring Price ID (annual — hardcoded as fallback) */
+const PLAN_PRICE_IDS_ANNUAL: Record<string, string> = {
+  starter: Deno.env.get("STRIPE_PRICE_STARTER_ANNUAL") ?? "price_1T661MDofGNcXNHKPIpj3KOE",
+  growth:  Deno.env.get("STRIPE_PRICE_GROWTH_ANNUAL")  ?? "price_1T662PDofGNcXNHKinIVq4Ft",
+  scale:   Deno.env.get("STRIPE_PRICE_SCALE_ANNUAL")   ?? "price_1T663BDofGNcXNHKAymouo25",
 };
 
 /** Credit pack → Stripe one-time Price ID */
@@ -30,20 +31,18 @@ const PACK_PRICE_IDS: Record<string, string | undefined> = {
   pack_10: Deno.env.get("STRIPE_PRICE_PACK_10"),
   pack_30: Deno.env.get("STRIPE_PRICE_PACK_30"),
   pack_100: Deno.env.get("STRIPE_PRICE_PACK_100"),
+  // Single-video paywall purchases (price IDs are not secrets — hardcoded as fallback)
+  single_standard: Deno.env.get("STRIPE_PRICE_SINGLE_STANDARD") ?? "price_1T65y1DofGNcXNHKBXaliSF2",
+  single_hd:       Deno.env.get("STRIPE_PRICE_SINGLE_HD")       ?? "price_1T65zBDofGNcXNHKMYvxgyuw",
 };
 
 const PACK_NAMES: Record<string, string> = {
   pack_10: "10 Credits: Starter Pack ($12)",
   pack_30: "30 Credits: Creator Pack ($33)",
   pack_100: "100 Credits: Pro Pack ($95)",
+  single_standard: "5 Credits: Single Standard Video ($5)",
+  single_hd: "10 Credits: Single HD Video ($10)",
 };
-
-/**
- * Allowlist of Stripe coupon IDs accepted from the client.
- * t9QmsQTe = NewUsers (30% off once): first-paywall 30-min offer
- * yGuI3xvT = 50percent (50% off once, Starter only) — first-video offer
- */
-const ALLOWED_COUPONS = new Set(["t9QmsQTe", "yGuI3xvT"]);
 
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req);
@@ -58,17 +57,25 @@ Deno.serve(async (req: Request) => {
     const sb = getAdminClient();
 
     const body = await req.json();
-    const { plan, pack, couponId } = body;
+    const { plan, pack, couponId, billing } = body;
+    const isAnnual = billing === "annual";
 
     if (!plan && !pack) {
       return json({ detail: "Provide either 'plan' or 'pack'" }, cors, 400);
     }
 
-    // Validate coupon if provided
-    const validatedCoupon =
-      couponId && typeof couponId === "string" && ALLOWED_COUPONS.has(couponId)
-        ? couponId
-        : null;
+    // Validate coupon against Stripe API (no hardcoded allowlist needed)
+    let validatedCoupon: string | null = null;
+    if (couponId && typeof couponId === "string") {
+      try {
+        const coupon = await stripe.coupons.retrieve(couponId);
+        if (coupon.valid) {
+          validatedCoupon = couponId;
+        }
+      } catch {
+        // Invalid or expired coupon -- ignore, allow_promotion_codes will be set instead
+      }
+    }
 
     // Get user profile for email
     const { data: profile } = await sb
@@ -116,7 +123,7 @@ Deno.serve(async (req: Request) => {
         customer: stripeCustomerId,
         mode: "payment",
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${FRONTEND_URL}/dashboard?checkout=success&pack=${pack}`,
+        success_url: `${FRONTEND_URL}/dashboard?checkout=success&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${FRONTEND_URL}/settings/billing?checkout=cancelled`,
         metadata: {
           supabase_user_id: userId,
@@ -135,9 +142,12 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── Subscription ──────────────────────────────────────────────────────────
-    const priceId = PLAN_PRICE_IDS[plan];
-    if (!priceId) {
-      console.error(`Stripe price ID not configured for plan: ${plan}`);
+    const resolvedPriceId = isAnnual
+      ? PLAN_PRICE_IDS_ANNUAL[plan]
+      : PLAN_PRICE_IDS_MONTHLY[plan];
+
+    if (!resolvedPriceId) {
+      console.error(`Stripe price ID not configured for plan: ${plan} (${billing ?? "monthly"})`);
       return json(
         { detail: "Checkout is not available right now. Please try again later." },
         cors,
@@ -148,18 +158,18 @@ Deno.serve(async (req: Request) => {
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       customer: stripeCustomerId,
       mode: "subscription",
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${FRONTEND_URL}/dashboard?checkout=success&plan=${plan}`,
+      line_items: [{ price: resolvedPriceId, quantity: 1 }],
+      success_url: `${FRONTEND_URL}/dashboard?checkout=success&plan=${plan}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${FRONTEND_URL}/pricing?checkout=canceled`,
       subscription_data: {
-        metadata: { supabase_user_id: userId, plan },
+        metadata: { supabase_user_id: userId, plan, billing: billing ?? "monthly" },
       },
       metadata: {
         supabase_user_id: userId,
         plan,
+        billing: billing ?? "monthly",
       },
     };
-
     if (validatedCoupon) {
       sessionParams.discounts = [{ coupon: validatedCoupon }];
     } else {

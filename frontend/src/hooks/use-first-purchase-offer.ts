@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 
-// Stripe coupon IDs (server-side validated — safe to reference client-side)
+// Stripe coupon IDs (server-side validated - safe to reference client-side)
 // Stripe coupon ID for the new-user 30% discount offer.
 // To rotate: create a new coupon in Stripe Dashboard → copy the coupon ID → update this value.
 // Current coupon: 30% off, applies to first subscription purchase only.
-export const COUPON_30_OFF = "t9QmsQTe"; // 30% off any plan, once — NewUsers
+export const COUPON_30_OFF = "t9QmsQTe"; // 30% off any plan, once - NewUsers
 
 const OFFER_KEY_STARTED = "cr_offer_started_at";
 const OFFER_KEY_USED = "cr_offer_used";
@@ -21,7 +21,7 @@ export interface FirstPurchaseOffer {
   timeDisplay: string;
   /** Discounted price given a full price (30% off) */
   discountedPrice: (original: number) => number;
-  /** Start the timer (idempotent — only sets once) */
+  /** Start the timer (idempotent - only sets once) */
   startOffer: () => void;
   /** Mark offer as permanently used */
   markUsed: () => void;
@@ -73,7 +73,7 @@ export function useFirstPurchaseOffer(): FirstPurchaseOffer {
     if (typeof window === "undefined") return;
     const used = localStorage.getItem(OFFER_KEY_USED) === "true";
     if (used) return;
-    // Only start once — never reset if already started
+    // Only start once - never reset if already started
     if (!localStorage.getItem(OFFER_KEY_STARTED)) {
       localStorage.setItem(OFFER_KEY_STARTED, Date.now().toString());
     }

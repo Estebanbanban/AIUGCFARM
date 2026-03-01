@@ -5,9 +5,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
+  User,
+  ShoppingBag,
   Film,
   Clock,
   Settings,
+  CreditCard,
   Menu,
   LogOut,
   Plus,
@@ -30,13 +33,18 @@ import { useGenerationNotifications } from "@/hooks/use-generation-notifications
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Personas", href: "/personas", icon: User },
+  { label: "Brand", href: "/products", icon: ShoppingBag },
   { label: "Generate", href: "/generate", icon: Film },
   { label: "History", href: "/history", icon: Clock },
   { label: "Settings", href: "/settings", icon: Settings },
+  { label: "Billing", href: "/settings/billing", icon: CreditCard },
 ];
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
+  "/personas": "Personas",
+  "/products": "Brand",
   "/generate": "Generate",
   "/history": "History",
   "/settings": "Settings",
@@ -58,7 +66,7 @@ function SidebarContent({
   const plan = profile?.plan ?? "free";
   const creditsTotal =
     plan !== "free" ? (PLANS[plan as keyof typeof PLANS]?.credits ?? 0) : 9;
-  // Cap at 100% — remaining can exceed plan allocation when trial + subscription credits stack
+  // Cap at 100% - remaining can exceed plan allocation when trial + subscription credits stack
   const creditPercent = isUnlimitedCredits
     ? 100
     : creditsTotal > 0
@@ -78,15 +86,23 @@ function SidebarContent({
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center px-6">
         <Link href="/" onClick={onNavigate}>
-          <Logo variant="full" size="sm" theme="dark" />
+          <Logo variant="full" size="sm" theme="auto" />
         </Link>
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 px-3 py-4">
         {navItems.map((item) => {
+          const hasMoreSpecificMatch = navItems.some(
+            (other) =>
+              other.href !== item.href &&
+              other.href.startsWith(item.href) &&
+              pathname.startsWith(other.href)
+          );
           const isActive =
             pathname === item.href ||
-            (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            (item.href !== "/dashboard" &&
+              pathname.startsWith(item.href) &&
+              !hasMoreSpecificMatch);
 
           return (
             <Link
@@ -113,11 +129,7 @@ function SidebarContent({
             <span className="text-muted-foreground">Credits</span>
             <div className="flex items-center gap-1.5">
               <span className="font-mono font-medium text-foreground">
-                {isUnlimitedCredits
-                  ? "Unlimited"
-                  : creditsRemaining > creditsTotal
-                  ? creditsRemaining
-                  : `${creditsRemaining}/${creditsTotal}`}
+                {isUnlimitedCredits ? "Unlimited" : creditsRemaining}
               </span>
               <Link
                 href="/settings/billing"
@@ -154,6 +166,7 @@ function SidebarContent({
 function getPageTitle(pathname: string): string {
   if (pageTitles[pathname]) return pageTitles[pathname];
   if (pathname.startsWith("/personas/")) return "Persona Detail";
+  if (pathname.startsWith("/products/")) return "Product Detail";
   if (pathname.startsWith("/generate/")) return "Generation";
   return "Dashboard";
 }
@@ -178,7 +191,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       </Sheet>
 
       <div className="flex flex-1 flex-col overflow-hidden bg-background-secondary">
-        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-border bg-background/90 px-4 backdrop-blur md:px-6">
+        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-border bg-background/75 px-4 backdrop-blur-xl md:px-6">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"

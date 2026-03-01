@@ -11,7 +11,7 @@ import { CookieBanner } from "@/components/layout/CookieBanner";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "CineRads — AI UGC Video Ad Generator for Shopify & DTC Brands",
+  title: "CineRads - AI UGC Video Ad Generator for Shopify & DTC Brands",
   description:
     "The AI UGC video generator for e-commerce brands. Turn any Shopify or product URL into 27 unique TikTok and Meta ad creatives in under 10 minutes. No creators. No editing. Start free.",
   keywords: [
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
   },
   manifest: "/site.webmanifest",
   openGraph: {
-    title: "CineRads — AI UGC Video Ad Generator for Shopify & DTC Brands",
+    title: "CineRads - AI UGC Video Ad Generator for Shopify & DTC Brands",
     description:
       "The AI UGC video generator for e-commerce brands. Turn any Shopify or product URL into 27 unique TikTok and Meta ad creatives in under 10 minutes. No creators. No editing. Start free.",
     type: "website",
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "CineRads — AI UGC Video Ad Generator for Shopify & DTC Brands",
+    title: "CineRads - AI UGC Video Ad Generator for Shopify & DTC Brands",
     description:
       "The AI UGC video generator for e-commerce brands. Turn any Shopify or product URL into 27 unique TikTok and Meta ad creatives in under 10 minutes. No creators. No editing. Start free.",
   },

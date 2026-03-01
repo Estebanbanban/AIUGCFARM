@@ -79,14 +79,14 @@ export function PricingSection() {
   async function handlePlanClick(planKey: PlanTier) {
     trackCtaClicked("pricing", planKey);
     if (!isLoggedIn) {
-      router.push(`/signup?plan=${planKey}`);
+      router.push(`/signup?plan=${planKey}${annual ? "&billing=annual" : ""}`);
       return;
     }
 
     setLoadingPlan(planKey);
     try {
       const res = await callEdge<{ data: { url: string } }>("stripe-checkout", {
-        body: { plan: planKey },
+        body: { plan: planKey, billing: annual ? "annual" : "monthly" },
       });
       window.location.href = res.data.url;
     } catch (err) {
@@ -225,7 +225,7 @@ export function PricingSection() {
             All plans include: No watermarks · MP4 download · Cancel anytime
           </p>
           <p className="text-center text-xs text-primary mt-3">
-            Beta pricing: lock in your rate forever. Prices increase at public launch.
+            Beta pricing - lock in your rate forever. Prices increase at public launch.
           </p>
         </FadeInUp>
       </div>
