@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useQueryClient } from '@tanstack/react-query';
 import { callEdge } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -574,6 +575,7 @@ interface PersonaBuilderInlineProps {
 
 export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInlineProps) {
   const store = usePersonaBuilderStore();
+  const queryClient = useQueryClient();
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<number>>(new Set());
   const [builderMode, setBuilderMode] = useState<'visual' | 'text'>('visual');
   const [textPrompt, setTextPrompt] = useState('');
@@ -684,6 +686,9 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
       await callEdge('select-persona-image', {
         body: { persona_id: store.personaId, image_index: store.selectedImageIndex },
       });
+      // Invalidate personas cache so the onboarding checklist and other
+      // consumers immediately see the newly-saved persona with its image.
+      queryClient.invalidateQueries({ queryKey: ["personas"] });
       toast.success('Persona saved!');
       store.reset();
       onSaved(savedPersonaId);

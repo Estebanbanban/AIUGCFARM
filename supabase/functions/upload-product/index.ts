@@ -7,6 +7,13 @@ const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 const MAX_IMAGE_COUNT = 5;
 
+const PRODUCT_LIMITS: Record<string, number> = {
+  free: 1,
+  starter: 1,
+  growth: 3,
+  scale: 10,
+};
+
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -18,6 +25,32 @@ Deno.serve(async (req: Request) => {
 
     const userId = await requireUserId(req);
     const sb = getAdminClient();
+
+    // ── Enforce product limit per plan ──────────────────────────────
+    const { data: profileRow } = await sb
+      .from("profiles")
+      .select("plan, role")
+      .eq("id", userId)
+      .maybeSingle();
+
+    const userPlan = (profileRow?.plan as string) ?? "free";
+    const isAdmin = profileRow?.role === "admin";
+
+    if (!isAdmin) {
+      const limit = PRODUCT_LIMITS[userPlan] ?? 1;
+      const { count: existingCount } = await sb
+        .from("products")
+        .select("id", { count: "exact", head: true })
+        .eq("owner_id", userId);
+
+      if ((existingCount ?? 0) >= limit) {
+        return json(
+          { detail: `Product limit reached (${limit}) for your ${userPlan} plan. Upgrade to add more products.` },
+          cors,
+          403,
+        );
+      }
+    }
 
     const contentType = req.headers.get("content-type") ?? "";
     if (!contentType.includes("multipart/form-data")) {

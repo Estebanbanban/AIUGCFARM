@@ -75,7 +75,7 @@ import {
   useApproveAndGenerate,
 } from "@/hooks/use-generations";
 import { useCheckout, useBuyCredits } from "@/hooks/use-checkout";
-import { useProfile } from "@/hooks/use-profile";
+import { useProfile, HD_QUALITY_PLANS, ADVANCED_MODE_PLANS } from "@/hooks/use-profile";
 import { ManualUploadForm } from "@/components/products/ManualUploadForm";
 import { ScrapeResults } from "@/components/products/ScrapeResults";
 import {
@@ -402,6 +402,9 @@ export default function GeneratePage() {
 
   const creditsRemaining = credits?.remaining ?? 0;
   const isUnlimitedCredits = credits?.is_unlimited === true;
+  const userPlan = profile?.plan ?? "free";
+  const canUseHD = HD_QUALITY_PLANS.has(userPlan) || profile?.role === "admin";
+  const canUseAdvanced = ADVANCED_MODE_PLANS.has(userPlan) || profile?.role === "admin";
   const creditCost =
     store.quality === "hd"
       ? store.mode === "single"
@@ -1309,12 +1312,18 @@ export default function GeneratePage() {
               <button
                 type="button"
                 onClick={() => {
+                  if (!canUseAdvanced) {
+                    toast.error("Advanced mode requires Growth or Scale plan.");
+                    return;
+                  }
                   if (!store.advancedMode) {
                     handleSwitchToAdvanced();
                   }
                 }}
+                disabled={!canUseAdvanced}
                 className={cn(
                   "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all",
+                  !canUseAdvanced && "cursor-not-allowed opacity-50",
                   store.advancedMode
                     ? "bg-background text-foreground shadow-sm ring-1 ring-border"
                     : "text-muted-foreground hover:text-foreground",
@@ -1322,8 +1331,8 @@ export default function GeneratePage() {
               >
                 <Settings2 className="size-4" />
                 Advanced
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                  Pro
+                <Badge variant={canUseAdvanced ? "secondary" : "outline"} className="text-[10px] px-1.5 py-0">
+                  {canUseAdvanced ? "Pro" : "Growth+"}
                 </Badge>
               </button>
             </div>
@@ -1399,9 +1408,18 @@ export default function GeneratePage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => { store.setQuality("hd"); setScriptConfigChanged(true); }}
+                      onClick={() => {
+                        if (!canUseHD) {
+                          toast.error("HD quality (Kling V3) requires Growth or Scale plan.");
+                          return;
+                        }
+                        store.setQuality("hd");
+                        setScriptConfigChanged(true);
+                      }}
+                      disabled={!canUseHD}
                       className={cn(
                         "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                        !canUseHD && "cursor-not-allowed opacity-50",
                         store.quality === "hd"
                           ? "border-primary bg-primary/5"
                           : "border-border hover:border-muted-foreground/30",
@@ -1409,9 +1427,14 @@ export default function GeneratePage() {
                     >
                       <div className="flex w-full items-center justify-between">
                         <p className="text-sm font-semibold">Kling V3</p>
-                        <Badge variant="secondary" className="text-[10px]">2× cr</Badge>
+                        <div className="flex items-center gap-1">
+                          {!canUseHD && <Badge variant="outline" className="text-[10px]">Growth+</Badge>}
+                          <Badge variant="secondary" className="text-[10px]">2x cr</Badge>
+                        </div>
                       </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">Best quality · final ads</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {canUseHD ? "Best quality · final ads" : "Upgrade to Growth to unlock"}
+                      </p>
                     </button>
                   </div>
                 </div>

@@ -6,6 +6,13 @@ import { validateUrl } from "../_shared/ssrf.ts";
 import { rateLimit } from "../_shared/rate-limit.ts";
 import { callOpenRouter } from "../_shared/openrouter.ts";
 
+const PRODUCT_LIMITS: Record<string, number> = {
+  free: 1,
+  starter: 1,
+  growth: 3,
+  scale: 10,
+};
+
 function stripHtml(html: string): string {
   return html
     .replace(/<[^>]*>/g, " ")
@@ -427,6 +434,41 @@ Deno.serve(async (req: Request) => {
     let saveError: string | null = null;
     if (userId && save !== false && products.length > 0) {
       const sb = getAdminClient();
+
+      // ── Enforce product limit per plan ──────────────────────────────
+      const { data: profileRow } = await sb
+        .from("profiles")
+        .select("plan, role")
+        .eq("id", userId)
+        .maybeSingle();
+
+      const userPlan = (profileRow?.plan as string) ?? "free";
+      const isAdmin = profileRow?.role === "admin";
+
+      if (!isAdmin) {
+        const limit = PRODUCT_LIMITS[userPlan] ?? 1;
+        const { count: existingCount } = await sb
+          .from("products")
+          .select("id", { count: "exact", head: true })
+          .eq("owner_id", userId);
+
+        const currentCount = existingCount ?? 0;
+        const availableSlots = Math.max(0, limit - currentCount);
+
+        if (availableSlots === 0) {
+          return json(
+            { detail: `Product limit reached (${limit}) for your ${userPlan} plan. Upgrade to add more products.` },
+            cors,
+            403,
+          );
+        }
+
+        // Truncate products to available slots
+        if (products.length > availableSlots) {
+          products = products.slice(0, availableSlots);
+        }
+      }
+
       const rows = products.map((p) => ({
         owner_id: userId,
         store_url: url,
