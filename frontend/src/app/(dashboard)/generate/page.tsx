@@ -628,6 +628,13 @@ export default function GeneratePage() {
       toast.error("Add a comment keyword for the CTA style.");
       return;
     }
+    // Check credits before doing anything — show paywall immediately
+    if (!hasEnoughCredits) {
+      trackPaywallShown("insufficient_credits");
+      offer.startOffer();
+      setShowPaywall(true);
+      return;
+    }
     if (!store.productId || !store.personaId || !store.compositeImagePath) return;
     setScriptConfigChanged(false);
 
