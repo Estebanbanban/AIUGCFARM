@@ -37,12 +37,17 @@ const PACK_PRICE_IDS: Record<string, string | undefined> = {
   pack_10: Deno.env.get("STRIPE_PRICE_PACK_10"),
   pack_30: Deno.env.get("STRIPE_PRICE_PACK_30"),
   pack_100: Deno.env.get("STRIPE_PRICE_PACK_100"),
+  // Single-video paywall purchases
+  single_standard: Deno.env.get("STRIPE_PRICE_SINGLE_STANDARD"),
+  single_hd: Deno.env.get("STRIPE_PRICE_SINGLE_HD"),
 };
 
 const PACK_NAMES: Record<string, string> = {
   pack_10: "10 Credits: Starter Pack ($12)",
   pack_30: "30 Credits: Creator Pack ($33)",
   pack_100: "100 Credits: Pro Pack ($95)",
+  single_standard: "5 Credits: Single Standard Video ($5)",
+  single_hd: "10 Credits: Single HD Video ($10)",
 };
 
 /**

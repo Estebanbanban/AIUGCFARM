@@ -106,3 +106,24 @@ export const CREDIT_PACKS = {
 } as const;
 
 export type CreditPackKey = keyof typeof CREDIT_PACKS;
+
+// ── Single-video purchases (paywall "Try 1 Video" tab) ────────────────────────
+// These are standalone Stripe prices for a single video generation.
+// Standard = 5 credits ($5), HD = 10 credits ($10).
+
+export const SINGLE_VIDEO_PACKS = {
+  single_standard: {
+    name: "Single Video · Standard",
+    credits: CREDITS_PER_SINGLE,       // 5
+    price: CREDITS_PER_SINGLE,         // $5
+    quality: "standard" as const,
+  },
+  single_hd: {
+    name: "Single Video · HD",
+    credits: CREDITS_PER_SINGLE_HD,    // 10
+    price: CREDITS_PER_SINGLE_HD,      // $10
+    quality: "hd" as const,
+  },
+} as const;
+
+export type SingleVideoPackKey = keyof typeof SINGLE_VIDEO_PACKS;

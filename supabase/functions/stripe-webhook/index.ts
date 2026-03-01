@@ -17,11 +17,13 @@ const PLAN_CREDITS: Record<string, number> = {
   scale: 250,
 };
 
-/** Credit amounts per one-time pack purchase (matches CREDIT_PACKS in lib/stripe.ts). */
+/** Credit amounts per one-time pack purchase (matches CREDIT_PACKS + SINGLE_VIDEO_PACKS in lib/stripe.ts). */
 const PACK_CREDITS: Record<string, number> = {
-  pack_10: 10,   // $12
-  pack_30: 30,   // $33
-  pack_100: 100, // $95
+  pack_10: 10,          // $12
+  pack_30: 30,          // $33
+  pack_100: 100,        // $95
+  single_standard: 5,   // $5  – single standard video (Kling 2.6)
+  single_hd: 10,        // $10 – single HD video (Kling 3.0)
 };
 
 /** NOTE: No auth middleware  -  this endpoint uses Stripe webhook signature verification. */

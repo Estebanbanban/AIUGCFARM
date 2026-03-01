@@ -41,6 +41,7 @@ import {
   CREDITS_PER_BATCH_HD,
   type PlanTier,
   type CreditPackKey,
+  type SingleVideoPackKey,
 } from "@/lib/stripe";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -755,11 +756,11 @@ export default function GeneratePage() {
     });
   }
 
-  async function handleBuyPack(pack: CreditPackKey) {
+  async function handleBuyPack(pack: CreditPackKey | SingleVideoPackKey) {
     const couponId = offer.isActive ? COUPON_30_OFF : undefined;
-    buyCredits.mutate({ pack, couponId }, {
+    buyCredits.mutate({ pack: pack as CreditPackKey, couponId }, {
       onSuccess: (url) => {
-        trackCreditsPurchased(pack);
+        trackCreditsPurchased(pack as CreditPackKey);
         if (couponId) offer.markUsed();
         window.location.href = url;
       },
@@ -1990,14 +1991,14 @@ export default function GeneratePage() {
                     className="w-full py-6 text-base font-bold"
                     onClick={() => {
                       store.setQuality(paywallQuality);
-                      handleBuyPack("pack_10");
+                      handleBuyPack(paywallQuality === "hd" ? "single_hd" : "single_standard");
                     }}
                     disabled={buyCredits.isPending}
                   >
                     {buyCredits.isPending ? <Loader2 className="size-4 animate-spin" /> : "Generate Video →"}
                   </Button>
                   <p className="text-center text-xs text-muted-foreground mt-3">
-                    Buying 10 credits · Unused credits carry over for future videos
+                    Buying {paywallQuality === "hd" ? "10" : "5"} credits · Unused credits carry over for future videos
                   </p>
                 </div>
               ) : (
