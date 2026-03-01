@@ -123,7 +123,7 @@ Deno.serve(async (req: Request) => {
         customer: stripeCustomerId,
         mode: "payment",
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${FRONTEND_URL}/dashboard?checkout=success&pack=${pack}`,
+        success_url: `${FRONTEND_URL}/dashboard?checkout=success&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${FRONTEND_URL}/settings/billing?checkout=cancelled`,
         metadata: {
           supabase_user_id: userId,
@@ -159,7 +159,7 @@ Deno.serve(async (req: Request) => {
       customer: stripeCustomerId,
       mode: "subscription",
       line_items: [{ price: resolvedPriceId, quantity: 1 }],
-      success_url: `${FRONTEND_URL}/dashboard?checkout=success&plan=${plan}`,
+      success_url: `${FRONTEND_URL}/dashboard?checkout=success&plan=${plan}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${FRONTEND_URL}/pricing?checkout=canceled`,
       subscription_data: {
         metadata: { supabase_user_id: userId, plan, billing: billing ?? "monthly" },

@@ -18,6 +18,10 @@ export function CheckoutSuccessHandler() {
     const checkout = searchParams.get("checkout");
     if (checkout !== "success") return;
 
+    // Require session_id from Stripe to prevent manual URL spoofing
+    const sessionId = searchParams.get("session_id");
+    if (!sessionId || !sessionId.startsWith("cs_")) return;
+
     const planParam = searchParams.get("plan");
     const packParam = searchParams.get("pack");
 

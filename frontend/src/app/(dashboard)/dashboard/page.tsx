@@ -12,14 +12,12 @@ import {
   Film,
   UserPlus,
   Package,
-  ArrowRight,
   Clock,
   Loader2,
-  DollarSign,
   PlayCircle,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { cn, formatDate, formatCurrency } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { PLANS, CREDITS_PER_SINGLE, CREDITS_PER_BATCH, CREDITS_PER_SINGLE_HD, CREDITS_PER_BATCH_HD } from "@/lib/stripe";
 import { FadeInUp, StaggerContainer, staggerItem } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
@@ -38,28 +36,12 @@ import {
   type GenerationWithRelations,
 } from "@/hooks/use-generations";
 import { usePersonas } from "@/hooks/use-personas";
-import type { GenerationStatus } from "@/types/database";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { useRouter } from "next/navigation";
-import { calculateGenerationCost } from "@/lib/generation-cost";
 import { Suspense } from "react";
 import { CheckoutSuccessHandler } from "@/components/checkout/CheckoutSuccessHandler";
+import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
 
-const statusColors: Record<GenerationStatus, string> = {
-  pending: "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
-  scripting: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  awaiting_approval: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  locking: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  submitting_jobs: "bg-primary/10 text-primary",
-  generating_segments: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  completed: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  failed: "bg-red-500/10 text-red-700 dark:text-red-300",
-};
-
-function statusLabel(status: GenerationStatus): string {
-  if (status === "completed" || status === "failed") return status;
-  return "In Progress";
-}
 
 const quickActions = [
   {
@@ -79,6 +61,12 @@ const quickActions = [
     description: "Produce new ad variants from a single product.",
     href: "/generate",
     icon: Film,
+  },
+  {
+    title: "View History",
+    description: "Browse all your past video generations.",
+    href: "/history",
+    icon: Clock,
   },
 ];
 
@@ -101,7 +89,8 @@ export default function DashboardPage() {
   const isUnlimitedCredits = credits?.is_unlimited === true;
   const creditsTotal = planConfig?.credits ?? 9;
 
-  const recentGenerations = (generations ?? []).slice(0, 5);
+  const [hasProduct, setHasProduct] = useState(false);
+
   const draftGenerations = (generations ?? []).filter(
     (g) => g.status === "awaiting_approval",
   );
@@ -109,7 +98,12 @@ export default function DashboardPage() {
     (g) => g.status === "completed"
   ).length;
   const activePersonas = personas?.length ?? 0;
-  const hasGenerations = recentGenerations.length > 0;
+
+  const hasPersonaWithImage = (personas ?? []).some(
+    (p) => p.selected_image_url != null,
+  );
+  const hasCompletedGeneration = videosGenerated > 0;
+  const allOnboardingDone = hasProduct && hasPersonaWithImage && hasCompletedGeneration;
 
   function handleResumeDraft(gen: GenerationWithRelations) {
     if (!gen.script) {
@@ -141,6 +135,14 @@ export default function DashboardPage() {
         setFirstName(user.email.split("@")[0]);
       }
     });
+    supabase
+      .from("products")
+      .select("id")
+      .eq("status", "confirmed")
+      .limit(1)
+      .then(({ data }) => {
+        setHasProduct((data ?? []).length > 0);
+      });
   }, []);
 
   const creditPercent = isUnlimitedCredits
@@ -178,6 +180,16 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </FadeInUp>
+
+      {!allOnboardingDone && (
+        <FadeInUp delay={0.05}>
+          <OnboardingChecklist
+            hasProduct={hasProduct}
+            hasPersonaWithImage={hasPersonaWithImage}
+            hasCompletedGeneration={hasCompletedGeneration}
+          />
+        </FadeInUp>
+      )}
 
       <StaggerContainer className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <motion.div variants={staggerItem}>
@@ -247,7 +259,7 @@ export default function DashboardPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Quick Actions</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-3">
+          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {quickActions.map((action) => (
               <Link key={action.title} href={action.href} className="group">
                 <div className="flex h-full flex-col gap-3 rounded-lg border border-border bg-background p-4 transition-all hover:border-primary/50 hover:bg-muted/30 hover:shadow-md">
@@ -269,7 +281,7 @@ export default function DashboardPage() {
         {draftGenerations.length > 0 && (
           <div className="flex flex-col gap-3">
             <h2 className="text-lg font-semibold text-foreground">
-              Script Ready - Awaiting Approval
+              Awaiting Your Approval
             </h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {draftGenerations.map((gen) => (
@@ -310,90 +322,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">Recent Generations</h2>
-            {hasGenerations && (
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/history">
-                  View all
-                  <ArrowRight className="size-4" />
-                </Link>
-              </Button>
-            )}
-          </div>
-
-          {generationsLoading ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3].map((i) => (
-                <Card key={i} className="h-32 animate-pulse bg-muted" />
-              ))}
-            </div>
-          ) : hasGenerations ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {recentGenerations.map((gen) => {
-                const cost = calculateGenerationCost(
-                  gen.videos,
-                  gen.video_quality,
-                  gen.kling_model,
-                );
-                const showCost = gen.status === "completed" && cost.totalBilledSeconds > 0;
-                return (
-                  <Link key={gen.id} href={`/generate/${gen.id}`} className="group">
-                    <Card className="h-full border-border bg-card transition-all hover:border-primary/40 hover:shadow-md">
-                      <CardHeader className="pb-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <CardTitle className="line-clamp-1 text-sm font-medium">
-                            {gen.products?.name ?? `Generation ${gen.id.slice(0, 8)}`}
-                          </CardTitle>
-                          <Badge
-                            variant="secondary"
-                            className={cn(
-                              "shrink-0 text-xs capitalize",
-                              statusColors[gen.status] ?? statusColors.pending
-                            )}
-                          >
-                            {statusLabel(gen.status)}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Clock className="size-3" />
-                          {formatDate(gen.created_at)}
-                        </div>
-                        {showCost && (
-                          <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <DollarSign className="size-3" />
-                            {formatCurrency(cost.totalCostUsd)} · {cost.modelName}
-                          </div>
-                        )}
-                      </CardHeader>
-                    </Card>
-                  </Link>
-                );
-              })}
-            </div>
-          ) : (
-            <Card className="border-border bg-card">
-              <CardContent className="flex flex-col items-center gap-4 py-12">
-                <div className="flex size-14 items-center justify-center rounded-full bg-primary/10">
-                  <Film className="size-7 text-primary" />
-                </div>
-                <div className="text-center">
-                  <h3 className="font-semibold text-foreground">Create your first video ad</h3>
-                  <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                    Import a product, build a persona, and generate ad-ready variants in minutes.
-                  </p>
-                </div>
-                <Button asChild>
-                  <Link href="/generate">
-                    <Film className="size-4" />
-                    Get Started
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
       </FadeInUp>
     </div>
     </>

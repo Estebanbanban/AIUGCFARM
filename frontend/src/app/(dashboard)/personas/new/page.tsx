@@ -6,7 +6,8 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { resolvePersonaImageUrl } from "@/hooks/use-personas";
+import { resolvePersonaImageUrl, usePersonas } from "@/hooks/use-personas";
+import { useProfile, PERSONA_SLOT_LIMITS } from "@/hooks/use-profile";
 import Image from "next/image";
 import {
   ArrowLeft, Loader2, Sparkles, Check, User, ImageIcon,
@@ -515,6 +516,23 @@ function NewPersonaPageInner() {
   const store = usePersonaBuilderStore();
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<number>>(new Set());
   const [msgIdx, setMsgIdx] = useState(0);
+
+  // Redirect guard: prevent access when at persona limit
+  const { data: profile } = useProfile();
+  const { data: personas } = usePersonas();
+  const isRegeneration = !!store.personaId;
+
+  useEffect(() => {
+    if (!profile || !personas || isRegeneration) return;
+    const plan = profile.plan ?? "free";
+    const isAdmin = profile.role === "admin";
+    const slotLimit = PERSONA_SLOT_LIMITS[plan];
+    const slotsUsed = personas.length;
+    if (!isAdmin && slotsUsed >= slotLimit) {
+      toast.error("You've reached your persona limit. Upgrade to create more.");
+      router.push("/personas");
+    }
+  }, [profile, personas, isRegeneration, router]);
 
   useEffect(() => {
     if (!store.isGenerating) { setMsgIdx(0); return; }
