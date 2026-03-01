@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
+  User,
+  ShoppingBag,
   Film,
   Clock,
   Settings,
@@ -30,6 +32,8 @@ import { useGenerationNotifications } from "@/hooks/use-generation-notifications
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Personas", href: "/personas", icon: User },
+  { label: "Brand", href: "/products", icon: ShoppingBag },
   { label: "Generate", href: "/generate", icon: Film },
   { label: "History", href: "/history", icon: Clock },
   { label: "Settings", href: "/settings", icon: Settings },
@@ -37,6 +41,8 @@ const navItems = [
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
+  "/personas": "Personas",
+  "/products": "Brand",
   "/generate": "Generate",
   "/history": "History",
   "/settings": "Settings",
@@ -150,6 +156,7 @@ function SidebarContent({
 function getPageTitle(pathname: string): string {
   if (pageTitles[pathname]) return pageTitles[pathname];
   if (pathname.startsWith("/personas/")) return "Persona Detail";
+  if (pathname.startsWith("/products/")) return "Product Detail";
   if (pathname.startsWith("/generate/")) return "Generation";
   return "Dashboard";
 }
