@@ -37,9 +37,9 @@ const PACK_PRICE_IDS: Record<string, string | undefined> = {
   pack_10: Deno.env.get("STRIPE_PRICE_PACK_10"),
   pack_30: Deno.env.get("STRIPE_PRICE_PACK_30"),
   pack_100: Deno.env.get("STRIPE_PRICE_PACK_100"),
-  // Single-video paywall purchases
-  single_standard: Deno.env.get("STRIPE_PRICE_SINGLE_STANDARD"),
-  single_hd: Deno.env.get("STRIPE_PRICE_SINGLE_HD"),
+  // Single-video paywall purchases (price IDs are not secrets — hardcoded as fallback)
+  single_standard: Deno.env.get("STRIPE_PRICE_SINGLE_STANDARD") ?? "price_1T65y1DofGNcXNHKBXaliSF2",
+  single_hd:       Deno.env.get("STRIPE_PRICE_SINGLE_HD")       ?? "price_1T65zBDofGNcXNHKMYvxgyuw",
 };
 
 const PACK_NAMES: Record<string, string> = {
@@ -116,13 +116,10 @@ Deno.serve(async (req: Request) => {
     // ── Credit pack (one-time payment) ────────────────────────────────────────
     if (pack) {
       const priceId = PACK_PRICE_IDS[pack];
-      console.log(`[stripe-checkout] pack=${JSON.stringify(pack)} priceId=${priceId ?? "UNDEFINED"}`);
-      console.log(`[stripe-checkout] env SINGLE_STANDARD=${Deno.env.get("STRIPE_PRICE_SINGLE_STANDARD") ?? "NOT_SET"} SINGLE_HD=${Deno.env.get("STRIPE_PRICE_SINGLE_HD") ?? "NOT_SET"}`);
       if (!priceId) {
-        const debug = `pack=${pack} | keys=${Object.keys(PACK_PRICE_IDS).join(",")} | SINGLE_STD=${Deno.env.get("STRIPE_PRICE_SINGLE_STANDARD") ?? "NOT_SET"} | SINGLE_HD=${Deno.env.get("STRIPE_PRICE_SINGLE_HD") ?? "NOT_SET"}`;
-        console.error(`[stripe-checkout] missing price: ${debug}`);
+        console.error(`Stripe price ID not configured for pack: ${pack}`);
         return json(
-          { detail: `DEBUG: ${debug}` },
+          { detail: "This credit pack is not available right now." },
           cors,
           503,
         );
