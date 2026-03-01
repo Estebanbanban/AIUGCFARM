@@ -56,6 +56,19 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Product } from "@/types/database";
 
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const MAX_PRODUCT_IMAGES = 10;
@@ -220,7 +233,7 @@ export default function ProductDetailPage({
   useEffect(() => {
     if (product) {
       setEditName(product.name);
-      setEditDescription(product.description ?? "");
+      setEditDescription(stripHtml(product.description ?? ""));
       setEditPrice(product.price != null ? String(product.price) : "");
     }
   }, [product]);
@@ -557,7 +570,7 @@ export default function ProductDetailPage({
             </div>
           ) : product.description ? (
             <p className="text-sm leading-relaxed text-muted-foreground">
-              {product.description}
+              {stripHtml(product.description)}
             </p>
           ) : null}
 

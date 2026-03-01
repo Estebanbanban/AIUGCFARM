@@ -78,7 +78,7 @@ function SidebarContent({
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center px-6">
         <Link href="/" onClick={onNavigate}>
-          <Logo variant="full" size="sm" theme="dark" />
+          <Logo variant="full" size="sm" theme="auto" />
         </Link>
       </div>
 
@@ -178,7 +178,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       </Sheet>
 
       <div className="flex flex-1 flex-col overflow-hidden bg-background-secondary">
-        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-border bg-background/90 px-4 backdrop-blur md:px-6">
+        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-border bg-background/75 px-4 backdrop-blur-xl md:px-6">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
