@@ -113,11 +113,7 @@ function SidebarContent({
             <span className="text-muted-foreground">Credits</span>
             <div className="flex items-center gap-1.5">
               <span className="font-mono font-medium text-foreground">
-                {isUnlimitedCredits
-                  ? "Unlimited"
-                  : creditsRemaining > creditsTotal
-                  ? creditsRemaining
-                  : `${creditsRemaining}/${creditsTotal}`}
+                {isUnlimitedCredits ? "Unlimited" : creditsRemaining}
               </span>
               <Link
                 href="/settings/billing"
