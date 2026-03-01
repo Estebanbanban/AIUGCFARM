@@ -742,12 +742,16 @@ export default function GenerationDetailPage() {
   const params = useParams();
   const generationId = params.id as string;
 
+  // Stale timeout state — must be declared before useGenerationStatus so it can be passed in
+  const pageOpenedAt = useRef(Date.now());
+  const [isStale, setIsStale] = useState(false);
+
   const {
     data: gen,
     isLoading,
     error,
     refetch,
-  } = useGenerationStatus(generationId);
+  } = useGenerationStatus(generationId, isStale);
   const regenerateSegment = useRegenerateSegment();
 
   // Script collapsible state
@@ -870,6 +874,22 @@ export default function GenerationDetailPage() {
     }, 1000);
     return () => clearInterval(interval);
   }, [isProcessing, lastChecked]);
+
+  // Client-side stale timeout — after 12 minutes of non-terminal status, stop
+  // polling and show a "taking longer than expected" card.
+  useEffect(() => {
+    if (!isProcessing || isStale) return;
+    const TIMEOUT_MS = 12 * 60 * 1000;
+    const elapsed = Date.now() - pageOpenedAt.current;
+    const remaining = TIMEOUT_MS - elapsed;
+    if (remaining <= 0) {
+      setIsStale(true);
+      return;
+    }
+    const timer = setTimeout(() => setIsStale(true), remaining);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isProcessing]);
 
   // Toast on ZIP download failure (Story A)
   useEffect(() => {
@@ -1010,10 +1030,16 @@ export default function GenerationDetailPage() {
             ID: {generationId.slice(0, 8)}...
           </p>
         </div>
-        {isProcessing && (
+        {isProcessing && !isStale && (
           <Badge variant="secondary" className={config.badgeClass}>
             <Loader2 className="size-3 animate-spin" />
             {config.label}
+          </Badge>
+        )}
+        {isProcessing && isStale && (
+          <Badge variant="secondary" className="bg-amber-500/10 text-amber-400">
+            <Clock className="size-3" />
+            Taking longer...
           </Badge>
         )}
         {isComplete && (
@@ -1034,9 +1060,48 @@ export default function GenerationDetailPage() {
       </div>
 
       {/* ---------------------------------------------------------------- */}
+      {/*  Stale timeout card (replaces progress + productive wait)        */}
+      {/* ---------------------------------------------------------------- */}
+      {isProcessing && isStale && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="flex flex-col gap-4 py-6">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-full bg-amber-500/10">
+                <Clock className="size-5 text-amber-400" />
+              </div>
+              <div>
+                <p className="font-semibold text-foreground">
+                  Taking longer than expected
+                </p>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  The video provider may be under high load. Your credits are safe — check back in a few minutes.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsStale(false);
+                  pageOpenedAt.current = Date.now();
+                  refetch();
+                }}
+              >
+                <RefreshCw className="size-4" />
+                Check again
+              </Button>
+              <Button asChild variant="ghost">
+                <Link href="/generate">Start new generation</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ---------------------------------------------------------------- */}
       {/*  Progress section                                                 */}
       {/* ---------------------------------------------------------------- */}
-      {isProcessing && (
+      {isProcessing && !isStale && (
         <Card>
           <CardHeader>
             <CardTitle className="text-foreground">Pipeline Progress</CardTitle>
@@ -1137,7 +1202,7 @@ export default function GenerationDetailPage() {
       {/* ---------------------------------------------------------------- */}
       {/*  Productive wait                                                   */}
       {/* ---------------------------------------------------------------- */}
-      {isProcessing && (
+      {isProcessing && !isStale && (
         <Card>
           <CardContent className="flex flex-col gap-3 py-4">
             <p className="text-sm font-semibold text-foreground">

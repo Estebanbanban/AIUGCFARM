@@ -298,8 +298,18 @@ Deno.serve(async (req: Request) => {
 
       for (const pollResult of pollResults) {
         if (pollResult.status === "rejected") {
-          // Transient error — treat as still-in-progress
-          console.error("Kling check failed:", pollResult.reason);
+          // Distinguish permanent 4xx errors from transient ones
+          const errMsg = pollResult.reason instanceof Error ? pollResult.reason.message : String(pollResult.reason);
+          console.error("Kling check failed:", errMsg);
+          const statusMatch = errMsg.match(/Kling status error (\d{3})/);
+          const httpStatus = statusMatch ? parseInt(statusMatch[1], 10) : 0;
+          const isPermanent = httpStatus >= 400 && httpStatus < 500 && httpStatus !== 429;
+          if (isPermanent) {
+            anyFailed = true;
+            failedMessage = `Kling API error (${httpStatus}) — ${errMsg}`;
+            break;
+          }
+          // Transient: treat as still-in-progress
           continue;
         }
         const { jobKey, klingResult } = pollResult.value;

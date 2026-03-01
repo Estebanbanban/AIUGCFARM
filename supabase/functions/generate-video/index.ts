@@ -131,9 +131,17 @@ function buildKlingPrompt(params: {
   return prompt;
 }
 
+// ── Language support ───────────────────────────────────────────────────
+
+const LANGUAGE_NAMES: Record<string, string> = {
+  es: "Spanish", fr: "French", de: "German", it: "Italian",
+  pt: "Portuguese", ja: "Japanese", zh: "Mandarin Chinese",
+  ar: "Arabic", ru: "Russian",
+};
+
 // ── Script generation via OpenRouter ──────────────────────────────────
 
-function buildSystemPrompt(count: number): string {
+function buildSystemPrompt(count: number, language: string): string {
   const plural = count > 1 ? "s" : "";
   const hookAngles = count > 1
     ? " Each uses a DIFFERENT angle from the list below."
@@ -145,7 +153,7 @@ function buildSystemPrompt(count: number): string {
     ? " Each uses a DIFFERENT pattern."
     : " Use the most natural-sounding pattern.";
 
-  return `You are an expert UGC (User-Generated Content) ad scriptwriter for e-commerce brands.
+  const result = `You are an expert UGC (User-Generated Content) ad scriptwriter for e-commerce brands.
 Write scripts in first-person, conversational tone — exactly how a real person speaks to camera. NOT how a marketer writes.
 
 CRITICAL VOICE RULES:
@@ -208,11 +216,16 @@ Return ONLY valid JSON (exactly ${count} item${plural} per array). Set duration_
   "bodies": [{ "text": "...", "duration_seconds": 7, "variant_label": "problem_solution" }${count > 1 ? ", ..." : ""}],
   "ctas": [{ "text": "...", "duration_seconds": 3, "variant_label": "link_drop" }${count > 1 ? ", ..." : ""}]
 }`;
+
+  if (language !== "en") {
+    return result + `\n\nCRITICAL: Write ALL script text ENTIRELY in ${LANGUAGE_NAMES[language]}. Do NOT include any English words or phrases.`;
+  }
+  return result;
 }
 
-function buildUserPrompt(product: Record<string, unknown>): string {
+function buildUserPrompt(product: Record<string, unknown>, language: string): string {
   const brandSummary = (product.brand_summary ?? {}) as Record<string, unknown>;
-  return `Product: ${product.name}
+  let base = `Product: ${product.name}
 Description: ${product.description}
 Price: ${product.price ?? "N/A"}
 Brand tone: ${brandSummary.tone ?? "conversational, authentic"}
@@ -226,6 +239,11 @@ CALIBRATION INSTRUCTIONS:
 - If price is listed and it's a clear value advantage, you may reference it in the hook or body.
 - Mirror the brand tone: if "playful" → be light and fun; if "premium" → be aspirational but still authentic.
 - Write scripts AS IF the persona IS the target demographic speaking to their peers.`;
+
+  if (language !== "en") {
+    base += `\n\nWrite the script ENTIRELY in ${LANGUAGE_NAMES[language]}. No English.`;
+  }
+  return base;
 }
 
 /** Clamp a number to [min, max]. */
@@ -292,12 +310,13 @@ interface GenerateScriptResult {
 async function generateScript(
   product: Record<string, unknown>,
   variantCount: number,
+  language: string,
 ): Promise<GenerateScriptResult> {
   const rawContent = await withRetry(() =>
     callOpenRouter(
       [
-        { role: "system", content: buildSystemPrompt(variantCount) },
-        { role: "user", content: buildUserPrompt(product) },
+        { role: "system", content: buildSystemPrompt(variantCount, language) },
+        { role: "user", content: buildUserPrompt(product, language) },
       ],
       { maxTokens: variantCount === 1 ? 600 : 1500, timeoutMs: 30000, jsonMode: true },
     ),
@@ -641,14 +660,18 @@ Deno.serve(async (req: Request) => {
     // New generation: either phase="script" (script-only) or default
     // ══════════════════════════════════════════════════════════════════
 
-    const { product_id, persona_id, mode, quality, composite_image_path, advanced_segments } = body as {
+    const { product_id, persona_id, mode, quality, composite_image_path, advanced_segments, language = "en" } = body as {
       product_id: string;
       persona_id: string;
       mode?: string;
       quality?: string;
       composite_image_path: string;
       advanced_segments?: AdvancedSegmentsInput;
+      language?: string;
     };
+
+    const VALID_LANGUAGES = new Set(["en","es","fr","de","it","pt","ja","zh","ar","ru"]);
+    const resolvedLanguage = VALID_LANGUAGES.has(language) ? language : "en";
 
     if (!product_id) return json({ detail: "product_id is required" }, cors, 400);
     if (!persona_id) return json({ detail: "persona_id is required" }, cors, 400);
@@ -743,6 +766,7 @@ Deno.serve(async (req: Request) => {
           mode: resolvedMode,
           video_quality: resolvedQuality,
           composite_image_url: composite_image_path,
+          language: resolvedLanguage,
           status: "awaiting_approval",
           started_at: new Date().toISOString(),
         })
@@ -756,7 +780,7 @@ Deno.serve(async (req: Request) => {
 
       try {
         // ── Generate script (with coherence review) ─────────────────
-        const { script, scriptRaw } = await generateScript(product, variantCount);
+        const { script, scriptRaw } = await generateScript(product, variantCount, resolvedLanguage);
 
         // ── Save script to generation record ────────────────────────
         const { error: updateErr } = await sb

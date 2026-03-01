@@ -91,7 +91,7 @@ export function Logo({
       <span
         className={`font-bold tracking-[-0.03em] ${text} ${textColor} ${className}`}
       >
-        CineRads
+        Cinerads
       </span>
     );
   }
@@ -102,7 +102,7 @@ export function Logo({
       <span
         className={`font-bold tracking-[-0.03em] ${text} ${textColor}`}
       >
-        CineRads
+        Cinerads
       </span>
     </span>
   );
