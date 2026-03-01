@@ -162,11 +162,12 @@ Deno.serve(async (req: Request) => {
       success_url: `${FRONTEND_URL}/dashboard?checkout=success&plan=${plan}`,
       cancel_url: `${FRONTEND_URL}/pricing?checkout=canceled`,
       subscription_data: {
-        metadata: { supabase_user_id: userId, plan },
+        metadata: { supabase_user_id: userId, plan, billing: billing ?? "monthly" },
       },
       metadata: {
         supabase_user_id: userId,
         plan,
+        billing: billing ?? "monthly",
       },
     };
     if (validatedCoupon) {
