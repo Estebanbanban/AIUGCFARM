@@ -44,13 +44,6 @@ const PACK_NAMES: Record<string, string> = {
   single_hd: "10 Credits: Single HD Video ($10)",
 };
 
-/**
- * Allowlist of Stripe coupon IDs accepted from the client.
- * t9QmsQTe = NewUsers (30% off once): first-paywall 30-min offer
- * yGuI3xvT = 50percent (50% off once, Starter only) — first-video offer
- */
-const ALLOWED_COUPONS = new Set(["t9QmsQTe", "yGuI3xvT"]);
-
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -71,11 +64,18 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "Provide either 'plan' or 'pack'" }, cors, 400);
     }
 
-    // Validate coupon if provided
-    const validatedCoupon =
-      couponId && typeof couponId === "string" && ALLOWED_COUPONS.has(couponId)
-        ? couponId
-        : null;
+    // Validate coupon against Stripe API (no hardcoded allowlist needed)
+    let validatedCoupon: string | null = null;
+    if (couponId && typeof couponId === "string") {
+      try {
+        const coupon = await stripe.coupons.retrieve(couponId);
+        if (coupon.valid) {
+          validatedCoupon = couponId;
+        }
+      } catch {
+        // Invalid or expired coupon -- ignore, allow_promotion_codes will be set instead
+      }
+    }
 
     // Get user profile for email
     const { data: profile } = await sb
