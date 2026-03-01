@@ -8,7 +8,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
 import { CookieBanner } from "@/components/layout/CookieBanner";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "CineRads - AI UGC Video Ad Generator for Shopify & DTC Brands",
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} min-h-screen bg-background text-foreground antialiased`}>
+      <body className={`${inter.variable} font-sans min-h-screen bg-background text-foreground antialiased`}>
         <Script
           src="https://datafa.st/js/script.js"
           data-website-id="dfid_aeeAwbTgJDYJIXhN8pSZx"

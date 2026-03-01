@@ -79,7 +79,7 @@ export function VideoCarousel() {
   const doubled = [...reels, ...reels];
 
   return (
-    <section className="bg-background pb-20 pt-14 md:pb-28 md:pt-20">
+    <section className="bg-background pb-12 pt-14 md:pb-16 md:pt-20">
       <div
         className="overflow-hidden"
         onMouseEnter={() => setPaused(true)}

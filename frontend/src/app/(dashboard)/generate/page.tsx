@@ -91,8 +91,21 @@ import {
 } from "@/lib/datafast";
 import { AdvancedModePanel } from "@/components/generate/AdvancedModePanel";
 import { callEdge } from "@/lib/api";
-import type { GenerateSegmentScriptResponse } from "@/types/api";
+import type { GenerateSegmentScriptResponse, AdvancedSegmentsInput } from "@/types/api";
 import type { AdvancedSegmentConfig, AdvancedSegmentsConfig } from "@/types/database";
+
+const LANGUAGE_OPTIONS = [
+  { code: "en", native: "English"   },
+  { code: "es", native: "Español"   },
+  { code: "fr", native: "Français"  },
+  { code: "de", native: "Deutsch"   },
+  { code: "it", native: "Italiano"  },
+  { code: "pt", native: "Português" },
+  { code: "ja", native: "日本語"     },
+  { code: "zh", native: "中文"       },
+  { code: "ar", native: "العربية"   },
+  { code: "ru", native: "Русский"   },
+] as const;
 
 const CTA_STYLE_OPTIONS = [
   {
@@ -563,6 +576,7 @@ export default function GeneratePage() {
           quality: store.quality,
           composite_image_path: path,
           cta_style: store.ctaStyle,
+          language: store.language,
           phase: "script",
         },
         {
@@ -578,7 +592,7 @@ export default function GeneratePage() {
             }
           },
           onError: () => {
-            // Silent fail - user can manually generate script
+            toast.error("Script generation failed. Click 'Generate Script' to retry.");
           },
         },
       );
@@ -630,6 +644,7 @@ export default function GeneratePage() {
         composite_image_path: store.compositeImagePath,
         cta_style: store.ctaStyle,
         cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
+        language: store.language,
         phase: "script",
       },
       {
@@ -655,6 +670,21 @@ export default function GeneratePage() {
 
   // ── Approve & generate video ──────────────────────────────────────────
 
+  function buildAdvancedSegmentsInput(segments: AdvancedSegmentsConfig): AdvancedSegmentsInput {
+    const mapSeg = (seg: AdvancedSegmentConfig) => ({
+      script_text: seg.scriptText,
+      global_emotion: seg.globalEmotion,
+      global_intensity: seg.globalIntensity,
+      ...(seg.actionDescription && { action_description: seg.actionDescription }),
+      ...(seg.imagePath && { image_path: seg.imagePath }),
+    });
+    return {
+      hooks: segments.hooks.map(mapSeg),
+      bodies: segments.bodies.map(mapSeg),
+      ctas: segments.ctas.map(mapSeg),
+    };
+  }
+
   async function handleApproveAndGenerate() {
     if (!store.pendingGenerationId || !store.pendingScript) return;
     if (!hasEnoughCredits) {
@@ -664,10 +694,16 @@ export default function GeneratePage() {
       return;
     }
 
+    const advancedSegments =
+      store.advancedMode && store.advancedSegments
+        ? buildAdvancedSegmentsInput(store.advancedSegments)
+        : undefined;
+
     approveAndGenerate.mutate(
       {
         generation_id: store.pendingGenerationId,
         override_script: store.pendingScript,
+        advanced_segments: advancedSegments,
       },
       {
         onSuccess: () => {
@@ -1376,6 +1412,28 @@ export default function GeneratePage() {
                   </div>
                 </div>
 
+                {/* Language */}
+                <div>
+                  <p className="mb-2 text-sm font-medium">Script language</p>
+                  <div className="flex flex-wrap gap-2">
+                    {LANGUAGE_OPTIONS.map((lang) => (
+                      <button
+                        key={lang.code}
+                        type="button"
+                        onClick={() => { store.setLanguage(lang.code); setScriptConfigChanged(true); }}
+                        className={cn(
+                          "rounded-lg border-2 px-3 py-1.5 text-sm transition-all",
+                          store.language === lang.code
+                            ? "border-primary bg-primary/5 font-medium text-primary"
+                            : "border-border text-muted-foreground hover:border-muted-foreground/40",
+                        )}
+                      >
+                        {lang.native}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* CTA style - collapsible */}
                 <Collapsible open={ctaOpen} onOpenChange={setCtaOpen}>
                   <CollapsibleTrigger asChild>
@@ -1473,6 +1531,7 @@ export default function GeneratePage() {
                         <button
                           key={i}
                           onClick={() => {
+                            if (i !== selectedCompositeIdx && store.pendingScript) setScriptConfigChanged(true);
                             setSelectedCompositeIdx(i);
                             setShowPreviewEditor(false);
                             const path = compositeImages[i].path;
@@ -1679,22 +1738,27 @@ export default function GeneratePage() {
                                             composite_image_path: store.compositeImagePath,
                                             cta_style: store.ctaStyle,
                                             cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
+                                            language: store.language,
                                             phase: "script",
                                           },
                                           {
                                             onSuccess: (result) => {
-                                              if (result.script) {
-                                                const newSegments = result.script[sectionType];
-                                                if (newSegments?.[idx]) {
-                                                  store.updateScriptSection(sectionType, idx, newSegments[idx].text);
+                                              const newSegText = result.script?.[sectionType]?.[idx]?.text;
+                                              if (newSegText !== undefined && result.generation_id) {
+                                                const freshScript = useGenerationWizardStore.getState().pendingScript;
+                                                const freshCredits = useGenerationWizardStore.getState().creditsToCharge ?? 0;
+                                                if (freshScript) {
+                                                  store.setPendingScript(
+                                                    result.generation_id,
+                                                    {
+                                                      ...freshScript,
+                                                      [sectionType]: freshScript[sectionType].map((seg, i) =>
+                                                        i === idx ? { ...seg, text: newSegText } : seg
+                                                      ),
+                                                    },
+                                                    freshCredits,
+                                                  );
                                                 }
-                                              }
-                                              if (result.generation_id) {
-                                                store.setPendingScript(
-                                                  result.generation_id,
-                                                  store.pendingScript!,
-                                                  store.creditsToCharge ?? 0,
-                                                );
                                               }
                                             },
                                             onError: (err) => { toast.error(err.message || "Failed to regenerate"); },
@@ -1874,7 +1938,7 @@ export default function GeneratePage() {
           <DialogDescription className="sr-only">Choose a plan or credit pack to start generating video ads.</DialogDescription>
 
           {offer.isActive && (
-            <div className="bg-primary text-white px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm font-medium shrink-0">
+            <div className="bg-primary text-primary-foreground px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm font-medium shrink-0">
               <div className="flex items-center gap-2">
                 <Flame className="size-4 shrink-0" />
                 <span>Limited Offer: 50% OFF your first video & 30% OFF all plans.</span>
@@ -2038,7 +2102,7 @@ export default function GeneratePage() {
                           )}
                         >
                           {isGrowth && (
-                            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-primary text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm whitespace-nowrap">
+                            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm whitespace-nowrap">
                               Most Popular
                             </div>
                           )}
@@ -2132,7 +2196,7 @@ export default function GeneratePage() {
           <DialogTitle className="sr-only">Upgrade to create more personas</DialogTitle>
 
           {offer.isActive && (
-            <div className="bg-primary text-white px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm font-medium shrink-0">
+            <div className="bg-primary text-primary-foreground px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm font-medium shrink-0">
               <div className="flex items-center gap-2">
                 <Flame className="size-4" />
                 <span>Limited-time offer - 30% off your first plan</span>

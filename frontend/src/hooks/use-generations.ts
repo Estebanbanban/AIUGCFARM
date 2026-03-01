@@ -33,6 +33,7 @@ interface GenerationInput {
     | "direct_website"
     | "discount_code";
   cta_comment_keyword?: string;
+  language?: string;
   advanced_segments?: AdvancedSegmentsInput;
 }
 
@@ -183,7 +184,7 @@ export function useRegenerateSegment() {
 }
 
 /** Poll generation status (auto-refetches while processing). */
-export function useGenerationStatus(generationId: string | null) {
+export function useGenerationStatus(generationId: string | null, stopPolling = false) {
   return useQuery({
     queryKey: ["generation-progress", generationId],
     queryFn: async () => {
@@ -195,6 +196,7 @@ export function useGenerationStatus(generationId: string | null) {
     },
     enabled: !!generationId,
     refetchInterval: (query) => {
+      if (stopPolling) return false;
       const data = query.state.data;
       if (
         data?.status === "completed" ||

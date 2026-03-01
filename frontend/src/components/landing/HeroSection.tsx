@@ -27,10 +27,9 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.45, ease: [0.25, 0.4, 0.25, 1] }}
-            className="mt-6 text-lg md:text-xl text-[#999] max-w-2xl mx-auto text-center leading-relaxed"
+            className="mt-6 text-lg text-[#999] max-w-lg mx-auto text-center leading-relaxed"
           >
-            The AI UGC video generator that turns your store URL into 27 ready-to-run
-            video ads in under 10 minutes. No creators. No editing. No $500 invoices.
+            Turn any store URL into 27 ready-to-run video ads in under 10 minutes. No creators. No editing.
           </motion.p>
 
           <motion.div
@@ -41,15 +40,6 @@ export function HeroSection() {
           >
             <UrlInputCta location="hero" />
           </motion.div>
-
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.45, delay: 0.65 }}
-            className="mt-4 text-sm text-[#888]"
-          >
-            No credit card required · <span className="text-primary font-medium">Free trial included</span> · Cancel anytime
-          </motion.p>
         </div>
       </div>
     </section>

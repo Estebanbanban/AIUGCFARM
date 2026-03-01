@@ -44,7 +44,7 @@ const faqs = [
   {
     question: "Who owns the generated content?",
     answer:
-      "You do. All videos generated on CineRads are yours to use commercially without restriction. We retain no rights to your content.",
+      "You do. All videos generated on Cinerads are yours to use commercially without restriction. We retain no rights to your content.",
   },
   {
     question: "What video quality do I get?",
@@ -72,12 +72,14 @@ export function FaqSection() {
   const [open, setOpen] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="bg-background-secondary py-24 px-4 sm:px-6">
+    <section id="faq" className="bg-background py-24 px-4 sm:px-6">
       <div className="max-w-2xl mx-auto">
         <FadeInUp className="text-center mb-12">
           <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground mb-3">FAQ</p>
           <h2 className="text-[clamp(2rem,4vw,3rem)] font-semibold tracking-tight text-foreground">
-            Frequently Asked Questions
+            Frequently{" "}
+            <span className="font-serif italic text-primary">Asked</span>{" "}
+            Questions
           </h2>
         </FadeInUp>
 

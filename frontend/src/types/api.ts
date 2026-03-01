@@ -97,6 +97,7 @@ export interface CreateGenerationParams {
 export interface ApproveGenerationParams {
   generation_id: string;
   override_script?: GenerationScript;
+  advanced_segments?: AdvancedSegmentsInput;
 }
 
 /** Response from generate-video Edge Function */
