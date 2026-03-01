@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePersonas } from "@/hooks/use-personas";
@@ -741,6 +741,9 @@ function GuideBanner({
   onGoGenerate: () => void;
   onDismiss: () => void;
 }) {
+  const pathname = usePathname();
+  const isOnGeneratePage = pathname === "/generate";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: -20 }}
@@ -757,16 +760,19 @@ function GuideBanner({
         </span>
       </div>
 
-      <div className="h-4 w-px bg-border" />
-
-      <Button
-        size="sm"
-        className="h-7 gap-1.5 rounded-full px-3 text-xs"
-        onClick={onGoGenerate}
-      >
-        Go to generator
-        <ArrowRight className="size-3" />
-      </Button>
+      {!isOnGeneratePage && (
+        <>
+          <div className="h-4 w-px bg-border" />
+          <Button
+            size="sm"
+            className="h-7 gap-1.5 rounded-full px-3 text-xs"
+            onClick={onGoGenerate}
+          >
+            Go to generator
+            <ArrowRight className="size-3" />
+          </Button>
+        </>
+      )}
 
       <button
         onClick={onDismiss}

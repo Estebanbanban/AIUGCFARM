@@ -279,11 +279,6 @@ export default function GeneratePage() {
   const store = useGenerationWizardStore();
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallTab, setPaywallTab] = useState<"single" | "subscription">("single");
-  const [paywallQuality, setPaywallQuality] = useState<"standard" | "hd">("standard");
-  // Sync paywall quality to whatever the user picked when dialog opens
-  useEffect(() => {
-    if (showPaywall) setPaywallQuality(store.quality);
-  }, [showPaywall, store.quality]);
 
   // Validate persisted pendingGenerationId against DB on mount.
   useEffect(() => {
@@ -2001,7 +1996,7 @@ export default function GeneratePage() {
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  Try 1 Video
+                  {store.quality === "hd" ? "1 HD Video" : "1 Standard Video"}
                 </button>
                 <button
                   type="button"
@@ -2037,81 +2032,59 @@ export default function GeneratePage() {
                     </p>
                   </div>
 
-                  <div className="space-y-3 mb-6">
-                    <button
-                      type="button"
-                      onClick={() => setPaywallQuality("standard")}
-                      className={cn(
-                        "w-full p-5 rounded-2xl border-2 transition-all duration-200 text-left",
-                        paywallQuality === "standard" ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/40",
-                      )}
-                    >
+                  <div className="mb-6">
+                    <div className="w-full p-5 rounded-2xl border-2 border-primary bg-primary/5 text-left">
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-3">
-                          <div className={cn(
-                            "w-5 h-5 rounded-full border flex items-center justify-center shrink-0",
-                            paywallQuality === "standard" ? "border-primary" : "border-muted-foreground/40",
-                          )}>
-                            {paywallQuality === "standard" && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
+                          <div className="w-5 h-5 rounded-full border border-primary flex items-center justify-center shrink-0">
+                            <div className="w-2.5 h-2.5 bg-primary rounded-full" />
                           </div>
-                          <span className="font-semibold text-foreground">Kling 2.6 · Standard</span>
+                          {store.quality === "hd" ? (
+                            <div>
+                              <span className="font-semibold text-foreground">Kling 3.0 · HD</span>
+                              <span className="ml-2 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Best Quality</span>
+                            </div>
+                          ) : (
+                            <span className="font-semibold text-foreground">Kling 2.6 · Standard</span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           {isFirstVideo && (
-                            <span className="text-sm text-muted-foreground line-through font-medium">${CREDITS_PER_SINGLE}.00</span>
+                            <span className="text-sm text-muted-foreground line-through font-medium">
+                              ${store.quality === "hd" ? `${CREDITS_PER_SINGLE_HD}.00` : `${CREDITS_PER_SINGLE}.00`}
+                            </span>
                           )}
                           <span className="font-bold text-foreground text-lg">
-                            ${isFirstVideo ? (CREDITS_PER_SINGLE / 2).toFixed(2) : `${CREDITS_PER_SINGLE}.00`}
+                            ${store.quality === "hd"
+                              ? (isFirstVideo ? (CREDITS_PER_SINGLE_HD / 2).toFixed(2) : `${CREDITS_PER_SINGLE_HD}.00`)
+                              : (isFirstVideo ? (CREDITS_PER_SINGLE / 2).toFixed(2) : `${CREDITS_PER_SINGLE}.00`)}
                           </span>
                         </div>
                       </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setPaywallQuality("hd")}
-                      className={cn(
-                        "w-full p-5 rounded-2xl border-2 transition-all duration-200 text-left",
-                        paywallQuality === "hd" ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/40",
-                      )}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <div className={cn(
-                            "w-5 h-5 rounded-full border flex items-center justify-center shrink-0",
-                            paywallQuality === "hd" ? "border-primary" : "border-muted-foreground/40",
-                          )}>
-                            {paywallQuality === "hd" && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
-                          </div>
-                          <div>
-                            <span className="font-semibold text-foreground">Kling 3.0 · HD</span>
-                            <span className="ml-2 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Best Quality</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {isFirstVideo && (
-                            <span className="text-sm text-muted-foreground line-through font-medium">${CREDITS_PER_SINGLE_HD}.00</span>
-                          )}
-                          <span className="font-bold text-foreground text-lg">
-                            ${isFirstVideo ? (CREDITS_PER_SINGLE_HD / 2).toFixed(2) : `${CREDITS_PER_SINGLE_HD}.00`}
-                          </span>
-                        </div>
-                      </div>
-                    </button>
+                    </div>
+                    {store.quality === "standard" && (
+                      <p className="text-xs text-muted-foreground mt-2 text-center">
+                        Want HD instead?{" "}
+                        <button
+                          type="button"
+                          className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
+                          onClick={() => setPaywallTab("subscription")}
+                        >
+                          Upgrade to a plan →
+                        </button>
+                      </p>
+                    )}
                   </div>
 
                   <Button
                     className="w-full py-6 text-base font-bold"
-                    onClick={() => {
-                      store.setQuality(paywallQuality);
-                      handleBuyPack(paywallQuality === "hd" ? "single_hd" : "single_standard");
-                    }}
+                    onClick={() => handleBuyPack(store.quality === "hd" ? "single_hd" : "single_standard")}
                     disabled={buyCredits.isPending}
                   >
                     {buyCredits.isPending ? <Loader2 className="size-4 animate-spin" /> : "Generate Video →"}
                   </Button>
                   <p className="text-center text-xs text-muted-foreground mt-3">
-                    Buying {paywallQuality === "hd" ? "10" : "5"} credits · Unused credits carry over for future videos
+                    Buying {store.quality === "hd" ? "10" : "5"} credits · Unused credits carry over for future videos
                   </p>
                 </div>
               ) : (
