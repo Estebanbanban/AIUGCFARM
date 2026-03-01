@@ -79,7 +79,7 @@ export function UserActionsModal({ user, onClose, onSuccess }: Props) {
               </div>
             )}
             <div>
-              <p className="font-medium text-foreground text-sm">{user.full_name ?? "—"}</p>
+              <p className="font-medium text-foreground text-sm">{user.full_name ?? "-"}</p>
               <p className="text-xs text-muted-foreground">{user.email}</p>
             </div>
           </div>

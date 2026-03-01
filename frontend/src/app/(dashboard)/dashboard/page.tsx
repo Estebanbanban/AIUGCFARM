@@ -275,7 +275,7 @@ export default function DashboardPage() {
         {draftGenerations.length > 0 && (
           <div className="flex flex-col gap-3">
             <h2 className="text-lg font-semibold text-foreground">
-              Script Ready — Awaiting Approval
+              Script Ready - Awaiting Approval
             </h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {draftGenerations.map((gen) => (

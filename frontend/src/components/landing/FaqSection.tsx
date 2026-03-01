@@ -49,22 +49,22 @@ const faqs = [
   {
     question: "What video quality do I get?",
     answer:
-      "Starter plans export at 720p — ideal for TikTok and Instagram Reels. Growth and Scale plans export at 1080p for maximum quality on any platform.",
+      "Starter plans export at 720p - ideal for TikTok and Instagram Reels. Growth and Scale plans export at 1080p for maximum quality on any platform.",
   },
   {
     question: "Do you offer a refund?",
     answer:
-      "Yes — if your first generation isn't what you expected, we offer a 7-day money-back guarantee. No questions asked. Just contact us at support@cinerads.com.",
+      "Yes - if your first generation isn't what you expected, we offer a 7-day money-back guarantee. No questions asked. Just contact us at support@cinerads.com.",
   },
   {
     question: "What's the difference between AI-Written Scripts and Custom Script Editor?",
     answer:
-      "AI-Written Scripts (all plans): CineRads automatically writes your Hook, Body, and CTA scripts from your product data and persona — no copywriting needed. Custom Script Editor (Growth & Scale): Write or edit scripts yourself before generation, perfect for brands with specific messaging or compliance requirements.",
+      "AI-Written Scripts (all plans): CineRads automatically writes your Hook, Body, and CTA scripts from your product data and persona - no copywriting needed. Custom Script Editor (Growth & Scale): Write or edit scripts yourself before generation, perfect for brands with specific messaging or compliance requirements.",
   },
   {
     question: "What's a segment credit?",
     answer:
-      "One segment credit generates one video clip — either a Hook (3–5s), Body (5–10s), or CTA (3–5s). With 9 segments (3 of each type), you can mix and match 27 unique full-length video ads. Combining segments is always free and uses no credits.",
+      "One segment credit generates one video clip - either a Hook (3–5s), Body (5–10s), or CTA (3–5s). With 9 segments (3 of each type), you can mix and match 27 unique full-length video ads. Combining segments is always free and uses no credits.",
   },
 ];
 

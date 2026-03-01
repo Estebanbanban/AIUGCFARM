@@ -12,7 +12,7 @@ const steps = [
     icon: Link,
     title: "Paste Your Product URL",
     description:
-      "Drop any Shopify or store URL. Our AI UGC video generator imports everything — name, images, price, description — in seconds.",
+      "Drop any Shopify or store URL. Our AI UGC video generator imports everything - name, images, price, description - in seconds.",
     mediaType: "image" as const,
     mediaSrc:
       "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&w=1200&q=80",
@@ -23,7 +23,7 @@ const steps = [
     icon: Upload,
     title: "Design Your AI Spokesperson",
     description:
-      "Configure your virtual brand spokesperson with 9 attributes. Tone, energy, style, age — saved and reused across every campaign.",
+      "Configure your virtual brand spokesperson with 9 attributes. Tone, energy, style, age - saved and reused across every campaign.",
     mediaType: "image" as const,
     mediaSrc:
       "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=1200&q=80",

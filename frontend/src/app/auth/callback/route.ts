@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   const next = searchParams.get("next") ?? "/dashboard";
 
   // Supabase forwards provider errors (e.g. consent denied, email not verified)
-  // as ?error=...&error_description=... — handle before trying any exchange.
+  // as ?error=...&error_description=... - handle before trying any exchange.
   const providerError = searchParams.get("error");
   if (providerError) {
     const desc = searchParams.get("error_description") ?? providerError;
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     // the user can still sign in manually.
     console.error("PKCE code exchange failed:", error?.message);
 
-    // For OAuth providers the user can just re-authenticate — send them to
+    // For OAuth providers the user can just re-authenticate - send them to
     // login with a clear message rather than a cryptic error code.
     return NextResponse.redirect(
       `${origin}/login?error=${encodeURIComponent(error.message ?? "Sign-in failed. Please try again.")}`
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}${next}`);
     }
     console.error("OTP verify failed:", error?.message);
-    // Return an actual error — do NOT fall through to the signup success message below.
+    // Return an actual error - do NOT fall through to the signup success message below.
     return NextResponse.redirect(
       `${origin}/login?error=${encodeURIComponent(error.message ?? "Email confirmation failed. Please try again.")}`
     );

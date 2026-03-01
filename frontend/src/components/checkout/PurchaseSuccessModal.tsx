@@ -32,7 +32,7 @@ const PLAN_PERKS: Record<PlanTier, { icon: React.ElementType; headline: string; 
   starter: {
     icon: Zap,
     headline: "You're officially live. 🎬",
-    sub: "Your Starter plan is active — you have everything you need to launch your first AI UGC campaign.",
+    sub: "Your Starter plan is active - you have everything you need to launch your first AI UGC campaign.",
     highlight: "30 credits loaded · 6 standard videos ready to go",
     bullets: [
       "30 monthly credits (renews automatically)",
@@ -46,12 +46,12 @@ const PLAN_PERKS: Record<PlanTier, { icon: React.ElementType; headline: string; 
   growth: {
     icon: TrendingUp,
     headline: "Time to scale your ad creative. 🚀",
-    sub: "Growth unlocked — you now have the bandwidth to run serious A/B tests and fill your content calendar.",
+    sub: "Growth unlocked - you now have the bandwidth to run serious A/B tests and fill your content calendar.",
     highlight: "100 credits loaded · 20 standard or 10 HD videos",
     bullets: [
       "100 monthly credits (renews automatically)",
       "Up to 20 standard or 10 HD videos per month",
-      "3 AI personas — test different voices & styles",
+      "3 AI personas - test different voices & styles",
       "3 brand profiles for multi-product campaigns",
       "1080p HD export for premium ad placements",
       "Custom script editor + priority generation queue",
@@ -65,7 +65,7 @@ const PLAN_PERKS: Record<PlanTier, { icon: React.ElementType; headline: string; 
     bullets: [
       "250 monthly credits (renews automatically)",
       "Up to 50 standard or 25 HD videos per month",
-      "10 AI personas — cover every audience segment",
+      "10 AI personas - cover every audience segment",
       "10 brand profiles for full portfolio management",
       "1080p export + priority support + API access",
       "Custom scripts, fastest generation queue",
@@ -76,7 +76,7 @@ const PLAN_PERKS: Record<PlanTier, { icon: React.ElementType; headline: string; 
 const PACK_PERKS: Record<CreditPackKey, { headline: string; sub: string; highlight: string; bullets: string[] }> = {
   pack_10: {
     headline: "Credits loaded. Let's make something. 🎬",
-    sub: "Your 10 credits are ready to use right now. That's 2 complete video ads — go test your first hook.",
+    sub: "Your 10 credits are ready to use right now. That's 2 complete video ads - go test your first hook.",
     highlight: "10 credits added to your account",
     bullets: [
       "2 standard videos (Hook → Body → CTA)",
@@ -98,7 +98,7 @@ const PACK_PERKS: Record<CreditPackKey, { headline: string; sub: string; highlig
   },
   pack_100: {
     headline: "100 credits. Your creative pipeline just leveled up. 🔥",
-    sub: "Pro Pack loaded. That's 20 complete video ads on demand — more than most agencies produce in a month.",
+    sub: "Pro Pack loaded. That's 20 complete video ads on demand - more than most agencies produce in a month.",
     highlight: "100 credits added to your account",
     bullets: [
       "20 standard videos (or 10 HD)",
@@ -183,7 +183,7 @@ export function PurchaseSuccessModal({ open, onClose, plan, pack }: PurchaseSucc
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <Badge className="bg-primary/20 text-primary border-primary/30 text-xs">
-                  {planName} — {planPrice}
+                  {planName} - {planPrice}
                 </Badge>
                 {isPlan && (
                   <Badge variant="outline" className="text-xs text-emerald-400 border-emerald-400/40">

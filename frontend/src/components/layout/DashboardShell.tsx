@@ -58,7 +58,7 @@ function SidebarContent({
   const plan = profile?.plan ?? "free";
   const creditsTotal =
     plan !== "free" ? (PLANS[plan as keyof typeof PLANS]?.credits ?? 0) : 9;
-  // Cap at 100% — remaining can exceed plan allocation when trial + subscription credits stack
+  // Cap at 100% - remaining can exceed plan allocation when trial + subscription credits stack
   const creditPercent = isUnlimitedCredits
     ? 100
     : creditsTotal > 0

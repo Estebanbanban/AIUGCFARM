@@ -35,7 +35,7 @@ export default async function UsagePage() {
       </div>
 
       <div className="rounded-xl border border-border bg-card p-5">
-        <p className="text-sm font-medium text-foreground mb-4">Générations / jour — 30 derniers jours</p>
+        <p className="text-sm font-medium text-foreground mb-4">Générations / jour - 30 derniers jours</p>
         <GenerationsLineChart data={timeseries} />
       </div>
 

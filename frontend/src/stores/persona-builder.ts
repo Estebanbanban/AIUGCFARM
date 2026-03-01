@@ -14,11 +14,11 @@ interface PersonaBuilderState {
   bodyType: string;
   clothingStyle: string;
   accessories: string[];
-  generatedImages: string[];       // signed URLs — NOT persisted (1hr expiry)
+  generatedImages: string[];       // signed URLs - NOT persisted (1hr expiry)
   selectedImageIndex: number | null;
-  isGenerating: boolean;           // transient — NOT persisted
-  isSaving: boolean;               // transient — NOT persisted
-  personaId: string | null;        // persisted — used to restore images from DB
+  isGenerating: boolean;           // transient - NOT persisted
+  isSaving: boolean;               // transient - NOT persisted
+  personaId: string | null;        // persisted - used to restore images from DB
   setField: (field: string, value: string) => void;
   toggleAccessory: (accessory: string) => void;
   setGeneratedImages: (urls: string[]) => void;
@@ -124,7 +124,7 @@ export const usePersonaBuilderStore = create<PersonaBuilderState>()(
         return localStorage;
       }),
       // Exclude transient runtime state and signed URLs that expire after 1 hour.
-      // personaId IS persisted — the page uses it to re-fetch signed image URLs from DB.
+      // personaId IS persisted - the page uses it to re-fetch signed image URLs from DB.
       partialize: (state) => ({
         name: state.name,
         gender: state.gender,
@@ -139,8 +139,8 @@ export const usePersonaBuilderStore = create<PersonaBuilderState>()(
         accessories: state.accessories,
         personaId: state.personaId,
         selectedImageIndex: state.selectedImageIndex,
-        // generatedImages: excluded — signed URLs expire after 1 hour
-        // isGenerating, isSaving: excluded — transient flags
+        // generatedImages: excluded - signed URLs expire after 1 hour
+        // isGenerating, isSaving: excluded - transient flags
       }),
       version: 1,
     },

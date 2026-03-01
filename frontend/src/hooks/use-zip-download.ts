@@ -10,7 +10,7 @@ export interface ZipEntry {
   name: string;
   /** Remote URL or blob: URL to fetch */
   url: string;
-  /** Pre-fetched blob — skip network fetch if provided */
+  /** Pre-fetched blob - skip network fetch if provided */
   blob?: Blob;
 }
 

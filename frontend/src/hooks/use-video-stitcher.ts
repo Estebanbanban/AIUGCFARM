@@ -4,10 +4,10 @@ import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import { useCallback, useRef, useState } from "react";
 
-// Singleton — load once, reuse across stitches
+// Singleton - load once, reuse across stitches
 let ffmpegSingleton: FFmpeg | null = null;
 
-// Mutex — FFmpeg WASM is single-threaded; only one stitch can run at a time
+// Mutex - FFmpeg WASM is single-threaded; only one stitch can run at a time
 let ffmpegBusy = false;
 
 async function getFFmpeg(): Promise<FFmpeg> {
@@ -85,7 +85,7 @@ function getSpeechBounds(
     }
   }
 
-  // Safety clamp — always leave at least 0.5s of content
+  // Safety clamp - always leave at least 0.5s of content
   return {
     start: Math.max(0, speechStart),
     end: Math.min(duration, Math.max(speechEnd, speechStart + 0.5)),
@@ -123,7 +123,7 @@ async function detectSpeechBounds(
 async function cleanupFFmpegFiles(ffmpeg: FFmpeg) {
   const tempFiles = ["hook.mp4", "body.mp4", "cta.mp4", "hook_t.mp4", "body_t.mp4", "cta_t.mp4", "list.txt", "output.mp4"];
   for (const f of tempFiles) {
-    try { await ffmpeg.deleteFile(f); } catch { /* ignore — file may not exist */ }
+    try { await ffmpeg.deleteFile(f); } catch { /* ignore - file may not exist */ }
   }
 }
 
@@ -137,7 +137,7 @@ export async function stitchToBlob(
   bodyUrl: string,
   ctaUrl: string,
 ): Promise<Blob> {
-  if (ffmpegBusy) throw new Error("FFmpeg is already in use — wait for the current stitch to finish.");
+  if (ffmpegBusy) throw new Error("FFmpeg is already in use - wait for the current stitch to finish.");
   ffmpegBusy = true;
 
   try {
@@ -211,7 +211,7 @@ export function useVideoStitcher() {
   const stitch = useCallback(
     async (hookUrl: string, bodyUrl: string, ctaUrl: string) => {
       if (ffmpegBusy) {
-        setError("FFmpeg is already in use — wait for the current stitch to finish.");
+        setError("FFmpeg is already in use - wait for the current stitch to finish.");
         setStatus("error");
         return;
       }

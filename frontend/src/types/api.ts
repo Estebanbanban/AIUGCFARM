@@ -104,11 +104,11 @@ export interface CreateGenerationResponse {
   data: {
     generation_id: string;
     status: string;
-    /** Present when phase="script" — the generated script for review */
+    /** Present when phase="script" - the generated script for review */
     script?: GenerationScript;
-    /** Present when phase="script" — credits that will be charged on approval */
+    /** Present when phase="script" - credits that will be charged on approval */
     credits_to_charge?: number;
-    /** Present on full/approval flow — credits actually charged */
+    /** Present on full/approval flow - credits actually charged */
     credits_charged?: number;
     first_video_discount_applied?: boolean;
   };

@@ -122,7 +122,7 @@ export function AdvancedSegmentCard({
           value={config.scriptText}
           onChange={(e) => onUpdate({ scriptText: e.target.value })}
           rows={3}
-          placeholder="Script text will generate here — or type your own"
+          placeholder="Script text will generate here - or type your own"
           className="resize-none text-sm"
         />
         <Button

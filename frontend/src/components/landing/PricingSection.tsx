@@ -223,7 +223,7 @@ export function PricingSection() {
             All plans include: No watermarks · MP4 download · Cancel anytime
           </p>
           <p className="text-center text-xs text-primary mt-3">
-            Beta pricing — lock in your rate forever. Prices increase at public launch.
+            Beta pricing - lock in your rate forever. Prices increase at public launch.
           </p>
         </FadeInUp>
       </div>

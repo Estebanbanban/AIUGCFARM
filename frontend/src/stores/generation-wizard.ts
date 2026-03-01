@@ -201,7 +201,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
     {
       name: "cinerads-generation-wizard",
       storage: createJSONStorage(() => {
-        // Safe SSR guard — localStorage is not available on the server.
+        // Safe SSR guard - localStorage is not available on the server.
         // Return a no-op StateStorage so Zustand persist doesn't crash during SSR.
         if (typeof window === "undefined") {
           return {
@@ -213,7 +213,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
         return localStorage;
       }),
       // Don't persist action functions (Zustand handles this automatically)
-      // Explicitly skip advancedSegments — large, session-specific
+      // Explicitly skip advancedSegments - large, session-specific
       partialize: (state) => ({
         step: state.step,
         productId: state.productId,
@@ -228,7 +228,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
         pendingScript: state.pendingScript,
         creditsToCharge: state.creditsToCharge,
         advancedMode: state.advancedMode,
-        // advancedSegments intentionally excluded — complex, per-session
+        // advancedSegments intentionally excluded - complex, per-session
       }),
       version: 1,
     },
