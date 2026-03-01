@@ -1,6 +1,11 @@
+import nextDynamic from "next/dynamic";
 import { getOverviewStats, getSignupTimeseries } from "@/lib/admin/queries";
 import { StatCard } from "@/components/admin/StatCard";
-import { OverviewChart } from "@/components/admin/OverviewChart";
+
+const OverviewChart = nextDynamic(
+  () => import("@/components/admin/OverviewChart").then((m) => m.OverviewChart),
+  { loading: () => <div className="h-[200px] w-full animate-pulse rounded-lg bg-muted" /> },
+);
 
 export const dynamic = "force-dynamic";
 

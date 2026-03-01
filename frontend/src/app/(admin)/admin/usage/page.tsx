@@ -1,6 +1,19 @@
+import nextDynamic from "next/dynamic";
 import { getGenerationTimeseries, getGenerationStats, getProductSourceBreakdown } from "@/lib/admin/queries";
 import { StatCard } from "@/components/admin/StatCard";
-import { GenerationsLineChart, StatusPieChart, SourcePieChart } from "@/components/admin/UsageCharts";
+
+const GenerationsLineChart = nextDynamic(
+  () => import("@/components/admin/UsageCharts").then((m) => m.GenerationsLineChart),
+  { loading: () => <div className="h-[200px] w-full animate-pulse rounded-lg bg-muted" /> },
+);
+const StatusPieChart = nextDynamic(
+  () => import("@/components/admin/UsageCharts").then((m) => m.StatusPieChart),
+  { loading: () => <div className="h-[200px] w-full animate-pulse rounded-lg bg-muted" /> },
+);
+const SourcePieChart = nextDynamic(
+  () => import("@/components/admin/UsageCharts").then((m) => m.SourcePieChart),
+  { loading: () => <div className="h-[200px] w-full animate-pulse rounded-lg bg-muted" /> },
+);
 
 export const dynamic = "force-dynamic";
 

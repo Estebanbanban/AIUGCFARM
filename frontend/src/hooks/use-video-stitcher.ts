@@ -1,8 +1,7 @@
 "use client";
 
-import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import { useCallback, useRef, useState } from "react";
+import type { FFmpeg } from "@ffmpeg/ffmpeg";
 
 // Singleton - load once, reuse across stitches
 let ffmpegSingleton: FFmpeg | null = null;
@@ -13,7 +12,13 @@ let ffmpegBusy = false;
 async function getFFmpeg(): Promise<FFmpeg> {
   if (ffmpegSingleton?.loaded) return ffmpegSingleton;
 
-  const ffmpeg = new FFmpeg();
+  // Dynamically import FFmpeg libraries only when first needed (~1.5-2MB)
+  const [{ FFmpeg: FFmpegClass }, { toBlobURL }] = await Promise.all([
+    import("@ffmpeg/ffmpeg"),
+    import("@ffmpeg/util"),
+  ]);
+
+  const ffmpeg = new FFmpegClass();
   // Use non-MT core (no SharedArrayBuffer / no COOP+COEP headers required)
   const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
   await ffmpeg.load({
@@ -141,7 +146,10 @@ export async function stitchToBlob(
   ffmpegBusy = true;
 
   try {
-    const ffmpeg = await getFFmpeg();
+    const [ffmpeg, { fetchFile }] = await Promise.all([
+      getFFmpeg(),
+      import("@ffmpeg/util"),
+    ]);
 
     // Clean up any leftover files from a previous run
     await cleanupFFmpegFiles(ffmpeg);
@@ -228,7 +236,10 @@ export function useVideoStitcher() {
 
       try {
         setStatus("loading_ffmpeg");
-        const ffmpeg = await getFFmpeg();
+        const [ffmpeg, { fetchFile }] = await Promise.all([
+          getFFmpeg(),
+          import("@ffmpeg/util"),
+        ]);
 
         setStatus("fetching");
         await Promise.all([

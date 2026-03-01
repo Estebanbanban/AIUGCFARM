@@ -49,7 +49,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // 2. Delete storage objects across all buckets
+    // 2. Delete storage objects across all buckets in parallel
     const buckets = [
       "product-images",
       "persona-images",
@@ -57,47 +57,53 @@ Deno.serve(async (req: Request) => {
       "generated-videos",
     ];
 
-    for (const bucket of buckets) {
+    await Promise.all(buckets.map(async (bucket) => {
       const { data: files } = await sb.storage.from(bucket).list(userId);
 
       if (files && files.length > 0) {
-        const paths = files.map((f) => `${userId}/${f.name}`);
-        await sb.storage.from(bucket).remove(paths);
-      }
+        // Separate files from folders
+        const filePaths = files.filter((f) => f.id !== null).map((f) => `${userId}/${f.name}`);
+        const folders = files.filter((f) => f.id === null);
 
-      // Also check for nested directories (e.g., userId/generationId/)
-      // List subdirectories and clean up
-      const { data: subDirs } = await sb.storage.from(bucket).list(userId);
-      if (subDirs) {
-        for (const item of subDirs) {
-          if (item.id === null) {
-            // This is a folder
-            const { data: subFiles } = await sb.storage
-              .from(bucket)
-              .list(`${userId}/${item.name}`);
-            if (subFiles && subFiles.length > 0) {
-              const subPaths = subFiles.map(
-                (f) => `${userId}/${item.name}/${f.name}`,
-              );
-              await sb.storage.from(bucket).remove(subPaths);
-            }
-          }
+        // Delete top-level files and clean up sub-folders in parallel
+        const tasks: Promise<unknown>[] = [];
+
+        if (filePaths.length > 0) {
+          tasks.push(sb.storage.from(bucket).remove(filePaths));
         }
-      }
-    }
 
-    // 3. Delete database records (cascading via FK should handle most)
-    // Explicitly delete in order to handle any without CASCADE
+        for (const folder of folders) {
+          tasks.push(
+            (async () => {
+              const { data: subFiles } = await sb.storage
+                .from(bucket)
+                .list(`${userId}/${folder.name}`);
+              if (subFiles && subFiles.length > 0) {
+                const subPaths = subFiles.map(
+                  (f) => `${userId}/${folder.name}/${f.name}`,
+                );
+                await sb.storage.from(bucket).remove(subPaths);
+              }
+            })()
+          );
+        }
+
+        await Promise.all(tasks);
+      }
+    }));
+
+    // 3. Delete database records in parallel
+    // credit_ledger depends on credit_balances via FK, so delete ledger first,
+    // then the rest can go in parallel.
     await sb.from("credit_ledger").delete().eq("owner_id", userId);
-    await sb.from("credit_balances").delete().eq("owner_id", userId);
-    await sb.from("generations").delete().eq("owner_id", userId);
-    await sb.from("personas").delete().eq("owner_id", userId);
-    await sb.from("products").delete().eq("owner_id", userId);
-    await sb.from("subscriptions").delete().eq("owner_id", userId);
-    await sb
-      .from("audit_logs")
-      .delete()
-      .eq("owner_id", userId);
+    await Promise.all([
+      sb.from("credit_balances").delete().eq("owner_id", userId),
+      sb.from("generations").delete().eq("owner_id", userId),
+      sb.from("personas").delete().eq("owner_id", userId),
+      sb.from("products").delete().eq("owner_id", userId),
+      sb.from("subscriptions").delete().eq("owner_id", userId),
+      sb.from("audit_logs").delete().eq("owner_id", userId),
+    ]);
 
     // 4. Delete profile (should cascade from auth.users, but be explicit)
     await sb.from("profiles").delete().eq("id", userId);

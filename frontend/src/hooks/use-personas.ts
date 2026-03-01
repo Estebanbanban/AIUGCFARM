@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { callEdge } from "@/lib/api";
+import { getSignedImageUrl } from "@/lib/storage";
 import type { Persona, Generation } from "@/types/database";
 import type { CreatePersonaInput } from "@/schemas/persona";
 
@@ -156,7 +157,7 @@ export function usePersonaGenerations(personaId: string) {
 /**
  * Resolves a persona image URL. If the URL is already an HTTP URL it is
  * returned as-is; otherwise it is treated as a Supabase Storage path and
- * a signed URL (1-hour expiry) is generated.
+ * a signed URL (1-hour expiry) is generated via the cached storage helper.
  */
 export async function resolvePersonaImageUrl(
   url: string | null | undefined
@@ -164,9 +165,6 @@ export async function resolvePersonaImageUrl(
   if (!url) return null;
   if (url.startsWith("http")) return url;
 
-  const supabase = createClient();
-  const { data } = await supabase.storage
-    .from("persona-images")
-    .createSignedUrl(url, 3600);
-  return data?.signedUrl ?? null;
+  const result = await getSignedImageUrl("persona-images", url);
+  return result === "/placeholder-product.svg" ? null : result;
 }

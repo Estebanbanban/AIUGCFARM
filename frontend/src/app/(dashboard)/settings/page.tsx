@@ -1,7 +1,5 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -57,7 +55,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user } }: { data: { user: { email?: string; user_metadata?: Record<string, string> } | null } }) => {
       if (user) {
         setEmail(user.email ?? "");
         setFullName(user.user_metadata?.full_name ?? "");

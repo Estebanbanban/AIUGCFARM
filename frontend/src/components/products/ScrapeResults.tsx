@@ -238,6 +238,8 @@ function ProductEditCard({
                   src={img}
                   alt={`${stripHtml(product.name)} ${i + 1}`}
                   className="size-full object-cover"
+                  loading="lazy"
+                  decoding="async"
                 />
               </div>
             ))

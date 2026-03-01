@@ -281,6 +281,8 @@ export function ManualUploadForm({ onSuccess }: ManualUploadFormProps) {
                   src={sf.preview}
                   alt={sf.file.name}
                   className="size-full rounded-md object-cover"
+                  loading="lazy"
+                  decoding="async"
                 />
                 <button
                   type="button"

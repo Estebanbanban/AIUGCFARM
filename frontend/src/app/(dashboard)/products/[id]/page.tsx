@@ -1,7 +1,5 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
 import {
   use,
   useEffect,
@@ -55,6 +53,7 @@ import { isExternalUrl, getSignedImageUrls } from "@/lib/storage";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Product } from "@/types/database";
+import { OptimizedImage } from "@/components/ui/optimized-image";
 
 function stripHtml(html: string): string {
   return html
@@ -425,9 +424,9 @@ export default function ProductDetailPage({
         {/* Image section */}
         <div className="flex flex-col gap-3">
           {/* Main image */}
-          <div className="flex aspect-square items-center justify-center rounded-lg bg-muted overflow-hidden">
+          <div className="relative flex aspect-square items-center justify-center rounded-lg bg-muted overflow-hidden">
             {mainImage ? (
-              <img
+              <OptimizedImage
                 src={mainImage}
                 alt={product.name}
                 className="size-full object-contain"
@@ -486,6 +485,8 @@ export default function ProductDetailPage({
                       src={imgUrl}
                       alt={`${product.name} ${i + 1}`}
                       className="size-full object-cover"
+                      loading="lazy"
+                      decoding="async"
                     />
                   </button>
                   <button

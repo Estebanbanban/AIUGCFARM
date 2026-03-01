@@ -29,14 +29,21 @@ const sourceBadgeStyles: Record<Product['source'], string> = {
 interface ProductCardProps {
   product: Product;
   onDelete?: (id: string) => void;
+  /** Pre-resolved image URL from parent (avoids N individual signed URL calls) */
+  resolvedImageUrl?: string;
 }
 
-export function ProductCard({ product, onDelete }: ProductCardProps) {
+export function ProductCard({ product, onDelete, resolvedImageUrl }: ProductCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [resolvedImage, setResolvedImage] = useState<string>('');
+  const [resolvedImage, setResolvedImage] = useState<string>(resolvedImageUrl ?? '');
+  const [imageLoaded, setImageLoaded] = useState(false);
 
-  // Resolve first image, handles external URLs and storage paths
+  // Use parent-provided URL if available; otherwise resolve internally (fallback)
   useEffect(() => {
+    if (resolvedImageUrl !== undefined) {
+      setResolvedImage(resolvedImageUrl);
+      return;
+    }
     const firstImage = product.images?.[0];
     if (!firstImage) {
       setResolvedImage('');
@@ -51,7 +58,7 @@ export function ProductCard({ product, onDelete }: ProductCardProps) {
       if (!cancelled) setResolvedImage(url);
     });
     return () => { cancelled = true; };
-  }, [product.images]);
+  }, [product.images, resolvedImageUrl]);
 
   return (
     <>
@@ -61,11 +68,17 @@ export function ProductCard({ product, onDelete }: ProductCardProps) {
             {/* Product Image */}
             <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-muted">
               {resolvedImage ? (
-                <img
-                  src={resolvedImage}
-                  alt={product.name}
-                  className="size-full rounded-lg object-cover"
-                />
+                <>
+                  {!imageLoaded && <div className="absolute inset-0 animate-pulse bg-muted" />}
+                  <img
+                    src={resolvedImage}
+                    alt={product.name}
+                    className="size-full rounded-lg object-cover"
+                    loading="lazy"
+                    decoding="async"
+                    onLoad={() => setImageLoaded(true)}
+                  />
+                </>
               ) : (
                 <ImageIcon className="size-8 text-muted-foreground" />
               )}

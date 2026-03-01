@@ -75,30 +75,30 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Upload images to product-images bucket, storing paths (not public URLs)
-    const imagePaths: string[] = [];
+    // Upload images to product-images bucket in parallel, storing paths (not public URLs)
+    const uploadResults = await Promise.all(
+      imageFiles
+        .filter((file): file is File => file instanceof File)
+        .map(async (file) => {
+          const ext = file.name.split(".").pop() || "jpg";
+          const storagePath = `${userId}/${crypto.randomUUID()}.${ext}`;
 
-    for (let i = 0; i < imageFiles.length; i++) {
-      const file = imageFiles[i];
-      if (!(file instanceof File)) continue;
+          const { error: uploadErr } = await sb.storage
+            .from("product-images")
+            .upload(storagePath, file, {
+              contentType: file.type,
+              upsert: false,
+            });
 
-      const ext = file.name.split(".").pop() || "jpg";
-      const storagePath = `${userId}/${crypto.randomUUID()}.${ext}`;
+          if (uploadErr) {
+            console.error(`Image upload failed: ${uploadErr.message}`);
+            return null;
+          }
 
-      const { error: uploadErr } = await sb.storage
-        .from("product-images")
-        .upload(storagePath, file, {
-          contentType: file.type,
-          upsert: false,
-        });
-
-      if (uploadErr) {
-        console.error(`Image upload failed: ${uploadErr.message}`);
-        continue;
-      }
-
-      imagePaths.push(storagePath);
-    }
+          return storagePath;
+        })
+    );
+    const imagePaths = uploadResults.filter((p): p is string => p !== null);
 
     // Create product record with storage paths (not public URLs)
     const { data: product, error: insertErr } = await sb

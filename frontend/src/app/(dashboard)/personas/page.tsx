@@ -1,7 +1,5 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Users, User, Trash2, Loader2, Lock } from "lucide-react";
@@ -25,12 +23,13 @@ import {
 import {
   useDeletePersona,
   usePersonas,
-  resolvePersonaImageUrl,
 } from "@/hooks/use-personas";
+import { getSignedImageUrls, isExternalUrl } from "@/lib/storage";
 import { useProfile, PERSONA_SLOT_LIMITS } from "@/hooks/use-profile";
+import { OptimizedImage } from "@/components/ui/optimized-image";
 import type { Persona } from "@/types/database";
 
-/** Resolve image URLs for a list of personas (handles storage paths). */
+/** Resolve image URLs for a list of personas (batch, handles storage paths). */
 function useResolvedImages(personas: Persona[] | undefined) {
   const [imageMap, setImageMap] = useState<Record<string, string | null>>({});
 
@@ -38,21 +37,31 @@ function useResolvedImages(personas: Persona[] | undefined) {
     if (!personas || personas.length === 0) return;
 
     let cancelled = false;
-    async function resolve() {
-      const entries = await Promise.all(
-        personas!.map(async (p) => {
-          const url = await resolvePersonaImageUrl(p.selected_image_url);
-          return [p.id, url] as [string, string | null];
-        })
-      );
-      if (!cancelled) {
-        setImageMap(Object.fromEntries(entries));
-      }
+
+    // Separate external URLs from storage paths
+    const external: [string, string][] = [];
+    const internal: [string, string][] = [];
+    for (const p of personas) {
+      const url = p.selected_image_url;
+      if (!url) continue;
+      if (isExternalUrl(url)) external.push([p.id, url]);
+      else internal.push([p.id, url]);
     }
-    resolve();
-    return () => {
-      cancelled = true;
-    };
+
+    // Batch sign all storage paths in 1 API call
+    const paths = internal.map(([, path]) => path);
+    getSignedImageUrls("persona-images", paths).then((urls) => {
+      if (cancelled) return;
+      const map: Record<string, string | null> = {};
+      external.forEach(([id, url]) => { map[id] = url; });
+      internal.forEach(([id], i) => {
+        const signed = urls[i];
+        map[id] = signed === "/placeholder-product.svg" ? null : signed;
+      });
+      setImageMap(map);
+    });
+
+    return () => { cancelled = true; };
   }, [personas]);
 
   return imageMap;
@@ -185,9 +194,9 @@ export default function PersonasPage() {
                 <Card className="h-full cursor-pointer transition-colors hover:border-primary/30">
                   <CardContent className="flex flex-col items-center gap-4 p-6">
                     {/* Avatar / Image */}
-                    <div className="flex size-24 items-center justify-center rounded-full bg-muted">
+                    <div className="relative flex size-24 items-center justify-center rounded-full bg-muted overflow-hidden">
                       {resolvedUrl ? (
-                        <img
+                        <OptimizedImage
                           src={resolvedUrl}
                           alt={persona.name}
                           className="size-full rounded-full object-cover"
