@@ -10,6 +10,7 @@ import {
   Film,
   Clock,
   Settings,
+  CreditCard,
   Menu,
   LogOut,
   Plus,
@@ -37,6 +38,7 @@ const navItems = [
   { label: "Generate", href: "/generate", icon: Film },
   { label: "History", href: "/history", icon: Clock },
   { label: "Settings", href: "/settings", icon: Settings },
+  { label: "Billing", href: "/settings/billing", icon: CreditCard },
 ];
 
 const pageTitles: Record<string, string> = {
@@ -90,9 +92,17 @@ function SidebarContent({
 
       <nav className="flex flex-1 flex-col gap-1 px-3 py-4">
         {navItems.map((item) => {
+          const hasMoreSpecificMatch = navItems.some(
+            (other) =>
+              other.href !== item.href &&
+              other.href.startsWith(item.href) &&
+              pathname.startsWith(other.href)
+          );
           const isActive =
             pathname === item.href ||
-            (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            (item.href !== "/dashboard" &&
+              pathname.startsWith(item.href) &&
+              !hasMoreSpecificMatch);
 
           return (
             <Link

@@ -226,11 +226,19 @@ Deno.serve(async (req: Request) => {
           break;
         }
 
-        // Grant renewal credits (reset to plan amount)
+        // Grant renewal credits (ADD to existing balance, don't overwrite)
         const credits = PLAN_CREDITS[sub.plan] ?? 0;
         if (credits > 0) {
+          const { data: existing } = await sb
+            .from("credit_balances")
+            .select("remaining")
+            .eq("owner_id", sub.owner_id)
+            .maybeSingle();
+
+          const newBalance = (existing?.remaining ?? 0) + credits;
+
           const { error: balErr } = await sb.from("credit_balances").upsert(
-            { owner_id: sub.owner_id, remaining: credits },
+            { owner_id: sub.owner_id, remaining: newBalance },
             { onConflict: "owner_id" },
           );
           if (balErr) {
@@ -489,6 +497,17 @@ Deno.serve(async (req: Request) => {
           console.warn(
             `invoice.payment_failed: subscription ${subscriptionId} for user ${sub.owner_id}`,
           );
+
+          // Mark subscription as past_due so the user cannot keep generating
+          const { error: statusErr } = await sb
+            .from("subscriptions")
+            .update({ status: "past_due" })
+            .eq("stripe_subscription_id", subscriptionId);
+
+          if (statusErr) {
+            console.error("invoice.payment_failed: subscription status update failed:", statusErr);
+            processingError = statusErr.message;
+          }
         } else {
           console.warn(
             `invoice.payment_failed: subscription ${subscriptionId} not found in DB`,

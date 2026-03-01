@@ -26,6 +26,7 @@ import {
   Flame,
   AlertCircle,
   ChevronDown,
+  ChevronUp,
   ChevronRight,
   Settings2,
 } from "lucide-react";
@@ -50,6 +51,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -311,6 +313,7 @@ export default function GeneratePage() {
   const [selectedCompositeIdx, setSelectedCompositeIdx] = useState<number | null>(null);
   const [showPreviewEditor, setShowPreviewEditor] = useState(false);
   const [previewEditPrompt, setPreviewEditPrompt] = useState("");
+  const [ctaOpen, setCtaOpen] = useState(false);
 
   // Advanced mode state
   const [isInitializingAdvanced, setIsInitializingAdvanced] = useState(false);
@@ -1373,76 +1376,64 @@ export default function GeneratePage() {
                   </div>
                 </div>
 
-                {/* CTA style */}
-                <div>
-                  <p className="mb-2 text-sm font-medium">CTA style</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {CTA_STYLE_OPTIONS.map((option) => (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => { store.setCtaStyle(option.key); setScriptConfigChanged(true); }}
-                        className={cn(
-                          "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
-                          store.ctaStyle === option.key
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:border-muted-foreground/30",
+                {/* CTA style - collapsible */}
+                <Collapsible open={ctaOpen} onOpenChange={setCtaOpen}>
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between rounded-xl border-2 border-border px-4 py-3 text-left transition-all hover:border-muted-foreground/30"
+                    >
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">Customize CTA</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">
+                          {CTA_STYLE_OPTIONS.find((o) => o.key === store.ctaStyle)?.label ?? "Auto"}
+                        </Badge>
+                        {ctaOpen ? (
+                          <ChevronUp className="size-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="size-4 text-muted-foreground" />
                         )}
-                      >
-                        <p className="text-sm font-semibold">{option.label}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">{option.description}</p>
-                      </button>
-                    ))}
-                  </div>
-                  {requiresCommentKeyword && (
-                    <div className="mt-3">
-                      <Label htmlFor="cta-comment-keyword" className="text-xs text-muted-foreground">
-                        Keyword viewers should comment
-                      </Label>
-                      <Input
-                        id="cta-comment-keyword"
-                        value={store.ctaCommentKeyword}
-                        onChange={(e) => store.setCtaCommentKeyword(e.target.value.replace(/[^a-zA-Z0-9 _-]/g, ""))}
-                        placeholder='e.g. "link" or "deal"'
-                        className="mt-1"
-                        maxLength={30}
-                      />
+                      </div>
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      {CTA_STYLE_OPTIONS.map((option) => (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => { store.setCtaStyle(option.key); setScriptConfigChanged(true); }}
+                          className={cn(
+                            "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                            store.ctaStyle === option.key
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-muted-foreground/30",
+                          )}
+                        >
+                          <p className="text-sm font-semibold">{option.label}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">{option.description}</p>
+                        </button>
+                      ))}
                     </div>
-                  )}
-                </div>
-
-                <Separator />
-
-                {/* Credit cost */}
-                <div className={cn(
-                  "rounded-xl border px-4 py-3",
-                  hasEnoughCredits ? "border-border bg-muted/30" : "border-amber-500/30 bg-amber-500/10",
-                )}>
-                  {hasEnoughCredits ? (
-                    <p className="text-sm text-muted-foreground">
-                      This will use{" "}
-                      <span className="font-bold text-foreground">{effectiveCost} credits</span>
-                      {!isUnlimitedCredits && <span> ({creditsRemaining} remaining)</span>}
-                      {isFirstVideo && (
-                        <span className="ml-2 text-xs text-amber-500 font-medium">
-                          ✦ 50% first-video discount applied
-                        </span>
-                      )}
-                    </p>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="size-4 text-amber-500 shrink-0" />
-                      <p className="text-sm text-amber-600 dark:text-amber-400">
-                        Not enough credits - you'll be prompted to top up.{" "}
-                        {!isUnlimitedCredits && (
-                          <span className="text-xs">
-                            Need {effectiveCost} ({creditsRemaining} remaining)
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  )}
-                </div>
+                    {requiresCommentKeyword && (
+                      <div className="mt-3">
+                        <Label htmlFor="cta-comment-keyword" className="text-xs text-muted-foreground">
+                          Keyword viewers should comment
+                        </Label>
+                        <Input
+                          id="cta-comment-keyword"
+                          value={store.ctaCommentKeyword}
+                          onChange={(e) => store.setCtaCommentKeyword(e.target.value.replace(/[^a-zA-Z0-9 _-]/g, ""))}
+                          placeholder='e.g. "link" or "deal"'
+                          className="mt-1"
+                          maxLength={30}
+                        />
+                      </div>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
 
                 {requiresCommentKeyword && !commentKeyword && (
                   <div className="rounded-xl bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
@@ -1573,7 +1564,36 @@ export default function GeneratePage() {
                   </Button>
                 )}
 
-                <Separator />
+                {/* Credit cost */}
+                <div className={cn(
+                  "rounded-xl border px-4 py-3",
+                  hasEnoughCredits ? "border-border bg-muted/30" : "border-amber-500/30 bg-amber-500/10",
+                )}>
+                  {hasEnoughCredits ? (
+                    <p className="text-sm text-muted-foreground">
+                      This will use{" "}
+                      <span className="font-bold text-foreground">{effectiveCost} credits</span>
+                      {!isUnlimitedCredits && <span> ({creditsRemaining} remaining)</span>}
+                      {isFirstVideo && (
+                        <span className="ml-2 text-xs text-amber-500 font-medium">
+                          ✦ 50% first-video discount applied
+                        </span>
+                      )}
+                    </p>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="size-4 text-amber-500 shrink-0" />
+                      <p className="text-sm text-amber-600 dark:text-amber-400">
+                        Not enough credits - you'll be prompted to top up.{" "}
+                        {!isUnlimitedCredits && (
+                          <span className="text-xs">
+                            Need {effectiveCost} ({creditsRemaining} remaining)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 {/* ── Script / Generate area ────────────────────────── */}
                 {generateScript.isPending ? (
