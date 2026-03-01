@@ -7,6 +7,7 @@ import { PurchaseSuccessModal } from "@/components/checkout/PurchaseSuccessModal
 import type { PlanTier, CreditPackKey } from "@/lib/stripe";
 import { PLANS, CREDIT_PACKS, SINGLE_VIDEO_PACKS } from "@/lib/stripe";
 import { trackPurchaseConfirmed } from "@/lib/datafast";
+import type { Profile } from "@/types/database";
 
 export function CheckoutSuccessHandler() {
   const searchParams = useSearchParams();
@@ -27,9 +28,17 @@ export function CheckoutSuccessHandler() {
     const planParam = searchParams.get("plan");
     const packParam = searchParams.get("pack");
 
-    // Invalidate profile + credits so the dashboard reflects the new plan/credits
-    // immediately without requiring a page refresh. Retry a few times to account
-    // for Stripe webhook processing delay.
+    // Optimistically update the profile cache so the dashboard shows the new plan
+    // instantly, even before the Stripe webhook has processed.
+    if (planParam && planParam in PLANS) {
+      queryClient.setQueryData<Profile>(["profile"], (old) => {
+        if (!old) return old;
+        return { ...old, plan: planParam as Profile["plan"] };
+      });
+    }
+
+    // Also invalidate to refetch the real data from the server once the webhook processes.
+    // Retry a few times to account for Stripe webhook processing delay.
     const invalidate = () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["credits"] });
@@ -37,6 +46,7 @@ export function CheckoutSuccessHandler() {
     invalidate();
     const t1 = setTimeout(invalidate, 2000);
     const t2 = setTimeout(invalidate, 5000);
+    const t3 = setTimeout(invalidate, 10000);
 
     if (planParam && planParam in PLANS) {
       trackPurchaseConfirmed("subscription", planParam);
@@ -60,6 +70,7 @@ export function CheckoutSuccessHandler() {
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
+      clearTimeout(t3);
     };
   }, [searchParams, router, queryClient]);
 
