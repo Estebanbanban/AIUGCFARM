@@ -260,6 +260,8 @@ export default function GeneratePage() {
   const [scrapedProducts, setScrapedProducts] = useState<Product[]>([]);
   const [scrapedBrandSummary, setScrapedBrandSummary] = useState<BrandSummary | null>(null);
   const [showScrapeResults, setShowScrapeResults] = useState(false);
+  // Section 1 sub-steps: 1 = product selection, 2 = format selection
+  const [section1SubStep, setSection1SubStep] = useState<1 | 2>(1);
 
   // Persona limit paywall
   const [showPersonaLimitPaywall, setShowPersonaLimitPaywall] = useState(false);
@@ -382,6 +384,7 @@ export default function GeneratePage() {
     if (section === 1) {
       // Also clear format so user explicitly re-chooses
       store.setStep(1);
+      setSection1SubStep(1);
     } else {
       store.setStep(2);
     }
@@ -782,7 +785,7 @@ export default function GeneratePage() {
                   </Badge>
                 </span>
               ) : (
-                "Product & Format"
+                section1SubStep === 2 ? "Select Format" : "Select Product"
               )}
             </span>
           </div>
@@ -797,24 +800,36 @@ export default function GeneratePage() {
           )}
         </div>
 
-        {/* Section 1 body — only shown when not complete */}
-        {!section1Complete && (
+        {/* Section 1 sub-step 1: Product selection */}
+        {!section1Complete && section1SubStep === 1 && (
           <div className="px-5 pb-5 flex flex-col gap-5">
             {/* Product selector */}
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">Select a product</p>
-                {!showAddProductForm && confirmedProducts.length > 0 && (
-                  <Button variant="outline" size="sm" onClick={() => setAddingProduct(true)}>
-                    <Plus className="size-4" />
-                    Add Product
-                  </Button>
-                )}
-                {showAddProductForm && confirmedProducts.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={handleCancelAddProduct}>
-                    ← Back to products
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {!showAddProductForm && confirmedProducts.length > 0 && (
+                    <Button variant="outline" size="sm" onClick={() => setAddingProduct(true)}>
+                      <Plus className="size-4" />
+                      Add Product
+                    </Button>
+                  )}
+                  {showAddProductForm && confirmedProducts.length > 0 && (
+                    <Button variant="ghost" size="sm" onClick={handleCancelAddProduct}>
+                      ← Back to products
+                    </Button>
+                  )}
+                  {confirmedProducts.length > 0 && !showAddProductForm && (
+                    <Button
+                      size="sm"
+                      onClick={() => setSection1SubStep(2)}
+                      disabled={!store.productId}
+                    >
+                      Continue
+                      <ChevronRight className="size-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {productsLoading ? (
@@ -947,58 +962,64 @@ export default function GeneratePage() {
               ) : null}
             </div>
 
-            {/* Format picker — shown once products are loaded */}
-            {confirmedProducts.length > 0 && !showAddProductForm && (
-              <div className="flex flex-col gap-2">
-                <p className="text-sm font-medium text-muted-foreground">Format</p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => store.setFormat("9:16")}
-                    className={cn(
-                      "flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-sm transition-all",
-                      store.format === "9:16"
-                        ? "border-primary bg-primary/5 font-medium text-primary"
-                        : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/30",
-                    )}
-                  >
-                    <Smartphone className="size-4" />
-                    <div className="text-left">
-                      <p className="font-medium leading-none">Portrait</p>
-                      <p className="text-xs opacity-60 mt-0.5">9:16 · TikTok, Reels</p>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => store.setFormat("16:9")}
-                    className={cn(
-                      "flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-sm transition-all",
-                      store.format === "16:9"
-                        ? "border-primary bg-primary/5 font-medium text-primary"
-                        : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/30",
-                    )}
-                  >
-                    <Monitor className="size-4" />
-                    <div className="text-left">
-                      <p className="font-medium leading-none">Landscape</p>
-                      <p className="text-xs opacity-60 mt-0.5">16:9 · YouTube, Meta</p>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            )}
+          </div>
+        )}
 
-            {/* Continue button */}
-            {confirmedProducts.length > 0 && !showAddProductForm && (
-              <Button
-                onClick={() => store.setStep(2)}
-                disabled={!store.productId || !store.format}
-                className="w-full sm:w-auto"
+        {/* Section 1 sub-step 2: Format selection */}
+        {!section1Complete && section1SubStep === 2 && (
+          <div className="border-t border-border px-5 pb-5 pt-4 flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSection1SubStep(1)}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
               >
-                Continue
-                <ChevronRight className="size-4" />
-              </Button>
-            )}
+                ← Back
+              </button>
+              <p className="text-sm font-medium text-muted-foreground">Choose format</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => store.setFormat("9:16")}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-sm transition-all",
+                  store.format === "9:16"
+                    ? "border-primary bg-primary/5 font-medium text-primary"
+                    : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/30",
+                )}
+              >
+                <Smartphone className="size-4" />
+                <div className="text-left">
+                  <p className="font-medium leading-none">Portrait</p>
+                  <p className="text-xs opacity-60 mt-0.5">9:16 · TikTok, Reels</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => store.setFormat("16:9")}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-sm transition-all",
+                  store.format === "16:9"
+                    ? "border-primary bg-primary/5 font-medium text-primary"
+                    : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/30",
+                )}
+              >
+                <Monitor className="size-4" />
+                <div className="text-left">
+                  <p className="font-medium leading-none">Landscape</p>
+                  <p className="text-xs opacity-60 mt-0.5">16:9 · YouTube, Meta</p>
+                </div>
+              </button>
+            </div>
+            <Button
+              onClick={() => store.setStep(2)}
+              disabled={!store.format}
+              className="w-full sm:w-auto"
+            >
+              Continue
+              <ChevronRight className="size-4" />
+            </Button>
           </div>
         )}
       </div>
