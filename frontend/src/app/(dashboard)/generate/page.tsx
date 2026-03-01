@@ -1667,11 +1667,22 @@ export default function GeneratePage() {
                 </div>
 
                 {/* ── Script / Generate area ────────────────────────── */}
-                {generateScript.isPending ? (
-                  <Button disabled size="lg" className="w-full">
-                    <Loader2 className="size-4 animate-spin" />
-                    Generating script…
-                  </Button>
+                {generateComposites.isPending && !store.compositeImagePath ? (
+                  <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-8 text-center">
+                    <Loader2 className="size-7 animate-spin text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Preparing your scene…</p>
+                      <p className="text-xs text-muted-foreground mt-1">We're generating a personalized preview with your persona & product. This takes a few seconds.</p>
+                    </div>
+                  </div>
+                ) : generateScript.isPending ? (
+                  <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-8 text-center">
+                    <Loader2 className="size-7 animate-spin text-primary" />
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Writing your script…</p>
+                      <p className="text-xs text-muted-foreground mt-1">AI is crafting your Hook, Body & CTA. Almost there!</p>
+                    </div>
+                  </div>
                 ) : store.pendingScript ? (
                   <div className="flex flex-col gap-4">
                     {/* Script config changed warning */}
@@ -1819,16 +1830,13 @@ export default function GeneratePage() {
                     onClick={handleGenerateScript}
                     disabled={
                       (requiresCommentKeyword && !commentKeyword) ||
-                      generateComposites.isPending ||
                       !store.compositeImagePath
                     }
                     size="lg"
                     className="w-full"
                   >
                     <Sparkles className="size-4" />
-                    {!store.compositeImagePath && generateComposites.isPending
-                      ? "Preparing scene…"
-                      : "Generate Script"}
+                    Generate Script
                   </Button>
                 )}
               </div>
@@ -1880,11 +1888,22 @@ export default function GeneratePage() {
                     </div>
 
                     {/* Generate buttons for advanced mode */}
-                    {generateScript.isPending ? (
-                      <Button disabled size="lg" className="w-full">
-                        <Loader2 className="size-4 animate-spin" />
-                        Generating script…
-                      </Button>
+                    {generateComposites.isPending && !store.compositeImagePath ? (
+                      <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-8 text-center">
+                        <Loader2 className="size-7 animate-spin text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">Preparing your scene…</p>
+                          <p className="text-xs text-muted-foreground mt-1">We're generating a personalized preview with your persona & product. This takes a few seconds.</p>
+                        </div>
+                      </div>
+                    ) : generateScript.isPending ? (
+                      <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-8 text-center">
+                        <Loader2 className="size-7 animate-spin text-primary" />
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">Writing your script…</p>
+                          <p className="text-xs text-muted-foreground mt-1">AI is crafting your Hook, Body & CTA. Almost there!</p>
+                        </div>
+                      </div>
                     ) : store.pendingScript ? (
                       <Button
                         onClick={handleApproveAndGenerate}
@@ -1901,17 +1920,12 @@ export default function GeneratePage() {
                     ) : (
                       <Button
                         onClick={handleGenerateScript}
-                        disabled={
-                          !store.compositeImagePath ||
-                          generateComposites.isPending
-                        }
+                        disabled={!store.compositeImagePath}
                         size="lg"
                         className="w-full"
                       >
                         <Sparkles className="size-4" />
-                        {!store.compositeImagePath && generateComposites.isPending
-                          ? "Preparing scene…"
-                          : "Generate Script"}
+                        Generate Script
                       </Button>
                     )}
                   </>
