@@ -174,12 +174,6 @@ export default function DashboardPage() {
               <Badge variant="outline" className="capitalize">
                 {plan} plan
               </Badge>
-              <Button asChild size="sm">
-                <Link href="/generate">
-                  New Generation
-                  <ArrowRight className="size-4" />
-                </Link>
-              </Button>
             </div>
           </CardContent>
         </Card>
