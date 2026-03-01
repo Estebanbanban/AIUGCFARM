@@ -19,10 +19,10 @@ export const PRODUCT_SLOT_LIMITS: Record<Profile["plan"], number> = {
 };
 
 /** Plans that can use HD (Kling V3) video quality */
-export const HD_QUALITY_PLANS: Set<Profile["plan"]> = new Set(["growth", "scale"]);
+export const HD_QUALITY_PLANS: Set<Profile["plan"]> = new Set(["free", "starter", "growth", "scale"]);
 
 /** Plans that can use the Advanced script editor */
-export const ADVANCED_MODE_PLANS: Set<Profile["plan"]> = new Set(["growth", "scale"]);
+export const ADVANCED_MODE_PLANS: Set<Profile["plan"]> = new Set(["free", "starter", "growth", "scale"]);
 
 export function useProfile() {
   return useQuery<Profile>({

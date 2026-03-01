@@ -635,7 +635,11 @@ export default function GeneratePage() {
       setShowPaywall(true);
       return;
     }
-    if (!store.productId || !store.personaId || !store.compositeImagePath) return;
+    if (!store.productId || !store.personaId) return;
+    if (!store.compositeImagePath) {
+      toast.error("Scene preview is still loading, please wait a moment.");
+      return;
+    }
     setScriptConfigChanged(false);
 
     generateScript.mutate(
@@ -1314,18 +1318,12 @@ export default function GeneratePage() {
               <button
                 type="button"
                 onClick={() => {
-                  if (!canUseAdvanced) {
-                    toast.error("Advanced mode requires Growth or Scale plan.");
-                    return;
-                  }
                   if (!store.advancedMode) {
                     handleSwitchToAdvanced();
                   }
                 }}
-                disabled={!canUseAdvanced}
                 className={cn(
                   "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all",
-                  !canUseAdvanced && "cursor-not-allowed opacity-50",
                   store.advancedMode
                     ? "bg-background text-foreground shadow-sm ring-1 ring-border"
                     : "text-muted-foreground hover:text-foreground",
@@ -1333,9 +1331,6 @@ export default function GeneratePage() {
               >
                 <Settings2 className="size-4" />
                 Advanced
-                <Badge variant={canUseAdvanced ? "secondary" : "outline"} className="text-[10px] px-1.5 py-0">
-                  {canUseAdvanced ? "Pro" : "Growth+"}
-                </Badge>
               </button>
             </div>
 
@@ -1411,17 +1406,11 @@ export default function GeneratePage() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (!canUseHD) {
-                          toast.error("HD quality (Kling V3) requires Growth or Scale plan.");
-                          return;
-                        }
                         store.setQuality("hd");
                         setScriptConfigChanged(true);
                       }}
-                      disabled={!canUseHD}
                       className={cn(
                         "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
-                        !canUseHD && "cursor-not-allowed opacity-50",
                         store.quality === "hd"
                           ? "border-primary bg-primary/5"
                           : "border-border hover:border-muted-foreground/30",
@@ -1429,14 +1418,9 @@ export default function GeneratePage() {
                     >
                       <div className="flex w-full items-center justify-between">
                         <p className="text-sm font-semibold">Kling V3</p>
-                        <div className="flex items-center gap-1">
-                          {!canUseHD && <Badge variant="outline" className="text-[10px]">Growth+</Badge>}
-                          <Badge variant="secondary" className="text-[10px]">2x cr</Badge>
-                        </div>
+                        <Badge variant="secondary" className="text-[10px]">2x cr</Badge>
                       </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {canUseHD ? "Best quality · final ads" : "Upgrade to Growth to unlock"}
-                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">Best quality · final ads</p>
                     </button>
                   </div>
                 </div>
@@ -1828,10 +1812,7 @@ export default function GeneratePage() {
                 ) : (
                   <Button
                     onClick={handleGenerateScript}
-                    disabled={
-                      (requiresCommentKeyword && !commentKeyword) ||
-                      !store.compositeImagePath
-                    }
+                    disabled={requiresCommentKeyword && !commentKeyword}
                     size="lg"
                     className="w-full"
                   >
@@ -1920,7 +1901,6 @@ export default function GeneratePage() {
                     ) : (
                       <Button
                         onClick={handleGenerateScript}
-                        disabled={!store.compositeImagePath}
                         size="lg"
                         className="w-full"
                       >
