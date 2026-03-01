@@ -535,10 +535,25 @@ function NewPersonaPageInner() {
         .eq("id", store.personaId!)
         .single();
       if (!persona?.generated_images?.length || cancelled) return;
-      const signed = await Promise.all(
-        (persona.generated_images as string[]).map((p) => resolvePersonaImageUrl(p)),
+      const paths = persona.generated_images as string[];
+      const internalPaths = paths.filter((p) => !p.startsWith("http"));
+      // Build result: external URLs are instant, internal paths need batch signing
+      const result: (string | null)[] = paths.map((p) =>
+        p.startsWith("http") ? p : null,
       );
-      const valid = signed.filter(Boolean) as string[];
+      if (internalPaths.length > 0) {
+        const { data } = await supabase.storage
+          .from("persona-images")
+          .createSignedUrls(internalPaths, 3600);
+        let signedIdx = 0;
+        for (let i = 0; i < paths.length; i++) {
+          if (!paths[i].startsWith("http")) {
+            result[i] = data?.[signedIdx]?.signedUrl ?? null;
+            signedIdx++;
+          }
+        }
+      }
+      const valid = result.filter(Boolean) as string[];
       if (valid.length > 0 && !cancelled) {
         store.setGeneratedImages(valid);
         // Restore which image was selected, if any

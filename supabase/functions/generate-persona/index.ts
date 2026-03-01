@@ -405,41 +405,37 @@ Deno.serve(async (req: Request) => {
     // Generate images via Gemini / NanoBanana 2 (with retry)
     const images = await generateImages(imagePrompt);
 
-    // Upload generated images to persona-images bucket (private)
-    const storagePaths: string[] = [];
-    for (const image of images) {
-      const ext = image.mimeType.includes("png") ? "png" : "jpg";
-      const storagePath = `${userId}/${crypto.randomUUID()}.${ext}`;
+    // Upload all generated images in parallel
+    const uploadResults = await Promise.all(
+      images.map(async (image) => {
+        const ext = image.mimeType.includes("png") ? "png" : "jpg";
+        const storagePath = `${userId}/${crypto.randomUUID()}.${ext}`;
+        const { error: uploadErr } = await sb.storage
+          .from("persona-images")
+          .upload(storagePath, image.data, {
+            contentType: image.mimeType,
+            upsert: false,
+          });
+        if (uploadErr) {
+          console.error(`Persona image upload failed: ${uploadErr.message}`);
+          return null;
+        }
+        return storagePath;
+      }),
+    );
 
-      const { error: uploadErr } = await sb.storage
-        .from("persona-images")
-        .upload(storagePath, image.data, {
-          contentType: image.mimeType,
-          upsert: false,
-        });
-
-      if (uploadErr) {
-        console.error(`Persona image upload failed: ${uploadErr.message}`);
-        continue;
-      }
-
-      storagePaths.push(storagePath);
-    }
-
+    const storagePaths = uploadResults.filter(Boolean) as string[];
     if (storagePaths.length === 0) {
       throw new Error("All image uploads failed");
     }
 
-    // Generate signed URLs for the immediate response
-    const signedUrls: string[] = [];
-    for (const path of storagePaths) {
-      const { data } = await sb.storage
-        .from("persona-images")
-        .createSignedUrl(path, 3600); // 1 hour
-      if (data?.signedUrl) {
-        signedUrls.push(data.signedUrl);
-      }
-    }
+    // Batch-sign all paths in a single request
+    const { data: signedData } = await sb.storage
+      .from("persona-images")
+      .createSignedUrls(storagePaths, 3600);
+    const signedUrls = (signedData ?? [])
+      .map((d) => d.signedUrl)
+      .filter(Boolean) as string[];
 
     // Persist scene_prompt alongside attributes so generate-video can reuse it
     const attributesToSave = { ...validAttrs, scene_prompt: scenePrompt };
