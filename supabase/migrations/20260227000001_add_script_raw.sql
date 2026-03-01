@@ -1,1 +1,0 @@
-ALTER TABLE generations ADD COLUMN IF NOT EXISTS script_raw JSONB;
