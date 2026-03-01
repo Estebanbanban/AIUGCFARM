@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
+import { callEdge } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +15,10 @@ import { Logo } from "@/components/ui/Logo";
 import { trackSignup, trackEmailVerified } from "@/lib/datafast";
 
 export default function SignupPage() {
+  const searchParams = useSearchParams();
+  const postSignupPlan = searchParams.get("plan");
+  const postSignupBilling = searchParams.get("billing") ?? "monthly";
+
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -65,6 +71,20 @@ export default function SignupPage() {
     }
 
     trackEmailVerified();
+
+    // If user came from pricing page with a plan selected, send them straight to checkout
+    if (postSignupPlan) {
+      try {
+        const res = await callEdge<{ data: { url: string } }>("stripe-checkout", {
+          body: { plan: postSignupPlan, billing: postSignupBilling },
+        });
+        window.location.href = res.data.url;
+        return;
+      } catch {
+        // Checkout failed — fall back to dashboard
+      }
+    }
+
     window.location.href = "/dashboard";
   }
 
@@ -79,10 +99,14 @@ export default function SignupPage() {
     const supabase = createClient();
     const forceSelect = localStorage.getItem("force_account_select") === "1";
     if (forceSelect) localStorage.removeItem("force_account_select");
+    // Preserve plan/billing through OAuth redirect so auth/callback can forward them
+    const next = postSignupPlan
+      ? `/dashboard?plan=${postSignupPlan}&billing=${postSignupBilling}`
+      : "/dashboard";
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
         ...(forceSelect ? { queryParams: { prompt: "select_account" } } : {}),
       },
     });

@@ -66,6 +66,7 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const { plan, pack, couponId, billing } = body;
     const isAnnual = billing === "annual";
+    console.log(`[stripe-checkout] plan=${plan} pack=${pack} billing=${billing} isAnnual=${isAnnual}`);
 
     if (!plan && !pack) {
       return json({ detail: "Provide either 'plan' or 'pack'" }, cors, 400);
@@ -154,6 +155,7 @@ Deno.serve(async (req: Request) => {
         503,
       );
     }
+    console.log(`[stripe-checkout] resolvedPriceId=${resolvedPriceId}`);
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       customer: stripeCustomerId,
