@@ -10,6 +10,7 @@ interface CheckoutResponse {
 
 interface CheckoutPlanArgs {
   plan: PlanTier;
+  billing?: "monthly" | "annual";
   couponId?: string;
 }
 
@@ -22,9 +23,9 @@ export function useCheckout() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ plan, couponId }: CheckoutPlanArgs) => {
+    mutationFn: async ({ plan, billing, couponId }: CheckoutPlanArgs) => {
       const res = await callEdge<CheckoutResponse>("stripe-checkout", {
-        body: { plan, ...(couponId ? { couponId } : {}) },
+        body: { plan, ...(billing ? { billing } : {}), ...(couponId ? { couponId } : {}) },
       });
       return res.data.url;
     },

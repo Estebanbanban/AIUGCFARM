@@ -233,12 +233,15 @@ Deno.serve(async (req: Request) => {
         // Try price ID lookup first (most reliable), then metadata fallback
         let plan: string | null = null;
         if (priceId) {
-          const priceStarter = Deno.env.get("STRIPE_PRICE_STARTER");
-          const priceGrowth = Deno.env.get("STRIPE_PRICE_GROWTH");
-          const priceScale = Deno.env.get("STRIPE_PRICE_SCALE");
-          if (priceId === priceStarter) plan = "starter";
-          else if (priceId === priceGrowth) plan = "growth";
-          else if (priceId === priceScale) plan = "scale";
+          const priceStarter        = Deno.env.get("STRIPE_PRICE_STARTER");
+          const priceGrowth         = Deno.env.get("STRIPE_PRICE_GROWTH");
+          const priceScale          = Deno.env.get("STRIPE_PRICE_SCALE");
+          const priceStarterAnnual  = Deno.env.get("STRIPE_PRICE_STARTER_ANNUAL");
+          const priceGrowthAnnual   = Deno.env.get("STRIPE_PRICE_GROWTH_ANNUAL");
+          const priceScaleAnnual    = Deno.env.get("STRIPE_PRICE_SCALE_ANNUAL");
+          if (priceId === priceStarter || priceId === priceStarterAnnual) plan = "starter";
+          else if (priceId === priceGrowth || priceId === priceGrowthAnnual) plan = "growth";
+          else if (priceId === priceScale || priceId === priceScaleAnnual) plan = "scale";
         }
         // Fallback to metadata
         if (!plan) {
