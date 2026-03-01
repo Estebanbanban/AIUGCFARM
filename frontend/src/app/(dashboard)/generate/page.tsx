@@ -575,7 +575,7 @@ export default function GeneratePage() {
             }
           },
           onError: () => {
-            // Silent fail — user can manually generate script
+            // Silent fail - user can manually generate script
           },
         },
       );
@@ -638,7 +638,7 @@ export default function GeneratePage() {
               result.script,
               result.credits_to_charge ?? effectiveCost,
             );
-            // Script now shows inline — no step change needed
+            // Script now shows inline - no step change needed
           } else {
             toast.error("Script was not returned. Please try again.");
           }
@@ -758,9 +758,11 @@ export default function GeneratePage() {
 
   async function handleBuyPack(pack: CreditPackKey | SingleVideoPackKey) {
     const couponId = offer.isActive ? COUPON_30_OFF : undefined;
-    buyCredits.mutate({ pack: pack as CreditPackKey, couponId }, {
+    buyCredits.mutate({ pack, couponId }, {
       onSuccess: (url) => {
-        trackCreditsPurchased(pack as CreditPackKey);
+        if (pack in { pack_10: 1, pack_30: 1, pack_100: 1 }) {
+          trackCreditsPurchased(pack as CreditPackKey);
+        }
         if (couponId) offer.markUsed();
         window.location.href = url;
       },
@@ -798,7 +800,7 @@ export default function GeneratePage() {
 
       {/* ── Section 1: Product & Format ───────────────────────────────── */}
       <div className="rounded-xl border border-border overflow-hidden">
-        {/* Section header — always visible */}
+        {/* Section header - always visible */}
         <div
           className={cn(
             "flex items-center justify-between px-5 py-4",
@@ -1050,7 +1052,7 @@ export default function GeneratePage() {
         )}
       </div>
 
-      {/* ── Sticky Continue — Section 1 product step ──────────────────── */}
+      {/* ── Sticky Continue - Section 1 product step ──────────────────── */}
       {!section1Complete && section1SubStep === 1 && confirmedProducts.length > 0 && !showAddProductForm && !productsLoading && (
         <div className="sticky bottom-4 z-20 flex justify-end pointer-events-none">
           <Button
@@ -1106,7 +1108,7 @@ export default function GeneratePage() {
             )}
           </div>
 
-          {/* Section 2 body — only shown when not complete */}
+          {/* Section 2 body - only shown when not complete */}
           {!section2Complete && (
             <div className="px-5 pb-5 flex flex-col gap-4">
               {personasLoading ? (
@@ -1169,7 +1171,7 @@ export default function GeneratePage() {
                                 {!hasImage ? (
                                   <div className="flex items-center gap-1.5 text-xs text-amber-500">
                                     <AlertCircle className="size-3.5" />
-                                    Needs image — visit Personas
+                                    Needs image - visit Personas
                                   </div>
                                 ) : store.personaId === persona.id ? (
                                   <div className="flex items-center gap-1.5 text-xs text-primary">
@@ -1219,7 +1221,7 @@ export default function GeneratePage() {
                   <CardContent className="flex flex-col items-center gap-3 py-10">
                     <User className="size-8 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
-                      No personas yet — create one first before generating a video.
+                      No personas yet - create one first before generating a video.
                     </p>
                     <Button asChild variant="outline" size="sm">
                       <Link href="/personas/new?returnTo=/generate">
@@ -1431,7 +1433,7 @@ export default function GeneratePage() {
                     <div className="flex items-center gap-2">
                       <AlertCircle className="size-4 text-amber-500 shrink-0" />
                       <p className="text-sm text-amber-600 dark:text-amber-400">
-                        Not enough credits — you'll be prompted to top up.{" "}
+                        Not enough credits - you'll be prompted to top up.{" "}
                         {!isUnlimitedCredits && (
                           <span className="text-xs">
                             Need {effectiveCost} ({creditsRemaining} remaining)
@@ -1559,7 +1561,7 @@ export default function GeneratePage() {
                   </div>
                 )}
 
-                {/* No composites + not pending — fallback generate button */}
+                {/* No composites + not pending - fallback generate button */}
                 {!generateComposites.isPending && compositeImages.length === 0 && (
                   <Button
                     variant="outline"
@@ -1586,7 +1588,7 @@ export default function GeneratePage() {
                       <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
                         <AlertCircle className="size-4 text-amber-500 shrink-0" />
                         <div className="flex-1">
-                          <p className="text-sm text-amber-600 dark:text-amber-400">Settings changed — regenerate script to reflect updates.</p>
+                          <p className="text-sm text-amber-600 dark:text-amber-400">Settings changed - regenerate script to reflect updates.</p>
                         </div>
                         <Button
                           variant="outline"
@@ -1601,11 +1603,11 @@ export default function GeneratePage() {
                       </div>
                     )}
 
-                    {/* Script review — inline */}
+                    {/* Script review - inline */}
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2 mb-1">
                         <Check className="size-4 text-emerald-500" />
-                        <p className="text-sm font-semibold">Script ready — review & edit</p>
+                        <p className="text-sm font-semibold">Script ready - review & edit</p>
                       </div>
                       <p className="text-xs text-muted-foreground mb-3">
                         Edit any segment before generating your video.
@@ -1753,7 +1755,7 @@ export default function GeneratePage() {
                   <>
                     <div className="rounded-xl bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
                       {store.mode === "triple"
-                        ? "Customize each of the 9 segments — 3 variants × 3 types. Mix any combo for 27 unique videos."
+                        ? "Customize each of the 9 segments - 3 variants × 3 types. Mix any combo for 27 unique videos."
                         : "Customize your Hook, Body, and CTA individually for full creative control."}
                     </div>
                     <AdvancedModePanel
@@ -1787,7 +1789,7 @@ export default function GeneratePage() {
                         <div className="flex items-center gap-2">
                           <AlertCircle className="size-4 text-amber-500 shrink-0" />
                           <p className="text-sm text-amber-600 dark:text-amber-400">
-                            Not enough credits — you'll be prompted to top up.
+                            Not enough credits - you'll be prompted to top up.
                           </p>
                         </div>
                       )}
@@ -1830,7 +1832,7 @@ export default function GeneratePage() {
                     )}
                   </>
                 ) : (
-                  /* No segments yet and not initializing — re-init option */
+                  /* No segments yet and not initializing - re-init option */
                   <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-10">
                     <Settings2 className="size-8 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">Advanced segments failed to generate.</p>
@@ -2080,7 +2082,7 @@ export default function GeneratePage() {
                             <span className="font-bold text-foreground">{pack.credits} credits</span>
                             {" "}
                             <span className="text-muted-foreground">
-                              — {discountedPackPrice !== null ? (
+                              - {discountedPackPrice !== null ? (
                                 <>
                                   <span className="line-through">${pack.price}</span>{" "}
                                   <span className="text-primary font-semibold">${discountedPackPrice}</span>
@@ -2113,7 +2115,7 @@ export default function GeneratePage() {
             <div className="bg-primary text-white px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm font-medium shrink-0">
               <div className="flex items-center gap-2">
                 <Flame className="size-4" />
-                <span>Limited-time offer — 30% off your first plan</span>
+                <span>Limited-time offer - 30% off your first plan</span>
               </div>
               <div className="flex items-center gap-2 bg-black/15 px-2.5 py-0.5 rounded font-mono">
                 <Clock className="size-3 opacity-80" />
@@ -2128,7 +2130,7 @@ export default function GeneratePage() {
                 <User className="size-7 text-primary" />
               </div>
               <h2 className="text-2xl font-bold tracking-tight">
-                {offer.isActive ? "Unlock More Personas — 30% Off" : "Unlock More Personas"}
+                {offer.isActive ? "Unlock More Personas - 30% Off" : "Unlock More Personas"}
               </h2>
               <p className="mt-2 text-muted-foreground max-w-md mx-auto">
                 {(() => {
