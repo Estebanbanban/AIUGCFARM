@@ -119,9 +119,10 @@ Deno.serve(async (req: Request) => {
       console.log(`[stripe-checkout] pack=${JSON.stringify(pack)} priceId=${priceId ?? "UNDEFINED"}`);
       console.log(`[stripe-checkout] env SINGLE_STANDARD=${Deno.env.get("STRIPE_PRICE_SINGLE_STANDARD") ?? "NOT_SET"} SINGLE_HD=${Deno.env.get("STRIPE_PRICE_SINGLE_HD") ?? "NOT_SET"}`);
       if (!priceId) {
-        console.error(`[stripe-checkout] Stripe price ID not configured for pack: ${pack}. Known keys: ${Object.keys(PACK_PRICE_IDS).join(", ")}`);
+        const debug = `pack=${pack} | keys=${Object.keys(PACK_PRICE_IDS).join(",")} | SINGLE_STD=${Deno.env.get("STRIPE_PRICE_SINGLE_STANDARD") ?? "NOT_SET"} | SINGLE_HD=${Deno.env.get("STRIPE_PRICE_SINGLE_HD") ?? "NOT_SET"}`;
+        console.error(`[stripe-checkout] missing price: ${debug}`);
         return json(
-          { detail: "This credit pack is not available right now." },
+          { detail: `DEBUG: ${debug}` },
           cors,
           503,
         );
