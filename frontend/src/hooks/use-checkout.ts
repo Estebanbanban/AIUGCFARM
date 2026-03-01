@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { callEdge } from "@/lib/api";
-import type { PlanTier, CreditPackKey } from "@/lib/stripe";
+import type { PlanTier, CreditPackKey, SingleVideoPackKey } from "@/lib/stripe";
 
 interface CheckoutResponse {
   data: { url: string };
@@ -15,7 +15,7 @@ interface CheckoutPlanArgs {
 }
 
 interface CheckoutPackArgs {
-  pack: CreditPackKey;
+  pack: CreditPackKey | SingleVideoPackKey;
   couponId?: string;
 }
 
