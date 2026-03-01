@@ -410,7 +410,7 @@ export default function GeneratePage() {
         : CREDITS_PER_BATCH;
 
   const isFirstVideo = profile?.first_video_discount_used === false;
-  const effectiveCost = isFirstVideo ? Math.floor(creditCost / 2) : creditCost;
+  const effectiveCost = creditCost;
 
   const hasEnoughCredits = creditsLoading || isUnlimitedCredits || creditsRemaining >= effectiveCost;
   const requiresCommentKeyword = store.ctaStyle === "comment_keyword";
@@ -1642,11 +1642,6 @@ export default function GeneratePage() {
                     This will use{" "}
                     <span className="font-bold text-foreground">{effectiveCost} credits</span>
                     {!isUnlimitedCredits && <span> ({creditsRemaining} remaining)</span>}
-                    {isFirstVideo && (
-                      <span className="ml-2 text-xs text-amber-500 font-medium">
-                        ✦ 50% first-video discount applied
-                      </span>
-                    )}
                   </p>
                 </div>
 
@@ -2000,7 +1995,6 @@ export default function GeneratePage() {
                     <h3 className="text-xl font-bold text-foreground mb-1">Single Video</h3>
                     <p className="text-muted-foreground text-sm leading-relaxed">
                       Experience the quality before committing.
-                      {isFirstVideo && " Your first generation automatically includes a 50% discount."}
                     </p>
                   </div>
 

@@ -8,7 +8,7 @@ import { withRetry } from "../_shared/retry.ts";
 import { submitKlingJob } from "../_shared/kling.ts";
 
 // 1 credit = $1. Kling v2.6 = ~$0.88/single gen → 5cr. Kling v3 = ~$1.76/single → 10cr.
-// First video: 50% off (ceil(cost/2)), tracked via first_video_discount_used on profile.
+// Credit costs are fixed. first_video_discount_used tracks the one-time purchase price discount (paywall only).
 const COSTS = {
   standard: { single: 5, batch: 15 },
   hd:       { single: 10, batch: 30 },
@@ -554,7 +554,7 @@ Deno.serve(async (req: Request) => {
 
       // ── Compute effective cost + check credits ──────────────────
       const isFirstVideo = profileData?.first_video_discount_used === false;
-      const effectiveCost = isFirstVideo ? Math.ceil(creditCost / 2) : creditCost;
+      const effectiveCost = creditCost;
 
       const remaining = await checkCredits(userId);
       if (remaining < effectiveCost) {
@@ -787,7 +787,7 @@ Deno.serve(async (req: Request) => {
       .single();
 
     const isFirstVideo = profileData?.first_video_discount_used === false;
-    const effectiveCost = isFirstVideo ? Math.ceil(creditCost / 2) : creditCost;
+    const effectiveCost = creditCost;
 
     // ══════════════════════════════════════════════════════════════════
     // PHASE "script" — Generate script only, no credit debit
