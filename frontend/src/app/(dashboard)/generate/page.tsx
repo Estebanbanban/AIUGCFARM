@@ -1646,34 +1646,17 @@ export default function GeneratePage() {
                 )}
 
                 {/* Credit cost */}
-                <div className={cn(
-                  "rounded-xl border px-4 py-3",
-                  hasEnoughCredits ? "border-border bg-muted/30" : "border-amber-500/30 bg-amber-500/10",
-                )}>
-                  {hasEnoughCredits ? (
-                    <p className="text-sm text-muted-foreground">
-                      This will use{" "}
-                      <span className="font-bold text-foreground">{effectiveCost} credits</span>
-                      {!isUnlimitedCredits && <span> ({creditsRemaining} remaining)</span>}
-                      {isFirstVideo && (
-                        <span className="ml-2 text-xs text-amber-500 font-medium">
-                          ✦ 50% first-video discount applied
-                        </span>
-                      )}
-                    </p>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="size-4 text-amber-500 shrink-0" />
-                      <p className="text-sm text-amber-600 dark:text-amber-400">
-                        Not enough credits - you'll be prompted to top up.{" "}
-                        {!isUnlimitedCredits && (
-                          <span className="text-xs">
-                            Need {effectiveCost} ({creditsRemaining} remaining)
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  )}
+                <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
+                  <p className="text-sm text-muted-foreground">
+                    This will use{" "}
+                    <span className="font-bold text-foreground">{effectiveCost} credits</span>
+                    {!isUnlimitedCredits && <span> ({creditsRemaining} remaining)</span>}
+                    {isFirstVideo && (
+                      <span className="ml-2 text-xs text-amber-500 font-medium">
+                        ✦ 50% first-video discount applied
+                      </span>
+                    )}
+                  </p>
                 </div>
 
                 {/* ── Script / Generate area ────────────────────────── */}
@@ -1881,24 +1864,12 @@ export default function GeneratePage() {
                     <Separator />
 
                     {/* Credit cost */}
-                    <div className={cn(
-                      "rounded-xl border px-4 py-3",
-                      hasEnoughCredits ? "border-border bg-muted/30" : "border-amber-500/30 bg-amber-500/10",
-                    )}>
-                      {hasEnoughCredits ? (
-                        <p className="text-sm text-muted-foreground">
-                          This will use{" "}
-                          <span className="font-bold text-foreground">{effectiveCost} credits</span>
-                          {!isUnlimitedCredits && <span> ({creditsRemaining} remaining)</span>}
-                        </p>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <AlertCircle className="size-4 text-amber-500 shrink-0" />
-                          <p className="text-sm text-amber-600 dark:text-amber-400">
-                            Not enough credits - you'll be prompted to top up.
-                          </p>
-                        </div>
-                      )}
+                    <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
+                      <p className="text-sm text-muted-foreground">
+                        This will use{" "}
+                        <span className="font-bold text-foreground">{effectiveCost} credits</span>
+                        {!isUnlimitedCredits && <span> ({creditsRemaining} remaining)</span>}
+                      </p>
                     </div>
 
                     {/* Generate buttons for advanced mode */}
