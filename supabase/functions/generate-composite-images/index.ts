@@ -1,0 +1,176 @@
+import { getCorsHeaders } from "../_shared/cors.ts";
+import { requireUserId } from "../_shared/auth.ts";
+import { json } from "../_shared/response.ts";
+import { getAdminClient } from "../_shared/supabase.ts";
+import { withRetry } from "../_shared/retry.ts";
+import { generateCompositeFromImages } from "../_shared/nanobanana.ts";
+
+const COMPOSITE_COUNT = 4;
+const MAX_PRODUCT_REFERENCE_IMAGES = 4;
+
+Deno.serve(async (req: Request) => {
+  const cors = getCorsHeaders(req);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+
+  try {
+    if (req.method !== "POST") {
+      return json({ detail: "Method not allowed" }, cors, 405);
+    }
+
+    const userId = await requireUserId(req);
+    const sb = getAdminClient();
+
+    const { product_id, persona_id, format = "9:16" } = await req.json();
+
+    if (!product_id) return json({ detail: "product_id is required" }, cors, 400);
+    if (!persona_id) return json({ detail: "persona_id is required" }, cors, 400);
+    if (format !== "9:16" && format !== "16:9") {
+      return json({ detail: "format must be '9:16' or '16:9'" }, cors, 400);
+    }
+
+    // Verify product ownership
+    const { data: product, error: prodErr } = await sb
+      .from("products")
+      .select("*")
+      .eq("id", product_id)
+      .eq("owner_id", userId)
+      .eq("confirmed", true)
+      .single();
+    if (prodErr || !product) {
+      return json({ detail: "Product not found or not confirmed" }, cors, 404);
+    }
+
+    // Verify persona ownership + has selected image
+    const { data: persona, error: persErr } = await sb
+      .from("personas")
+      .select("*")
+      .eq("id", persona_id)
+      .eq("owner_id", userId)
+      .eq("is_active", true)
+      .single();
+    if (persErr || !persona) {
+      return json({ detail: "Persona not found or inactive" }, cors, 404);
+    }
+    if (!persona.selected_image_url) {
+      return json({ detail: "Persona has no selected image. Select one first." }, cors, 400);
+    }
+
+    // Persona signed URL (10 min)
+    const { data: personaSignedUrlData, error: personaSignedUrlErr } = await sb
+      .storage
+      .from("persona-images")
+      .createSignedUrl(persona.selected_image_url, 600);
+    if (personaSignedUrlErr || !personaSignedUrlData?.signedUrl) {
+      throw new Error(`Failed to sign persona image URL: ${personaSignedUrlErr?.message}`);
+    }
+    const personaSignedUrl = personaSignedUrlData.signedUrl;
+
+    // Product image URLs (multiple references improve output fidelity).
+    const productImagePaths = ((product.images as string[]) ?? [])
+      .filter((img) => typeof img === "string" && img.trim().length > 0)
+      .slice(0, MAX_PRODUCT_REFERENCE_IMAGES);
+    if (productImagePaths.length === 0) {
+      throw new Error("Product has no images available");
+    }
+
+    const resolvedProductImageUrls: string[] = [];
+    for (const imagePath of productImagePaths) {
+      if (imagePath.startsWith("http")) {
+        resolvedProductImageUrls.push(imagePath);
+        continue;
+      }
+
+      const { data: signedData, error: signErr } = await sb
+        .storage
+        .from("product-images")
+        .createSignedUrl(imagePath, 600);
+      if (signErr || !signedData?.signedUrl) {
+        throw new Error(`Failed to sign product image URL: ${signErr?.message}`);
+      }
+      resolvedProductImageUrls.push(signedData.signedUrl);
+    }
+
+    // Scene prompt from persona attributes (for context)
+    const scenePrompt = (persona.attributes as Record<string, unknown>)
+      ?.scene_prompt as string | undefined;
+
+    // Generate COMPOSITE_COUNT composites — staggered to avoid Gemini 500 bursts.
+    // withRetry uses 5 attempts with 1s base delay (1s, 2s, 4s, 8s) per composite.
+    const staggeredTasks = Array.from({ length: COMPOSITE_COUNT }, (_, i) =>
+      new Promise<Awaited<ReturnType<typeof generateCompositeFromImages>>>((resolve, reject) => {
+        setTimeout(() => {
+          withRetry(
+            () => generateCompositeFromImages(
+              personaSignedUrl,
+              resolvedProductImageUrls,
+              {
+                name: typeof product.name === "string" ? product.name : undefined,
+                description: typeof product.description === "string"
+                  ? product.description
+                  : undefined,
+                category: typeof product.category === "string" ? product.category : undefined,
+                price: typeof product.price === "number" ? product.price : undefined,
+                currency: typeof product.currency === "string" ? product.currency : undefined,
+              },
+              scenePrompt,
+              format as "9:16" | "16:9",
+            ),
+            5,   // attempts
+            1000, // 1s base → 1s, 2s, 4s, 8s between retries
+          ).then(resolve).catch(reject);
+        }, i * 500); // stagger each by 500ms
+      })
+    );
+    const compositeResults = await Promise.allSettled(staggeredTasks);
+
+    // Upload successful composites
+    const results: Array<{ path: string; signed_url: string }> = [];
+
+    for (const result of compositeResults) {
+      if (result.status === "rejected") {
+        console.error("Composite generation failed:", result.reason);
+        continue;
+      }
+      const composite = result.value;
+      const ext = composite.mimeType.includes("png") ? "png" : "jpg";
+      const storagePath = `${userId}/preview/${crypto.randomUUID()}.${ext}`;
+
+      const { error: uploadErr } = await sb.storage
+        .from("composite-images")
+        .upload(storagePath, composite.data, {
+          contentType: composite.mimeType,
+          upsert: false,
+        });
+
+      if (uploadErr) {
+        console.error(`Composite upload failed: ${uploadErr.message}`);
+        continue;
+      }
+
+      const { data: signedData } = await sb.storage
+        .from("composite-images")
+        .createSignedUrl(storagePath, 3600); // 1h for user to preview
+
+      if (signedData?.signedUrl) {
+        results.push({ path: storagePath, signed_url: signedData.signedUrl });
+      }
+    }
+
+    if (results.length === 0) {
+      throw new Error("All composite image generations failed");
+    }
+
+    return json({ data: { images: results } }, cors, 200);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg === "Unauthorized") {
+      return json({ detail: "Authentication required" }, cors, 401);
+    }
+    console.error("generate-composite-images error:", e);
+    return json(
+      { detail: msg || "Failed to generate composite images. Please try again." },
+      cors,
+      500,
+    );
+  }
+});

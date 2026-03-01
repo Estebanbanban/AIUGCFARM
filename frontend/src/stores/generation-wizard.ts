@@ -1,0 +1,236 @@
+import { create } from "zustand";
+import { immer } from "zustand/middleware/immer";
+import { persist, createJSONStorage } from "zustand/middleware";
+import type { ScriptSegment, AdvancedSegmentConfig, AdvancedSegmentsConfig } from "@/types/database";
+
+interface PendingScript {
+  hooks: ScriptSegment[];
+  bodies: ScriptSegment[];
+  ctas: ScriptSegment[];
+}
+
+interface GenerationWizardState {
+  step: number;
+  productId: string | null;
+  personaId: string | null;
+  mode: "single" | "triple";
+  quality: "standard" | "hd";
+  format: "9:16" | "16:9" | null;
+  ctaStyle:
+    | "auto"
+    | "product_name_drop"
+    | "link_in_bio"
+    | "link_in_comments"
+    | "comment_keyword"
+    | "check_description"
+    | "direct_website"
+    | "discount_code";
+  ctaCommentKeyword: string;
+  compositeImagePath: string | null;
+  pendingGenerationId: string | null;
+  pendingScript: PendingScript | null;
+  creditsToCharge: number | null;
+  // Advanced Mode
+  advancedMode: boolean;
+  advancedSegments: AdvancedSegmentsConfig | null;
+  // Actions
+  setStep: (step: number) => void;
+  setProductId: (id: string) => void;
+  setPersonaId: (id: string) => void;
+  setMode: (mode: "single" | "triple") => void;
+  setQuality: (quality: "standard" | "hd") => void;
+  setFormat: (format: "9:16" | "16:9" | null) => void;
+  setCtaStyle: (
+    style:
+      | "auto"
+      | "product_name_drop"
+      | "link_in_bio"
+      | "link_in_comments"
+      | "comment_keyword"
+      | "check_description"
+      | "direct_website"
+      | "discount_code",
+  ) => void;
+  setCtaCommentKeyword: (keyword: string) => void;
+  setCompositeImagePath: (path: string | null) => void;
+  setPendingScript: (id: string, script: PendingScript, credits: number) => void;
+  updateScriptSection: (type: "hooks" | "bodies" | "ctas", index: number, text: string) => void;
+  clearPendingScript: () => void;
+  setAdvancedMode: (enabled: boolean) => void;
+  setAdvancedSegments: (segments: AdvancedSegmentsConfig | null) => void;
+  updateAdvancedSegment: (
+    type: "hooks" | "bodies" | "ctas",
+    index: number,
+    patch: Partial<AdvancedSegmentConfig>,
+  ) => void;
+  /** Hydrate the wizard from a DB generation record (for dashboard resume). */
+  resumeFromGeneration: (params: {
+    generationId: string;
+    script: PendingScript;
+    creditsToCharge: number;
+    productId: string;
+    personaId: string;
+    mode: "single" | "triple";
+    quality: "standard" | "hd";
+  }) => void;
+  reset: () => void;
+}
+
+export const useGenerationWizardStore = create<GenerationWizardState>()(
+  persist(
+    immer((set) => ({
+      step: 1,
+      productId: null,
+      personaId: null,
+      mode: "single",
+      quality: "standard",
+      format: null,
+      ctaStyle: "auto",
+      ctaCommentKeyword: "",
+      compositeImagePath: null,
+      pendingGenerationId: null,
+      pendingScript: null,
+      creditsToCharge: null,
+      advancedMode: false,
+      advancedSegments: null,
+      setStep: (step) =>
+        set((state) => {
+          state.step = step;
+        }),
+      setProductId: (id) =>
+        set((state) => {
+          state.productId = id;
+        }),
+      setPersonaId: (id) =>
+        set((state) => {
+          state.personaId = id;
+        }),
+      setMode: (mode) =>
+        set((state) => {
+          state.mode = mode;
+          if (state.advancedMode) {
+            state.advancedMode = false;
+            state.advancedSegments = null;
+          }
+        }),
+      setQuality: (quality) =>
+        set((state) => {
+          state.quality = quality;
+        }),
+      setFormat: (format) =>
+        set((state) => {
+          state.format = format;
+        }),
+      setCtaStyle: (style) =>
+        set((state) => {
+          state.ctaStyle = style;
+        }),
+      setCtaCommentKeyword: (keyword) =>
+        set((state) => {
+          state.ctaCommentKeyword = keyword;
+        }),
+      setCompositeImagePath: (path) =>
+        set((state) => {
+          state.compositeImagePath = path;
+        }),
+      setPendingScript: (id, script, credits) =>
+        set((state) => {
+          state.pendingGenerationId = id;
+          state.pendingScript = script;
+          state.creditsToCharge = credits;
+        }),
+      updateScriptSection: (type, index, text) =>
+        set((state) => {
+          if (state.pendingScript && state.pendingScript[type][index]) {
+            state.pendingScript[type][index].text = text;
+          }
+        }),
+      clearPendingScript: () =>
+        set((state) => {
+          state.pendingGenerationId = null;
+          state.pendingScript = null;
+          state.creditsToCharge = null;
+        }),
+      setAdvancedMode: (enabled) =>
+        set((state) => {
+          state.advancedMode = enabled;
+          if (!enabled) {
+            state.advancedSegments = null;
+          }
+        }),
+      setAdvancedSegments: (segments) =>
+        set((state) => {
+          state.advancedSegments = segments;
+        }),
+      updateAdvancedSegment: (type, index, patch) =>
+        set((state) => {
+          if (!state.advancedSegments) return;
+          const seg = state.advancedSegments[type][index];
+          if (!seg) return;
+          Object.assign(seg, patch);
+        }),
+      resumeFromGeneration: ({ generationId, script, creditsToCharge, productId, personaId, mode, quality }) =>
+        set((state) => {
+          state.pendingGenerationId = generationId;
+          state.pendingScript = script;
+          state.creditsToCharge = creditsToCharge;
+          state.productId = productId;
+          state.personaId = personaId;
+          state.mode = mode;
+          state.quality = quality;
+          state.step = 5;
+        }),
+      reset: () =>
+        set(() => ({
+          step: 1,
+          productId: null,
+          personaId: null,
+          mode: "single" as const,
+          quality: "standard" as const,
+          format: null,
+          ctaStyle: "auto" as const,
+          ctaCommentKeyword: "",
+          compositeImagePath: null,
+          pendingGenerationId: null,
+          pendingScript: null,
+          creditsToCharge: null,
+          advancedMode: false,
+          advancedSegments: null,
+        })),
+    })),
+    {
+      name: "cinerads-generation-wizard",
+      storage: createJSONStorage(() => {
+        // Safe SSR guard — localStorage is not available on the server.
+        // Return a no-op StateStorage so Zustand persist doesn't crash during SSR.
+        if (typeof window === "undefined") {
+          return {
+            getItem: (_key: string) => null,
+            setItem: (_key: string, _value: string) => {},
+            removeItem: (_key: string) => {},
+          };
+        }
+        return localStorage;
+      }),
+      // Don't persist action functions (Zustand handles this automatically)
+      // Explicitly skip advancedSegments — large, session-specific
+      partialize: (state) => ({
+        step: state.step,
+        productId: state.productId,
+        personaId: state.personaId,
+        mode: state.mode,
+        quality: state.quality,
+        format: state.format,
+        ctaStyle: state.ctaStyle,
+        ctaCommentKeyword: state.ctaCommentKeyword,
+        compositeImagePath: state.compositeImagePath,
+        pendingGenerationId: state.pendingGenerationId,
+        pendingScript: state.pendingScript,
+        creditsToCharge: state.creditsToCharge,
+        advancedMode: state.advancedMode,
+        // advancedSegments intentionally excluded — complex, per-session
+      }),
+      version: 1,
+    },
+  ),
+);

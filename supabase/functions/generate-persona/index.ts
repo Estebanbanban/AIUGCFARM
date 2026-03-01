@@ -1,0 +1,510 @@
+import { getCorsHeaders } from "../_shared/cors.ts";
+import { requireUserId } from "../_shared/auth.ts";
+import { json } from "../_shared/response.ts";
+import { getAdminClient } from "../_shared/supabase.ts";
+import { withRetry } from "../_shared/retry.ts";
+import { callOpenRouter } from "../_shared/openrouter.ts";
+import { generateImagesFromPrompt, type GeneratedImage } from "../_shared/nanobanana.ts";
+
+const PERSONA_LIMITS: Record<string, number> = {
+  free: 1,
+  starter: 1,
+  growth: 3,
+  scale: 10,
+};
+
+// Free-tier: max regeneration attempts per persona (2 images/call × 5 calls = 10 images)
+const FREE_REGEN_LIMIT = 4; // 4 regen calls after initial creation = 10 total images
+
+/* ------------------------------------------------------------------ */
+/*  Attribute validation                                              */
+/* ------------------------------------------------------------------ */
+
+const VALID_GENDERS = new Set(["male", "female", "non_binary"]);
+const VALID_AGE_RANGES = new Set(["18_25", "25_35", "35_45", "45_55", "55_plus"]);
+const VALID_BODY_TYPES = new Set(["slim", "average", "athletic", "curvy", "plus_size"]);
+
+const REQUIRED_ATTRIBUTE_KEYS = [
+  "gender",
+  "age",
+  "hair_color",
+  "hair_style",
+  "eye_color",
+  "body_type",
+  "clothing_style",
+  "accessories",
+] as const;
+// ethnicity is preferred; skin_tone is the legacy fallback — at least one must be present
+
+interface PersonaAttributes {
+  gender: string;
+  ethnicity?: string; // preferred — descriptive label like "East Asian", "Black / African"
+  skin_tone?: string; // legacy — hex colour (#C68642) or free-text; used when ethnicity absent
+  age: string;
+  hair_color: string;
+  hair_style: string;
+  eye_color: string;
+  body_type: string;
+  clothing_style: string;
+  accessories: string[];
+}
+
+/**
+ * Validate the incoming attributes object. Returns a user-friendly error
+ * message if validation fails, or `null` when the input is valid.
+ */
+function validateAttributes(
+  attrs: Record<string, unknown>,
+): string | null {
+  const missing = REQUIRED_ATTRIBUTE_KEYS.filter(
+    (key) => attrs[key] === undefined || attrs[key] === null,
+  );
+  if (missing.length > 0) {
+    return `Missing required attributes: ${missing.join(", ")}`;
+  }
+
+  if (!VALID_GENDERS.has(attrs.gender as string)) {
+    return `Invalid gender. Expected one of: ${[...VALID_GENDERS].join(", ")}`;
+  }
+  if (!VALID_AGE_RANGES.has(attrs.age as string)) {
+    return `Invalid age range. Expected one of: ${[...VALID_AGE_RANGES].join(", ")}`;
+  }
+  if (!VALID_BODY_TYPES.has(attrs.body_type as string)) {
+    return `Invalid body type. Expected one of: ${[...VALID_BODY_TYPES].join(", ")}`;
+  }
+
+  // Require either ethnicity (new) or skin_tone (legacy)
+  const hasEthnicity = typeof attrs.ethnicity === "string" && !!attrs.ethnicity;
+  const hasSkinTone = typeof attrs.skin_tone === "string" && !!attrs.skin_tone;
+  if (!hasEthnicity && !hasSkinTone) {
+    return "Either ethnicity or skin_tone is required";
+  }
+  if (typeof attrs.hair_color !== "string" || !attrs.hair_color) {
+    return "hair_color must be a non-empty string";
+  }
+  if (typeof attrs.hair_style !== "string" || !attrs.hair_style) {
+    return "hair_style must be a non-empty string";
+  }
+  if (typeof attrs.eye_color !== "string" || !attrs.eye_color) {
+    return "eye_color must be a non-empty string";
+  }
+  if (typeof attrs.clothing_style !== "string" || !attrs.clothing_style) {
+    return "clothing_style must be a non-empty string";
+  }
+  if (!Array.isArray(attrs.accessories)) {
+    return "accessories must be an array of strings";
+  }
+  if (attrs.accessories.length > 5) {
+    return "accessories can contain at most 5 items";
+  }
+  for (const item of attrs.accessories) {
+    if (typeof item !== "string") {
+      return "Each accessory must be a string";
+    }
+  }
+
+  return null;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Prompt building                                                   */
+/* ------------------------------------------------------------------ */
+
+const AGE_LABEL: Record<string, string> = {
+  "18_25": "18-25 years old",
+  "25_35": "25-35 years old",
+  "35_45": "35-45 years old",
+  "45_55": "45-55 years old",
+  "55_plus": "55+ years old",
+};
+
+const GENDER_LABEL: Record<string, string> = {
+  male: "male",
+  female: "female",
+  non_binary: "non-binary",
+};
+
+const BODY_TYPE_LABEL: Record<string, string> = {
+  slim: "slim build",
+  average: "average build",
+  athletic: "athletic build",
+  curvy: "curvy build",
+  plus_size: "plus-size build",
+};
+
+/** Map hex skin-tone color to a descriptive label for the image prompt. */
+function hexToSkinToneLabel(hex: string): string {
+  const map: Record<string, string> = {
+    "#FDDBB4": "very light",
+    "#F1C27D": "light",
+    "#E0AC69": "medium-light",
+    "#C68642": "medium",
+    "#8D5524": "medium-dark",
+    "#5C3A1E": "dark",
+  };
+  return map[hex.toUpperCase()] ?? "natural";
+}
+
+/**
+ * Fallback: build a basic attribute-list prompt when OpenRouter is unavailable.
+ */
+function buildFallbackPrompt(attributes: PersonaAttributes): string {
+  const genderLabel = GENDER_LABEL[attributes.gender] ?? attributes.gender;
+  const ageLabel = AGE_LABEL[attributes.age] ?? attributes.age;
+  const bodyLabel = BODY_TYPE_LABEL[attributes.body_type] ?? attributes.body_type;
+  const ethnicityLabel = resolveEthnicityLabel(attributes);
+  const realAccessories = attributes.accessories.filter(
+    (a) => a.toLowerCase() !== "none",
+  );
+
+  const parts = [
+    "Casual iPhone front-camera selfie vlog, talking to camera, UGC creator style",
+    `${genderLabel} person of ${ethnicityLabel} ethnicity`,
+    ageLabel,
+    bodyLabel,
+    `${attributes.hair_color} ${attributes.hair_style.toLowerCase()} hair`,
+    `${attributes.eye_color.toLowerCase()} eyes`,
+    `wearing ${attributes.clothing_style.toLowerCase()} clothing`,
+    ...(realAccessories.length > 0 ? [`with ${realAccessories.join(", ").toLowerCase()}`] : []),
+    "natural window light, authentic imperfections, realistic, 4K, upper body shot",
+  ];
+
+  return parts.join(", ");
+}
+
+/* ------------------------------------------------------------------ */
+/*  Scene prompt generation via OpenRouter                            */
+/* ------------------------------------------------------------------ */
+
+const SCENE_PROMPT_SYSTEM = `You are an expert AI image prompt writer specializing in authentic UGC (user-generated content) style photography for social media ads.
+
+Given a persona's attributes, write a scene description for an AI image generator. Your job is to describe ONLY the setting, background, lighting, and vibe — NOT the person's appearance. Physical traits are provided separately and will be prepended to your output.
+
+Your scene description must:
+- Describe a casual handheld iPhone front-camera selfie vlog aesthetic
+- Set a believable background/setting that fits the persona's demographic and clothing style
+- Include authentic imperfections: slight hand shake, imperfect framing, natural lighting variance
+- Feel like a real person filming a quick social media update, NOT a professional shoot
+- Be 2–3 sentences focused purely on scene, setting, and mood
+
+Scene rules:
+- Camera: arm's-length iPhone front camera, slight wide-angle distortion
+- Lighting: natural window light or soft warm indoor light
+- Background: hints at personality (modern apartment, cozy café, outdoors, home office) — match the clothing style
+- Expression hint: candid "talking to camera", warm approachable energy
+- Props: 1–2 natural props max (coffee cup, phone, earbuds, etc.)
+
+CRITICAL: Do NOT mention hair color, eye color, skin tone, or any specific physical appearance in your output. Those are handled separately.
+
+Example of a great output:
+"Casual handheld iPhone front-camera selfie, filming at arm's length with slight wide-angle distortion and natural window light. Modern apartment in the background — clean lines, soft daylight, lived-in feel. Candid talking-to-camera energy, slight hand shake, looks like a real creator filming a quick update."
+
+Return ONLY the scene description. No explanation, no surrounding quotes, no prefix.`;
+
+/** Resolve the best ethnicity/skin description from attributes. */
+function resolveEthnicityLabel(attributes: PersonaAttributes): string {
+  if (attributes.ethnicity) return attributes.ethnicity;
+  if (attributes.skin_tone) return hexToSkinToneLabel(attributes.skin_tone) + " skin tone";
+  return "natural skin tone";
+}
+
+/**
+ * Build a human-readable attribute summary to feed into OpenRouter.
+ */
+function buildAttributeSummary(attributes: PersonaAttributes): string {
+  const ethnicityLabel = resolveEthnicityLabel(attributes);
+  const realAccessories = attributes.accessories.filter(
+    (a) => a.toLowerCase() !== "none",
+  );
+  return [
+    `Gender: ${GENDER_LABEL[attributes.gender] ?? attributes.gender}`,
+    `Age: ${AGE_LABEL[attributes.age] ?? attributes.age}`,
+    `Ethnicity: ${ethnicityLabel}`,
+    `Hair: ${attributes.hair_color} ${attributes.hair_style}`,
+    `Eyes: ${attributes.eye_color}`,
+    `Body type: ${BODY_TYPE_LABEL[attributes.body_type] ?? attributes.body_type}`,
+    `Clothing style: ${attributes.clothing_style}`,
+    realAccessories.length > 0 ? `Accessories: ${realAccessories.join(", ")}` : null,
+  ].filter(Boolean).join("\n");
+}
+
+/**
+ * Use OpenRouter to generate a rich UGC scene prompt from persona attributes.
+ * Falls back to buildFallbackPrompt() if the LLM call fails.
+ */
+async function generateScenePrompt(
+  attributes: PersonaAttributes,
+): Promise<{ prompt: string; generated: boolean }> {
+  try {
+    const summary = buildAttributeSummary(attributes);
+    const prompt = await callOpenRouter(
+      [
+        { role: "system", content: SCENE_PROMPT_SYSTEM },
+        { role: "user", content: `Generate a UGC selfie scene prompt for this persona:\n\n${summary}` },
+      ],
+      { maxTokens: 300, timeoutMs: 20000 },
+    );
+    // Strip any accidental surrounding quotes the model might add
+    const cleaned = prompt.trim().replace(/^["']|["']$/g, "");
+    // If LLM returned empty content, fall back
+    if (!cleaned) {
+      return { prompt: buildFallbackPrompt(attributes), generated: false };
+    }
+    return { prompt: cleaned, generated: true };
+  } catch (err) {
+    console.error("Scene prompt generation failed, using fallback:", err);
+    return { prompt: buildFallbackPrompt(attributes), generated: false };
+  }
+}
+
+/**
+ * Build the final Gemini image prompt with physical attributes FIRST.
+ * Placing mandatory appearance at the top ensures Gemini honours every
+ * trait — hair colour, eye colour, skin tone, etc. — before reading the
+ * scene description, which only sets background/lighting/vibe.
+ */
+function buildImagePrompt(attributes: PersonaAttributes, scenePrompt: string): string {
+  const genderLabel = GENDER_LABEL[attributes.gender] ?? attributes.gender;
+  const ageLabel = AGE_LABEL[attributes.age] ?? attributes.age;
+  const bodyLabel = BODY_TYPE_LABEL[attributes.body_type] ?? attributes.body_type;
+  const realAccessories = attributes.accessories.filter(
+    (a) => a.toLowerCase() !== "none",
+  );
+
+  const ethnicityLabel = resolveEthnicityLabel(attributes);
+
+  // Physical appearance block — listed first so Gemini weights it highest.
+  const appearanceBlock = [
+    `MANDATORY SUBJECT APPEARANCE — render EXACTLY as specified below. Every attribute is NON-NEGOTIABLE. Do NOT substitute, alter, or omit any trait:`,
+    `• Gender: ${genderLabel.toUpperCase()}`,
+    `• Age: ${ageLabel}`,
+    `• Ethnicity: ${ethnicityLabel.toUpperCase()} — REQUIRED, render with correct facial features and skin tone for this ethnicity`,
+    `• Body: ${bodyLabel}`,
+    `• Hair: ${attributes.hair_color.toUpperCase()} ${attributes.hair_style} hair — this colour is REQUIRED`,
+    `• Eyes: ${attributes.eye_color.toUpperCase()} eyes — this colour is REQUIRED`,
+    `• Clothing: ${attributes.clothing_style} style`,
+    ...(realAccessories.length > 0 ? [`• Accessories: ${realAccessories.join(", ")}`] : []),
+  ].join("\n");
+
+  return `${appearanceBlock}\n\nScene / setting (background and lighting only — do NOT change the person's appearance):\n${scenePrompt}`;
+}
+
+/* ------------------------------------------------------------------ */
+/*  NanoBanana API                                                    */
+/* ------------------------------------------------------------------ */
+
+/** Generate persona images via Gemini (NanoBanana 2), with retry. */
+function generateImages(prompt: string): Promise<GeneratedImage[]> {
+  return withRetry(() => generateImagesFromPrompt(prompt, 2), 3, 500);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Edge Function handler                                             */
+/* ------------------------------------------------------------------ */
+
+Deno.serve(async (req: Request) => {
+  const cors = getCorsHeaders(req);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+
+  try {
+    if (req.method !== "POST") {
+      return json({ detail: "Method not allowed" }, cors, 405);
+    }
+
+    const userId = await requireUserId(req);
+    const sb = getAdminClient();
+
+    const { name, attributes, persona_id } = await req.json();
+
+    if (!name || typeof name !== "string") {
+      return json({ detail: "name is required" }, cors, 400);
+    }
+    if (!attributes || typeof attributes !== "object" || Array.isArray(attributes)) {
+      return json({ detail: "attributes object is required" }, cors, 400);
+    }
+
+    // Validate attributes
+    const validationError = validateAttributes(attributes as Record<string, unknown>);
+    if (validationError) {
+      return json({ detail: validationError }, cors, 400);
+    }
+
+    const validAttrs = attributes as PersonaAttributes;
+    const isRegeneration = typeof persona_id === "string" && persona_id.length > 0;
+
+    // Fetch profile once — used for slot limit + regen rate limit
+    const { data: profile } = await sb
+      .from("profiles")
+      .select("plan, role")
+      .eq("id", userId)
+      .single();
+    const plan = profile?.plan ?? "free";
+    const isAdmin = profile?.role === "admin";
+
+    // If regenerating, verify the persona exists and belongs to the user
+    let existingRegenCount = 0;
+    if (isRegeneration) {
+      const { data: existing } = await sb
+        .from("personas")
+        .select("id, owner_id, regen_count")
+        .eq("id", persona_id)
+        .single();
+      if (!existing || existing.owner_id !== userId) {
+        return json({ detail: "Persona not found" }, cors, 404);
+      }
+      existingRegenCount = existing.regen_count ?? 0;
+      // Free-tier rate limit: cap at FREE_REGEN_LIMIT regenerations per persona
+      if (!isAdmin && plan === "free" && existingRegenCount >= FREE_REGEN_LIMIT) {
+        return json(
+          {
+            detail:
+              "You've reached the free-tier image limit for this persona. " +
+              "Upgrade to regenerate more images.",
+          },
+          cors,
+          429,
+        );
+      }
+    }
+
+    // Check plan persona slots (skip for regeneration — not creating a new slot)
+    if (!isRegeneration) {
+      const maxPersonas = PERSONA_LIMITS[plan] ?? 0;
+
+      if (!isAdmin) {
+        const { count: currentCount } = await sb
+          .from("personas")
+          .select("id", { count: "exact", head: true })
+          .eq("owner_id", userId)
+          .eq("is_active", true);
+
+        if ((currentCount ?? 0) >= maxPersonas) {
+          return json(
+            {
+              detail:
+                plan === "free"
+                  ? `You can create 1 persona on the free plan. Upgrade to add more.`
+                  : `Your ${plan} plan allows up to ${maxPersonas} persona(s). Upgrade to add more.`,
+            },
+            cors,
+            403,
+          );
+        }
+      }
+    }
+
+    // Generate rich UGC scene prompt via OpenRouter (falls back to basic descriptor)
+    const { prompt: scenePrompt, generated: promptGenerated } = await generateScenePrompt(validAttrs);
+    console.log(`Scene prompt (${promptGenerated ? "LLM" : "fallback"}):`, scenePrompt);
+
+    // Build final image prompt: scene context + explicit physical attributes pinned
+    // This guarantees Gemini renders the correct skin tone, gender, hair, etc.
+    const imagePrompt = buildImagePrompt(validAttrs, scenePrompt);
+    console.log("Image prompt:", imagePrompt);
+
+    // Generate images via Gemini / NanoBanana 2 (with retry)
+    const images = await generateImages(imagePrompt);
+
+    // Upload all generated images in parallel
+    const uploadResults = await Promise.all(
+      images.map(async (image) => {
+        const ext = image.mimeType.includes("png") ? "png" : "jpg";
+        const storagePath = `${userId}/${crypto.randomUUID()}.${ext}`;
+        const { error: uploadErr } = await sb.storage
+          .from("persona-images")
+          .upload(storagePath, image.data, {
+            contentType: image.mimeType,
+            upsert: false,
+          });
+        if (uploadErr) {
+          console.error(`Persona image upload failed: ${uploadErr.message}`);
+          return null;
+        }
+        return storagePath;
+      }),
+    );
+
+    const storagePaths = uploadResults.filter(Boolean) as string[];
+    if (storagePaths.length === 0) {
+      throw new Error("All image uploads failed");
+    }
+
+    // Batch-sign all paths in a single request
+    const { data: signedData } = await sb.storage
+      .from("persona-images")
+      .createSignedUrls(storagePaths, 3600);
+    const signedUrls = (signedData ?? [])
+      .map((d) => d.signedUrl)
+      .filter(Boolean) as string[];
+
+    // Persist scene_prompt alongside attributes so generate-video can reuse it
+    const attributesToSave = { ...validAttrs, scene_prompt: scenePrompt };
+
+    // Save persona record  -  UPDATE on regeneration, INSERT on new creation
+    let persona;
+    if (isRegeneration) {
+      const { data, error } = await sb
+        .from("personas")
+        .update({
+          name,
+          attributes: attributesToSave,
+          generated_images: storagePaths,
+          selected_image_url: null, // reset selection on regeneration
+          regen_count: existingRegenCount + 1,
+        })
+        .eq("id", persona_id)
+        .eq("owner_id", userId)
+        .select("id, name, attributes, generated_images, selected_image_url")
+        .single();
+      if (error) throw new Error(`DB update failed: ${error.message}`);
+      persona = data;
+    } else {
+      const { data, error } = await sb
+        .from("personas")
+        .insert({
+          owner_id: userId,
+          name,
+          attributes: attributesToSave,
+          generated_images: storagePaths,
+          selected_image_url: null,
+          is_active: true,
+          regen_count: 1,
+        })
+        .select("id, name, attributes, generated_images, selected_image_url")
+        .single();
+      if (error) throw new Error(`DB insert failed: ${error.message}`);
+      persona = data;
+    }
+
+    // Return signed URLs to the frontend for immediate display
+    return json(
+      {
+        data: {
+          ...persona,
+          generated_image_urls: signedUrls,
+        },
+      },
+      cors,
+      201,
+    );
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg === "Unauthorized") {
+      return json({ detail: "Authentication required" }, cors, 401);
+    }
+
+    // Return actionable messages for known upstream/config failures so the UI
+    // can show the real cause instead of a generic 500.
+    if (
+      msg.includes("NANOBANANA_API_KEY") ||
+      msg.includes("NanoBanana") ||
+      msg.includes("OpenRouter")
+    ) {
+      console.error("generate-persona upstream/config error:", e);
+      return json({ detail: msg }, cors, 502);
+    }
+
+    console.error("generate-persona error:", e);
+    return json({ detail: msg || "Failed to generate persona. Please try again." }, cors, 500);
+  }
+});
