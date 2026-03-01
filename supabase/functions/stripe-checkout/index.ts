@@ -12,17 +12,24 @@ const stripe = new Stripe(STRIPE_SECRET_KEY, {
   httpClient: Stripe.createFetchHttpClient(),
 });
 
-/** Subscription plan → Stripe recurring Price ID */
-const PLAN_PRICE_IDS: Record<string, string | undefined> = {
+/** Subscription plan → Stripe recurring Price ID (monthly) */
+const PLAN_PRICE_IDS_MONTHLY: Record<string, string | undefined> = {
   starter: Deno.env.get("STRIPE_PRICE_STARTER"),
   growth: Deno.env.get("STRIPE_PRICE_GROWTH"),
   scale: Deno.env.get("STRIPE_PRICE_SCALE"),
 };
 
-const PLAN_NAMES: Record<string, string> = {
-  starter: "Starter ($25/mo)",
-  growth: "Growth ($80/mo)",
-  scale: "Scale ($180/mo)",
+/** Subscription plan → Stripe recurring Price ID (annual) */
+const PLAN_PRICE_IDS_ANNUAL: Record<string, string | undefined> = {
+  starter: Deno.env.get("STRIPE_PRICE_STARTER_ANNUAL"),
+  growth: Deno.env.get("STRIPE_PRICE_GROWTH_ANNUAL"),
+  scale: Deno.env.get("STRIPE_PRICE_SCALE_ANNUAL"),
+};
+
+const PLAN_NAMES: Record<string, Record<string, string>> = {
+  starter: { monthly: "Starter ($25/mo)", annual: "Starter Annual ($20/mo)" },
+  growth:  { monthly: "Growth ($80/mo)",  annual: "Growth Annual ($64/mo)"  },
+  scale:   { monthly: "Scale ($180/mo)",  annual: "Scale Annual ($144/mo)"  },
 };
 
 /** Credit pack → Stripe one-time Price ID */
@@ -30,12 +37,17 @@ const PACK_PRICE_IDS: Record<string, string | undefined> = {
   pack_10: Deno.env.get("STRIPE_PRICE_PACK_10"),
   pack_30: Deno.env.get("STRIPE_PRICE_PACK_30"),
   pack_100: Deno.env.get("STRIPE_PRICE_PACK_100"),
+  // Single-video paywall purchases
+  single_standard: Deno.env.get("STRIPE_PRICE_SINGLE_STANDARD"),
+  single_hd: Deno.env.get("STRIPE_PRICE_SINGLE_HD"),
 };
 
 const PACK_NAMES: Record<string, string> = {
   pack_10: "10 Credits: Starter Pack ($12)",
   pack_30: "30 Credits: Creator Pack ($33)",
   pack_100: "100 Credits: Pro Pack ($95)",
+  single_standard: "5 Credits: Single Standard Video ($5)",
+  single_hd: "10 Credits: Single HD Video ($10)",
 };
 
 /**
@@ -58,7 +70,8 @@ Deno.serve(async (req: Request) => {
     const sb = getAdminClient();
 
     const body = await req.json();
-    const { plan, pack, couponId } = body;
+    const { plan, pack, couponId, billing } = body;
+    const isAnnual = billing === "annual";
 
     if (!plan && !pack) {
       return json({ detail: "Provide either 'plan' or 'pack'" }, cors, 400);
@@ -135,20 +148,28 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── Subscription ──────────────────────────────────────────────────────────
-    const priceId = PLAN_PRICE_IDS[plan];
+    const priceIdMap = isAnnual ? PLAN_PRICE_IDS_ANNUAL : PLAN_PRICE_IDS_MONTHLY;
+    const priceId = priceIdMap[plan];
     if (!priceId) {
-      console.error(`Stripe price ID not configured for plan: ${plan}`);
-      return json(
-        { detail: "Checkout is not available right now. Please try again later." },
-        cors,
-        503,
-      );
+      // Fallback to monthly if annual not configured
+      const fallback = PLAN_PRICE_IDS_MONTHLY[plan];
+      if (!fallback) {
+        console.error(`Stripe price ID not configured for plan: ${plan} (${billing ?? "monthly"})`);
+        return json(
+          { detail: "Checkout is not available right now. Please try again later." },
+          cors,
+          503,
+        );
+      }
+      console.warn(`Annual price not configured for ${plan}, falling back to monthly`);
     }
+    const resolvedPriceId = priceId ?? PLAN_PRICE_IDS_MONTHLY[plan]!;
+    const planName = PLAN_NAMES[plan]?.[isAnnual ? "annual" : "monthly"] ?? plan;
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       customer: stripeCustomerId,
       mode: "subscription",
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: [{ price: resolvedPriceId, quantity: 1 }],
       success_url: `${FRONTEND_URL}/dashboard?checkout=success&plan=${plan}`,
       cancel_url: `${FRONTEND_URL}/pricing?checkout=canceled`,
       subscription_data: {
@@ -159,6 +180,7 @@ Deno.serve(async (req: Request) => {
         plan,
       },
     };
+    void planName; // used for logging only
 
     if (validatedCoupon) {
       sessionParams.discounts = [{ coupon: validatedCoupon }];

@@ -17,11 +17,13 @@ const PLAN_CREDITS: Record<string, number> = {
   scale: 250,
 };
 
-/** Credit amounts per one-time pack purchase (matches CREDIT_PACKS in lib/stripe.ts). */
+/** Credit amounts per one-time pack purchase (matches CREDIT_PACKS + SINGLE_VIDEO_PACKS in lib/stripe.ts). */
 const PACK_CREDITS: Record<string, number> = {
-  pack_10: 10,   // $12
-  pack_30: 30,   // $33
-  pack_100: 100, // $95
+  pack_10: 10,          // $12
+  pack_30: 30,          // $33
+  pack_100: 100,        // $95
+  single_standard: 5,   // $5  – single standard video (Kling 2.6)
+  single_hd: 10,        // $10 – single HD video (Kling 3.0)
 };
 
 /** NOTE: No auth middleware  -  this endpoint uses Stripe webhook signature verification. */
@@ -233,12 +235,15 @@ Deno.serve(async (req: Request) => {
         // Try price ID lookup first (most reliable), then metadata fallback
         let plan: string | null = null;
         if (priceId) {
-          const priceStarter = Deno.env.get("STRIPE_PRICE_STARTER");
-          const priceGrowth = Deno.env.get("STRIPE_PRICE_GROWTH");
-          const priceScale = Deno.env.get("STRIPE_PRICE_SCALE");
-          if (priceId === priceStarter) plan = "starter";
-          else if (priceId === priceGrowth) plan = "growth";
-          else if (priceId === priceScale) plan = "scale";
+          const priceStarter        = Deno.env.get("STRIPE_PRICE_STARTER");
+          const priceGrowth         = Deno.env.get("STRIPE_PRICE_GROWTH");
+          const priceScale          = Deno.env.get("STRIPE_PRICE_SCALE");
+          const priceStarterAnnual  = Deno.env.get("STRIPE_PRICE_STARTER_ANNUAL");
+          const priceGrowthAnnual   = Deno.env.get("STRIPE_PRICE_GROWTH_ANNUAL");
+          const priceScaleAnnual    = Deno.env.get("STRIPE_PRICE_SCALE_ANNUAL");
+          if (priceId === priceStarter || priceId === priceStarterAnnual) plan = "starter";
+          else if (priceId === priceGrowth || priceId === priceGrowthAnnual) plan = "growth";
+          else if (priceId === priceScale || priceId === priceScaleAnnual) plan = "scale";
         }
         // Fallback to metadata
         if (!plan) {
