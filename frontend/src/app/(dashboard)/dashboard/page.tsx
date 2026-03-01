@@ -1,7 +1,5 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -128,7 +126,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user } }: { data: { user: { user_metadata?: Record<string, string>; email?: string } | null } }) => {
       if (user?.user_metadata?.full_name) {
         setFirstName(user.user_metadata.full_name.split(" ")[0]);
       } else if (user?.email) {
@@ -140,7 +138,7 @@ export default function DashboardPage() {
       .select("id")
       .eq("status", "confirmed")
       .limit(1)
-      .then(({ data }) => {
+      .then(({ data }: { data: { id: string }[] | null }) => {
         setHasProduct((data ?? []).length > 0);
       });
   }, []);
@@ -218,14 +216,7 @@ export default function DashboardPage() {
                   <Loader2 className="size-5 animate-spin" />
                 ) : (
                   <>
-                    {isUnlimitedCredits ? (
-                      "Unlimited"
-                    ) : (
-                      <>
-                        {creditsRemaining}
-                        <span className="text-lg text-muted-foreground">/{creditsTotal}</span>
-                      </>
-                    )}
+                    {isUnlimitedCredits ? "Unlimited" : creditsRemaining}
                   </>
                 )}
               </p>
