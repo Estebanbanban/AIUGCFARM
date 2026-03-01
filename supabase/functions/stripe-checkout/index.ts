@@ -15,21 +15,15 @@ const stripe = new Stripe(STRIPE_SECRET_KEY, {
 /** Subscription plan → Stripe recurring Price ID (monthly) */
 const PLAN_PRICE_IDS_MONTHLY: Record<string, string | undefined> = {
   starter: Deno.env.get("STRIPE_PRICE_STARTER"),
-  growth: Deno.env.get("STRIPE_PRICE_GROWTH"),
-  scale: Deno.env.get("STRIPE_PRICE_SCALE"),
+  growth:  Deno.env.get("STRIPE_PRICE_GROWTH"),
+  scale:   Deno.env.get("STRIPE_PRICE_SCALE"),
 };
 
-/** Subscription plan → Stripe recurring Price ID (annual) */
-const PLAN_PRICE_IDS_ANNUAL: Record<string, string | undefined> = {
-  starter: Deno.env.get("STRIPE_PRICE_STARTER_ANNUAL"),
-  growth: Deno.env.get("STRIPE_PRICE_GROWTH_ANNUAL"),
-  scale: Deno.env.get("STRIPE_PRICE_SCALE_ANNUAL"),
-};
-
-const PLAN_NAMES: Record<string, Record<string, string>> = {
-  starter: { monthly: "Starter ($25/mo)", annual: "Starter Annual ($20/mo)" },
-  growth:  { monthly: "Growth ($80/mo)",  annual: "Growth Annual ($64/mo)"  },
-  scale:   { monthly: "Scale ($180/mo)",  annual: "Scale Annual ($144/mo)"  },
+/** Subscription plan → Stripe recurring Price ID (annual — hardcoded as fallback) */
+const PLAN_PRICE_IDS_ANNUAL: Record<string, string> = {
+  starter: Deno.env.get("STRIPE_PRICE_STARTER_ANNUAL") ?? "price_1T661MDofGNcXNHKPIpj3KOE",
+  growth:  Deno.env.get("STRIPE_PRICE_GROWTH_ANNUAL")  ?? "price_1T662PDofGNcXNHKinIVq4Ft",
+  scale:   Deno.env.get("STRIPE_PRICE_SCALE_ANNUAL")   ?? "price_1T663BDofGNcXNHKAymouo25",
 };
 
 /** Credit pack → Stripe one-time Price ID */
@@ -148,23 +142,18 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── Subscription ──────────────────────────────────────────────────────────
-    const priceIdMap = isAnnual ? PLAN_PRICE_IDS_ANNUAL : PLAN_PRICE_IDS_MONTHLY;
-    const priceId = priceIdMap[plan];
-    if (!priceId) {
-      // Fallback to monthly if annual not configured
-      const fallback = PLAN_PRICE_IDS_MONTHLY[plan];
-      if (!fallback) {
-        console.error(`Stripe price ID not configured for plan: ${plan} (${billing ?? "monthly"})`);
-        return json(
-          { detail: "Checkout is not available right now. Please try again later." },
-          cors,
-          503,
-        );
-      }
-      console.warn(`Annual price not configured for ${plan}, falling back to monthly`);
+    const resolvedPriceId = isAnnual
+      ? PLAN_PRICE_IDS_ANNUAL[plan]
+      : PLAN_PRICE_IDS_MONTHLY[plan];
+
+    if (!resolvedPriceId) {
+      console.error(`Stripe price ID not configured for plan: ${plan} (${billing ?? "monthly"})`);
+      return json(
+        { detail: "Checkout is not available right now. Please try again later." },
+        cors,
+        503,
+      );
     }
-    const resolvedPriceId = priceId ?? PLAN_PRICE_IDS_MONTHLY[plan]!;
-    const planName = PLAN_NAMES[plan]?.[isAnnual ? "annual" : "monthly"] ?? plan;
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       customer: stripeCustomerId,
@@ -180,8 +169,6 @@ Deno.serve(async (req: Request) => {
         plan,
       },
     };
-    void planName; // used for logging only
-
     if (validatedCoupon) {
       sessionParams.discounts = [{ coupon: validatedCoupon }];
     } else {
