@@ -1,11 +1,14 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Circle, Package, User, Film } from "lucide-react";
+import { CheckCircle2, Circle, Package, User, Film, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+
+const SKIP_KEY = "onboarding-skipped";
 
 interface OnboardingChecklistProps {
   hasProduct: boolean;
@@ -47,6 +50,17 @@ export function OnboardingChecklist({
 }: OnboardingChecklistProps) {
   const props = { hasProduct, hasPersonaWithImage, hasCompletedGeneration };
   const completedCount = steps.filter((s) => props[s.propKey]).length;
+  const [tutorialSkipped, setTutorialSkipped] = useState(false);
+
+  useEffect(() => {
+    setTutorialSkipped(localStorage.getItem(SKIP_KEY) === "true");
+  }, []);
+
+  function handleResumeTutorial() {
+    localStorage.removeItem(SKIP_KEY);
+    setTutorialSkipped(false);
+    window.dispatchEvent(new CustomEvent("onboarding:resume"));
+  }
 
   if (completedCount === steps.length) return null;
 
@@ -67,6 +81,15 @@ export function OnboardingChecklist({
         />
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
+        {tutorialSkipped && (
+          <button
+            onClick={handleResumeTutorial}
+            className="flex w-fit items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+          >
+            <Sparkles className="size-3.5" />
+            Resume guided tutorial
+          </button>
+        )}
         {steps.map((step, index) => {
           const done = props[step.propKey];
           return (
