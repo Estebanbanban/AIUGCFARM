@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Clock,
@@ -68,16 +68,44 @@ function statusLabel(status: string): string {
   }
 }
 
+type HistoryStatusFilter = "all" | "in_progress" | "completed" | "failed";
+
+function toStatusFilter(status: GenerationStatus): Exclude<HistoryStatusFilter, "all"> {
+  if (status === "completed") return "completed";
+  if (status === "failed") return "failed";
+  return "in_progress";
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Main page                                                                 */
 /* -------------------------------------------------------------------------- */
 
 export default function HistoryPage() {
   const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>("all");
   const { data, isLoading, error } = useGenerationHistory(page);
 
   const generations = data?.generations ?? [];
   const pagination = data?.pagination;
+  const statusCounts = useMemo(() => {
+    const counts = {
+      all: generations.length,
+      in_progress: 0,
+      completed: 0,
+      failed: 0,
+    };
+
+    for (const generation of generations) {
+      counts[toStatusFilter(generation.status)] += 1;
+    }
+
+    return counts;
+  }, [generations]);
+
+  const filteredGenerations = useMemo(() => {
+    if (statusFilter === "all") return generations;
+    return generations.filter((generation) => toStatusFilter(generation.status) === statusFilter);
+  }, [generations, statusFilter]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -148,8 +176,49 @@ export default function HistoryPage() {
       {/* Generation cards */}
       {!isLoading && generations.length > 0 && (
         <>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant={statusFilter === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setStatusFilter("all")}
+            >
+              All ({statusCounts.all})
+            </Button>
+            <Button
+              variant={statusFilter === "in_progress" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setStatusFilter("in_progress")}
+            >
+              In Progress ({statusCounts.in_progress})
+            </Button>
+            <Button
+              variant={statusFilter === "completed" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setStatusFilter("completed")}
+            >
+              Completed ({statusCounts.completed})
+            </Button>
+            <Button
+              variant={statusFilter === "failed" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setStatusFilter("failed")}
+            >
+              Failed ({statusCounts.failed})
+            </Button>
+          </div>
+
+          {filteredGenerations.length === 0 && (
+            <Card>
+              <CardContent className="py-8">
+                <p className="text-sm text-muted-foreground">
+                  No videos found for this status on this page.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {generations.map((gen) => {
+            {filteredGenerations.map((gen) => {
               const cost = calculateGenerationCost(
                 gen.videos,
                 gen.video_quality,
