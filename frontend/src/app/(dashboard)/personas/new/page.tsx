@@ -683,9 +683,13 @@ function NewPersonaPageInner() {
         },
       });
 
+      const displayUrls = result.data.generated_image_urls ?? result.data.generated_images;
+      store.setField("name", personaName.trim());
+      store.setPersonaId(result.data.id);
+      store.setGeneratedImages(displayUrls);
       queryClient.invalidateQueries({ queryKey: ["personas"] });
       toast.success("Persona generated! Select your favorite image below.");
-      router.push(`/personas/${result.data.id}`);
+      setCreateMode("custom");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to generate persona";
       toast.error(msg);

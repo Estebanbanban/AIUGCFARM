@@ -8,7 +8,7 @@ import Image from 'next/image';
 import {
   Loader2, Sparkles, Check, User, ImageIcon, X,
   ChevronDown, ChevronUp, Eye, Palette, Clock,
-  Shirt, Watch, Type, LayoutGrid, Wand2,
+  Shirt, Watch, Wand2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -516,7 +516,7 @@ function ImageCard({
             src={imageSrc}
             alt=""
             aria-hidden="true"
-            loading="lazy"
+            loading="eager"
             decoding="async"
             className="absolute inset-0 h-full w-full object-cover"
             onError={(e) => { e.currentTarget.style.display = "none"; }}
@@ -577,8 +577,6 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
   const store = usePersonaBuilderStore();
   const queryClient = useQueryClient();
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<number>>(new Set());
-  const [builderMode, setBuilderMode] = useState<'visual' | 'text'>('visual');
-  const [textPrompt, setTextPrompt] = useState('');
   const [createMode, setCreateMode] = useState<'quick' | 'custom'>('quick');
   const [quickDescription, setQuickDescription] = useState('');
   const [isGeneratingQuick, setIsGeneratingQuick] = useState(false);
@@ -617,9 +615,11 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
         body: { name: store.name.trim(), description: quickDescription.trim() },
       });
 
+      const displayUrls = result.data.generated_image_urls ?? result.data.generated_images;
+      store.setPersonaId(result.data.id);
+      store.setGeneratedImages(displayUrls);
       queryClient.invalidateQueries({ queryKey: ['personas'] });
-      toast.success('Persona generated! Select your image below.');
-      onSaved(result.data.id);
+      toast.success('Persona generated! Select your preferred image below.');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to generate persona';
       toast.error(msg);
@@ -654,39 +654,6 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
         body: {
           name: store.name,
           attributes,
-          ...(store.personaId ? { persona_id: store.personaId } : {}),
-        },
-      });
-
-      const displayUrls = result.data.generated_image_urls ?? result.data.generated_images;
-      store.setPersonaId(result.data.id);
-      store.setGeneratedImages(displayUrls);
-      toast.success(`${displayUrls.length} persona images generated!`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to generate persona');
-    } finally {
-      store.setIsGenerating(false);
-    }
-  }
-
-  async function handleGenerateFromText() {
-    if (!textPrompt.trim()) return;
-    store.setIsGenerating(true);
-    setImageLoadErrors(new Set());
-    toast.info('Generating persona from description…');
-
-    try {
-      const result = await callEdge<{
-        data: { id: string; generated_images: string[]; generated_image_urls: string[] };
-      }>('generate-persona', {
-        body: {
-          name: store.name || 'Custom Persona',
-          custom_prompt: textPrompt,
-          attributes: {
-            gender: store.gender,
-            ethnicity: store.ethnicity,
-            age: store.ageRange,
-          },
           ...(store.personaId ? { persona_id: store.personaId } : {}),
         },
       });
@@ -802,80 +769,8 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
               </div>
             )}
 
-            {/* Custom mode: the full visual / text builder */}
+            {/* Custom mode: the full visual builder */}
             {createMode === 'custom' && (<>
-
-            {/* Mode toggle */}
-            <div className="flex rounded-lg border border-border bg-muted/50 p-1">
-              <button
-                type="button"
-                onClick={() => setBuilderMode('visual')}
-                className={cn(
-                  'flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                  builderMode === 'visual'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <LayoutGrid className="size-3.5" />
-                Visual Builder
-              </button>
-              <button
-                type="button"
-                onClick={() => setBuilderMode('text')}
-                className={cn(
-                  'flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                  builderMode === 'text'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <Type className="size-3.5" />
-                Describe in text
-              </button>
-            </div>
-
-            {builderMode === 'text' ? (
-              <div className="flex flex-col gap-4 p-4">
-                <div>
-                  <Label className="text-sm font-medium">Describe your ideal persona</Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Describe appearance, style, and vibe in plain language
-                  </p>
-                </div>
-                <Textarea
-                  value={textPrompt}
-                  onChange={(e) => setTextPrompt(e.target.value)}
-                  placeholder="e.g. Young athletic woman, 25-30, dark curly hair, confident and energetic, wearing activewear"
-                  rows={4}
-                  className="resize-none"
-                />
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Persona Name
-                  </Label>
-                  <Input
-                    placeholder="e.g. Sophie, Marcus"
-                    value={store.name}
-                    onChange={(e) => store.setField('name', e.target.value)}
-                  />
-                </div>
-                <Button onClick={handleGenerateFromText} disabled={!textPrompt.trim() || store.isGenerating}>
-                  {store.isGenerating ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin" />
-                      Generating…
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="size-4" />
-                      Generate Persona
-                    </>
-                  )}
-                </Button>
-              </div>
-            ) : (
-            <>
 
             {/* Gender */}
             <Section icon={<User className="size-4" />} label="Gender" count={1}>
@@ -1026,9 +921,6 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                 })}
               </div>
             </Section>
-
-            </>
-            )}
 
             </>) /* end createMode === 'custom' */}
 
