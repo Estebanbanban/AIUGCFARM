@@ -49,6 +49,18 @@ interface PersonaAttributes {
   accessories: string[];
 }
 
+const FALLBACK_ATTRIBUTES: PersonaAttributes = {
+  gender: "female",
+  age: "25_35",
+  ethnicity: "mixed",
+  hair_color: "brown",
+  hair_style: "casual straight",
+  eye_color: "brown",
+  body_type: "average",
+  clothing_style: "casual modern",
+  accessories: [],
+};
+
 /**
  * Validate the incoming attributes object. Returns a user-friendly error
  * message if validation fails, or `null` when the input is valid.
@@ -331,8 +343,8 @@ function buildImagePrompt(attributes: PersonaAttributes, scenePrompt: string): s
 /* ------------------------------------------------------------------ */
 
 /** Generate persona images via Gemini (NanoBanana 2), with retry. */
-function generateImages(prompt: string): Promise<GeneratedImage[]> {
-  return withRetry(() => generateImagesFromPrompt(prompt, 2), 3, 500);
+function generateImages(prompt: string, count = 2): Promise<GeneratedImage[]> {
+  return withRetry(() => generateImagesFromPrompt(prompt, count), 3, 500);
 }
 
 /* ------------------------------------------------------------------ */
@@ -351,7 +363,11 @@ Deno.serve(async (req: Request) => {
     const userId = await requireUserId(req);
     const sb = getAdminClient();
 
-    const { name, attributes, description, persona_id } = await req.json();
+    const req_body = await req.json();
+    const { name, attributes, description, persona_id } = req_body;
+    const imageCount = typeof req_body.image_count === "number"
+      ? Math.min(Math.max(1, req_body.image_count), 2)
+      : 2;
 
     // Description mode: use OpenRouter to parse free-form description into structured attributes
     let resolvedAttributes = attributes;
@@ -359,13 +375,15 @@ Deno.serve(async (req: Request) => {
       if (!resolvedAttributes || Object.keys(resolvedAttributes ?? {}).length === 0) {
         try {
           resolvedAttributes = await descriptionToAttributes(description.trim());
+          // Validate after parsing and fall back if invalid
+          const valErr = validateAttributes(resolvedAttributes as Record<string, unknown>);
+          if (valErr) {
+            console.warn("descriptionToAttributes returned invalid attrs:", valErr, "using fallback");
+            resolvedAttributes = { ...FALLBACK_ATTRIBUTES };
+          }
         } catch (err) {
-          console.error("Failed to parse description into attributes:", err);
-          return json(
-            { detail: "Could not understand the persona description. Please try again or use manual attribute selection." },
-            cors,
-            400,
-          );
+          console.error("Failed to parse description, using fallback:", err);
+          resolvedAttributes = { ...FALLBACK_ATTRIBUTES };
         }
       }
     }
@@ -377,14 +395,23 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "Either 'attributes' or 'description' is required" }, cors, 400);
     }
 
-    // Validate attributes
+    // Validate attributes — fix missing/invalid fields with fallback values instead of 400
     const validationError = validateAttributes(resolvedAttributes as Record<string, unknown>);
     if (validationError) {
-      return json({ detail: validationError }, cors, 400);
+      console.warn("Attribute validation failed:", validationError, "— merging with fallback");
+      resolvedAttributes = { ...FALLBACK_ATTRIBUTES, ...resolvedAttributes };
+      // Re-validate after merge; if still invalid, use pure fallback
+      const revalidationError = validateAttributes(resolvedAttributes as Record<string, unknown>);
+      if (revalidationError) {
+        console.warn("Re-validation still failed:", revalidationError, "— using pure fallback");
+        resolvedAttributes = { ...FALLBACK_ATTRIBUTES };
+      }
     }
 
     const validAttrs = resolvedAttributes as PersonaAttributes;
-    const isRegeneration = typeof persona_id === "string" && persona_id.length > 0;
+    const hasPersonaId = typeof persona_id === "string" && persona_id.length > 0;
+    const isProgressiveAppend = hasPersonaId && imageCount === 1;
+    const isRegeneration = hasPersonaId && !isProgressiveAppend;
 
     // Fetch profile once — used for slot limit + regen rate limit
     const { data: profile } = await sb
@@ -395,18 +422,22 @@ Deno.serve(async (req: Request) => {
     const plan = profile?.plan ?? "free";
     const isAdmin = profile?.role === "admin";
 
-    // If regenerating, verify the persona exists and belongs to the user
+    // If regenerating or appending, verify the persona exists and belongs to the user
     let existingRegenCount = 0;
-    if (isRegeneration) {
+    let existingGeneratedImages: string[] = [];
+    if (hasPersonaId) {
       const { data: existing } = await sb
         .from("personas")
-        .select("id, owner_id, regen_count")
+        .select("id, owner_id, regen_count, generated_images")
         .eq("id", persona_id)
         .single();
       if (!existing || existing.owner_id !== userId) {
         return json({ detail: "Persona not found" }, cors, 404);
       }
       existingRegenCount = existing.regen_count ?? 0;
+      existingGeneratedImages = Array.isArray(existing.generated_images)
+        ? existing.generated_images
+        : [];
       // Free-tier rate limit: cap at FREE_REGEN_LIMIT regenerations per persona
       if (!isAdmin && plan === "free" && existingRegenCount >= FREE_REGEN_LIMIT) {
         return json(
@@ -421,8 +452,8 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Check plan persona slots (skip for regeneration — not creating a new slot)
-    if (!isRegeneration) {
+    // Check plan persona slots (skip for regeneration/progressive append — not creating a new slot)
+    if (!isRegeneration && !isProgressiveAppend) {
       const maxPersonas = PERSONA_LIMITS[plan] ?? 0;
 
       if (!isAdmin) {
@@ -457,7 +488,7 @@ Deno.serve(async (req: Request) => {
     console.log("Image prompt:", imagePrompt);
 
     // Generate images via Gemini / NanoBanana 2 (with retry)
-    const images = await generateImages(imagePrompt);
+    const images = await generateImages(imagePrompt, imageCount);
 
     // Upload all generated images in parallel
     const uploadResults = await Promise.all(
@@ -494,9 +525,44 @@ Deno.serve(async (req: Request) => {
     // Persist scene_prompt alongside attributes so generate-video can reuse it
     const attributesToSave = { ...validAttrs, scene_prompt: scenePrompt };
 
-    // Save persona record  -  UPDATE on regeneration, INSERT on new creation
+    // Save persona record — UPDATE on regeneration, APPEND on progressive, INSERT on new
     let persona;
-    if (isRegeneration) {
+    if (isProgressiveAppend) {
+      // Progressive generation: append new image(s) to the existing persona's array
+      const mergedImages = [...existingGeneratedImages, ...storagePaths];
+      const { data, error } = await sb
+        .from("personas")
+        .update({
+          generated_images: mergedImages,
+          regen_count: existingRegenCount + 1,
+        })
+        .eq("id", persona_id)
+        .eq("owner_id", userId)
+        .select("id, name, attributes, generated_images, selected_image_url")
+        .single();
+      if (error) throw new Error(`DB update failed: ${error.message}`);
+
+      // Sign ALL images (existing + new) so the frontend gets the full set
+      const { data: allSignedData } = await sb.storage
+        .from("persona-images")
+        .createSignedUrls(mergedImages, 3600);
+      const allSignedUrls = (allSignedData ?? [])
+        .map((d) => d.signedUrl)
+        .filter(Boolean) as string[];
+
+      persona = data;
+      return json(
+        {
+          data: {
+            ...persona,
+            generated_image_urls: allSignedUrls,
+            attributes: validAttrs,
+          },
+        },
+        cors,
+        201,
+      );
+    } else if (isRegeneration) {
       const { data, error } = await sb
         .from("personas")
         .update({
@@ -536,6 +602,7 @@ Deno.serve(async (req: Request) => {
         data: {
           ...persona,
           generated_image_urls: signedUrls,
+          attributes: validAttrs,
         },
       },
       cors,
