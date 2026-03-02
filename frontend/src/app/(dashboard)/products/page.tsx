@@ -8,6 +8,7 @@ import {
   Loader2,
   LinkIcon,
   Upload,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -106,6 +107,7 @@ export default function ProductsPage() {
   const productLimit = PRODUCT_SLOT_LIMITS[plan];
   const productCount = products?.length ?? 0;
   const atProductLimit = !isAdmin && productCount >= productLimit;
+  const approachingLimit = !isAdmin && productCount >= productLimit * 0.8;
 
   async function handleScrape() {
     if (!importUrl.trim()) return;
@@ -202,9 +204,10 @@ export default function ProductsPage() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {atProductLimit && (
-            <Badge variant="outline" className="text-xs text-muted-foreground">
+            <Badge variant="outline" className={`text-xs ${approachingLimit ? 'bg-amber-500/10 text-amber-600 border-amber-500/30' : 'text-muted-foreground'}`}>
+              {atProductLimit && <AlertCircle className="size-3" />}
               {productCount}/{productLimit} products
             </Badge>
           )}

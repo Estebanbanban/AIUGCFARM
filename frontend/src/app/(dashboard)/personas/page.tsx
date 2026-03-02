@@ -148,7 +148,7 @@ export default function PersonasPage() {
 
       {/* Upgrade banner when at persona limit */}
       {!isLoading && atLimit && (
-        <Alert className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/50">
+        <Alert className="border-l-4 border-amber-500 bg-amber-500/10 dark:bg-amber-950/40">
           <Lock className="size-4 text-amber-600 dark:text-amber-400" />
           <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-amber-800 dark:text-amber-200">
@@ -191,10 +191,10 @@ export default function PersonasPage() {
 
             return (
               <Link key={persona.id} href={`/personas/${persona.id}`} className="block h-full">
-                <Card className="h-full cursor-pointer transition-colors hover:border-primary/30">
+                <Card className="group h-full cursor-pointer transition-colors hover:border-primary/30">
                   <CardContent className="flex flex-col items-center gap-4 p-6">
                     {/* Avatar / Image */}
-                    <div className="relative flex size-24 items-center justify-center rounded-full bg-muted overflow-hidden">
+                    <div className="relative flex size-28 items-center justify-center rounded-full bg-muted overflow-hidden">
                       {resolvedUrl === undefined ? (
                         <div className="absolute inset-0 overflow-hidden bg-muted">
                           <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-foreground/[0.06] to-transparent [animation:shimmer_1.5s_ease-in-out_infinite]" />
@@ -223,24 +223,24 @@ export default function PersonasPage() {
                     {/* Attribute Badges */}
                     <div className="flex flex-wrap justify-center gap-1.5">
                       {attrs.hair_color && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20">
                           {attrs.hair_color} hair
                         </Badge>
                       )}
                       {attrs.body_type && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20">
                           {attrs.body_type}
                         </Badge>
                       )}
                       {attrs.clothing_style && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="outline" className="text-xs bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20">
                           {attrs.clothing_style}
                         </Badge>
                       )}
                     </div>
                   </CardContent>
 
-                  <div className="flex items-center justify-center gap-2 px-6 pb-6">
+                  <div className="flex items-center justify-center gap-2 px-6 pb-6 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button
                       variant="outline"
                       size="sm"

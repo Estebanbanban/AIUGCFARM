@@ -3,7 +3,9 @@ import { requireUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
 import { checkKlingJob } from "../_shared/kling.ts";
+import { checkSoraJob } from "../_shared/sora.ts";
 import { refundCredits } from "../_shared/credits.ts";
+import { sendEmail } from "../_shared/email.ts";
 
 const COSTS = {
   standard: { single: 5, batch: 15 },
@@ -284,11 +286,14 @@ Deno.serve(async (req: Request) => {
       // Get the script for looking up variant_label and duration
       const script = gen.script as Record<string, Array<Record<string, unknown>>> | null;
 
-      // Poll all pending Kling jobs in parallel
+      // Poll all pending jobs in parallel — route by provider for backward compat
+      const videoProvider = (gen.video_provider ?? "kling") as "kling" | "sora";
       const pendingJobKeys = jobKeys.filter((k) => !completedKeys.has(k));
       const pollResults = await Promise.allSettled(
         pendingJobKeys.map(async (jobKey) => {
-          const klingResult = await checkKlingJob(jobIds[jobKey]);
+          const klingResult = videoProvider === "sora"
+            ? await checkSoraJob(jobIds[jobKey])
+            : await checkKlingJob(jobIds[jobKey]);
           return { jobKey, klingResult };
         })
       );
@@ -300,13 +305,13 @@ Deno.serve(async (req: Request) => {
         if (pollResult.status === "rejected") {
           // Distinguish permanent 4xx errors from transient ones
           const errMsg = pollResult.reason instanceof Error ? pollResult.reason.message : String(pollResult.reason);
-          console.error("Kling check failed:", errMsg);
-          const statusMatch = errMsg.match(/Kling status error (\d{3})/);
+          console.error("Video job check failed:", errMsg);
+          const statusMatch = errMsg.match(/(?:Kling|Sora) status error (\d{3})/);
           const httpStatus = statusMatch ? parseInt(statusMatch[1], 10) : 0;
           const isPermanent = httpStatus >= 400 && httpStatus < 500 && httpStatus !== 429;
           if (isPermanent) {
             anyFailed = true;
-            failedMessage = `Kling API error (${httpStatus}) — ${errMsg}`;
+            failedMessage = `Video API error (${httpStatus}) — ${errMsg}`;
             break;
           }
           // Transient: treat as still-in-progress
@@ -454,6 +459,30 @@ Deno.serve(async (req: Request) => {
             completed_at: new Date().toISOString(),
           })
           .eq("id", generationId);
+
+        // Send email notification — non-blocking, failure must not affect status
+        try {
+          const { data: userRecord } = await sb.auth.admin.getUserById(gen.owner_id);
+          const userEmail = userRecord?.user?.email;
+          if (userEmail) {
+            await sendEmail({
+              to: userEmail,
+              subject: "Your UGC video is ready 🎬",
+              html: `
+                <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+                  <h2 style="margin:0 0 8px">Your video is ready!</h2>
+                  <p style="color:#666;margin:0 0 24px">Your UGC ad has finished generating. Click below to view and download your results.</p>
+                  <a href="https://app.cinerads.com/generate/${gen.id}"
+                     style="display:inline-block;background:#000;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600">
+                    View Result →
+                  </a>
+                </div>
+              `,
+            });
+          }
+        } catch (emailErr) {
+          console.error("video-status: email notification failed (non-fatal):", emailErr);
+        }
 
         // Generate signed URLs for response
         const segments = await signSegmentVideos(sb, storedVideos);

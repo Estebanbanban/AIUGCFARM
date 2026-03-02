@@ -50,6 +50,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -735,6 +736,7 @@ export default function GeneratePage() {
         generation_id: store.pendingGenerationId,
         override_script: store.pendingScript,
         advanced_segments: advancedSegments,
+        video_provider: store.videoProvider,
       },
       {
         onSuccess: () => {
@@ -1482,23 +1484,32 @@ export default function GeneratePage() {
                         <Zap className="size-4" />
                         Easy Mode
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!store.advancedMode) {
-                            handleSwitchToAdvanced();
-                          }
-                        }}
-                        className={cn(
-                          "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all",
-                          store.advancedMode
-                            ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        <Settings2 className="size-4" />
-                        Advanced
-                      </button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!store.advancedMode) {
+                                  handleSwitchToAdvanced();
+                                }
+                              }}
+                              className={cn(
+                                "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all",
+                                store.advancedMode
+                                  ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                                  : "text-muted-foreground hover:text-foreground",
+                              )}
+                            >
+                              <Settings2 className="size-4" />
+                              Advanced
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Customize each Hook, Body, and CTA script, voice, and timing individually before generating.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
 
                     {/* Mode selector */}
@@ -1519,7 +1530,7 @@ export default function GeneratePage() {
                           )}
                         >
                           <div className="flex w-full items-center justify-between">
-                            <p className="text-sm font-semibold">Single</p>
+                            <p className="text-sm font-semibold">Single Ad</p>
                             <p className="text-sm font-bold text-primary">
                               {store.quality === "hd" ? CREDITS_PER_SINGLE_HD : CREDITS_PER_SINGLE} cr
                             </p>
@@ -1540,7 +1551,7 @@ export default function GeneratePage() {
                           )}
                         >
                           <div className="flex w-full items-center justify-between">
-                            <p className="text-sm font-semibold">3x</p>
+                            <p className="text-sm font-semibold">Full Campaign</p>
                             <p className="text-sm font-bold text-primary">
                               {store.quality === "hd" ? CREDITS_PER_BATCH_HD : CREDITS_PER_BATCH} cr
                             </p>
@@ -1556,7 +1567,7 @@ export default function GeneratePage() {
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
-                          onClick={() => { store.setQuality("standard"); setScriptConfigChanged(true); }}
+                          onClick={() => { store.setQuality("standard"); store.setVideoProvider("kling"); setScriptConfigChanged(true); }}
                           className={cn(
                             "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
                             store.quality === "standard"
@@ -1588,6 +1599,44 @@ export default function GeneratePage() {
                         </button>
                       </div>
                     </div>
+
+                    {/* Model sub-selector (HD only) */}
+                    {store.quality === "hd" && (
+                      <div>
+                        <p className="mb-2 text-sm font-medium">Model</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => store.setVideoProvider("kling")}
+                            className={cn(
+                              "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                              store.videoProvider === "kling"
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-muted-foreground/30",
+                            )}
+                          >
+                            <p className="text-sm font-semibold">Kling 3.0</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">Fast · proven quality</p>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => store.setVideoProvider("sora")}
+                            className={cn(
+                              "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                              store.videoProvider === "sora"
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-muted-foreground/30",
+                            )}
+                          >
+                            <div className="flex w-full items-center justify-between">
+                              <p className="text-sm font-semibold">Sora 2 ✨</p>
+                              <Badge variant="secondary" className="text-[10px]">+$3/vid</Badge>
+                            </div>
+                            <p className="mt-0.5 text-xs text-muted-foreground">Premium · OpenAI</p>
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Language */}
                     <div>

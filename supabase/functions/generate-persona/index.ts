@@ -508,7 +508,7 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", persona_id)
         .eq("owner_id", userId)
-        .select("id, name, attributes, generated_images, selected_image_url")
+        .select("id, name, attributes, generated_images, selected_image_url, regen_count")
         .single();
       if (error) throw new Error(`DB update failed: ${error.message}`);
       persona = data;
@@ -524,7 +524,7 @@ Deno.serve(async (req: Request) => {
           is_active: true,
           regen_count: 1,
         })
-        .select("id, name, attributes, generated_images, selected_image_url")
+        .select("id, name, attributes, generated_images, selected_image_url, regen_count")
         .single();
       if (error) throw new Error(`DB insert failed: ${error.message}`);
       persona = data;

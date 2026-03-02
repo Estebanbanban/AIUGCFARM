@@ -9,7 +9,7 @@ import { useProfile, PERSONA_SLOT_LIMITS } from "@/hooks/use-profile";
 import Image from "next/image";
 import {
   ArrowLeft, Loader2, Sparkles, Check, User, ImageIcon,
-  ChevronDown, ChevronUp, Eye, Palette, Clock, Shirt, Watch, Wand2, AlertCircle,
+  ChevronDown, Eye, Palette, Clock, Shirt, Watch, Wand2, AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -409,12 +409,10 @@ function Section({
             <span className="ml-1.5 font-normal text-muted-foreground">· {count}</span>
           )}
         </span>
-        {open
-          ? <ChevronUp className="size-4 text-muted-foreground" />
-          : <ChevronDown className="size-4 text-muted-foreground" />}
+        <ChevronDown className={cn("size-4 text-muted-foreground transition-transform duration-200", open && "rotate-180")} />
       </button>
       {open && (
-        <div className="rounded-xl border border-border bg-muted/50 p-3">
+        <div className="rounded-xl border border-border bg-primary/5 p-3">
           {children}
         </div>
       )}
@@ -442,10 +440,10 @@ function ImageCard({
       type="button"
       onClick={onClick}
       className={cn(
-        "relative overflow-hidden rounded-xl transition-all duration-150",
+        "relative overflow-hidden rounded-xl transition-transform duration-150 hover:scale-[1.03]",
         aspect,
         selected
-          ? "ring-2 ring-primary ring-offset-1 ring-offset-background"
+          ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-background"
           : "ring-1 ring-border hover:ring-primary/40",
       )}
     >
@@ -488,9 +486,9 @@ function TextCard({
       type="button"
       onClick={onClick}
       className={cn(
-        "rounded-xl border py-3 text-sm font-medium transition-all",
+        "rounded-xl border py-3 text-sm font-medium transition-all duration-150",
         selected
-          ? "border-primary bg-primary/10 text-primary"
+          ? "border-primary bg-gradient-to-r from-primary/15 to-primary/5 text-primary"
           : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
       )}
     >
