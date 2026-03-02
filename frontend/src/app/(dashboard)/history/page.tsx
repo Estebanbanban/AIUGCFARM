@@ -148,9 +148,9 @@ export default function HistoryPage() {
 
       {/* Empty state */}
       {!isLoading && !error && generations.length === 0 && (
-        <Card>
+        <Card className="bg-gradient-to-br from-card via-card to-muted/30">
           <CardContent className="flex flex-col items-center gap-4 py-12">
-            <div className="flex size-14 items-center justify-center rounded-full bg-primary/10">
+            <div className="flex size-16 items-center justify-center rounded-full bg-primary/10">
               <Sparkles className="size-7 text-primary" />
             </div>
             <div className="text-center">
@@ -229,7 +229,12 @@ export default function HistoryPage() {
                 href={`/generate/${gen.id}`}
                 className="group"
               >
-                <Card className="h-full transition-colors hover:border-primary/30">
+                <Card className={cn(
+                  "h-full transition-colors hover:border-primary/30 border-l-4",
+                  gen.status === "completed" && "border-emerald-500",
+                  gen.status === "failed" && "border-red-500",
+                  (gen.status === "pending" || gen.status === "generating_segments") && "border-amber-500",
+                )}>
                   <CardContent className="flex flex-col gap-3 py-5">
                     {/* Product & persona names */}
                     <div className="flex items-start gap-3">
@@ -315,7 +320,7 @@ export default function HistoryPage() {
                           </p>
                           <Link
                             href="/generate"
-                            className="mt-1 inline-flex items-center gap-1 text-xs text-red-400 underline-offset-2 hover:underline"
+                            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 px-2 py-1 rounded transition-colors"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <RefreshCw className="size-3" />

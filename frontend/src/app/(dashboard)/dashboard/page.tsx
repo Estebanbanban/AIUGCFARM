@@ -160,7 +160,7 @@ export default function DashboardPage() {
     </Suspense>
     <div className="flex flex-col gap-6">
       <FadeInUp>
-        <Card className="border-border bg-card">
+        <Card className="border-border bg-card border-l-4 border-primary">
           <CardContent className="flex flex-col gap-5 p-6 md:flex-row md:items-end md:justify-between md:p-7">
             <div className="space-y-2">
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -263,13 +263,14 @@ export default function DashboardPage() {
 
       <StaggerContainer className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <motion.div variants={staggerItem}>
-          <Card className="border-border bg-card">
+          <Card className="border-border bg-card bg-primary/5">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Videos Generated</p>
                 <Video className="size-4 text-muted-foreground" />
               </div>
-              <p className="mt-3 font-mono text-3xl font-semibold text-primary">
+              <div className="size-2 rounded-full bg-primary mb-1 mt-3" />
+              <p className="font-mono text-3xl font-semibold text-primary">
                 {generationsLoading ? <Loader2 className="size-5 animate-spin" /> : videosGenerated}
               </p>
             </CardContent>
@@ -277,12 +278,13 @@ export default function DashboardPage() {
         </motion.div>
 
         <motion.div variants={staggerItem}>
-          <Card className="border-border bg-card">
+          <Card className="border-border bg-card bg-primary/5">
             <CardContent className="flex flex-col gap-3 p-5">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Credits Remaining</p>
                 <CreditCard className="size-4 text-muted-foreground" />
               </div>
+              <div className="size-2 rounded-full bg-primary mb-1" />
               <p className="font-mono text-3xl font-semibold text-primary">
                 {creditsLoading ? (
                   <Loader2 className="size-5 animate-spin" />
@@ -303,13 +305,14 @@ export default function DashboardPage() {
         </motion.div>
 
         <motion.div variants={staggerItem}>
-          <Card className="border-border bg-card">
+          <Card className="border-border bg-card bg-primary/5">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Active Personas</p>
                 <Users className="size-4 text-muted-foreground" />
               </div>
-              <p className="mt-3 font-mono text-3xl font-semibold text-primary">
+              <div className="size-2 rounded-full bg-primary mb-1 mt-3" />
+              <p className="font-mono text-3xl font-semibold text-primary">
                 {activePersonas}
               </p>
             </CardContent>
@@ -322,11 +325,11 @@ export default function DashboardPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Quick Actions</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {quickActions.map((action) => (
               <Link key={action.title} href={action.href} className="group">
                 <div className="flex h-full flex-col gap-3 rounded-lg border border-border bg-background p-4 transition-all hover:border-primary/50 hover:bg-muted/30 hover:shadow-md">
-                  <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-primary/5">
+                  <div className="flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/10">
                     <action.icon className="size-5 text-primary" />
                   </div>
                   <div>
@@ -348,8 +351,8 @@ export default function DashboardPage() {
             </h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {draftGenerations.map((gen) => (
+                <div key={gen.id} className="ring-1 ring-amber-500/40 animate-pulse rounded-xl">
                 <Card
-                  key={gen.id}
                   className="border-amber-500/30 bg-amber-500/5 transition-all hover:border-amber-500/60 hover:shadow-md"
                 >
                   <CardHeader className="pb-3">
@@ -380,6 +383,7 @@ export default function DashboardPage() {
                     </Button>
                   </CardContent>
                 </Card>
+                </div>
               ))}
             </div>
           </div>

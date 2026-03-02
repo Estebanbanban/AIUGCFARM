@@ -15,12 +15,14 @@ import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { callEdge } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { usePersonaBuilderStore } from '@/stores/persona-builder';
+import { useProfile } from '@/hooks/use-profile';
 import {
   ethnicities,
   hairColors,
@@ -576,15 +578,33 @@ interface PersonaBuilderInlineProps {
 export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInlineProps) {
   const store = usePersonaBuilderStore();
   const queryClient = useQueryClient();
+  const { data: profile } = useProfile();
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<number>>(new Set());
   const [createMode, setCreateMode] = useState<'quick' | 'custom'>('quick');
   const [quickDescription, setQuickDescription] = useState('');
   const [isGeneratingQuick, setIsGeneratingQuick] = useState(false);
+  const [regenCount, setRegenCount] = useState<number>(0);
 
   // ── Theme detection ────────────────────────────────────────────────────────
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  // ── Load regen_count on mount when resuming an existing persona ────────────
+  useEffect(() => {
+    if (!store.personaId || profile?.plan !== 'free') return;
+    let cancelled = false;
+    const supabase = createClient();
+    supabase
+      .from('personas')
+      .select('regen_count')
+      .eq('id', store.personaId)
+      .single()
+      .then(({ data }: { data: { regen_count: number } | null }) => {
+        if (!cancelled && data?.regen_count != null) setRegenCount(data.regen_count);
+      });
+    return () => { cancelled = true; };
+  }, [store.personaId, profile?.plan]);
 
   // ── Preload all static persona option images on mount ──────────────────────
   useEffect(() => {
@@ -670,7 +690,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
       };
 
       const result = await callEdge<{
-        data: { id: string; generated_images: string[]; generated_image_urls: string[] };
+        data: { id: string; generated_images: string[]; generated_image_urls: string[]; regen_count?: number };
       }>('generate-persona', {
         body: {
           name: store.name,
@@ -682,6 +702,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
       const displayUrls = result.data.generated_image_urls ?? result.data.generated_images;
       store.setPersonaId(result.data.id);
       store.setGeneratedImages(displayUrls);
+      if (result.data.regen_count != null) setRegenCount(result.data.regen_count);
       toast.success(`${displayUrls.length} persona images generated!`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to generate persona');
@@ -1088,24 +1109,40 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                       </>
                     )}
                   </Button>
-                  <Button
-                    onClick={handleGenerate}
-                    variant="outline"
-                    disabled={store.isGenerating || store.isSaving}
-                    className="w-full"
-                  >
-                    {store.isGenerating ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" />
-                        Regenerating…
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="size-4" />
-                        Regenerate
-                      </>
-                    )}
-                  </Button>
+                  {profile?.plan === 'free' && regenCount > 0 && (
+                    <p className="text-center text-xs text-muted-foreground">{regenCount} of 4 regenerations used</p>
+                  )}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="w-full">
+                          <Button
+                            onClick={handleGenerate}
+                            variant="outline"
+                            disabled={store.isGenerating || store.isSaving || (profile?.plan === 'free' && regenCount >= 4)}
+                            className="w-full"
+                          >
+                            {store.isGenerating ? (
+                              <>
+                                <Loader2 className="size-4 animate-spin" />
+                                Regenerating…
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="size-4" />
+                                Regenerate
+                              </>
+                            )}
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {profile?.plan === 'free' && regenCount >= 4 && (
+                        <TooltipContent>
+                          <p>Upgrade to regenerate more images</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 </>
               )}
             </div>

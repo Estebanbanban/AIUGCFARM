@@ -34,6 +34,8 @@ interface GenerationWizardState {
   // Advanced Mode
   advancedMode: boolean;
   advancedSegments: AdvancedSegmentsConfig | null;
+  // Video provider (HD only)
+  videoProvider: "kling" | "sora";
   // Actions
   setStep: (step: number) => void;
   setProductId: (id: string) => void;
@@ -60,6 +62,7 @@ interface GenerationWizardState {
   clearPendingScript: () => void;
   setAdvancedMode: (enabled: boolean) => void;
   setAdvancedSegments: (segments: AdvancedSegmentsConfig | null) => void;
+  setVideoProvider: (provider: "kling" | "sora") => void;
   updateAdvancedSegment: (
     type: "hooks" | "bodies" | "ctas",
     index: number,
@@ -96,6 +99,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
       creditsToCharge: null,
       advancedMode: false,
       advancedSegments: null,
+      videoProvider: "kling",
       setStep: (step) =>
         set((state) => {
           state.step = step;
@@ -169,6 +173,10 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
         set((state) => {
           state.advancedSegments = segments;
         }),
+      setVideoProvider: (provider) =>
+        set((state) => {
+          state.videoProvider = provider;
+        }),
       updateAdvancedSegment: (type, index, patch) =>
         set((state) => {
           if (!state.advancedSegments) return;
@@ -204,6 +212,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
           creditsToCharge: null,
           advancedMode: false,
           advancedSegments: null,
+          videoProvider: "kling" as const,
         })),
     })),
     {
@@ -237,6 +246,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
         pendingScript: state.pendingScript,
         creditsToCharge: state.creditsToCharge,
         advancedMode: state.advancedMode,
+        videoProvider: state.videoProvider,
         // advancedSegments intentionally excluded - complex, per-session
       }),
       version: 1,

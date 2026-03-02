@@ -147,7 +147,7 @@ export default function BillingPage() {
               Credit Balance
             </p>
             <div className="flex items-end gap-2">
-              <span className="text-5xl font-bold tracking-tight text-foreground">
+              <span className="text-6xl font-black tracking-tight text-foreground drop-shadow-[0_0_20px_rgba(249,115,22,0.3)]">
                 {isUnlimitedCredits ? "∞" : creditsRemaining}
               </span>
               {!isUnlimitedCredits && (
@@ -200,7 +200,7 @@ export default function BillingPage() {
           <div className="mt-5">
             <Progress
               value={creditPercent}
-              className="h-2 bg-muted [&>[data-slot=progress-indicator]]:bg-primary"
+              className="h-2 bg-muted [&>[data-slot=progress-indicator]]:bg-primary [&>[data-slot=progress-indicator]]:transition-all [&>[data-slot=progress-indicator]]:duration-1000 [&>[data-slot=progress-indicator]]:ease-out"
             />
           </div>
         )}
@@ -240,7 +240,7 @@ export default function BillingPage() {
                 className={cn(
                   "relative flex flex-col rounded-2xl border p-6 transition-all duration-200",
                   ui.highlighted
-                    ? "border-primary/40 bg-card shadow-[0_0_40px_rgba(249,115,22,0.07)]"
+                    ? "border-primary/40 bg-card shadow-[0_8px_32px_rgba(249,115,22,0.15)] hover:scale-[1.02] transition-transform duration-200"
                     : "border-border bg-card hover:border-primary/30"
                 )}
               >
@@ -283,22 +283,22 @@ export default function BillingPage() {
                 {/* Features */}
                 <ul className="mb-6 flex flex-1 flex-col gap-2.5">
                   <li className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Check className="size-3.5 shrink-0 text-primary" strokeWidth={2.5} />
+                    <Check className="size-3.5 shrink-0 text-emerald-500" strokeWidth={2.5} />
                     <strong className="text-foreground">{p.credits} credits</strong>/month
                   </li>
                   <li className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Check className="size-3.5 shrink-0 text-primary" strokeWidth={2.5} />
+                    <Check className="size-3.5 shrink-0 text-emerald-500" strokeWidth={2.5} />
                     {videosStandard} standard or {videosHd} HD videos
                   </li>
                   {tripleStandard > 0 && (
                     <li className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Check className="size-3.5 shrink-0 text-emerald-400" strokeWidth={2.5} />
+                      <Check className="size-3.5 shrink-0 text-emerald-500" strokeWidth={2.5} />
                       Up to <strong className="text-foreground ml-0.5">{combosTriple} ad combos</strong>
                     </li>
                   )}
                   {p.features.slice(2).map((feature) => (
                     <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Check className="size-3.5 shrink-0 text-primary" strokeWidth={2.5} />
+                      <Check className="size-3.5 shrink-0 text-emerald-500" strokeWidth={2.5} />
                       {feature}
                     </li>
                   ))}
@@ -357,12 +357,13 @@ export default function BillingPage() {
               <div
                 key={key}
                 className={cn(
-                  "flex flex-col rounded-2xl border p-5 transition-all duration-200",
+                  "relative flex flex-col rounded-2xl border p-5 transition-all duration-200",
                   isBestValue
-                    ? "border-primary/40 bg-card shadow-[0_0_30px_rgba(249,115,22,0.06)]"
-                    : "border-border bg-card hover:border-primary/30"
+                    ? "border-primary/40 bg-muted/30 shadow-[0_0_30px_rgba(249,115,22,0.06)]"
+                    : "border-border bg-muted/30 hover:border-primary/30"
                 )}
               >
+                <span className="absolute top-2 right-2 text-[10px] font-medium bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">one-time</span>
                 <div className="mb-3 flex items-center gap-2">
                   <h3 className="font-semibold text-foreground">{pack.name}</h3>
                   {"badge" in pack && pack.badge && (
@@ -435,13 +436,13 @@ export default function BillingPage() {
           {/* Standard */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2.5">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10">
                 <Film className="size-4 text-primary" />
               </div>
               <span className="text-sm font-semibold">Standard</span>
             </div>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              <strong className="text-foreground">5 credits</strong> = 1 complete ad
+              <span className="font-semibold text-primary">5 credits</span> = 1 complete ad
               (hook + body + CTA) rendered with Kling v2.6.
             </p>
           </div>
@@ -449,27 +450,27 @@ export default function BillingPage() {
           {/* HD */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2.5">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10">
                 <Zap className="size-4 text-primary" />
               </div>
               <span className="text-sm font-semibold">HD</span>
             </div>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              <strong className="text-foreground">10 credits</strong> = 1 complete HD ad
+              <span className="font-semibold text-primary">10 credits</span> = 1 complete HD ad
               rendered with Kling v3 - sharper, more cinematic.
             </p>
           </div>
 
           {/* Triple */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 rounded-xl border-2 border-emerald-500/30 bg-emerald-500/5 p-3">
             <div className="flex items-center gap-2.5">
-              <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/10">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-500/10">
                 <Layers className="size-4 text-emerald-400" />
               </div>
               <span className="text-sm font-semibold">Triple Mode</span>
             </div>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              <strong className="text-foreground">15 credits</strong> = 3 hooks × 3 bodies × 3 CTAs
+              <span className="font-semibold text-primary">15 credits</span> = 3 hooks × 3 bodies × 3 CTAs
               = <strong className="text-foreground">27 unique ad combos</strong> from one generation.
             </p>
           </div>
@@ -548,12 +549,12 @@ export default function BillingPage() {
                   {ledger.map((entry) => {
                     const config = reasonLabels[entry.reason] ?? { label: entry.reason, color: "text-foreground" };
                     return (
-                      <tr key={entry.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                      <tr key={entry.id} className="border-b border-border last:border-0 odd:bg-muted/20 hover:bg-primary/5 transition-colors">
                         <td className="px-5 py-3 text-sm text-muted-foreground">{formatDate(entry.created_at)}</td>
                         <td className="px-5 py-3">
                           <Badge variant="secondary" className="text-xs">{config.label}</Badge>
                         </td>
-                        <td className={cn("px-5 py-3 text-right text-sm font-semibold tabular-nums", config.color)}>
+                        <td className={cn("px-5 py-3 text-right text-sm font-semibold tabular-nums", entry.amount > 0 ? "text-emerald-500" : "text-red-500")}>
                           {entry.amount > 0 ? "+" : ""}{entry.amount}
                         </td>
                       </tr>

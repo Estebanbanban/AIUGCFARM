@@ -6,7 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { callEdge } from "@/lib/api";
 import { toast } from "sonner";
-import { ArrowRight, CreditCard, User, Trash2 } from "lucide-react";
+import { ArrowRight, CreditCard, User, Lock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -92,10 +92,10 @@ export default function SettingsPage() {
       </div>
 
       {/* Billing Link */}
-      <Card>
+      <Card className="bg-gradient-to-r from-card to-primary/5">
         <CardContent className="flex items-center justify-between p-5">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+            <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10">
               <CreditCard className="size-5 text-primary" />
             </div>
             <div>
@@ -133,13 +133,16 @@ export default function SettingsPage() {
           <form onSubmit={handleUpdateProfile} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                disabled
-                className="bg-muted"
-              />
+              <div className="relative">
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  disabled
+                  className="bg-muted/60 pr-9"
+                />
+                <Lock className="absolute right-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+              </div>
               <p className="text-xs text-muted-foreground">
                 Email cannot be changed.
               </p>
@@ -171,7 +174,7 @@ export default function SettingsPage() {
       <Separator />
 
       {/* Danger Zone */}
-      <Card className="border-red-500/20">
+      <Card className="border-red-500/20 bg-red-500/5">
         <CardHeader>
           <CardTitle className="text-base text-red-400">Danger Zone</CardTitle>
           <CardDescription>
@@ -187,7 +190,7 @@ export default function SettingsPage() {
               </p>
             </div>
             <Button variant="destructive" size="sm" onClick={() => setShowDeleteDialog(true)}>
-              <Trash2 className="size-4" />
+              <AlertTriangle className="size-4" />
               Delete Account
             </Button>
           </div>

@@ -98,6 +98,7 @@ export interface ApproveGenerationParams {
   generation_id: string;
   override_script?: GenerationScript;
   advanced_segments?: AdvancedSegmentsInput;
+  video_provider?: "kling" | "sora";
 }
 
 /** Response from generate-video Edge Function */

@@ -6,12 +6,18 @@ import { checkCredits, debitCredits, refundCredits } from "../_shared/credits.ts
 import { callOpenRouter } from "../_shared/openrouter.ts";
 import { withRetry } from "../_shared/retry.ts";
 import { submitKlingJob } from "../_shared/kling.ts";
+import { submitSoraJob } from "../_shared/sora.ts";
 
 // 1 credit = $1. Kling v2.6 = ~$0.88/single gen → 5cr. Kling v3 = ~$1.76/single → 10cr.
 // Credit costs are fixed. first_video_discount_used tracks the one-time purchase price discount (paywall only).
 const COSTS = {
-  standard: { single: 5, batch: 15 },
-  hd:       { single: 10, batch: 30 },
+  kling: {
+    standard: { single: 5, batch: 15 },
+    hd:       { single: 10, batch: 30 },
+  },
+  sora: {
+    hd: { single: 14, batch: 42 },  // ~40% premium over Kling HD
+  },
 } as const;
 
 // Kling model name per quality tier
@@ -386,21 +392,24 @@ async function generateScript(
 
 // ── Shared helpers ────────────────────────────────────────────────────
 
-/** Compute credit cost and variant count from mode/quality. */
-function computeCosts(resolvedMode: string, resolvedQuality: string) {
+/** Compute credit cost and variant count from mode/quality/provider. */
+function computeCosts(resolvedMode: string, resolvedQuality: string, provider: "kling" | "sora" = "kling") {
   const variantCount = resolvedMode === "single" ? 1 : 3;
-  const creditCost = resolvedMode === "single"
-    ? COSTS[resolvedQuality as keyof typeof COSTS].single
-    : COSTS[resolvedQuality as keyof typeof COSTS].batch;
+  const providerCosts = provider === "sora"
+    ? COSTS.sora[resolvedQuality as keyof typeof COSTS.sora]
+    : COSTS.kling[resolvedQuality as keyof typeof COSTS.kling];
+  const creditCost = resolvedMode === "single" ? providerCosts.single : providerCosts.batch;
   const klingModel = KLING_MODEL[resolvedQuality as keyof typeof KLING_MODEL];
   return { variantCount, creditCost, klingModel };
 }
 
-/** Submit Kling jobs for all script segments and return job IDs map + actual model used. */
+/** Submit Kling or Sora jobs for all script segments and return job IDs map + actual model used. */
 async function submitAllKlingJobs(
   script: GeneratedScript,
   signedImageUrl: string,
   klingModel: string,
+  provider: "kling" | "sora" = "kling",
+  compositeImageBlob?: Blob,
 ): Promise<{ jobIds: Record<string, string>; modelUsed: string }> {
   const jobEntries: Array<[string, string]> = [];
   const jobModels: string[] = [];
@@ -409,11 +418,24 @@ async function submitAllKlingJobs(
   const jobSubmissions = segmentTypes.flatMap((segType) =>
     script[segType].map((segment, i) => {
       const jobKey = `${SEG_KEY[segType]}_${i + 1}`;
+      const prompt = `A UGC creator speaking directly to camera, saying: "${segment.text}" Natural, authentic talking-head style, casual handheld selfie aesthetic.`;
+      const duration = segment.duration_seconds <= 5 ? 5 : 10;
+
+      if (provider === "sora") {
+        if (!compositeImageBlob) throw new Error("compositeImageBlob required for Sora provider");
+        return withRetry(() =>
+          submitSoraJob({ composite_image_blob: compositeImageBlob, prompt, duration })
+        ).then((result) => {
+          jobModels.push(result.model_name);
+          return [jobKey, result.job_id] as [string, string];
+        });
+      }
+
       return withRetry(() =>
         submitKlingJob({
           image_url: signedImageUrl,
-          script: `A UGC creator speaking directly to camera, saying: "${segment.text}" Natural, authentic talking-head style, casual handheld selfie aesthetic.`,
-          duration: segment.duration_seconds <= 5 ? 5 : 10,
+          script: prompt,
+          duration,
           mode: "pro",
           sound: "on",
           model_name: klingModel,
@@ -472,7 +494,8 @@ Deno.serve(async (req: Request) => {
     const sb = getAdminClient();
 
     const body = await req.json();
-    const { phase, generation_id, override_script } = body;
+    const { phase, generation_id, override_script, video_provider } = body;
+    const provider = (video_provider === "sora" ? "sora" : "kling") as "kling" | "sora";
 
     // ══════════════════════════════════════════════════════════════════
     // PHASE "full" — Approve an existing awaiting_approval generation
@@ -516,7 +539,14 @@ Deno.serve(async (req: Request) => {
 
       const resolvedMode = gen.mode as string;
       const resolvedQuality = gen.video_quality as string;
-      const { variantCount, creditCost, klingModel } = computeCosts(resolvedMode, resolvedQuality);
+
+      // Validate Sora only supports HD
+      if (provider === "sora" && resolvedQuality !== "hd") {
+        await sb.from("generations").update({ status: "awaiting_approval" }).eq("id", generation_id);
+        return json({ detail: "Sora only supports HD quality. Please select HD quality to use Sora." }, cors, 400);
+      }
+
+      const { variantCount, creditCost, klingModel } = computeCosts(resolvedMode, resolvedQuality, provider);
 
       // If override_script provided, validate and save
       let finalScript: GeneratedScript;
@@ -593,30 +623,41 @@ Deno.serve(async (req: Request) => {
 
         const compositePath = gen.composite_image_url as string;
 
-        // ── Generate signed URL for Kling ─────────────────────────
+        // ── Generate signed URL for composite image ────────────────
         const { data: klingCompositeUrl, error: klingUrlErr } = await sb.storage
           .from("composite-images")
           .createSignedUrl(compositePath, 7200);
 
         if (klingUrlErr || !klingCompositeUrl?.signedUrl) {
           throw new Error(
-            `Failed to generate Kling-accessible signed URL: ${klingUrlErr?.message}`,
+            `Failed to generate signed URL for composite image: ${klingUrlErr?.message}`,
           );
         }
 
-        // ── Submit Kling jobs ─────────────────────────────────────
+        // ── Download image blob if using Sora (requires file upload) ──
+        let compositeImageBlob: Blob | undefined;
+        if (provider === "sora") {
+          const imgRes = await fetch(klingCompositeUrl.signedUrl);
+          if (!imgRes.ok) throw new Error(`Failed to download composite image for Sora: HTTP ${imgRes.status}`);
+          compositeImageBlob = await imgRes.blob();
+        }
+
+        // ── Submit video jobs ─────────────────────────────────────
         const { jobIds, modelUsed } = await submitAllKlingJobs(
           finalScript,
           klingCompositeUrl.signedUrl,
           klingModel,
+          provider,
+          compositeImageBlob,
         );
 
-        // ── Update generation with job IDs ────────────────────────
+        // ── Update generation with job IDs and provider ───────────
         const { error: jobUpdateErr } = await sb
           .from("generations")
           .update({
             external_job_ids: jobIds,
             kling_model: modelUsed,
+            video_provider: provider,
             status: "generating_segments",
           })
           .eq("id", generation_id);
@@ -700,7 +741,12 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "quality must be 'standard' or 'hd'" }, cors, 400);
     }
 
-    const { variantCount, creditCost, klingModel } = computeCosts(resolvedMode, resolvedQuality);
+    // Validate Sora only supports HD quality
+    if (provider === "sora" && resolvedQuality !== "hd") {
+      return json({ detail: "Sora only supports HD quality. Please select HD quality to use Sora." }, cors, 400);
+    }
+
+    const { variantCount, creditCost, klingModel } = computeCosts(resolvedMode, resolvedQuality, provider);
 
     // ── 1b. Fetch profile for plan-based validation ────────────────
     const { data: planProfile } = await sb
