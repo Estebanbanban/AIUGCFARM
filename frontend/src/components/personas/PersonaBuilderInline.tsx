@@ -585,6 +585,27 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  // ── Preload all static persona option images on mount ──────────────────────
+  useEffect(() => {
+    const allSrcs = [
+      ...Object.values(ethnicityImageSrc),
+      ...Object.values(genderImageSrc),
+      ...Object.values(hairStyleImageSrc),
+      ...Object.values(bodyTypeImageSrc),
+      ...Object.values(clothingImageSrc),
+      ...Object.values(accessoriesImageSrc),
+    ].filter((src) => !src.startsWith('data:'));
+
+    const imgs = [...new Set(allSrcs)].map((src) => {
+      const img = new window.Image();
+      img.src = src;
+      return img;
+    });
+    // Keep reference to prevent GC while loading
+    return () => { imgs.length = 0; };
+  }, []);
+
   const isDark = mounted && resolvedTheme === 'dark';
 
   // ── Dark-mode aware placeholder style maps ─────────────────────────────────
