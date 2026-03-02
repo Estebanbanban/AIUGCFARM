@@ -101,7 +101,7 @@ const jsonLd = {
           name: "Is there a free trial?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Yes. Every new account gets 3 free segment credits: no credit card required. Generate your first video ad and see the quality before you commit.",
+            text: "Brand import and AI persona creation are completely free — no credit card required. Your first video generation is 50% off, applied automatically.",
           },
         },
         {
