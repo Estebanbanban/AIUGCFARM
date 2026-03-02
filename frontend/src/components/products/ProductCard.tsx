@@ -69,7 +69,11 @@ export function ProductCard({ product, onDelete, resolvedImageUrl }: ProductCard
             <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-muted">
               {resolvedImage ? (
                 <>
-                  {!imageLoaded && <div className="absolute inset-0 animate-pulse bg-muted" />}
+                  {!imageLoaded && (
+                    <div className="absolute inset-0 overflow-hidden bg-muted">
+                      <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-foreground/[0.06] to-transparent [animation:shimmer_1.5s_ease-in-out_infinite]" />
+                    </div>
+                  )}
                   <img
                     src={resolvedImage}
                     alt={product.name}
