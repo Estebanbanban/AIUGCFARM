@@ -300,6 +300,14 @@ export default function GeneratePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Auto-close paywall when returning from Stripe checkout
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "success") {
+      setShowPaywall(false);
+    }
+  }, []);
+
   // Product import state
   const [addingProduct, setAddingProduct] = useState(false);
   const [importUrl, setImportUrl] = useState("");
@@ -321,6 +329,8 @@ export default function GeneratePage() {
   const [showPreviewEditor, setShowPreviewEditor] = useState(false);
   const [previewEditPrompt, setPreviewEditPrompt] = useState("");
   const [ctaOpen, setCtaOpen] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showMoreCta, setShowMoreCta] = useState(false);
 
   // Advanced mode state
   const [isInitializingAdvanced, setIsInitializingAdvanced] = useState(false);
@@ -1359,153 +1369,9 @@ export default function GeneratePage() {
           </div>
 
           <div className="p-5 flex flex-col gap-5">
-            {/* ── Easy / Advanced mode tab ──────────────────────────── */}
-            <div className="flex rounded-lg border border-border bg-muted/40 p-1 gap-1">
-              <button
-                type="button"
-                onClick={() => store.setAdvancedMode(false)}
-                className={cn(
-                  "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all",
-                  !store.advancedMode
-                    ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <Zap className="size-4" />
-                Easy Mode
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!store.advancedMode) {
-                    handleSwitchToAdvanced();
-                  }
-                }}
-                className={cn(
-                  "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all",
-                  store.advancedMode
-                    ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <Settings2 className="size-4" />
-                Advanced
-              </button>
-            </div>
-
             {/* ── Easy Mode ─────────────────────────────────────────── */}
             {!store.advancedMode && (
               <div className="flex flex-col gap-5">
-                {/* Mode selector */}
-                <div>
-                  <p className="mb-2 text-sm font-medium">Generation mode</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        store.setMode("single");
-                        setScriptConfigChanged(true);
-                      }}
-                      className={cn(
-                        "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
-                        store.mode === "single"
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-muted-foreground/30",
-                      )}
-                    >
-                      <div className="flex w-full items-center justify-between">
-                        <p className="text-sm font-semibold">Single</p>
-                        <p className="text-sm font-bold text-primary">
-                          {store.quality === "hd" ? CREDITS_PER_SINGLE_HD : CREDITS_PER_SINGLE} cr
-                        </p>
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">1 complete video · fastest</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        store.setMode("triple");
-                        setScriptConfigChanged(true);
-                      }}
-                      className={cn(
-                        "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
-                        store.mode === "triple"
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-muted-foreground/30",
-                      )}
-                    >
-                      <div className="flex w-full items-center justify-between">
-                        <p className="text-sm font-semibold">3×</p>
-                        <p className="text-sm font-bold text-primary">
-                          {store.quality === "hd" ? CREDITS_PER_BATCH_HD : CREDITS_PER_BATCH} cr
-                        </p>
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">27 combos · pick your best</p>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Quality selector */}
-                <div>
-                  <p className="mb-2 text-sm font-medium">Video quality</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => { store.setQuality("standard"); setScriptConfigChanged(true); }}
-                      className={cn(
-                        "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
-                        store.quality === "standard"
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-muted-foreground/30",
-                      )}
-                    >
-                      <p className="text-sm font-semibold">Kling 2.6</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">Faster · great for testing</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        store.setQuality("hd");
-                        setScriptConfigChanged(true);
-                      }}
-                      className={cn(
-                        "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
-                        store.quality === "hd"
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-muted-foreground/30",
-                      )}
-                    >
-                      <div className="flex w-full items-center justify-between">
-                        <p className="text-sm font-semibold">Kling V3</p>
-                        <Badge variant="secondary" className="text-[10px]">2x cr</Badge>
-                      </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">Best quality · final ads</p>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Language */}
-                <div>
-                  <p className="mb-2 text-sm font-medium">Script language</p>
-                  <div className="flex flex-wrap gap-2">
-                    {LANGUAGE_OPTIONS.map((lang) => (
-                      <button
-                        key={lang.code}
-                        type="button"
-                        onClick={() => { store.setLanguage(lang.code); setScriptConfigChanged(true); }}
-                        className={cn(
-                          "rounded-lg border-2 px-3 py-1.5 text-sm transition-all",
-                          store.language === lang.code
-                            ? "border-primary bg-primary/5 font-medium text-primary"
-                            : "border-border text-muted-foreground hover:border-muted-foreground/40",
-                        )}
-                      >
-                        {lang.native}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 {/* CTA style - collapsible */}
                 <Collapsible open={ctaOpen} onOpenChange={setCtaOpen}>
                   <CollapsibleTrigger asChild>
