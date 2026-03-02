@@ -237,7 +237,7 @@ export function OnboardingOverlay() {
   }
 
   // ── Full modal mode ───────────────────────────────────────────────────────
-  const modalWidth = "max-w-4xl";
+  const modalWidth = view === "step-persona" ? "max-w-6xl" : "max-w-4xl";
 
   return (
     <AnimatePresence>
