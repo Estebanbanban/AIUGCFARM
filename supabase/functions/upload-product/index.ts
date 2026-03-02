@@ -8,9 +8,9 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 const MAX_IMAGE_COUNT = 5;
 
 const PRODUCT_LIMITS: Record<string, number> = {
-  free: 1,
-  starter: 1,
-  growth: 3,
+  free: 3,
+  starter: 5,
+  growth: 5,
   scale: 10,
 };
 
