@@ -7,8 +7,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 // To rotate: create a new coupon in Stripe Dashboard → copy the coupon ID → update this value.
 // Current coupon: 30% off, applies to first subscription purchase only.
 export const COUPON_30_OFF = "t9QmsQTe"; // 30% off any plan, once - NewUsers
-// TODO: Create this coupon in Stripe Dashboard (50% off, single use, for single video purchases)
-export const COUPON_50_OFF_FIRST_VIDEO = "FIRST_VIDEO_50";
+// Stripe coupon ID for 50% off first single-video purchase. Coupon ID: STARTER50
+export const COUPON_50_OFF_FIRST_VIDEO = "STARTER50";
 
 const OFFER_KEY_STARTED = "cr_offer_started_at";
 const OFFER_KEY_USED = "cr_offer_used";
