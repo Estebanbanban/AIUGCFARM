@@ -32,7 +32,7 @@ export function OfferCountdownBanner() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -44, opacity: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="fixed top-0 left-0 right-0 z-50 h-[44px] bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 text-white"
+          className="sticky top-0 left-0 right-0 z-50 h-[44px] bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 text-white"
         >
           <div className="flex h-full items-center justify-center gap-3 px-4 text-sm font-medium">
             <span className="hidden sm:inline">
