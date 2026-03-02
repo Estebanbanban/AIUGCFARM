@@ -23,6 +23,7 @@ import {
   Loader2,
   X,
   AlertCircle,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -195,8 +196,8 @@ export function OnboardingOverlay() {
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
-            <div className="flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-              <div className="shrink-0 border-b border-border p-5">
+            <div className="flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+              <div className="shrink-0 border-b border-border p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="size-9 rounded-xl bg-muted animate-pulse" />
                   <div className="flex flex-col gap-1.5">
@@ -209,7 +210,7 @@ export function OnboardingOverlay() {
                 </div>
                 <div className="h-1 w-full rounded bg-muted animate-pulse" />
               </div>
-              <div className="flex flex-col gap-3 p-5">
+              <div className="flex flex-col gap-3 p-6">
                 {[1,2,3].map(i => (
                   <div key={i} className="h-16 w-full rounded-xl border border-border bg-muted/50 animate-pulse" />
                 ))}
@@ -238,9 +239,7 @@ export function OnboardingOverlay() {
   const modalWidth =
     view === "step-persona"
       ? "max-w-2xl"
-      : view === "step-brand"
-        ? "max-w-lg"
-        : "max-w-md";
+      : "max-w-xl";
 
   return (
     <AnimatePresence>
@@ -294,13 +293,13 @@ export function OnboardingOverlay() {
               {view === "step-persona" && (
                 <PersonaView
                   onComplete={handlePersonaComplete}
-                  onBack={() => setView("checklist")}
+                  onBack={() => setView("step-brand")}
                 />
               )}
               {view === "step-video" && (
                 <VideoLaunchView
                   onLaunch={handleLaunchGenerator}
-                  onBack={() => setView("checklist")}
+                  onBack={() => setView("step-persona")}
                   products={products ?? []}
                   personas={(personas ?? []).filter(
                     (p) => p.selected_image_url != null,
@@ -311,7 +310,7 @@ export function OnboardingOverlay() {
 
             {/* Footer skip — only shown on checklist */}
             {view === "checklist" && (
-              <div className="shrink-0 border-t border-border px-5 py-3">
+              <div className="shrink-0 border-t border-border px-6 py-3">
                 <button
                   onClick={handleSkip}
                   className="text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
@@ -350,7 +349,7 @@ function WizardHeader({
       : (activeStep?.title ?? "Setup");
 
   return (
-    <div className="shrink-0 border-b border-border p-5">
+    <div className="shrink-0 border-b border-border p-6">
       <div className="mb-4 flex items-center gap-3">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
           <Sparkles className="size-4 text-primary" />
@@ -383,19 +382,21 @@ function WizardHeader({
             view === "checklist";
 
           return (
-            <div
+            <button
               key={step.key}
+              onClick={() => done ? onNavigate(step.view) : undefined}
+              disabled={!done && !isCurrentView}
               className={cn(
                 "flex flex-1 items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-medium transition-all",
                 done &&
-                  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+                  "cursor-pointer bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/25",
                 (isCurrentView || isNextActive) &&
                   !done &&
                   "bg-primary/15 text-primary",
                 !done &&
                   !isCurrentView &&
                   !isNextActive &&
-                  "bg-muted text-muted-foreground",
+                  "bg-muted text-muted-foreground opacity-60",
               )}
             >
               {done ? (
@@ -406,7 +407,7 @@ function WizardHeader({
                 </span>
               )}
               <span>{step.label}</span>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -432,7 +433,7 @@ function ChecklistView({
   onStartStep: (view: WizardView) => void;
 }) {
   return (
-    <div className="flex flex-col gap-3 p-5">
+    <div className="flex flex-col gap-3 p-6">
       <p className="text-sm text-muted-foreground">
         Complete these 3 steps to launch your first UGC video ad.
       </p>
@@ -490,6 +491,17 @@ function ChecklistView({
               </p>
             </div>
 
+            {done && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="shrink-0 gap-1.5 text-muted-foreground"
+                onClick={() => onStartStep(step.view)}
+              >
+                <Pencil className="size-3.5" />
+                Edit
+              </Button>
+            )}
             {isActive && (
               <Button
                 size="sm"
@@ -599,7 +611,7 @@ function BrandImportView({
   }
 
   return (
-    <div className="flex flex-col gap-4 p-5">
+    <div className="flex flex-col gap-4 p-6">
       <BackButton onClick={onBack} />
 
       <div>
@@ -724,7 +736,7 @@ function PersonaView({
   onBack: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-4 p-5">
+    <div className="flex flex-col gap-4 p-6">
       <BackButton onClick={onBack} />
 
       <div>
@@ -759,7 +771,7 @@ function VideoLaunchView({
   const firstPersona = personas[0];
 
   return (
-    <div className="flex flex-col gap-5 p-5">
+    <div className="flex flex-col gap-5 p-6">
       <BackButton onClick={onBack} />
 
       <div>

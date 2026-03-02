@@ -392,6 +392,22 @@ export default function GeneratePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generateComposites.isPending]);
 
+  // Cycling progress messages while script generates
+  const SCRIPT_MESSAGES = [
+    "Analysing your product details...",
+    "Crafting the perfect hook...",
+    "Writing a compelling body...",
+    "Polishing the call-to-action...",
+    "Almost there...",
+  ];
+  const [scriptMsgIdx, setScriptMsgIdx] = useState(0);
+  useEffect(() => {
+    if (!generateScript.isPending) { setScriptMsgIdx(0); return; }
+    const id = setInterval(() => setScriptMsgIdx((i) => (i + 1) % SCRIPT_MESSAGES.length), 3200);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generateScript.isPending]);
+
   const confirmedProducts = products?.filter((p) => p.confirmed) ?? [];
   const activePersonas = personas ?? [];
 
@@ -1718,7 +1734,7 @@ export default function GeneratePage() {
                     <Loader2 className="size-7 animate-spin text-primary" />
                     <div>
                       <p className="text-sm font-semibold text-foreground">Writing your script…</p>
-                      <p className="text-xs text-muted-foreground mt-1">AI is crafting your Hook, Body & CTA. Almost there!</p>
+                      <p className="text-xs text-muted-foreground mt-1">{SCRIPT_MESSAGES[scriptMsgIdx]}</p>
                     </div>
                   </div>
                 ) : store.pendingScript ? (
@@ -1936,7 +1952,7 @@ export default function GeneratePage() {
                         <Loader2 className="size-7 animate-spin text-primary" />
                         <div>
                           <p className="text-sm font-semibold text-foreground">Writing your script…</p>
-                          <p className="text-xs text-muted-foreground mt-1">AI is crafting your Hook, Body & CTA. Almost there!</p>
+                          <p className="text-xs text-muted-foreground mt-1">{SCRIPT_MESSAGES[scriptMsgIdx]}</p>
                         </div>
                       </div>
                     ) : store.pendingScript ? (
