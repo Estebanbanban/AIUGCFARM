@@ -1396,7 +1396,9 @@ export default function GeneratePage() {
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-2">
                     <div className="grid grid-cols-2 gap-2">
-                      {CTA_STYLE_OPTIONS.map((option) => (
+                      {CTA_STYLE_OPTIONS.filter((o) =>
+                        o.key === "auto" || o.key === "link_in_bio" || o.key === "direct_website"
+                      ).map((option) => (
                         <button
                           key={option.key}
                           type="button"
@@ -1413,6 +1415,35 @@ export default function GeneratePage() {
                         </button>
                       ))}
                     </div>
+                    {showMoreCta && (
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        {CTA_STYLE_OPTIONS.filter((o) =>
+                          o.key !== "auto" && o.key !== "link_in_bio" && o.key !== "direct_website"
+                        ).map((option) => (
+                          <button
+                            key={option.key}
+                            type="button"
+                            onClick={() => { store.setCtaStyle(option.key); setScriptConfigChanged(true); }}
+                            className={cn(
+                              "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                              store.ctaStyle === option.key
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-muted-foreground/30",
+                            )}
+                          >
+                            <p className="text-sm font-semibold">{option.label}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">{option.description}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowMoreCta(v => !v)}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2"
+                    >
+                      {showMoreCta ? "Fewer CTA options \u25B2" : "More CTA options \u25BC"}
+                    </button>
                     {requiresCommentKeyword && (
                       <div className="mt-3">
                         <Label htmlFor="cta-comment-keyword" className="text-xs text-muted-foreground">
@@ -1430,6 +1461,164 @@ export default function GeneratePage() {
                     )}
                   </CollapsibleContent>
                 </Collapsible>
+
+                {/* Advanced options toggle */}
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced(v => !v)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Settings2 className="size-3.5" />
+                  {showAdvanced ? "Hide advanced options \u25B2" : "Advanced options \u25BC"}
+                </button>
+
+                {showAdvanced && (
+                  <div className="flex flex-col gap-5">
+                    {/* Easy / Advanced mode tab */}
+                    <div className="flex rounded-lg border border-border bg-muted/40 p-1 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => store.setAdvancedMode(false)}
+                        className={cn(
+                          "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all",
+                          !store.advancedMode
+                            ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        <Zap className="size-4" />
+                        Easy Mode
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!store.advancedMode) {
+                            handleSwitchToAdvanced();
+                          }
+                        }}
+                        className={cn(
+                          "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all",
+                          store.advancedMode
+                            ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        <Settings2 className="size-4" />
+                        Advanced
+                      </button>
+                    </div>
+
+                    {/* Mode selector */}
+                    <div>
+                      <p className="mb-2 text-sm font-medium">Generation mode</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            store.setMode("single");
+                            setScriptConfigChanged(true);
+                          }}
+                          className={cn(
+                            "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                            store.mode === "single"
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-muted-foreground/30",
+                          )}
+                        >
+                          <div className="flex w-full items-center justify-between">
+                            <p className="text-sm font-semibold">Single</p>
+                            <p className="text-sm font-bold text-primary">
+                              {store.quality === "hd" ? CREDITS_PER_SINGLE_HD : CREDITS_PER_SINGLE} cr
+                            </p>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">1 complete video · fastest</p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            store.setMode("triple");
+                            setScriptConfigChanged(true);
+                          }}
+                          className={cn(
+                            "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                            store.mode === "triple"
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-muted-foreground/30",
+                          )}
+                        >
+                          <div className="flex w-full items-center justify-between">
+                            <p className="text-sm font-semibold">3x</p>
+                            <p className="text-sm font-bold text-primary">
+                              {store.quality === "hd" ? CREDITS_PER_BATCH_HD : CREDITS_PER_BATCH} cr
+                            </p>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">27 combos · pick your best</p>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quality selector */}
+                    <div>
+                      <p className="mb-2 text-sm font-medium">Video quality</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { store.setQuality("standard"); setScriptConfigChanged(true); }}
+                          className={cn(
+                            "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                            store.quality === "standard"
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-muted-foreground/30",
+                          )}
+                        >
+                          <p className="text-sm font-semibold">Kling 2.6</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">Faster · great for testing</p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            store.setQuality("hd");
+                            setScriptConfigChanged(true);
+                          }}
+                          className={cn(
+                            "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                            store.quality === "hd"
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-muted-foreground/30",
+                          )}
+                        >
+                          <div className="flex w-full items-center justify-between">
+                            <p className="text-sm font-semibold">Kling V3</p>
+                            <Badge variant="secondary" className="text-[10px]">2x cr</Badge>
+                          </div>
+                          <p className="mt-0.5 text-xs text-muted-foreground">Best quality · final ads</p>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Language */}
+                    <div>
+                      <p className="mb-2 text-sm font-medium">Script language</p>
+                      <div className="flex flex-wrap gap-2">
+                        {LANGUAGE_OPTIONS.map((lang) => (
+                          <button
+                            key={lang.code}
+                            type="button"
+                            onClick={() => { store.setLanguage(lang.code); setScriptConfigChanged(true); }}
+                            className={cn(
+                              "rounded-lg border-2 px-3 py-1.5 text-sm transition-all",
+                              store.language === lang.code
+                                ? "border-primary bg-primary/5 font-medium text-primary"
+                                : "border-border text-muted-foreground hover:border-muted-foreground/40",
+                            )}
+                          >
+                            {lang.native}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {requiresCommentKeyword && !commentKeyword && (
                   <div className="rounded-xl bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
@@ -2076,36 +2265,42 @@ export default function GeneratePage() {
                     })}
                   </div>
 
-                  <div className="mt-12 text-center max-w-2xl mx-auto">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-5">
-                      Or buy one-time credit packs
-                    </p>
-                    <div className="flex flex-wrap justify-center gap-3">
-                      {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => {
-                        const discountedPackPrice = offer.discountedPrice(pack.price);
-                        return (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() => handleBuyPack(key)}
-                            disabled={buyCredits.isPending}
-                            className="px-6 py-3 rounded-xl border border-border bg-card hover:border-muted-foreground/40 transition-colors text-sm disabled:opacity-50"
-                          >
-                            <span className="font-bold text-foreground">{pack.credits} credits</span>
-                            {" "}
-                            <span className="text-muted-foreground">
-                              -{" "}
-                              <span className="line-through">${pack.price}</span>{" "}
-                              <span className="text-primary font-semibold">${discountedPackPrice}</span>
-                            </span>
-                          </button>
-                        );
-                      })}
+                  {userPlan !== "free" ? (
+                    <div className="mt-12 text-center max-w-2xl mx-auto">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-5">
+                        Top up your credits
+                      </p>
+                      <div className="flex flex-wrap justify-center gap-3">
+                        {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => {
+                          const discountedPackPrice = offer.discountedPrice(pack.price);
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => handleBuyPack(key)}
+                              disabled={buyCredits.isPending}
+                              className="px-6 py-3 rounded-xl border border-border bg-card hover:border-muted-foreground/40 transition-colors text-sm disabled:opacity-50"
+                            >
+                              <span className="font-bold text-foreground">{pack.credits} credits</span>
+                              {" "}
+                              <span className="text-muted-foreground">
+                                -{" "}
+                                <span className="line-through">${pack.price}</span>{" "}
+                                <span className="text-primary font-semibold">${discountedPackPrice}</span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-5 text-xs text-muted-foreground">
+                        No commitment on packs · Cancel subscriptions anytime
+                      </p>
                     </div>
-                    <p className="mt-5 text-xs text-muted-foreground">
-                      No commitment on packs · Cancel subscriptions anytime
+                  ) : (
+                    <p className="mt-8 text-center text-xs text-muted-foreground">
+                      Already subscribed? Top up credits in your billing settings.
                     </p>
-                  </div>
+                  )}
                 </>
               )}
             </div>
