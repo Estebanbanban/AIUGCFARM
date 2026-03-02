@@ -9,14 +9,16 @@ import { useProfile, PERSONA_SLOT_LIMITS } from "@/hooks/use-profile";
 import Image from "next/image";
 import {
   ArrowLeft, Loader2, Sparkles, Check, User, ImageIcon,
-  ChevronDown, ChevronUp, Eye, Palette, Clock, Shirt, Watch, Wand2,
+  ChevronDown, ChevronUp, Eye, Palette, Clock, Shirt, Watch, Wand2, AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { callEdge } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { usePersonaBuilderStore } from "@/stores/persona-builder";
@@ -512,13 +514,24 @@ function NewPersonaPageInner() {
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
   const store = usePersonaBuilderStore();
+  const queryClient = useQueryClient();
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<number>>(new Set());
   const [msgIdx, setMsgIdx] = useState(0);
+  const [createMode, setCreateMode] = useState<"quick" | "custom">("quick");
+  const [quickDescription, setQuickDescription] = useState("");
+  const [isGeneratingQuick, setIsGeneratingQuick] = useState(false);
+  const [personaName, setPersonaName] = useState("");
 
   // Redirect guard: prevent access when at persona limit
   const { data: profile } = useProfile();
   const { data: personas } = usePersonas();
   const isRegeneration = !!store.personaId;
+
+  const personaCount = personas?.length ?? 0;
+  const plan = profile?.plan ?? "free";
+  const personaLimit = PERSONA_SLOT_LIMITS[plan as keyof typeof PERSONA_SLOT_LIMITS] ?? 1;
+  const isFreePlan = plan === "free" || plan === "starter";
+  const isAtPersonaLimit = personaCount >= personaLimit;
 
   useEffect(() => {
     if (!profile || !personas || isRegeneration) return;
@@ -651,6 +664,36 @@ function NewPersonaPageInner() {
     }
   }
 
+  async function handleQuickGenerate() {
+    if (!personaName.trim() || !quickDescription.trim()) return;
+    if (isAtPersonaLimit) return;
+
+    setIsGeneratingQuick(true);
+    try {
+      const result = await callEdge<{
+        data: {
+          id: string;
+          generated_images: string[];
+          generated_image_urls: string[];
+        };
+      }>("generate-persona", {
+        body: {
+          name: personaName.trim(),
+          description: quickDescription.trim(),
+        },
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["personas"] });
+      toast.success("Persona generated! Select your favorite image below.");
+      router.push(`/personas/${result.data.id}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to generate persona";
+      toast.error(msg);
+    } finally {
+      setIsGeneratingQuick(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -668,6 +711,110 @@ function NewPersonaPageInner() {
         </div>
       </div>
 
+      {/* Free plan warning */}
+      {isFreePlan && !isAtPersonaLimit && !isRegeneration && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+          <AlertCircle className="size-4 shrink-0 text-amber-600 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+              Free plan: 1 persona slot
+            </p>
+            <p className="text-xs text-amber-600/80 dark:text-amber-500/80 mt-0.5">
+              Choose carefully — you can customize it later, but you can only create 1 persona on the free plan.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Mode selector */}
+      {!isRegeneration && (
+        <div className="flex gap-2 rounded-xl border border-border bg-muted/50 p-1">
+          <button
+            type="button"
+            onClick={() => setCreateMode("quick")}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
+              createMode === "quick"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Wand2 className="size-4" />
+            Quick Create
+          </button>
+          <button
+            type="button"
+            onClick={() => setCreateMode("custom")}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
+              createMode === "custom"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Palette className="size-4" />
+            Custom Create
+          </button>
+        </div>
+      )}
+
+      {/* Quick Create mode */}
+      {createMode === "quick" && !isRegeneration && (
+        <div className="flex flex-col gap-4">
+          {/* Name input */}
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="quick-persona-name">Persona name</Label>
+            <Input
+              id="quick-persona-name"
+              placeholder="e.g. Sophia, Alex, Maya..."
+              value={personaName}
+              onChange={(e) => setPersonaName(e.target.value)}
+            />
+          </div>
+          {/* Description */}
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="quick-description">Describe your persona</Label>
+            <Textarea
+              id="quick-description"
+              placeholder="e.g. A 28-year-old Black woman with natural curly hair, casual but stylish, gym lifestyle, friendly and energetic"
+              value={quickDescription}
+              onChange={(e) => setQuickDescription(e.target.value)}
+              rows={3}
+              className="resize-none"
+            />
+            <p className="text-xs text-muted-foreground">
+              Describe appearance, style, age, or personality. The AI will generate images from your description.
+            </p>
+          </div>
+          {/* Generate button */}
+          <Button
+            onClick={handleQuickGenerate}
+            disabled={!personaName.trim() || !quickDescription.trim() || isGeneratingQuick || isAtPersonaLimit}
+            className="w-full gap-2"
+            size="lg"
+          >
+            {isGeneratingQuick ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Generating persona...
+              </>
+            ) : (
+              <>
+                <Sparkles className="size-4" />
+                Generate Persona
+              </>
+            )}
+          </Button>
+          {isAtPersonaLimit && (
+            <p className="text-xs text-destructive text-center">
+              You have reached your persona limit. Upgrade to create more.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Custom Create mode (full attribute builder) */}
+      {(createMode === "custom" || isRegeneration) && (
       <div className={cn(
         "grid gap-6",
         store.generatedImages.length > 0
@@ -1052,6 +1199,7 @@ function NewPersonaPageInner() {
         </div>
 
       </div>
+      )} {/* end custom mode */}
     </div>
   );
 }

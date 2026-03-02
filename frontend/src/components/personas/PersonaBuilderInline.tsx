@@ -8,7 +8,7 @@ import Image from 'next/image';
 import {
   Loader2, Sparkles, Check, User, ImageIcon, X,
   ChevronDown, ChevronUp, Eye, Palette, Clock,
-  Shirt, Watch, Type, LayoutGrid,
+  Shirt, Watch, Type, LayoutGrid, Wand2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -579,6 +579,9 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<number>>(new Set());
   const [builderMode, setBuilderMode] = useState<'visual' | 'text'>('visual');
   const [textPrompt, setTextPrompt] = useState('');
+  const [createMode, setCreateMode] = useState<'quick' | 'custom'>('quick');
+  const [quickDescription, setQuickDescription] = useState('');
+  const [isGeneratingQuick, setIsGeneratingQuick] = useState(false);
 
   // ── Theme detection ────────────────────────────────────────────────────────
   const { resolvedTheme } = useTheme();
@@ -602,6 +605,28 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
   const accessoriesPlaceholderStyleDynamic: Record<string, React.CSSProperties> =
     Object.fromEntries(accessoryOptions.map((value) => [value, neutralCardStyle(`accessory-${value}`, isDark)]));
 
+
+  async function handleQuickCreate() {
+    if (!store.name.trim() || !quickDescription.trim()) return;
+
+    setIsGeneratingQuick(true);
+    try {
+      const result = await callEdge<{
+        data: { id: string; generated_images: string[]; generated_image_urls: string[] }
+      }>('generate-persona', {
+        body: { name: store.name.trim(), description: quickDescription.trim() },
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['personas'] });
+      toast.success('Persona generated! Select your image below.');
+      onSaved(result.data.id);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to generate persona';
+      toast.error(msg);
+    } finally {
+      setIsGeneratingQuick(false);
+    }
+  }
 
   async function handleGenerate() {
     if (!store.name.trim()) return;
@@ -724,6 +749,62 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
             (store.isGenerating || store.isSaving) && 'pointer-events-none opacity-50',
           )}>
 
+            {/* Persona Name (always visible) */}
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Persona Name
+              </Label>
+              <Input
+                placeholder="e.g. Sophie, Marcus"
+                value={store.name}
+                onChange={(e) => store.setField('name', e.target.value)}
+              />
+            </div>
+
+            {/* Quick / Custom mode selector */}
+            <div className="flex gap-1.5 rounded-xl border border-border bg-muted/50 p-1 mb-4">
+              <button type="button" onClick={() => setCreateMode('quick')} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all', createMode === 'quick' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+                <Wand2 className="size-3.5" />
+                Quick
+              </button>
+              <button type="button" onClick={() => setCreateMode('custom')} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all', createMode === 'custom' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+                <Palette className="size-3.5" />
+                Custom
+              </button>
+            </div>
+
+            {/* Quick Create mode */}
+            {createMode === 'quick' && (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="inline-quick-description" className="text-xs">Describe your persona</Label>
+                  <Textarea
+                    id="inline-quick-description"
+                    placeholder="e.g. A 28-year-old Black woman with natural hair, casual sporty style, friendly energy"
+                    value={quickDescription}
+                    onChange={(e) => setQuickDescription(e.target.value)}
+                    rows={3}
+                    className="resize-none text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">The AI will generate images from your description.</p>
+                </div>
+                <Button
+                  onClick={handleQuickCreate}
+                  disabled={!store.name.trim() || !quickDescription.trim() || isGeneratingQuick}
+                  className="w-full gap-2"
+                >
+                  {isGeneratingQuick ? (
+                    <><Loader2 className="size-4 animate-spin" />Generating...</>
+                  ) : (
+                    <><Sparkles className="size-4" />Generate from description</>
+                  )}
+                </Button>
+              </div>
+            )}
+
+            {/* Custom mode: the full visual / text builder */}
+            {createMode === 'custom' && (<>
+
             {/* Mode toggle */}
             <div className="flex rounded-lg border border-border bg-muted/50 p-1">
               <button
@@ -795,18 +876,6 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
               </div>
             ) : (
             <>
-
-            {/* Name */}
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Persona Name
-              </Label>
-              <Input
-                placeholder="e.g. Sophie, Marcus"
-                value={store.name}
-                onChange={(e) => store.setField('name', e.target.value)}
-              />
-            </div>
 
             {/* Gender */}
             <Section icon={<User className="size-4" />} label="Gender" count={1}>
@@ -960,6 +1029,8 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
 
             </>
             )}
+
+            </>) /* end createMode === 'custom' */}
 
           </div>
         </fieldset>
