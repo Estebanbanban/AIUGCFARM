@@ -73,6 +73,7 @@ import {
   useGenerateCompositeImages,
   useGenerateScript,
   useApproveAndGenerate,
+  useGenerations,
 } from "@/hooks/use-generations";
 import { useCheckout, useBuyCredits } from "@/hooks/use-checkout";
 import { useProfile, HD_QUALITY_PLANS, ADVANCED_MODE_PLANS } from "@/hooks/use-profile";
@@ -347,6 +348,7 @@ export default function GeneratePage() {
   const checkout = useCheckout();
   const buyCredits = useBuyCredits();
   const offer = useFirstPurchaseOffer();
+  const { data: generations } = useGenerations();
 
   // Auto-fire composites when arriving at Section 3 (step >= 4) via cold restore
   useEffect(() => {
@@ -632,6 +634,8 @@ export default function GeneratePage() {
     if (!hasEnoughCredits) {
       trackPaywallShown("insufficient_credits");
       offer.startOffer();
+      // Set default tab based on generation context
+      setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
       setShowPaywall(true);
       return;
     }
@@ -697,6 +701,8 @@ export default function GeneratePage() {
     if (!hasEnoughCredits) {
       trackPaywallShown("insufficient_credits");
       offer.startOffer();
+      // Set default tab based on generation context
+      setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
       setShowPaywall(true);
       return;
     }
@@ -819,6 +825,43 @@ export default function GeneratePage() {
   // ─────────────────────────────────────────────────────────────────────────
   // Render
   // ─────────────────────────────────────────────────────────────────────────
+
+  const videosGenerated = (generations ?? []).filter((g) => g.status === "completed").length;
+
+  const paywallHeadline =
+    videosGenerated === 0
+      ? "Create your first UGC ad — in seconds."
+      : videosGenerated === 1
+      ? "It works. Now scale your production."
+      : "Scale your ad production.";
+
+  const paywallSublineStatic =
+    videosGenerated === 0
+      ? "AI writes the script, composites your persona, and renders the video. No filming needed."
+      : null;
+
+  function handlePaywallClose(open: boolean) {
+    if (!open && !hasEnoughCredits) {
+      if (isFirstVideo) {
+        toast("Your 50% first-video discount is still available!", {
+          duration: 8000,
+          icon: "🎬",
+          action: {
+            label: "Grab it",
+            onClick: () => {
+              offer.startOffer();
+              setShowPaywall(true);
+            },
+          },
+        });
+      } else if (videosGenerated > 0) {
+        toast("Come back when you're ready to scale your production.", {
+          duration: 5000,
+        });
+      }
+    }
+    setShowPaywall(open);
+  }
 
   // Section 1 is "complete" once the user has moved past it
   const section1Complete = store.step >= 2;
@@ -1514,9 +1557,32 @@ export default function GeneratePage() {
 
                 {/* Composites generating indicator */}
                 {generateComposites.isPending && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground rounded-xl bg-muted/50 px-4 py-3">
-                    <Loader2 className="size-4 animate-spin shrink-0" />
-                    <span>{COMPOSITE_MESSAGES[compositeMsgIdx]}</span>
+                  <div className="flex flex-col gap-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      {[0, 1, 2, 3].map((i) => (
+                        <div
+                          key={i}
+                          className={cn(
+                            "relative overflow-hidden rounded-xl border border-border bg-muted",
+                            store.format === "9:16" ? "aspect-[9/16]" : "aspect-video",
+                          )}
+                        >
+                          <div
+                            className="absolute inset-0 animate-pulse bg-gradient-to-br from-muted to-muted-foreground/5"
+                            style={{ animationDelay: `${i * 200}ms` }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex flex-col items-center gap-1.5 py-2">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="size-4 animate-spin" />
+                        <span>{COMPOSITE_MESSAGES[compositeMsgIdx]}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground/60">
+                        Usually takes about 45 seconds
+                      </p>
+                    </div>
                   </div>
                 )}
 
@@ -1921,7 +1987,7 @@ export default function GeneratePage() {
       )}
 
       {/* ── Paywall dialog ────────────────────────────────────────────── */}
-      <Dialog open={showPaywall} onOpenChange={setShowPaywall}>
+      <Dialog open={showPaywall} onOpenChange={handlePaywallClose}>
         <DialogContent className="sm:max-w-4xl p-0 overflow-hidden max-h-[92vh] flex flex-col">
           <DialogTitle className="sr-only">Upgrade to generate videos</DialogTitle>
           <DialogDescription className="sr-only">Choose a plan or credit pack to start generating video ads.</DialogDescription>
@@ -1942,13 +2008,17 @@ export default function GeneratePage() {
           <div className="overflow-y-auto flex-1">
             <div className="text-center max-w-2xl mx-auto pt-10 pb-6 px-6">
               <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground mb-3 tracking-tight">
-                Scale your ad production.
+                {paywallHeadline}
               </h2>
-              <p className="text-muted-foreground font-medium">
-                Traditional UGC costs{" "}
-                <span className="line-through decoration-muted-foreground/50">$150–$500</span>.
-                {" "}Get the same quality instantly for a fraction of the cost.
-              </p>
+              {paywallSublineStatic ? (
+                <p className="text-muted-foreground font-medium">{paywallSublineStatic}</p>
+              ) : (
+                <p className="text-muted-foreground font-medium">
+                  Traditional UGC costs{" "}
+                  <span className="line-through decoration-muted-foreground/50">$150–$500</span>.
+                  {" "}Get the same quality instantly for a fraction of the cost.
+                </p>
+              )}
             </div>
 
             <div className="flex justify-center mb-8 px-4">
@@ -2049,6 +2119,18 @@ export default function GeneratePage() {
                   >
                     {buyCredits.isPending ? <Loader2 className="size-4 animate-spin" /> : "Generate Video →"}
                   </Button>
+                  {videosGenerated === 0 && isFirstVideo && (
+                    <div className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
+                      <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                        First video: 50% OFF applied automatically
+                      </span>
+                    </div>
+                  )}
+                  {videosGenerated > 0 && (
+                    <p className="text-center text-xs text-primary/70 mt-2 font-medium">
+                      You know it works. Keep scaling.
+                    </p>
+                  )}
                   <p className="text-center text-xs text-muted-foreground mt-3">
                     Buying {store.quality === "hd" ? "10" : "5"} credits · Unused credits carry over for future videos
                   </p>

@@ -106,6 +106,43 @@ function validateAttributes(
   return null;
 }
 
+/**
+ * Parse a free-form persona description into structured attributes via OpenRouter.
+ */
+async function descriptionToAttributes(description: string): Promise<PersonaAttributes> {
+  const prompt = `Convert this persona description into a JSON object with EXACTLY these fields. Choose the closest valid value for each field:
+
+{
+  "gender": "male" | "female" | "non_binary",
+  "age": "18_25" | "25_35" | "35_45" | "45_55" | "55_plus",
+  "ethnicity": "<descriptive label: 'East Asian', 'Black / African', 'Hispanic / Latino', 'South Asian', 'White / European', 'Middle Eastern', 'Mixed', etc.>",
+  "hair_color": "<color as string>",
+  "hair_style": "<style as string>",
+  "eye_color": "<color as string>",
+  "body_type": "slim" | "average" | "athletic" | "curvy" | "plus_size",
+  "clothing_style": "<style description>",
+  "accessories": []
+}
+
+Description: "${description.replace(/"/g, '\\"')}"
+
+Return ONLY valid JSON, no explanation, no markdown.`;
+
+  const response = await callOpenRouter(
+    [{ role: "user", content: prompt }],
+    { maxTokens: 400, timeoutMs: 25000 },
+  );
+
+  // Strip markdown code blocks if present
+  const cleaned = response.trim().replace(/^```(?:json)?\n?|\n?```$/g, "").trim();
+  const parsed = JSON.parse(cleaned);
+
+  // Ensure accessories is always an array
+  if (!Array.isArray(parsed.accessories)) parsed.accessories = [];
+
+  return parsed as PersonaAttributes;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Prompt building                                                   */
 /* ------------------------------------------------------------------ */
@@ -314,22 +351,39 @@ Deno.serve(async (req: Request) => {
     const userId = await requireUserId(req);
     const sb = getAdminClient();
 
-    const { name, attributes, persona_id } = await req.json();
+    const { name, attributes, description, persona_id } = await req.json();
+
+    // Description mode: use OpenRouter to parse free-form description into structured attributes
+    let resolvedAttributes = attributes;
+    if (description && typeof description === "string" && description.trim().length > 0) {
+      if (!resolvedAttributes || Object.keys(resolvedAttributes ?? {}).length === 0) {
+        try {
+          resolvedAttributes = await descriptionToAttributes(description.trim());
+        } catch (err) {
+          console.error("Failed to parse description into attributes:", err);
+          return json(
+            { detail: "Could not understand the persona description. Please try again or use manual attribute selection." },
+            cors,
+            400,
+          );
+        }
+      }
+    }
 
     if (!name || typeof name !== "string") {
       return json({ detail: "name is required" }, cors, 400);
     }
-    if (!attributes || typeof attributes !== "object" || Array.isArray(attributes)) {
-      return json({ detail: "attributes object is required" }, cors, 400);
+    if (!resolvedAttributes || typeof resolvedAttributes !== "object" || Array.isArray(resolvedAttributes)) {
+      return json({ detail: "Either 'attributes' or 'description' is required" }, cors, 400);
     }
 
     // Validate attributes
-    const validationError = validateAttributes(attributes as Record<string, unknown>);
+    const validationError = validateAttributes(resolvedAttributes as Record<string, unknown>);
     if (validationError) {
       return json({ detail: validationError }, cors, 400);
     }
 
-    const validAttrs = attributes as PersonaAttributes;
+    const validAttrs = resolvedAttributes as PersonaAttributes;
     const isRegeneration = typeof persona_id === "string" && persona_id.length > 0;
 
     // Fetch profile once — used for slot limit + regen rate limit
