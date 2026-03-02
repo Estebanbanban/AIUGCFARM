@@ -14,6 +14,7 @@ import {
   Loader2,
   PlayCircle,
   Sparkles,
+  CheckCircle2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatDate } from "@/lib/utils";
@@ -90,6 +91,15 @@ export default function DashboardPage() {
   const creditsTotal = planConfig?.credits ?? 9;
 
   const hasProduct = (products?.length ?? 0) > 0;
+
+  const activeGenerations = (generations ?? []).filter(g =>
+    ['locking', 'submitting_jobs', 'generating_segments'].includes(g.status)
+  );
+  const justCompletedGenerations = (generations ?? []).filter(g => {
+    if (g.status !== 'completed') return false;
+    const completedAt = new Date(g.completed_at ?? g.created_at);
+    return Date.now() - completedAt.getTime() < 10 * 60 * 1000;
+  });
 
   const draftGenerations = (generations ?? []).filter(
     (g) => g.status === "awaiting_approval",
@@ -197,6 +207,54 @@ export default function DashboardPage() {
               >
                 <Sparkles className="size-3.5" />
                 Open Tutorial
+              </Button>
+            </CardContent>
+          </Card>
+        </FadeInUp>
+      )}
+
+      {activeGenerations.length > 0 && (
+        <FadeInUp delay={0.04}>
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="flex items-center gap-4 p-4">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+                <Loader2 className="size-4 animate-spin text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  {activeGenerations.length === 1
+                    ? `Your video is generating...`
+                    : `${activeGenerations.length} videos generating...`}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {activeGenerations[0]?.products?.name && `"${activeGenerations[0].products.name}" · `}
+                  Usually ready in ~75 seconds
+                </p>
+              </div>
+              <Button size="sm" variant="outline" asChild className="shrink-0">
+                <Link href="/history">View progress →</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </FadeInUp>
+      )}
+
+      {justCompletedGenerations.length > 0 && activeGenerations.length === 0 && (
+        <FadeInUp delay={0.04}>
+          <Card className="border-emerald-500/30 bg-emerald-500/5">
+            <CardContent className="flex items-center gap-4 p-4">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15">
+                <CheckCircle2 className="size-4 text-emerald-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">Your video is ready!</p>
+                <p className="text-xs text-muted-foreground">
+                  {justCompletedGenerations[0]?.products?.name && `"${justCompletedGenerations[0].products.name}" · `}
+                  Download your segments below
+                </p>
+              </div>
+              <Button size="sm" asChild className="shrink-0">
+                <Link href="/history">View videos →</Link>
               </Button>
             </CardContent>
           </Card>

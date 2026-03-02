@@ -1,5 +1,6 @@
 "use client";
 
+import { Shield, RefreshCw, Star } from "lucide-react";
 import { FadeInUp } from "@/lib/motion";
 import { UrlInputCta } from "./UrlInputCta";
 
@@ -18,9 +19,20 @@ export function FinalCtaSection() {
             Start generating unlimited variations.
           </p>
           <UrlInputCta location="final_cta" />
-          <p className="text-xs text-muted-foreground mt-6">
-            Join 500+ e-commerce brands using Cinerads
+          <p className="text-xs text-muted-foreground mt-4">
+            No credit card for brand + persona setup
           </p>
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground mt-4">
+            <span className="flex items-center gap-1.5">
+              <Shield className="size-3.5 text-green-500" /> Secured by Stripe
+            </span>
+            <span className="flex items-center gap-1.5">
+              <RefreshCw className="size-3.5" /> Cancel anytime
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Star className="size-3.5 text-amber-500" /> 500+ brands already using it
+            </span>
+          </div>
         </FadeInUp>
       </div>
     </section>

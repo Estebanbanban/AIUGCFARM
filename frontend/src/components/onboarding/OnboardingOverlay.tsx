@@ -61,7 +61,7 @@ const STEPS = [
     key: "persona" as const,
     label: "Persona",
     title: "Create your AI creator",
-    description: "Design the persona that will star in your videos. (~5 min)",
+    description: "Create your AI spokesperson — customize look, style & vibe. They'll star in every video you make. (~5 min)",
     icon: User,
     doneKey: "hasPersonaWithImage" as const,
     view: "step-persona" as WizardView,
@@ -277,6 +277,7 @@ export function OnboardingOverlay() {
               completedCount={completedCount}
               doneMap={doneMap}
               onClose={handleSkip}
+              onNavigate={setView}
             />
 
             {/* Scrollable content */}
@@ -333,6 +334,7 @@ function WizardHeader({
   completedCount,
   doneMap,
   onClose,
+  onNavigate,
 }: {
   view: WizardView;
   completedCount: number;
@@ -341,6 +343,7 @@ function WizardHeader({
     boolean
   >;
   onClose: () => void;
+  onNavigate: (view: WizardView) => void;
 }) {
   const activeStep = STEPS.find((s) => s.view === view);
   const title =
@@ -538,6 +541,7 @@ function BrandImportView({
   const [scrapedBrandSummary, setScrapedBrandSummary] =
     useState<BrandSummary | null>(null);
   const [showScrapeResults, setShowScrapeResults] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   async function handleScrape() {
     if (!importUrl.trim()) return;
@@ -601,13 +605,34 @@ function BrandImportView({
     setShowScrapeResults(false);
     setScrapedProducts([]);
     setScrapedBrandSummary(null);
-    onComplete();
+    setShowSuccess(true);
+    setTimeout(onComplete, 1500);
   }
 
   function handleUploadSuccess() {
     // ManualUploadForm does not invalidate the RQ cache — we do it here
     queryClient.invalidateQueries({ queryKey: ["products"] });
-    onComplete();
+    setShowSuccess(true);
+    setTimeout(onComplete, 1500);
+  }
+
+  if (showSuccess) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-10 p-6">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+          className="flex size-16 items-center justify-center rounded-full bg-emerald-500/15"
+        >
+          <CheckCircle2 className="size-8 text-emerald-500" />
+        </motion.div>
+        <div className="text-center">
+          <p className="text-base font-semibold text-foreground">Brand imported!</p>
+          <p className="text-sm text-muted-foreground">Moving to your persona...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -735,21 +760,42 @@ function PersonaView({
   onComplete: () => void;
   onBack: () => void;
 }) {
-  return (
-    <div className="flex flex-col gap-4 p-6">
-      <BackButton onClick={onBack} />
+  const [showSuccess, setShowSuccess] = useState(false);
 
+  function handleSaved() {
+    setShowSuccess(true);
+    setTimeout(onComplete, 1500);
+  }
+
+  if (showSuccess) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-10 p-5">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+          className="flex size-16 items-center justify-center rounded-full bg-emerald-500/15"
+        >
+          <CheckCircle2 className="size-8 text-emerald-500" />
+        </motion.div>
+        <div className="text-center">
+          <p className="text-base font-semibold text-foreground">Persona created!</p>
+          <p className="text-sm text-muted-foreground">Your AI spokesperson is ready...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4 p-5">
+      <BackButton onClick={onBack} />
       <div>
-        <h3 className="text-sm font-semibold text-foreground">
-          Create your AI creator
-        </h3>
+        <h3 className="text-sm font-semibold text-foreground">Create your AI Spokesperson</h3>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Design the persona that will star in your UGC videos — look, voice,
-          and style.
+          Design the face of your brand. This persona will appear in all your videos — take a moment to get them just right.
         </p>
       </div>
-
-      <PersonaBuilderInline onSaved={onComplete} onCancel={onBack} />
+      <PersonaBuilderInline onSaved={handleSaved} onCancel={onBack} />
     </div>
   );
 }

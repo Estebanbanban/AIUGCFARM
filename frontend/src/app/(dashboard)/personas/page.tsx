@@ -195,7 +195,11 @@ export default function PersonasPage() {
                   <CardContent className="flex flex-col items-center gap-4 p-6">
                     {/* Avatar / Image */}
                     <div className="relative flex size-24 items-center justify-center rounded-full bg-muted overflow-hidden">
-                      {resolvedUrl ? (
+                      {resolvedUrl === undefined ? (
+                        <div className="absolute inset-0 overflow-hidden bg-muted">
+                          <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-foreground/[0.06] to-transparent [animation:shimmer_1.5s_ease-in-out_infinite]" />
+                        </div>
+                      ) : resolvedUrl ? (
                         <OptimizedImage
                           src={resolvedUrl}
                           alt={persona.name}

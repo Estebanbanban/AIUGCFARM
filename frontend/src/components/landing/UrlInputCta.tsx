@@ -31,7 +31,7 @@ export function UrlInputCta({ location = "hero" }: { location?: "hero" | "final_
           type="submit"
           className="absolute right-1.5 h-11 rounded-full bg-primary px-6 text-sm font-medium text-white transition-colors hover:bg-orange-600"
         >
-          Generate My First Ad Free →
+          Start Free — Import My Brand →
         </button>
       </div>
     </form>
