@@ -28,7 +28,7 @@ import {
   ChevronRight,
   Settings2,
 } from "lucide-react";
-import { useFirstPurchaseOffer, COUPON_30_OFF } from "@/hooks/use-first-purchase-offer";
+import { useFirstPurchaseOffer, COUPON_30_OFF, COUPON_50_OFF_FIRST_VIDEO } from "@/hooks/use-first-purchase-offer";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -270,7 +270,7 @@ function useResolvedPersonaImages(personas: Persona[] | undefined) {
 
 const PLAN_BENEFITS: Record<PlanTier, string[]> = {
   starter: ["Standard rendering queue", "Watermark-free exports", "Commercial use license", "Standard support"],
-  growth: ["Fast rendering priority", "Watermark-free exports", "Commercial use license", "Priority support", "API Access"],
+  growth: ["Fast rendering priority", "Watermark-free exports", "Commercial use license", "Priority support"],
   scale: ["Highest rendering priority", "Watermark-free exports", "Commercial use license", "Dedicated manager", "Custom API limits"],
 };
 
@@ -362,6 +362,7 @@ export default function GeneratePage() {
 
   // Auto-fire composites when arriving at Section 3 (step >= 4) via cold restore
   useEffect(() => {
+    if (store.compositeImagePath) return;
     if (
       store.step >= 4 &&
       compositeImages.length === 0 &&
@@ -656,15 +657,6 @@ export default function GeneratePage() {
       toast.error("Add a comment keyword for the CTA style.");
       return;
     }
-    // Check credits before doing anything — show paywall immediately
-    if (!hasEnoughCredits) {
-      trackPaywallShown("insufficient_credits");
-      offer.startOffer();
-      // Set default tab based on generation context
-      setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
-      setShowPaywall(true);
-      return;
-    }
     if (!store.productId || !store.personaId) return;
     if (!store.compositeImagePath) {
       toast.error("Scene preview is still loading, please wait a moment.");
@@ -835,7 +827,8 @@ export default function GeneratePage() {
   }
 
   async function handleBuyPack(pack: CreditPackKey | SingleVideoPackKey) {
-    const couponId = COUPON_30_OFF;
+    const isSingleVideo = pack === "single_standard" || pack === "single_hd";
+    const couponId = isSingleVideo && isFirstVideo ? COUPON_50_OFF_FIRST_VIDEO : COUPON_30_OFF;
     buyCredits.mutate({ pack, couponId }, {
       onSuccess: (url) => {
         if (pack in { pack_10: 1, pack_30: 1, pack_100: 1 }) {
@@ -2265,42 +2258,33 @@ export default function GeneratePage() {
                     })}
                   </div>
 
-                  {userPlan !== "free" ? (
-                    <div className="mt-12 text-center max-w-2xl mx-auto">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-5">
-                        Top up your credits
-                      </p>
-                      <div className="flex flex-wrap justify-center gap-3">
-                        {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => {
-                          const discountedPackPrice = offer.discountedPrice(pack.price);
-                          return (
-                            <button
-                              key={key}
-                              type="button"
-                              onClick={() => handleBuyPack(key)}
-                              disabled={buyCredits.isPending}
-                              className="px-6 py-3 rounded-xl border border-border bg-card hover:border-muted-foreground/40 transition-colors text-sm disabled:opacity-50"
-                            >
-                              <span className="font-bold text-foreground">{pack.credits} credits</span>
-                              {" "}
-                              <span className="text-muted-foreground">
-                                -{" "}
-                                <span className="line-through">${pack.price}</span>{" "}
-                                <span className="text-primary font-semibold">${discountedPackPrice}</span>
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <p className="mt-5 text-xs text-muted-foreground">
-                        No commitment on packs · Cancel subscriptions anytime
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="mt-8 text-center text-xs text-muted-foreground">
-                      Already subscribed? Top up credits in your billing settings.
+                  <div className="mt-12 text-center max-w-2xl mx-auto">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-5">
+                      Or buy one-time credit packs
                     </p>
-                  )}
+                    <div className="flex flex-wrap justify-center gap-3">
+                      {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => {
+                        const discountedPackPrice = isFirstVideo ? offer.discountedVideoPrice(pack.price) : offer.discountedPrice(pack.price);
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => handleBuyPack(key)}
+                            disabled={buyCredits.isPending}
+                            className="px-6 py-3 rounded-xl border border-border bg-card hover:border-muted-foreground/40 transition-colors text-sm disabled:opacity-50"
+                          >
+                            <span className="font-bold text-foreground">{pack.credits} credits</span>
+                            {" "}
+                            <span className="text-muted-foreground">
+                              -{" "}
+                              <span className="line-through">${pack.price}</span>{" "}
+                              <span className="text-primary font-semibold">${discountedPackPrice}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </>
               )}
             </div>

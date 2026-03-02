@@ -67,7 +67,7 @@ const PLAN_PERKS: Record<PlanTier, { icon: React.ElementType; headline: string; 
       "Up to 50 standard or 25 HD videos per month",
       "10 AI personas - cover every audience segment",
       "10 brand profiles for full portfolio management",
-      "1080p export + priority support + API access",
+      "1080p export + priority support",
       "Custom scripts, fastest generation queue",
     ],
   },

@@ -34,6 +34,7 @@ import { useCredits } from "@/hooks/use-credits";
 import { useProfile } from "@/hooks/use-profile";
 import { useSubscription, useCreditLedger } from "@/hooks/use-billing";
 import { useBillingPortal, useCheckout, useBuyCredits } from "@/hooks/use-checkout";
+import { useFirstPurchaseOffer } from "@/hooks/use-first-purchase-offer";
 
 const PLAN_HIGHLIGHTS: Record<PlanTier, { badge?: string; highlighted: boolean; ctaLabel: string }> = {
   starter: { highlighted: false, ctaLabel: "Switch to Starter" },
@@ -68,6 +69,7 @@ export default function BillingPage() {
   const billingPortal = useBillingPortal();
   const checkout = useCheckout();
   const buyCredits = useBuyCredits();
+  const offer = useFirstPurchaseOffer();
 
   function handleSwitchPlan(planKey: PlanTier) {
     checkout.mutate({ plan: planKey }, {
@@ -263,9 +265,17 @@ export default function BillingPage() {
 
                 {/* Price */}
                 <div className="mb-1 flex items-baseline gap-1">
-                  <span className="text-4xl font-bold text-foreground">${p.price}</span>
+                  <span className="text-4xl font-bold text-foreground">
+                    ${offer.isActive ? offer.discountedPrice(p.price) : p.price}
+                  </span>
                   <span className="text-muted-foreground">/mo</span>
                 </div>
+                {offer.isActive && (
+                  <div className="mb-1 flex items-center gap-2 text-sm">
+                    <span className="line-through text-muted-foreground">${p.price}/mo</span>
+                    <span className="text-primary bg-primary/10 px-2 py-0.5 rounded-md text-xs font-bold">-30%</span>
+                  </div>
+                )}
                 <p className="mb-5 text-xs text-primary">
                   ${(p.price / p.credits).toFixed(2)}/credit
                 </p>
@@ -363,8 +373,16 @@ export default function BillingPage() {
                 </div>
 
                 <div className="mb-1 flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-foreground">${pack.price}</span>
+                  <span className="text-3xl font-bold text-foreground">
+                    ${offer.isActive ? offer.discountedPrice(pack.price) : pack.price}
+                  </span>
                 </div>
+                {offer.isActive && (
+                  <div className="mb-1 flex items-center gap-2 text-sm">
+                    <span className="line-through text-muted-foreground">${pack.price}</span>
+                    <span className="text-primary bg-primary/10 px-2 py-0.5 rounded-md text-xs font-bold">-30%</span>
+                  </div>
+                )}
                 <p className="mb-4 text-xs text-primary">${pack.pricePerCredit}/credit</p>
 
                 <ul className="mb-5 flex flex-1 flex-col gap-2 text-sm text-muted-foreground">
