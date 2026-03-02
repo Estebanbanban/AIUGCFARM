@@ -31,6 +31,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import type { Product, BrandSummary, Persona } from "@/types/database";
 import type { ScrapeResponseData } from "@/types/api";
 
@@ -100,6 +101,15 @@ export function OnboardingOverlay() {
   const allDone = completedCount === STEPS.length;
   const isLoading = productsLoading || personasLoading || generationsLoading;
 
+  // If the user has an active wizard session (composites or script already generated),
+  // suppress the full-modal overlay so we don't interrupt mid-flow or cause regeneration.
+  // They can still see the banner mode if they navigated from the overlay previously.
+  const [hasActiveWizardSession, setHasActiveWizardSession] = useState(false);
+  useEffect(() => {
+    const { compositeImagePath, pendingScript, pendingGenerationId } = useGenerationWizardStore.getState();
+    setHasActiveWizardSession(!!(compositeImagePath || pendingScript || pendingGenerationId));
+  }, []);
+
   // Read skip state from localStorage (client-only, avoids SSR mismatch)
   useEffect(() => {
     setSkipped(localStorage.getItem(SKIP_KEY) === "true");
@@ -148,11 +158,21 @@ export function OnboardingOverlay() {
   };
 
   const handleLaunchGenerator = () => {
+    const wizardStore = useGenerationWizardStore.getState();
+    // Only initialize wizard for a fresh start — if the user already has
+    // composites or a pending script in the store, preserve their session
+    // entirely so we don't trigger expensive regeneration.
+    const hasPriorSession = !!(wizardStore.compositeImagePath || wizardStore.pendingScript || wizardStore.pendingGenerationId);
+    if (!hasPriorSession && products && products.length > 0) {
+      wizardStore.setProductId(products[0].id);
+      wizardStore.setStep(1);
+    }
     setView("banner");
     router.push("/generate");
   };
 
-  if (allDone || skipped) return null;
+  // Suppress the blocking overlay (not banner) if the user has an active wizard session
+  if (allDone || skipped || (hasActiveWizardSession && view !== "banner")) return null;
 
   if (!hydrated || isLoading) {
     return (
