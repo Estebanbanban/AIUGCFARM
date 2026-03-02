@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -34,6 +34,8 @@ import {
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { Logo } from "@/components/ui/Logo";
 import { useGenerationNotifications } from "@/hooks/use-generation-notifications";
+import { OfferCountdownBanner } from "@/components/offers/OfferCountdownBanner";
+import { useFirstPurchaseOffer } from "@/hooks/use-first-purchase-offer";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -208,6 +210,20 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pageTitle = getPageTitle(pathname);
   useGenerationNotifications();
 
+  const offer = useFirstPurchaseOffer();
+  const [bannerDismissed, setBannerDismissed] = useState(true);
+  useEffect(() => {
+    setBannerDismissed(localStorage.getItem("offer_banner_dismissed") === "true");
+  }, []);
+  // Re-check dismissed state periodically (in case user dismisses from banner)
+  useEffect(() => {
+    const id = setInterval(() => {
+      setBannerDismissed(localStorage.getItem("offer_banner_dismissed") === "true");
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+  const bannerVisible = offer.isActive && !bannerDismissed;
+
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
       <aside className="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar lg:flex lg:flex-col">
@@ -222,7 +238,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       </Sheet>
 
       <div className="flex flex-1 flex-col overflow-hidden bg-background-secondary">
-        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-border bg-background/75 px-4 backdrop-blur-xl md:px-6">
+        <OfferCountdownBanner />
+        <header
+          className={cn(
+            "sticky z-10 flex h-16 items-center justify-between border-b border-border bg-background/75 px-4 backdrop-blur-xl md:px-6",
+            bannerVisible ? "top-[44px]" : "top-0",
+          )}
+        >
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -247,7 +269,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
+        <main className={cn("flex-1 overflow-y-auto", bannerVisible && "pt-[44px]")}>
           <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 md:p-8">{children}</div>
         </main>
       </div>

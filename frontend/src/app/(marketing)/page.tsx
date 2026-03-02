@@ -49,7 +49,7 @@ const jsonLd = {
           price: "180",
           priceCurrency: "USD",
           description:
-            "Up to 810 unique video ads per month, 10 AI personas, unlimited brand profiles, API access, 5 team seats",
+            "Up to 810 unique video ads per month, 10 AI personas, unlimited brand profiles, 5 team seats",
         },
       ],
     },
