@@ -342,9 +342,9 @@ function buildImagePrompt(attributes: PersonaAttributes, scenePrompt: string): s
 /*  NanoBanana API                                                    */
 /* ------------------------------------------------------------------ */
 
-/** Generate persona images via Gemini (NanoBanana 2), with retry. */
+/** Generate persona images via Gemini (NanoBanana 2), single attempt (no retry). */
 function generateImages(prompt: string, count = 2): Promise<GeneratedImage[]> {
-  return withRetry(() => generateImagesFromPrompt(prompt, count), 3, 500);
+  return withRetry(() => generateImagesFromPrompt(prompt, count), 1, 0);
 }
 
 /* ------------------------------------------------------------------ */

@@ -42,32 +42,40 @@ function endpoint(): string {
 
 /** Call Gemini with a text prompt, return a single generated image. */
 async function generateSingleImage(prompt: string): Promise<GeneratedImage> {
-  const res = await fetch(endpoint(), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 50_000); // 50s per image max
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Gemini image generation failed (${res.status}): ${err.slice(0, 300)}`);
+  try {
+    const res = await fetch(endpoint(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Gemini image generation failed (${res.status}): ${err.slice(0, 300)}`);
+    }
+
+    const data = await res.json();
+    const parts: { text?: string; inlineData?: { mimeType: string; data: string } }[] =
+      data.candidates?.[0]?.content?.parts ?? [];
+
+    const imagePart = parts.find((p) => p.inlineData);
+    if (!imagePart?.inlineData) {
+      throw new Error(`Gemini returned no image. Response: ${JSON.stringify(data).slice(0, 300)}`);
+    }
+
+    const { mimeType, data: b64 } = imagePart.inlineData;
+    const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    return { data: binary, mimeType };
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const data = await res.json();
-  const parts: { text?: string; inlineData?: { mimeType: string; data: string } }[] =
-    data.candidates?.[0]?.content?.parts ?? [];
-
-  const imagePart = parts.find((p) => p.inlineData);
-  if (!imagePart?.inlineData) {
-    throw new Error(`Gemini returned no image. Response: ${JSON.stringify(data).slice(0, 300)}`);
-  }
-
-  const { mimeType, data: b64 } = imagePart.inlineData;
-  const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  return { data: binary, mimeType };
 }
 
 /**
