@@ -257,6 +257,7 @@ export function OnboardingOverlay() {
               view={view}
               completedCount={completedCount}
               doneMap={doneMap}
+              onClose={handleSkip}
             />
 
             {/* Scrollable content */}
@@ -312,6 +313,7 @@ function WizardHeader({
   view,
   completedCount,
   doneMap,
+  onClose,
 }: {
   view: WizardView;
   completedCount: number;
@@ -319,6 +321,7 @@ function WizardHeader({
     "hasProduct" | "hasPersonaWithImage" | "hasCompletedGeneration",
     boolean
   >;
+  onClose: () => void;
 }) {
   const activeStep = STEPS.find((s) => s.view === view);
   const title =
@@ -332,7 +335,7 @@ function WizardHeader({
         <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
           <Sparkles className="size-4 text-primary" />
         </div>
-        <div>
+        <div className="flex-1">
           <h2 className="text-base font-semibold leading-tight text-foreground">
             {title}
           </h2>
@@ -340,6 +343,13 @@ function WizardHeader({
             {completedCount} of {STEPS.length} steps complete
           </p>
         </div>
+        <button
+          onClick={onClose}
+          className="text-muted-foreground transition-colors hover:text-foreground"
+          aria-label="Close onboarding"
+        >
+          <X className="size-4" />
+        </button>
       </div>
 
       {/* Step pills */}
