@@ -7,8 +7,8 @@ import { rateLimit } from "../_shared/rate-limit.ts";
 import { callOpenRouter } from "../_shared/openrouter.ts";
 
 const PRODUCT_LIMITS: Record<string, number> = {
-  free: 1,
-  starter: 1,
+  free: 3,
+  starter: 3,
   growth: 3,
   scale: 10,
 };
