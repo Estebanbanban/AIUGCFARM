@@ -14,11 +14,15 @@ import {
   Menu,
   LogOut,
   Plus,
+  Sparkles,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { useCredits } from "@/hooks/use-credits";
 import { useProfile } from "@/hooks/use-profile";
+import { useProducts } from "@/hooks/use-products";
+import { usePersonas } from "@/hooks/use-personas";
+import { useGenerations } from "@/hooks/use-generations";
 import { PLANS } from "@/lib/stripe";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -61,6 +65,17 @@ function SidebarContent({
   const router = useRouter();
   const { data: credits } = useCredits();
   const { data: profile } = useProfile();
+  const { data: products } = useProducts();
+  const { data: personas } = usePersonas();
+  const { data: generations } = useGenerations();
+
+  const onboardingStepsDone = [
+    (products?.length ?? 0) > 0,
+    (personas ?? []).some((p) => p.selected_image_url != null),
+    (generations ?? []).some((g) => g.status === "completed"),
+  ].filter(Boolean).length;
+  const allOnboardingDone = onboardingStepsDone === 3;
+
   const creditsRemaining = credits?.remaining ?? 0;
   const isUnlimitedCredits = credits?.is_unlimited === true;
   const plan = profile?.plan ?? "free";
@@ -122,6 +137,24 @@ function SidebarContent({
           );
         })}
       </nav>
+
+      {!allOnboardingDone && (
+        <div className="px-3 pb-3">
+          <button
+            onClick={() => {
+              onNavigate?.();
+              window.dispatchEvent(new CustomEvent("onboarding:resume"));
+            }}
+            className="flex w-full items-center gap-2.5 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15"
+          >
+            <Sparkles className="size-4 shrink-0" />
+            <span className="flex-1 text-left">Get Started</span>
+            <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums">
+              {onboardingStepsDone}/3
+            </span>
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col gap-3 border-t border-sidebar-border px-4 py-4">
         <div className="rounded-lg border border-sidebar-border bg-card p-3">
