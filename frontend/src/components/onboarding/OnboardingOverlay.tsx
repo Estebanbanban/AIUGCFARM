@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
-import { usePersonas } from "@/hooks/use-personas";
+import { usePersonas, useGeneratePersonaImages, useSelectPersonaImage } from "@/hooks/use-personas";
 import { useGenerations } from "@/hooks/use-generations";
 import { useProducts, useScrapeProduct } from "@/hooks/use-products";
 import { PersonaBuilderInline } from "@/components/personas/PersonaBuilderInline";
@@ -238,8 +238,8 @@ export function OnboardingOverlay() {
   // ── Full modal mode ───────────────────────────────────────────────────────
   const modalWidth =
     view === "step-persona"
-      ? "max-w-2xl"
-      : "max-w-xl";
+      ? "max-w-3xl"
+      : "max-w-2xl";
 
   return (
     <AnimatePresence>
@@ -760,12 +760,61 @@ function PersonaView({
   onComplete: () => void;
   onBack: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const { data: personas } = usePersonas();
+  const generateImages = useGeneratePersonaImages();
+  const selectImage = useSelectPersonaImage();
+
   const [showSuccess, setShowSuccess] = useState(false);
+  const [addPhotoPersonaId, setAddPhotoPersonaId] = useState<string | null>(null);
+  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [selectingIndex, setSelectingIndex] = useState<number | null>(null);
+
+  // If a persona with image already exists (race condition / cache refresh), complete immediately
+  useEffect(() => {
+    if (personas?.some((p) => p.selected_image_url)) {
+      onComplete();
+    }
+  }, [personas, onComplete]);
+
+  const personasWithoutImage = (personas ?? []).filter((p) => !p.selected_image_url);
+  const hasExistingPersonas = personasWithoutImage.length > 0;
+
 
   function handleSaved() {
     setShowSuccess(true);
     setTimeout(onComplete, 1500);
   }
+
+  async function handleGenerateForExisting(persona: Persona) {
+    try {
+      const result = await generateImages.mutateAsync({
+        name: persona.name,
+        attributes: (persona.attributes as unknown as Record<string, unknown>) ?? {},
+      });
+      // Store the new persona id so we can select an image for it
+      setAddPhotoPersonaId(result.data.id);
+      setGeneratedImages(result.data.generated_image_urls ?? result.data.generated_images ?? []);
+    } catch {
+      toast.error("Failed to generate images. Please try again.");
+    }
+  }
+
+  async function handleSelectGeneratedImage(imageIndex: number) {
+    if (!addPhotoPersonaId) return;
+    setSelectingIndex(imageIndex);
+    try {
+      await selectImage.mutateAsync({ persona_id: addPhotoPersonaId, image_index: imageIndex });
+      await queryClient.invalidateQueries({ queryKey: ["personas"] });
+      setShowSuccess(true);
+      setTimeout(onComplete, 1500);
+    } catch {
+      toast.error("Failed to save image. Please try again.");
+    } finally {
+      setSelectingIndex(null);
+    }
+  }
+
 
   if (showSuccess) {
     return (
@@ -779,8 +828,47 @@ function PersonaView({
           <CheckCircle2 className="size-8 text-emerald-500" />
         </motion.div>
         <div className="text-center">
-          <p className="text-base font-semibold text-foreground">Persona created!</p>
-          <p className="text-sm text-muted-foreground">Your AI spokesperson is ready...</p>
+          <p className="text-base font-semibold text-foreground">Persona ready!</p>
+          <p className="text-sm text-muted-foreground">Your AI spokesperson is all set...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Inline image picker for an existing persona ────────────────────────────
+  if (generatedImages.length > 0 && addPhotoPersonaId) {
+    return (
+      <div className="flex flex-col gap-4 p-5">
+        <BackButton onClick={() => { setGeneratedImages([]); setAddPhotoPersonaId(null); }} />
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">Pick a profile photo</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Choose the best look for your AI spokesperson.
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {generatedImages.map((url, i) => (
+            <button
+              key={i}
+              onClick={() => handleSelectGeneratedImage(i)}
+              disabled={selectingIndex !== null}
+              className={cn(
+                "relative aspect-square overflow-hidden rounded-xl border-2 transition-all",
+                selectingIndex === i
+                  ? "border-primary"
+                  : "border-transparent hover:border-primary/60",
+              )}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt={`Option ${i + 1}`} className="size-full object-cover" />
+              {selectingIndex === i && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                  <Loader2 className="size-5 animate-spin text-white" />
+                </div>
+              )}
+            </button>
+          ))}
+
         </div>
       </div>
     );
@@ -792,9 +880,50 @@ function PersonaView({
       <div>
         <h3 className="text-sm font-semibold text-foreground">Create your AI Spokesperson</h3>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Design the face of your brand. This persona will appear in all your videos — take a moment to get them just right.
+          Design the face of your brand. This persona will appear in all your videos.
         </p>
       </div>
+
+      {/* Existing personas without images — offer to add photo inline */}
+      {hasExistingPersonas && (
+        <div className="flex flex-col gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+          <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+            You already have {personasWithoutImage.length === 1 ? "a persona" : "personas"} — just need a profile photo:
+          </p>
+          {personasWithoutImage.map((persona) => (
+            <div
+              key={persona.id}
+              className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-8 items-center justify-center rounded-full bg-muted">
+                  <User className="size-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">{persona.name}</p>
+                  <p className="text-xs text-muted-foreground">No photo yet</p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="shrink-0 gap-1.5 text-xs"
+                onClick={() => handleGenerateForExisting(persona)}
+                disabled={generateImages.isPending}
+              >
+                {generateImages.isPending ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="size-3.5" />
+                )}
+                Add photo
+              </Button>
+            </div>
+          ))}
+          <p className="text-xs text-muted-foreground">Or create a new persona below:</p>
+        </div>
+      )}
+
       <PersonaBuilderInline onSaved={handleSaved} onCancel={onBack} />
     </div>
   );
