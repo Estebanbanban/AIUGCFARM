@@ -8,9 +8,9 @@ import { callOpenRouter } from "../_shared/openrouter.ts";
 
 const PRODUCT_LIMITS: Record<string, number> = {
   free: 3,
-  starter: 5,
-  growth: 5,
-  scale: 10,
+  starter: 500,
+  growth: 500,
+  scale: 500,
 };
 
 function stripHtml(html: string): string {
