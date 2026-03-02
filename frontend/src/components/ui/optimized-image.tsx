@@ -15,7 +15,9 @@ export function OptimizedImage({ src, alt, className, shimmerClassName, ...props
   return (
     <div className="relative size-full">
       {!loaded && (
-        <div className={cn("absolute inset-0 animate-pulse bg-muted", shimmerClassName)} />
+        <div className={cn("absolute inset-0 overflow-hidden bg-muted", shimmerClassName)}>
+          <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-foreground/[0.06] to-transparent [animation:shimmer_1.5s_ease-in-out_infinite]" />
+        </div>
       )}
       <img
         src={src}
