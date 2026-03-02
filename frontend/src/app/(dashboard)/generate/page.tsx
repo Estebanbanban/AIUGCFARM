@@ -909,7 +909,7 @@ export default function GeneratePage() {
       </div>
 
       {/* ── Section 1: Product & Format ───────────────────────────────── */}
-      <div className="rounded-xl border border-border overflow-hidden">
+      <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
         {/* Section header - always visible */}
         <div
           className={cn(
@@ -1180,7 +1180,7 @@ export default function GeneratePage() {
 
       {/* ── Section 2: Persona ────────────────────────────────────────── */}
       {store.step >= 2 && (
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
           {/* Section header */}
           <div className="flex items-center justify-between px-5 py-4">
             <div className="flex items-center gap-3">
@@ -1354,7 +1354,7 @@ export default function GeneratePage() {
 
       {/* ── Section 3: Settings & Generate ───────────────────────────── */}
       {section3Unlocked && (
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
           {/* Section header */}
           <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
             <div className="flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
