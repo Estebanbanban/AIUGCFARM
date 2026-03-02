@@ -22,6 +22,7 @@ import {
   Upload,
   Loader2,
   X,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +50,7 @@ const STEPS = [
     key: "product" as const,
     label: "Brand",
     title: "Import your brand",
-    description: "Add at least one product from your store.",
+    description: "Add at least one product from your store. (~2 min)",
     icon: Package,
     doneKey: "hasProduct" as const,
     view: "step-brand" as WizardView,
@@ -58,7 +59,7 @@ const STEPS = [
     key: "persona" as const,
     label: "Persona",
     title: "Create your AI creator",
-    description: "Design the persona that will star in your videos.",
+    description: "Design the persona that will star in your videos. (~5 min)",
     icon: User,
     doneKey: "hasPersonaWithImage" as const,
     view: "step-persona" as WizardView,
@@ -67,7 +68,7 @@ const STEPS = [
     key: "generation" as const,
     label: "Video",
     title: "Generate your first video",
-    description: "Launch your first AI-powered UGC ad.",
+    description: "Launch your first AI-powered UGC ad. (~1 min to start)",
     icon: Film,
     doneKey: "hasCompletedGeneration" as const,
     view: "step-video" as WizardView,
@@ -127,13 +128,23 @@ export function OnboardingOverlay() {
   };
 
   const handleBrandComplete = () => {
-    setView("checklist");
-    toast.success("Brand imported! Now let's create your AI persona.");
+    toast.success("Brand imported!");
+    if (!hasPersonaWithImage) {
+      setView("step-persona");
+    } else if (!hasCompletedGeneration) {
+      setView("step-video");
+    } else {
+      setView("checklist");
+    }
   };
 
   const handlePersonaComplete = () => {
-    setView("checklist");
-    toast.success("Persona created! Time to generate your first video.");
+    toast.success("Persona created!");
+    if (!hasCompletedGeneration) {
+      setView("step-video");
+    } else {
+      setView("checklist");
+    }
   };
 
   const handleLaunchGenerator = () => {
@@ -141,8 +152,54 @@ export function OnboardingOverlay() {
     router.push("/generate");
   };
 
-  if (!hydrated || isLoading) return null;
   if (allDone || skipped) return null;
+
+  if (!hydrated || isLoading) {
+    return (
+      <AnimatePresence>
+        <>
+          <motion.div
+            key="onboarding-backdrop-loading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-40 bg-background/65 backdrop-blur-md"
+            aria-hidden="true"
+          />
+          <motion.div
+            key="onboarding-skeleton"
+            initial={{ opacity: 0, scale: 0.97, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.97, y: 16 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          >
+            <div className="flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+              <div className="shrink-0 border-b border-border p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="size-9 rounded-xl bg-muted animate-pulse" />
+                  <div className="flex flex-col gap-1.5">
+                    <div className="h-4 w-40 rounded bg-muted animate-pulse" />
+                    <div className="h-3 w-24 rounded bg-muted animate-pulse" />
+                  </div>
+                </div>
+                <div className="flex gap-2 mb-3">
+                  {[1,2,3].map(i => <div key={i} className="h-7 flex-1 rounded-full bg-muted animate-pulse" />)}
+                </div>
+                <div className="h-1 w-full rounded bg-muted animate-pulse" />
+              </div>
+              <div className="flex flex-col gap-3 p-5">
+                {[1,2,3].map(i => (
+                  <div key={i} className="h-16 w-full rounded-xl border border-border bg-muted/50 animate-pulse" />
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        </>
+      </AnimatePresence>
+    );
+  }
 
   // ── Banner mode: no blur, just a floating pill at the top ─────────────────
   if (view === "banner") {
@@ -433,6 +490,7 @@ function BrandImportView({
   const scrapeProduct = useScrapeProduct();
 
   const [importUrl, setImportUrl] = useState("");
+  const [importTab, setImportTab] = useState<"import-url" | "upload">("import-url");
   const [scrapeError, setScrapeError] = useState<string | null>(null);
   const [scrapedProducts, setScrapedProducts] = useState<Product[]>([]);
   const [scrapedBrandSummary, setScrapedBrandSummary] =
@@ -546,7 +604,7 @@ function BrandImportView({
           </Button>
         </div>
       ) : (
-        <Tabs defaultValue="import-url" className="w-full">
+        <Tabs value={importTab} onValueChange={(v) => setImportTab(v as "import-url" | "upload")} className="w-full">
           <TabsList className="w-full">
             <TabsTrigger value="import-url" className="flex-1">
               <LinkIcon className="size-3.5" />
@@ -582,7 +640,22 @@ function BrandImportView({
                   Supports Shopify and most e-commerce platforms.
                 </p>
                 {scrapeError && (
-                  <p className="text-xs text-destructive">{scrapeError}</p>
+                  <div className="flex flex-col gap-2">
+                    <p className="text-xs text-destructive">{scrapeError}</p>
+                    <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+                      <AlertCircle className="size-3.5 shrink-0 text-amber-600" />
+                      <span className="flex-1 text-xs text-amber-700 dark:text-amber-400">
+                        Having trouble? Try uploading manually instead.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setImportTab("upload")}
+                        className="text-xs font-medium text-primary underline underline-offset-2"
+                      >
+                        Switch →
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
 
