@@ -1,7 +1,5 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -39,7 +37,7 @@ function ResolvedImage({ path, alt, className }: { path: string; alt: string; cl
     }
   }, [path]);
   if (!src) return null;
-  return <img src={src} alt={alt} className={className} />;
+  return <img src={src} alt={alt} className={className} loading="lazy" decoding="async" />;
 }
 
 /* -------------------------------------------------------------------------- */

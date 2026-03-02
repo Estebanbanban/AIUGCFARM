@@ -1,7 +1,5 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -42,6 +40,8 @@ import {
   usePersonaGenerations,
   resolvePersonaImageUrl,
 } from "@/hooks/use-personas";
+
+import { OptimizedImage } from "@/components/ui/optimized-image";
 import { usePersonaBuilderStore } from "@/stores/persona-builder";
 import type { PersonaAttributes } from "@/types/database";
 
@@ -305,12 +305,13 @@ export default function PersonaDetailPage() {
         {/* Persona Image */}
         <Card>
           <CardContent className="flex flex-col items-center gap-4 p-6">
-            <div className="flex size-48 items-center justify-center rounded-xl bg-muted">
+            <div className="flex size-48 items-center justify-center rounded-xl bg-muted overflow-hidden">
               {resolvedImage ? (
-                <img
+                <OptimizedImage
                   src={resolvedImage}
                   alt={persona.name}
                   className="size-full rounded-xl object-cover"
+                  shimmerClassName="rounded-xl"
                 />
               ) : (
                 <User className="size-16 text-muted-foreground" />

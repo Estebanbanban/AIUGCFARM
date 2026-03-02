@@ -1,11 +1,15 @@
-export const dynamic = "force-dynamic";
-
 import { DashboardShell } from "@/components/layout/DashboardShell";
+import { OnboardingOverlay } from "@/components/onboarding/OnboardingOverlay";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <DashboardShell>{children}</DashboardShell>;
+  return (
+    <>
+      <OnboardingOverlay />
+      <DashboardShell>{children}</DashboardShell>
+    </>
+  );
 }

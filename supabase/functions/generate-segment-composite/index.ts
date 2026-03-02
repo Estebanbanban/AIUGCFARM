@@ -27,26 +27,16 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "format must be '9:16' or '16:9'" }, cors, 400);
     }
 
-    // Verify product ownership
-    const { data: product, error: prodErr } = await sb
-      .from("products")
-      .select("*")
-      .eq("id", product_id)
-      .eq("owner_id", userId)
-      .eq("confirmed", true)
-      .single();
+    // Verify product + persona ownership in parallel
+    const [productResult, personaResult] = await Promise.all([
+      sb.from("products").select("*").eq("id", product_id).eq("owner_id", userId).eq("confirmed", true).single(),
+      sb.from("personas").select("*").eq("id", persona_id).eq("owner_id", userId).eq("is_active", true).single(),
+    ]);
+    const { data: product, error: prodErr } = productResult;
     if (prodErr || !product) {
       return json({ detail: "Product not found or not confirmed" }, cors, 404);
     }
-
-    // Verify persona ownership + has selected image
-    const { data: persona, error: persErr } = await sb
-      .from("personas")
-      .select("*")
-      .eq("id", persona_id)
-      .eq("owner_id", userId)
-      .eq("is_active", true)
-      .single();
+    const { data: persona, error: persErr } = personaResult;
     if (persErr || !persona) {
       return json({ detail: "Persona not found or inactive" }, cors, 404);
     }
@@ -72,21 +62,22 @@ Deno.serve(async (req: Request) => {
       throw new Error("Product has no images available");
     }
 
-    const resolvedProductImageUrls: string[] = [];
-    for (const imagePath of productImagePaths) {
-      if (imagePath.startsWith("http")) {
-        resolvedProductImageUrls.push(imagePath);
-        continue;
-      }
-      const { data: signedData, error: signErr } = await sb
+    // Batch sign product image URLs
+    const httpUrls = productImagePaths.filter((p) => p.startsWith("http"));
+    const storagePaths = productImagePaths.filter((p) => !p.startsWith("http"));
+
+    let signedStorageUrls: string[] = [];
+    if (storagePaths.length > 0) {
+      const { data: batchSigned, error: batchErr } = await sb
         .storage
         .from("product-images")
-        .createSignedUrl(imagePath, 600);
-      if (signErr || !signedData?.signedUrl) {
-        throw new Error(`Failed to sign product image URL: ${signErr?.message}`);
+        .createSignedUrls(storagePaths, 600);
+      if (batchErr || !batchSigned) {
+        throw new Error(`Failed to batch sign product image URLs: ${batchErr?.message}`);
       }
-      resolvedProductImageUrls.push(signedData.signedUrl);
+      signedStorageUrls = batchSigned.map((s) => s.signedUrl);
     }
+    const resolvedProductImageUrls = [...httpUrls, ...signedStorageUrls];
 
     // Scene prompt: use custom if provided, else fall back to persona attributes
     const scenePrompt = custom_scene_prompt ||

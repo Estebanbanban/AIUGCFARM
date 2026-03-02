@@ -72,33 +72,44 @@ async function signSegmentVideos(
   const result: ResponseSegments = { hooks: [], bodies: [], ctas: [] };
   const segmentTypes = ["hooks", "bodies", "ctas"] as const;
 
-  // Sign all URLs in parallel
-  const signingTasks = segmentTypes.flatMap((segType) =>
-    stored[segType].map(async (seg) => {
-      const { data, error } = await sb.storage
-        .from("generated-videos")
-        .createSignedUrl(seg.storage_path, 3600);
+  // Collect all storage paths with their metadata for batch signing
+  const allSegments: Array<{ segType: typeof segmentTypes[number]; seg: StoredSegmentVideo }> = [];
+  const allPaths: string[] = [];
 
-      if (error || !data?.signedUrl) {
-        console.error(`Failed to sign video URL for ${seg.storage_path}:`, error?.message);
-        return null;
-      }
+  for (const segType of segmentTypes) {
+    for (const seg of stored[segType]) {
+      allSegments.push({ segType, seg });
+      allPaths.push(seg.storage_path);
+    }
+  }
 
-      return {
-        segType,
-        video: {
-          url: data.signedUrl,
-          duration: seg.duration,
-          variation: seg.variation,
-          variant_label: seg.variant_label,
-        } as ResponseSegmentVideo,
-      };
-    })
-  );
+  if (allPaths.length === 0) return result;
 
-  const signed = await Promise.all(signingTasks);
-  for (const item of signed) {
-    if (item) result[item.segType].push(item.video);
+  // Batch sign all video URLs in a single call
+  const { data: batchSigned, error: batchErr } = await sb.storage
+    .from("generated-videos")
+    .createSignedUrls(allPaths, 3600);
+
+  if (batchErr || !batchSigned) {
+    console.error("Failed to batch sign video URLs:", batchErr?.message);
+    return result;
+  }
+
+  // Map signed URLs back to segments
+  for (let i = 0; i < allSegments.length; i++) {
+    const signed = batchSigned[i];
+    if (!signed?.signedUrl) {
+      console.error(`Failed to sign video URL for ${allPaths[i]}`);
+      continue;
+    }
+
+    const { segType, seg } = allSegments[i];
+    result[segType].push({
+      url: signed.signedUrl,
+      duration: seg.duration,
+      variation: seg.variation,
+      variant_label: seg.variant_label,
+    });
   }
 
   return result;
@@ -273,85 +284,91 @@ Deno.serve(async (req: Request) => {
       // Get the script for looking up variant_label and duration
       const script = gen.script as Record<string, Array<Record<string, unknown>>> | null;
 
-      for (const jobKey of jobKeys) {
-        // Skip already completed jobs
-        if (completedKeys.has(jobKey)) continue;
+      // Poll all pending Kling jobs in parallel
+      const pendingJobKeys = jobKeys.filter((k) => !completedKeys.has(k));
+      const pollResults = await Promise.allSettled(
+        pendingJobKeys.map(async (jobKey) => {
+          const klingResult = await checkKlingJob(jobIds[jobKey]);
+          return { jobKey, klingResult };
+        })
+      );
 
-        let klingResult;
-        try {
-          klingResult = await checkKlingJob(jobIds[jobKey]);
-        } catch (err) {
-          console.error(`Kling check failed for ${jobKey}:`, err);
-          // Distinguish permanent 4xx errors (quota exhausted, auth failure, bad request)
-          // from transient ones (5xx, 429 rate limit, network flap).
-          // Permanent errors must fail the generation immediately — they will never resolve.
-          const errMsg = err instanceof Error ? err.message : String(err);
+      // Process poll results — download & upload completed videos in parallel
+      const downloadTasks: Promise<void>[] = [];
+
+      for (const pollResult of pollResults) {
+        if (pollResult.status === "rejected") {
+          // Distinguish permanent 4xx errors from transient ones
+          const errMsg = pollResult.reason instanceof Error ? pollResult.reason.message : String(pollResult.reason);
+          console.error("Kling check failed:", errMsg);
           const statusMatch = errMsg.match(/Kling status error (\d{3})/);
           const httpStatus = statusMatch ? parseInt(statusMatch[1], 10) : 0;
           const isPermanent = httpStatus >= 400 && httpStatus < 500 && httpStatus !== 429;
           if (isPermanent) {
             anyFailed = true;
             failedMessage = `Kling API error (${httpStatus}) — ${errMsg}`;
-            break; // No point checking remaining jobs
+            break;
           }
           // Transient: treat as still-in-progress
           continue;
         }
+        const { jobKey, klingResult } = pollResult.value;
 
         if (klingResult.status === "completed" && klingResult.video_url) {
-          // Download and store the video
-          try {
-            const videoRes = await fetch(klingResult.video_url);
-            if (!videoRes.ok) {
-              throw new Error(`Failed to download video: HTTP ${videoRes.status}`);
-            }
-            const videoBlob = await videoRes.blob();
-            const storagePath = `${userId}/${generationId}/${jobKey}.mp4`;
+          downloadTasks.push(
+            (async () => {
+              const videoRes = await fetch(klingResult.video_url!);
+              if (!videoRes.ok) {
+                throw new Error(`Failed to download video: HTTP ${videoRes.status}`);
+              }
+              const videoBlob = await videoRes.blob();
+              const storagePath = `${userId}/${generationId}/${jobKey}.mp4`;
 
-            const { error: uploadErr } = await sb.storage
-              .from("generated-videos")
-              .upload(storagePath, videoBlob, {
-                contentType: "video/mp4",
-                upsert: true,
+              const { error: uploadErr } = await sb.storage
+                .from("generated-videos")
+                .upload(storagePath, videoBlob, {
+                  contentType: "video/mp4",
+                  upsert: true,
+                });
+
+              if (uploadErr) {
+                throw new Error(`Video upload failed for ${jobKey}: ${uploadErr.message}`);
+              }
+
+              const { segType, variation } = parseJobKey(jobKey);
+
+              let duration = 5;
+              let variantLabel = "";
+              if (script && script[segType]) {
+                const segIndex = variation - 1;
+                const segData = script[segType][segIndex];
+                if (segData) {
+                  duration = (segData.duration_seconds as number) ?? 5;
+                  variantLabel = (segData.variant_label as string) ?? "";
+                }
+              }
+
+              storedVideos[segType].push({
+                storage_path: storagePath,
+                duration,
+                variation,
+                variant_label: variantLabel,
               });
 
-            if (uploadErr) {
-              throw new Error(`Video upload failed for ${jobKey}: ${uploadErr.message}`);
-            }
-
-            // Parse job key to get segment type and variation
-            const { segType, variation } = parseJobKey(jobKey);
-
-            // Look up duration and variant_label from script
-            let duration = 5;
-            let variantLabel = "";
-            if (script && script[segType]) {
-              const segIndex = variation - 1;
-              const segData = script[segType][segIndex];
-              if (segData) {
-                duration = (segData.duration_seconds as number) ?? 5;
-                variantLabel = (segData.variant_label as string) ?? "";
-              }
-            }
-
-            storedVideos[segType].push({
-              storage_path: storagePath,
-              duration,
-              variation,
-              variant_label: variantLabel,
-            });
-
-            completedKeys.add(jobKey);
-          } catch (dlErr) {
-            console.error(`Video download/upload failed for ${jobKey}:`, dlErr);
-            anyFailed = true;
-            failedMessage = dlErr instanceof Error ? dlErr.message : String(dlErr);
-          }
+              completedKeys.add(jobKey);
+            })().catch((dlErr) => {
+              console.error(`Video download/upload failed for ${jobKey}:`, dlErr);
+              anyFailed = true;
+              failedMessage = dlErr instanceof Error ? dlErr.message : String(dlErr);
+            })
+          );
         } else if (klingResult.status === "failed") {
           anyFailed = true;
           failedMessage = klingResult.error_message || `Video generation failed for segment ${jobKey}`;
         }
       }
+
+      await Promise.all(downloadTasks);
 
       const completedCount = completedKeys.size;
       const totalCount = jobKeys.length;

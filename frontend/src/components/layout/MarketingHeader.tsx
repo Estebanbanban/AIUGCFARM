@@ -54,6 +54,8 @@ function UserMenu({ user }: { user: AuthUser }) {
             src={user.avatar_url}
             alt={user.name}
             className="size-6 rounded-full object-cover"
+            loading="lazy"
+            decoding="async"
           />
         ) : (
           <div className="size-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-semibold flex-shrink-0">
@@ -134,7 +136,7 @@ export function MarketingHeader() {
     loadUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (_event: string, session: unknown) => {
         if (session) {
           loadUser();
         } else {
@@ -269,6 +271,8 @@ export function MarketingHeader() {
                           src={authUser.avatar_url}
                           alt={authUser.name}
                           className="size-9 rounded-full object-cover"
+                          loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <div className="size-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-semibold flex-shrink-0">
