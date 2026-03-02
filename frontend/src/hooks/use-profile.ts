@@ -13,9 +13,9 @@ export const PERSONA_SLOT_LIMITS: Record<Profile["plan"], number> = {
 
 export const PRODUCT_SLOT_LIMITS: Record<Profile["plan"], number> = {
   free: 3,
-  starter: 5,
-  growth: 5,
-  scale: 10,
+  starter: 500,
+  growth: 500,
+  scale: 500,
 };
 
 /** Plans that can use HD (Kling V3) video quality */
