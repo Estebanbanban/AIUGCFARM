@@ -13,8 +13,8 @@ export const PERSONA_SLOT_LIMITS: Record<Profile["plan"], number> = {
 
 export const PRODUCT_SLOT_LIMITS: Record<Profile["plan"], number> = {
   free: 3,
-  starter: 3,
-  growth: 3,
+  starter: 5,
+  growth: 5,
   scale: 10,
 };
 

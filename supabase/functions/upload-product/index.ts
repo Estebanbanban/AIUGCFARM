@@ -9,8 +9,8 @@ const MAX_IMAGE_COUNT = 5;
 
 const PRODUCT_LIMITS: Record<string, number> = {
   free: 3,
-  starter: 3,
-  growth: 3,
+  starter: 5,
+  growth: 5,
   scale: 10,
 };
 
