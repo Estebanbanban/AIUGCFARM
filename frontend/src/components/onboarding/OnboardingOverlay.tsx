@@ -277,6 +277,7 @@ export function OnboardingOverlay() {
               completedCount={completedCount}
               doneMap={doneMap}
               onClose={handleSkip}
+              onNavigate={setView}
             />
 
             {/* Scrollable content */}
@@ -333,6 +334,7 @@ function WizardHeader({
   completedCount,
   doneMap,
   onClose,
+  onNavigate,
 }: {
   view: WizardView;
   completedCount: number;
@@ -341,6 +343,7 @@ function WizardHeader({
     boolean
   >;
   onClose: () => void;
+  onNavigate: (view: WizardView) => void;
 }) {
   const activeStep = STEPS.find((s) => s.view === view);
   const title =
