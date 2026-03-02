@@ -29,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useCredits } from "@/hooks/use-credits";
 import { useProfile } from "@/hooks/use-profile";
+import { useProducts } from "@/hooks/use-products";
 import {
   useGenerations,
   type GenerationWithRelations,
@@ -75,6 +76,7 @@ export default function DashboardPage() {
 
   const { data: credits, isLoading: creditsLoading } = useCredits();
   const { data: profile } = useProfile();
+  const { data: products } = useProducts();
   const { data: generations, isLoading: generationsLoading } = useGenerations() as {
     data: GenerationWithRelations[] | undefined;
     isLoading: boolean;
@@ -87,7 +89,7 @@ export default function DashboardPage() {
   const isUnlimitedCredits = credits?.is_unlimited === true;
   const creditsTotal = planConfig?.credits ?? 9;
 
-  const [hasProduct, setHasProduct] = useState(false);
+  const hasProduct = (products?.length ?? 0) > 0;
 
   const draftGenerations = (generations ?? []).filter(
     (g) => g.status === "awaiting_approval",
@@ -133,14 +135,6 @@ export default function DashboardPage() {
         setFirstName(user.email.split("@")[0]);
       }
     });
-    supabase
-      .from("products")
-      .select("id")
-      .eq("status", "confirmed")
-      .limit(1)
-      .then(({ data }: { data: { id: string }[] | null }) => {
-        setHasProduct((data ?? []).length > 0);
-      });
   }, []);
 
   const creditPercent = isUnlimitedCredits
