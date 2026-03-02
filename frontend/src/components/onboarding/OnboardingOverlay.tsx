@@ -197,7 +197,7 @@ export function OnboardingOverlay() {
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
-            <div className="flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+            <div className="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
               <div className="shrink-0 border-b border-border p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="size-9 rounded-xl bg-muted animate-pulse" />
@@ -237,10 +237,7 @@ export function OnboardingOverlay() {
   }
 
   // ── Full modal mode ───────────────────────────────────────────────────────
-  const modalWidth =
-    view === "step-persona"
-      ? "max-w-3xl"
-      : "max-w-2xl";
+  const modalWidth = "max-w-4xl";
 
   return (
     <AnimatePresence>
@@ -295,7 +292,7 @@ export function OnboardingOverlay() {
               {view === "step-persona" && (
                 <PersonaView
                   onComplete={handlePersonaComplete}
-                  onBack={() => setView("step-brand")}
+                  onBack={() => hasProduct ? setView("checklist") : setView("step-brand")}
                 />
               )}
               {view === "step-video" && (
@@ -533,6 +530,7 @@ function BrandImportView({
   onBack: () => void;
 }) {
   const queryClient = useQueryClient();
+  const { data: products } = useProducts();
   const scrapeProduct = useScrapeProduct();
 
   const [importUrl, setImportUrl] = useState("");
@@ -543,6 +541,7 @@ function BrandImportView({
     useState<BrandSummary | null>(null);
   const [showScrapeResults, setShowScrapeResults] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [forceShowForm, setForceShowForm] = useState(false);
 
   async function handleScrape() {
     if (!importUrl.trim()) return;
@@ -631,6 +630,34 @@ function BrandImportView({
         <div className="text-center">
           <p className="text-base font-semibold text-foreground">Brand imported!</p>
           <p className="text-sm text-muted-foreground">Moving to your persona...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If brand already imported, show confirmation instead of blank form
+  if (products && products.length > 0 && !showScrapeResults && !forceShowForm) {
+    return (
+      <div className="flex flex-col gap-4 p-6">
+        <BackButton onClick={onBack} />
+        <div className="flex flex-col items-center gap-4 py-6">
+          <div className="flex size-14 items-center justify-center rounded-full bg-emerald-500/15">
+            <CheckCircle2 className="size-7 text-emerald-500" />
+          </div>
+          <div className="text-center">
+            <p className="font-semibold text-foreground">Brand already imported</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {products.length} product{products.length > 1 ? "s" : ""} ready — {products[0].name}
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Button onClick={onComplete} className="gap-1.5">
+              Continue <ArrowRight className="size-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setForceShowForm(true)}>
+              Re-import
+            </Button>
+          </div>
         </div>
       </div>
     );
