@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { PurchaseSuccessModal } from "@/components/checkout/PurchaseSuccessModal";
 import type { PlanTier, CreditPackKey } from "@/lib/stripe";
 import { PLANS, CREDIT_PACKS, SINGLE_VIDEO_PACKS } from "@/lib/stripe";
@@ -12,10 +13,12 @@ import type { Profile } from "@/types/database";
 export function CheckoutSuccessHandler() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [plan, setPlan] = useState<PlanTier | null>(null);
   const [pack, setPack] = useState<CreditPackKey | null>(null);
+  const isOnGeneratePage = pathname?.startsWith("/generate");
 
   useEffect(() => {
     const checkout = searchParams.get("checkout");
@@ -85,20 +88,35 @@ export function CheckoutSuccessHandler() {
       timers.push(setTimeout(invalidateCreditsOnly, 10_000));
     }
 
+    // Track purchase regardless of page
     if (expectedPlan) {
       trackPurchaseConfirmed("subscription", expectedPlan);
+    } else if (packParam && packParam in CREDIT_PACKS) {
+      trackPurchaseConfirmed("credits", packParam);
+    } else if (packParam && packParam in SINGLE_VIDEO_PACKS) {
+      trackPurchaseConfirmed("credits", packParam);
+    }
+
+    // On /generate: just toast + clean URL, don't navigate away or show modal
+    if (isOnGeneratePage) {
+      queryClient.invalidateQueries({ queryKey: ["credits"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("Payment confirmed! Your credits are ready — generate your video now");
+      router.replace(pathname!);
+      return () => { timers.forEach(clearTimeout); };
+    }
+
+    // Dashboard flow: show modal + navigate
+    if (expectedPlan) {
       setPlan(expectedPlan as PlanTier);
       setOpen(true);
       router.replace("/dashboard");
     } else if (packParam && packParam in CREDIT_PACKS) {
-      trackPurchaseConfirmed("credits", packParam);
       setPack(packParam as CreditPackKey);
       setOpen(true);
       router.replace("/dashboard");
     } else if (packParam && packParam in SINGLE_VIDEO_PACKS) {
       // Single video packs (single_standard / single_hd) — treat as credit pack
-      trackPurchaseConfirmed("credits", packParam);
-      // Map to pack_10 for modal display (closest credit pack)
       setPack("pack_10" as CreditPackKey);
       setOpen(true);
       router.replace("/dashboard");
@@ -107,7 +125,7 @@ export function CheckoutSuccessHandler() {
     return () => {
       timers.forEach(clearTimeout);
     };
-  }, [searchParams, router, queryClient]);
+  }, [searchParams, router, queryClient, pathname, isOnGeneratePage]);
 
   const handleClose = () => {
     setOpen(false);

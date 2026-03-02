@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, Shield, RefreshCw, Star } from "lucide-react";
 import { toast } from "sonner";
 import { ScaleIn, FadeInUp } from "@/lib/motion";
 import { createClient } from "@/lib/supabase/client";
@@ -109,7 +109,8 @@ export function PricingSection() {
             pricing
           </h2>
           <p className="text-muted-foreground mt-3 text-base">
-            Start free. Scale when you&apos;re ready.
+            Start for free — create your brand and AI persona at no cost.<br />
+            Pay only when you generate: from $3/video or subscribe from $20/month.
           </p>
 
           {/* Billing toggle */}
@@ -227,6 +228,17 @@ export function PricingSection() {
           <p className="text-center text-xs text-primary mt-3">
             Beta pricing - lock in your rate forever. Prices increase at public launch.
           </p>
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground mt-5">
+            <span className="flex items-center gap-1.5">
+              <Shield className="size-3.5 text-green-500" /> Secured by Stripe
+            </span>
+            <span className="flex items-center gap-1.5">
+              <RefreshCw className="size-3.5" /> Cancel anytime
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Star className="size-3.5 text-amber-500" /> 500+ brands already using it
+            </span>
+          </div>
         </FadeInUp>
       </div>
     </section>
