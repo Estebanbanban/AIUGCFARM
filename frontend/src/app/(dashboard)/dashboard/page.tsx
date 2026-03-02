@@ -13,6 +13,7 @@ import {
   Clock,
   Loader2,
   PlayCircle,
+  Sparkles,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatDate } from "@/lib/utils";
@@ -38,7 +39,7 @@ import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { useRouter } from "next/navigation";
 import { Suspense } from "react";
 import { CheckoutSuccessHandler } from "@/components/checkout/CheckoutSuccessHandler";
-import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
+import { useProducts } from "@/hooks/use-products";
 
 
 const quickActions = [
@@ -80,6 +81,7 @@ export default function DashboardPage() {
     isLoading: boolean;
   };
   const { data: personas } = usePersonas();
+  const { data: products } = useProducts();
 
   const plan = profile?.plan ?? "free";
   const planConfig = plan !== "free" ? PLANS[plan as keyof typeof PLANS] : null;
@@ -87,7 +89,7 @@ export default function DashboardPage() {
   const isUnlimitedCredits = credits?.is_unlimited === true;
   const creditsTotal = planConfig?.credits ?? 9;
 
-  const [hasProduct, setHasProduct] = useState(false);
+  const hasProduct = (products?.length ?? 0) > 0;
 
   const draftGenerations = (generations ?? []).filter(
     (g) => g.status === "awaiting_approval",
@@ -133,14 +135,6 @@ export default function DashboardPage() {
         setFirstName(user.email.split("@")[0]);
       }
     });
-    supabase
-      .from("products")
-      .select("id")
-      .eq("status", "confirmed")
-      .limit(1)
-      .then(({ data }: { data: { id: string }[] | null }) => {
-        setHasProduct((data ?? []).length > 0);
-      });
   }, []);
 
   const creditPercent = isUnlimitedCredits
@@ -181,11 +175,31 @@ export default function DashboardPage() {
 
       {!allOnboardingDone && (
         <FadeInUp delay={0.05}>
-          <OnboardingChecklist
-            hasProduct={hasProduct}
-            hasPersonaWithImage={hasPersonaWithImage}
-            hasCompletedGeneration={hasCompletedGeneration}
-          />
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="flex items-center gap-4 p-4">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                <Sparkles className="size-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  Get started — {[hasProduct, hasPersonaWithImage, hasCompletedGeneration].filter(Boolean).length}/3 steps complete
+                </p>
+                <Progress
+                  value={Math.round(([hasProduct, hasPersonaWithImage, hasCompletedGeneration].filter(Boolean).length / 3) * 100)}
+                  className="mt-1.5 h-1.5 bg-muted [&>[data-slot=progress-indicator]]:bg-primary"
+                />
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="shrink-0 gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                onClick={() => window.dispatchEvent(new CustomEvent("onboarding:resume"))}
+              >
+                <Sparkles className="size-3.5" />
+                Open Tutorial
+              </Button>
+            </CardContent>
+          </Card>
         </FadeInUp>
       )}
 
