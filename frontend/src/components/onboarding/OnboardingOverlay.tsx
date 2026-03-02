@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePersonas, useGeneratePersonaImages, useSelectPersonaImage } from "@/hooks/use-personas";
+import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
 import { useGenerations } from "@/hooks/use-generations";
 import { useProducts, useScrapeProduct } from "@/hooks/use-products";
 import { PersonaBuilderInline } from "@/components/personas/PersonaBuilderInline";
@@ -945,6 +946,17 @@ function VideoLaunchView({
   const firstProduct = products[0];
   const firstPersona = personas[0];
 
+  // Resolve signed URL for the persona avatar
+  const [personaAvatarUrl, setPersonaAvatarUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const raw = firstPersona?.selected_image_url ?? null;
+    if (!raw) { setPersonaAvatarUrl(null); return; }
+    if (isExternalUrl(raw)) { setPersonaAvatarUrl(raw); return; }
+    getSignedImageUrl("persona-images", raw).then((url) =>
+      setPersonaAvatarUrl(url === "/placeholder-product.svg" ? null : url)
+    );
+  }, [firstPersona?.selected_image_url]);
+
   return (
     <div className="flex flex-col gap-5 p-6">
       <BackButton onClick={onBack} />
@@ -989,15 +1001,17 @@ function VideoLaunchView({
                 Persona
               </p>
               <div className="flex items-center gap-2">
-                {firstPersona.selected_image_url ? (
+                {personaAvatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={firstPersona.selected_image_url}
+                    src={personaAvatarUrl}
                     alt={firstPersona.name}
                     className="size-8 shrink-0 rounded-full object-cover"
                   />
                 ) : (
-                  <User className="size-5 shrink-0 text-muted-foreground" />
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                    <User className="size-4 text-muted-foreground" />
+                  </div>
                 )}
                 <p className="line-clamp-1 text-xs font-medium text-foreground">
                   {firstPersona.name}
