@@ -501,14 +501,17 @@ Deno.serve(async (req: Request) => {
     const imagePrompt = buildImagePrompt(validAttrs, scenePrompt);
     console.log("Image prompt:", imagePrompt);
 
-    // Generate images via Gemini / NanoBanana 2 (with retry)
-    console.log(`[generate-persona] starting Gemini (count=${imageCount}): ${Date.now() - t0}ms`);
-    const images = await generateImages(imagePrompt, imageCount);
-    console.log(`[generate-persona] Gemini done: ${Date.now() - t0}ms`);
+    // Generate and upload images one at a time to stay within edge-function memory limits.
+    // Generating in parallel (Promise.all) keeps multiple large base64 buffers in RAM
+    // simultaneously and triggers WORKER_LIMIT on Supabase's free/pro tiers.
+    const storagePaths: string[] = [];
+    for (let i = 0; i < imageCount; i++) {
+      console.log(`[generate-persona] Gemini image ${i + 1}/${imageCount}: ${Date.now() - t0}ms`);
+      try {
+        const [image] = await generateImages(imagePrompt, 1);
+        console.log(`[generate-persona] Gemini image ${i + 1} done: ${Date.now() - t0}ms`);
 
-    // Upload all generated images in parallel
-    const uploadResults = await Promise.all(
-      images.map(async (image) => {
+        // Upload immediately so the buffer can be GC'd before the next image
         const ext = image.mimeType.includes("png") ? "png" : "jpg";
         const storagePath = `${userId}/${crypto.randomUUID()}.${ext}`;
         const { error: uploadErr } = await sb.storage
@@ -518,18 +521,20 @@ Deno.serve(async (req: Request) => {
             upsert: false,
           });
         if (uploadErr) {
-          console.error(`Persona image upload failed: ${uploadErr.message}`);
-          return null;
+          console.error(`Persona image ${i + 1} upload failed: ${uploadErr.message}`);
+        } else {
+          storagePaths.push(storagePath);
         }
-        return storagePath;
-      }),
-    );
-
-    const storagePaths = uploadResults.filter(Boolean) as string[];
-    if (storagePaths.length === 0) {
-      throw new Error("All image uploads failed");
+      } catch (imgErr) {
+        console.error(`Persona image ${i + 1} generation failed:`, imgErr);
+        // Continue — if we end up with at least 1 image we can still succeed
+      }
     }
-    console.log(`[generate-persona] uploads done: ${Date.now() - t0}ms`);
+
+    if (storagePaths.length === 0) {
+      throw new Error("All image generations failed");
+    }
+    console.log(`[generate-persona] all images done: ${Date.now() - t0}ms`);
 
     // Batch-sign all paths in a single request
     const { data: signedData } = await sb.storage
