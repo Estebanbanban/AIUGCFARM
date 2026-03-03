@@ -378,7 +378,7 @@ export default function GeneratePage() {
 
   // Auto-fire composites when arriving at Section 3 (step >= 4) via cold restore
   useEffect(() => {
-    if (store.compositeImagePath) return;
+    if (store.compositeImagePath && compositeImages.length > 0) return;
     if (
       store.step >= 4 &&
       compositeImages.length === 0 &&

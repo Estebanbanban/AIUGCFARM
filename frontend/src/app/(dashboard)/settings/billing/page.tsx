@@ -360,8 +360,8 @@ export default function BillingPage() {
                 className={cn(
                   "relative flex flex-col rounded-2xl border p-5 transition-all duration-200",
                   isBestValue
-                    ? "border-primary/40 bg-muted/30 shadow-[0_0_30px_rgba(249,115,22,0.06)]"
-                    : "border-border bg-muted/30 hover:border-primary/30"
+                    ? "border-primary/40 bg-card shadow-[0_0_30px_rgba(249,115,22,0.06)]"
+                    : "border-border bg-card hover:border-primary/30"
                 )}
               >
                 <span className="absolute top-2 right-2 text-[10px] font-medium bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">one-time</span>

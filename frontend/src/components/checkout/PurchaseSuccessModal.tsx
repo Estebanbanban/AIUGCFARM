@@ -18,14 +18,14 @@ import {
   TrendingUp,
   Video,
 } from "lucide-react";
-import { PLANS, CREDIT_PACKS, type PlanTier, type CreditPackKey } from "@/lib/stripe";
+import { PLANS, CREDIT_PACKS, SINGLE_VIDEO_PACKS, type PlanTier, type CreditPackKey, type SingleVideoPackKey } from "@/lib/stripe";
 import { cn } from "@/lib/utils";
 
 interface PurchaseSuccessModalProps {
   open: boolean;
   onClose: () => void;
   plan?: PlanTier | null;
-  pack?: CreditPackKey | null;
+  pack?: CreditPackKey | SingleVideoPackKey | null;
 }
 
 const PLAN_PERKS: Record<PlanTier, { icon: React.ElementType; headline: string; sub: string; bullets: string[]; highlight: string }> = {
@@ -73,7 +73,29 @@ const PLAN_PERKS: Record<PlanTier, { icon: React.ElementType; headline: string; 
   },
 };
 
-const PACK_PERKS: Record<CreditPackKey, { headline: string; sub: string; highlight: string; bullets: string[] }> = {
+const PACK_PERKS: Record<CreditPackKey | SingleVideoPackKey, { headline: string; sub: string; highlight: string; bullets: string[] }> = {
+  single_standard: {
+    headline: "Your video is on its way. 🎬",
+    sub: "5 credits loaded — enough for one complete standard video (Hook → Body → CTA). Hit generate and you're done.",
+    highlight: "5 credits added · 1 standard video ready",
+    bullets: [
+      "1 complete standard video (Hook → Body → CTA)",
+      "AI-written script, scene, and voiceover",
+      "720p MP4 export, ready for any platform",
+      "No watermarks, yours to keep",
+    ],
+  },
+  single_hd: {
+    headline: "HD video incoming. 🎬",
+    sub: "10 credits loaded — enough for one complete HD video (Hook → Body → CTA). Higher res, sharper results.",
+    highlight: "10 credits added · 1 HD video ready",
+    bullets: [
+      "1 complete HD video (Hook → Body → CTA)",
+      "AI-written script, scene, and voiceover",
+      "1080p HD MP4 export for premium placements",
+      "No watermarks, yours to keep",
+    ],
+  },
   pack_10: {
     headline: "Credits loaded. Let's make something. 🎬",
     sub: "Your 10 credits are ready to use right now. That's 2 complete video ads - go test your first hook.",
@@ -156,17 +178,22 @@ export function PurchaseSuccessModal({ open, onClose, plan, pack }: PurchaseSucc
   }, [open, fire]);
 
   const isPlan = plan && plan in PLANS;
-  const isPack = pack && pack in CREDIT_PACKS;
+  const isPack = pack && (pack in CREDIT_PACKS || pack in SINGLE_VIDEO_PACKS);
 
   if (!isPlan && !isPack) return null;
 
   const planData = isPlan ? PLAN_PERKS[plan as PlanTier] : null;
-  const packData = isPack ? PACK_PERKS[pack as CreditPackKey] : null;
+  const packData = isPack ? PACK_PERKS[pack as CreditPackKey | SingleVideoPackKey] : null;
   const data = planData ?? packData!;
 
   const Icon = planData ? planData.icon : Video;
-  const planName = isPlan ? PLANS[plan as PlanTier].name : isPack ? CREDIT_PACKS[pack as CreditPackKey].name : "";
-  const planPrice = isPlan ? `$${PLANS[plan as PlanTier].price}/mo` : isPack ? `$${CREDIT_PACKS[pack as CreditPackKey].price}` : "";
+  const packInfo = isPack
+    ? (pack in CREDIT_PACKS
+        ? { name: CREDIT_PACKS[pack as CreditPackKey].name, price: `$${CREDIT_PACKS[pack as CreditPackKey].price}` }
+        : { name: SINGLE_VIDEO_PACKS[pack as SingleVideoPackKey].name, price: `$${SINGLE_VIDEO_PACKS[pack as SingleVideoPackKey].price}` })
+    : null;
+  const planName = isPlan ? PLANS[plan as PlanTier].name : packInfo?.name ?? "";
+  const planPrice = isPlan ? `$${PLANS[plan as PlanTier].price}/mo` : packInfo?.price ?? "";
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
