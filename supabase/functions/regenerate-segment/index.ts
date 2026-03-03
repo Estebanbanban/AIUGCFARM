@@ -2,7 +2,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
-import { checkCredits, debitCredit, refundCredits } from "../_shared/credits.ts";
+import { checkCredits, debitCredits, refundCredits } from "../_shared/credits.ts";
 import { withRetry } from "../_shared/retry.ts";
 import { submitKlingJob } from "../_shared/kling.ts";
 
@@ -67,7 +67,7 @@ Deno.serve(async (req: Request) => {
     const userId = await requireUserId(req);
     const sb = getAdminClient();
 
-    const { generation_id, segment_type, variation } = await req.json();
+    const { generation_id, segment_type, variation, quality } = await req.json();
 
     if (!generation_id || typeof generation_id !== "string") {
       return json({ detail: "generation_id is required" }, cors, 400);
@@ -136,16 +136,20 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Dynamic credit cost: 2 for HD, 1 for standard
+    const resolvedQuality = quality || (generation.video_quality as string) || "standard";
+    const creditCost = resolvedQuality === "hd" ? 2 : 1;
+
     const remaining = await checkCredits(userId);
-    if (remaining < 1) {
+    if (remaining < creditCost) {
       return json(
-        { detail: "Insufficient credits. Regenerating a segment costs 1 credit." },
+        { detail: `Insufficient credits. Regenerating an ${resolvedQuality === "hd" ? "HD" : "standard"} segment costs ${creditCost} credit${creditCost > 1 ? "s" : ""}.` },
         cors,
         402,
       );
     }
 
-    await debitCredit(userId, generation.id);
+    await debitCredits(userId, creditCost, generation.id);
 
     try {
       let compositeSignedUrl = generation.composite_image_url as string;
@@ -221,16 +225,16 @@ Deno.serve(async (req: Request) => {
             generation_id: generation.id,
             status: "generating_segments",
             job_key: segmentKey,
-            credits_charged: 1,
+            credits_charged: creditCost,
           },
         },
         cors,
         200,
       );
     } catch (pipelineErr) {
-      // If job submission/update fails after debit, refund that single credit.
+      // If job submission/update fails after debit, refund the charged credits.
       try {
-        await refundCredits(userId, 1, generation.id);
+        await refundCredits(userId, creditCost, generation.id);
       } catch (refundErr) {
         console.error("Segment regen refund failed:", refundErr);
       }

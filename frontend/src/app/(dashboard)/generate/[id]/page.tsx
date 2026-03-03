@@ -454,8 +454,23 @@ function VideoSegmentCard({
     }
   }
 
-  function handleDownload() {
-    window.open(video.url, "_blank");
+  async function handleDownload() {
+    try {
+      const response = await fetch(video.url);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `cinerads-${label.replace(/\s+/g, "-").toLowerCase()}.mp4`;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      // Fallback to opening in new tab if blob fetch fails
+      window.open(video.url, "_blank");
+    }
   }
 
   return (
@@ -970,7 +985,7 @@ function CombinationPreview({
 
 const RENDER_STEPS = [
   { label: "Preparing video pipeline",   icon: <Cpu className="w-3 h-3" /> },
-  { label: "Submitting to Kling AI",     icon: <Zap className="w-3 h-3" /> },
+  { label: "Submitting to video engine",  icon: <Zap className="w-3 h-3" /> },
   { label: "Rendering video segments",   icon: <Video className="w-3 h-3" /> },
   { label: "Finalizing video",           icon: <Sparkles className="w-3 h-3" /> },
 ];
@@ -1395,7 +1410,7 @@ export default function GenerationDetailPage() {
       {isProcessing && !isStale && (
         <NanoBananaLoader
           title="Generating Your Video"
-          subtitle="Kling AI is rendering your video \u2014 usually 3\u201310 minutes"
+          subtitle="Your video is rendering — usually 3–10 minutes"
           steps={RENDER_STEPS}
           currentStep={loaderInfo.step}
           progress={loaderInfo.progress}

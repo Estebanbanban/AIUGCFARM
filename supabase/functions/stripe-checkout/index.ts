@@ -57,7 +57,7 @@ Deno.serve(async (req: Request) => {
     const sb = getAdminClient();
 
     const body = await req.json();
-    const { plan, pack, couponId, billing } = body;
+    const { plan, pack, couponId, billing, generation_id } = body;
     const isAnnual = billing === "annual";
 
     if (!plan && !pack) {
@@ -119,15 +119,20 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      const packSuccessUrl = generation_id
+        ? `${FRONTEND_URL}/generate/${generation_id}?checkout=success&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`
+        : `${FRONTEND_URL}/dashboard?checkout=success&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`;
+
       const sessionParams: Stripe.Checkout.SessionCreateParams = {
         customer: stripeCustomerId,
         mode: "payment",
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${FRONTEND_URL}/dashboard?checkout=success&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`,
+        success_url: packSuccessUrl,
         cancel_url: `${FRONTEND_URL}/settings/billing?checkout=cancelled`,
         metadata: {
           supabase_user_id: userId,
           pack,
+          ...(generation_id ? { generation_id } : {}),
         },
       };
 

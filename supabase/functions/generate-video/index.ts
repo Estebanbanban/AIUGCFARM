@@ -403,6 +403,13 @@ function computeCosts(resolvedMode: string, resolvedQuality: string, provider: "
   return { variantCount, creditCost, klingModel };
 }
 
+/** Estimate minimum video duration needed for the given text at ~2.5 words/sec. */
+function estimateDuration(text: string): number {
+  const words = text.trim().split(/\s+/).length;
+  const seconds = Math.ceil(words / 2.5);
+  return seconds <= 5 ? 5 : 10;
+}
+
 /** Submit Kling or Sora jobs for all script segments and return job IDs map + actual model used. */
 async function submitAllKlingJobs(
   script: GeneratedScript,
@@ -419,7 +426,9 @@ async function submitAllKlingJobs(
     script[segType].map((segment, i) => {
       const jobKey = `${SEG_KEY[segType]}_${i + 1}`;
       const prompt = `A UGC creator speaking directly to camera, saying: "${segment.text}" Natural, authentic talking-head style, casual handheld selfie aesthetic.`;
-      const duration = segment.duration_seconds <= 5 ? 5 : 10;
+      const textDuration = estimateDuration(segment.text);
+      const scriptDuration = segment.duration_seconds <= 5 ? 5 : 10;
+      const duration = Math.max(textDuration, scriptDuration);
 
       if (provider === "sora") {
         if (!compositeImageBlob) throw new Error("compositeImageBlob required for Sora provider");

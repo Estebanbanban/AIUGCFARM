@@ -17,6 +17,7 @@ interface CheckoutPlanArgs {
 interface CheckoutPackArgs {
   pack: CreditPackKey | SingleVideoPackKey;
   couponId?: string;
+  generation_id?: string;
 }
 
 export function useCheckout() {
@@ -39,9 +40,13 @@ export function useCheckout() {
 /** One-time credit pack purchase. Redirects to Stripe Checkout. */
 export function useBuyCredits() {
   return useMutation({
-    mutationFn: async ({ pack, couponId }: CheckoutPackArgs) => {
+    mutationFn: async ({ pack, couponId, generation_id }: CheckoutPackArgs) => {
       const res = await callEdge<CheckoutResponse>("stripe-checkout", {
-        body: { pack, ...(couponId ? { couponId } : {}) },
+        body: {
+          pack,
+          ...(couponId ? { couponId } : {}),
+          ...(generation_id ? { generation_id } : {}),
+        },
       });
       return res.data.url;
     },

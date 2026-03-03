@@ -356,6 +356,8 @@ export default function GeneratePage() {
   const generationFiredForFormat = useRef<string | null>(null);
   // Cancellation token for auto-fired script generation
   const scriptAutoFireToken = useRef(0);
+  // Debounce timer for auto-regen on settings change
+  const scriptRegenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: products, isLoading: productsLoading } = useProducts();
   const productImageMap = useResolvedProductImages(products);
@@ -764,6 +766,14 @@ export default function GeneratePage() {
     );
   }
 
+  /** Debounced auto-regen: call when settings change and a script already exists */
+  function debouncedRegenScript() {
+    if (scriptRegenTimer.current) clearTimeout(scriptRegenTimer.current);
+    scriptRegenTimer.current = setTimeout(() => {
+      if (store.pendingScript) handleGenerateScript();
+    }, 500);
+  }
+
   // ── Approve & generate video ──────────────────────────────────────────
 
   function buildAdvancedSegmentsInput(segments: AdvancedSegmentsConfig): AdvancedSegmentsInput {
@@ -912,7 +922,7 @@ export default function GeneratePage() {
   async function handleBuyPack(pack: CreditPackKey | SingleVideoPackKey) {
     const isSingleVideo = pack === "single_standard" || pack === "single_hd";
     const couponId = isSingleVideo && isFirstVideo ? COUPON_50_OFF_FIRST_VIDEO : COUPON_30_OFF;
-    buyCredits.mutate({ pack, couponId }, {
+    buyCredits.mutate({ pack, couponId, generation_id: store.pendingGenerationId ?? undefined }, {
       onSuccess: (url) => {
         if (pack in { pack_10: 1, pack_30: 1, pack_100: 1 }) {
           trackCreditsPurchased(pack as CreditPackKey);
@@ -1490,7 +1500,7 @@ export default function GeneratePage() {
                         <button
                           key={option.key}
                           type="button"
-                          onClick={() => { store.setCtaStyle(option.key); setScriptConfigChanged(true); }}
+                          onClick={() => { store.setCtaStyle(option.key); setScriptConfigChanged(true); debouncedRegenScript(); }}
                           className={cn(
                             "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
                             store.ctaStyle === option.key
@@ -1511,7 +1521,7 @@ export default function GeneratePage() {
                           <button
                             key={option.key}
                             type="button"
-                            onClick={() => { store.setCtaStyle(option.key); setScriptConfigChanged(true); }}
+                            onClick={() => { store.setCtaStyle(option.key); setScriptConfigChanged(true); debouncedRegenScript(); }}
                             className={cn(
                               "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
                               store.ctaStyle === option.key
@@ -1603,6 +1613,7 @@ export default function GeneratePage() {
                           onClick={() => {
                             store.setMode("single");
                             setScriptConfigChanged(true);
+                            debouncedRegenScript();
                           }}
                           className={cn(
                             "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
@@ -1624,6 +1635,7 @@ export default function GeneratePage() {
                           onClick={() => {
                             store.setMode("triple");
                             setScriptConfigChanged(true);
+                            debouncedRegenScript();
                           }}
                           className={cn(
                             "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
@@ -1649,7 +1661,7 @@ export default function GeneratePage() {
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
-                          onClick={() => { store.setQuality("standard"); store.setVideoProvider("kling"); setScriptConfigChanged(true); }}
+                          onClick={() => { store.setQuality("standard"); store.setVideoProvider("kling"); setScriptConfigChanged(true); debouncedRegenScript(); }}
                           className={cn(
                             "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
                             store.quality === "standard"
@@ -1665,6 +1677,7 @@ export default function GeneratePage() {
                           onClick={() => {
                             store.setQuality("hd");
                             setScriptConfigChanged(true);
+                            debouncedRegenScript();
                           }}
                           className={cn(
                             "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
@@ -1728,7 +1741,7 @@ export default function GeneratePage() {
                           <button
                             key={lang.code}
                             type="button"
-                            onClick={() => { store.setLanguage(lang.code); setScriptConfigChanged(true); }}
+                            onClick={() => { store.setLanguage(lang.code); setScriptConfigChanged(true); debouncedRegenScript(); }}
                             className={cn(
                               "rounded-lg border-2 px-3 py-1.5 text-sm transition-all",
                               store.language === lang.code
@@ -1841,15 +1854,30 @@ export default function GeneratePage() {
                             <p className="text-sm font-medium">Quick edit (optional)</p>
                             <p className="text-xs text-muted-foreground">Adjust outfit, background, or lighting.</p>
                           </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowPreviewEditor((prev) => !prev)}
-                          >
-                            <Sparkles className="size-3.5" />
-                            {showPreviewEditor ? "Hide" : "Edit"}
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGenerateComposites()}
+                              disabled={generateComposites.isPending}
+                            >
+                              {generateComposites.isPending ? (
+                                <><Loader2 className="size-3.5 animate-spin" />Regenerating...</>
+                              ) : (
+                                <><RefreshCw className="size-3.5" />Regenerate image</>
+                              )}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowPreviewEditor((prev) => !prev)}
+                            >
+                              <Sparkles className="size-3.5" />
+                              {showPreviewEditor ? "Hide" : "Edit"}
+                            </Button>
+                          </div>
                         </div>
                         {showPreviewEditor && (
                           <div className="mt-3 flex flex-col gap-3">
@@ -1924,28 +1952,31 @@ export default function GeneratePage() {
                   </div>
                 ) : store.pendingScript ? (
                   <div className="flex flex-col gap-4">
-                    {/* Script config changed warning */}
-                    {scriptConfigChanged && (
-                      <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
-                        <AlertCircle className="size-4 text-amber-500 shrink-0" />
-                        <div className="flex-1">
-                          <p className="text-sm text-amber-600 dark:text-amber-400">Settings changed - regenerate script to reflect updates.</p>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => { setScriptConfigChanged(false); handleGenerateScript(); }}
-                          disabled={requiresCommentKeyword && !commentKeyword}
-                          className="shrink-0 text-xs"
-                        >
-                          <RefreshCw className="size-3.5" />
-                          Regenerate
-                        </Button>
-                      </div>
-                    )}
+                    {/* Script auto-regenerates when settings change */}
 
-                    {/* Script review - inline */}
-                    <div className="flex flex-col gap-1">
+                    {/* Script review - side-by-side for single mode, stacked for triple */}
+                    <div className={cn(
+                      "flex gap-4",
+                      store.mode === "single" ? "flex-row items-start" : "flex-col",
+                    )}>
+                      {/* Selected composite preview (single mode only - left column) */}
+                      {store.mode === "single" && selectedCompositeIdx !== null && compositeImages[selectedCompositeIdx] && (
+                        <div className="shrink-0 w-[200px]">
+                          <div className={cn(
+                            "relative overflow-hidden rounded-lg border border-border",
+                            store.format === "9:16" ? "aspect-[9/16]" : "aspect-video",
+                          )}>
+                            <img
+                              src={compositeImages[selectedCompositeIdx].signed_url}
+                              alt="Selected scene preview"
+                              className="size-full object-cover"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Script content (right column in single mode) */}
+                      <div className={cn("flex flex-col gap-1", store.mode === "single" ? "flex-1 min-w-0" : "")}>
                       <div className="flex items-center gap-2 mb-1">
                         <Check className="size-4 text-emerald-500" />
                         <p className="text-sm font-semibold">Script ready - review & edit</p>
@@ -2048,6 +2079,7 @@ export default function GeneratePage() {
                           </div>
                         );
                       })}
+                    </div>
                     </div>
 
                     {/* Generate Video */}

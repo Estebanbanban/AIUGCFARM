@@ -169,9 +169,9 @@ export async function stitchToBlob(
       detectSpeechBounds(ffmpeg, "cta.mp4"),
     ]);
 
-    await ffmpeg.exec(["-i", "hook.mp4", "-ss", hookB.start.toFixed(3), "-to", hookB.end.toFixed(3), "-c", "copy", "hook_t.mp4"]);
-    await ffmpeg.exec(["-i", "body.mp4", "-ss", bodyB.start.toFixed(3), "-to", bodyB.end.toFixed(3), "-c", "copy", "body_t.mp4"]);
-    await ffmpeg.exec(["-i", "cta.mp4",  "-ss", ctaB.start.toFixed(3),  "-to", ctaB.end.toFixed(3),  "-c", "copy", "cta_t.mp4"]);
+    await ffmpeg.exec(["-i", "hook.mp4", "-ss", hookB.start.toFixed(3), "-to", hookB.end.toFixed(3), "-c:v", "libx264", "-c:a", "aac", "hook_t.mp4"]);
+    await ffmpeg.exec(["-i", "body.mp4", "-ss", bodyB.start.toFixed(3), "-to", bodyB.end.toFixed(3), "-c:v", "libx264", "-c:a", "aac", "body_t.mp4"]);
+    await ffmpeg.exec(["-i", "cta.mp4",  "-ss", ctaB.start.toFixed(3),  "-to", ctaB.end.toFixed(3),  "-c:v", "libx264", "-c:a", "aac", "cta_t.mp4"]);
 
     const manifest = "file 'hook_t.mp4'\nfile 'body_t.mp4'\nfile 'cta_t.mp4'\n";
     await ffmpeg.writeFile("list.txt", new TextEncoder().encode(manifest));
@@ -262,26 +262,26 @@ export function useVideoStitcher() {
         ]);
 
         setStatus("trimming");
-        // Trim each clip to its speech boundaries (-c copy = fast, no re-encode)
+        // Trim each clip to its speech boundaries (re-encode for frame-accurate cuts)
         await ffmpeg.exec([
           "-i", "hook.mp4",
           "-ss", hookB.start.toFixed(3),
           "-to", hookB.end.toFixed(3),
-          "-c", "copy",
+          "-c:v", "libx264", "-c:a", "aac",
           "hook_t.mp4",
         ]);
         await ffmpeg.exec([
           "-i", "body.mp4",
           "-ss", bodyB.start.toFixed(3),
           "-to", bodyB.end.toFixed(3),
-          "-c", "copy",
+          "-c:v", "libx264", "-c:a", "aac",
           "body_t.mp4",
         ]);
         await ffmpeg.exec([
           "-i", "cta.mp4",
           "-ss", ctaB.start.toFixed(3),
           "-to", ctaB.end.toFixed(3),
-          "-c", "copy",
+          "-c:v", "libx264", "-c:a", "aac",
           "cta_t.mp4",
         ]);
 

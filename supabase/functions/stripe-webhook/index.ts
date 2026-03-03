@@ -1,6 +1,9 @@
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
+import { sendEmail } from "../_shared/email.ts";
 import Stripe from "https://esm.sh/stripe@14?target=deno";
+
+const FRONTEND_URL = Deno.env.get("FRONTEND_URL") || "http://localhost:3000";
 
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY")!;
 const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET")!;
@@ -120,6 +123,66 @@ Deno.serve(async (req: Request) => {
             if (ledgerErr) {
               console.error("checkout: pack ledger insert failed:", ledgerErr);
               processingError = ledgerErr.message;
+            }
+
+            // Mark first_video_discount_used to prevent double discount
+            const { data: discountProfile } = await sb
+              .from("profiles")
+              .select("first_video_discount_used")
+              .eq("id", userId)
+              .single();
+
+            if (discountProfile && !discountProfile.first_video_discount_used) {
+              await sb
+                .from("profiles")
+                .update({ first_video_discount_used: true })
+                .eq("id", userId);
+            }
+
+            // Send post-purchase confirmation email
+            try {
+              const { data: authUser } = await sb.auth.admin.getUserById(userId);
+              const userEmail = authUser?.user?.email;
+              if (userEmail) {
+                const generateUrl = session.metadata?.generation_id
+                  ? `${FRONTEND_URL}/generate/${session.metadata.generation_id}`
+                  : `${FRONTEND_URL}/generate`;
+                await sendEmail({
+                  to: userEmail,
+                  subject: "Your credits are ready \u2014 let\u2019s make your video!",
+                  html: `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:system-ui,-apple-system,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 0">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
+        <tr><td style="padding:32px 40px 24px;border-bottom:1px solid #f3f4f6">
+          <p style="margin:0;font-size:22px;font-weight:700;color:#111827;letter-spacing:-0.5px">CineRads</p>
+        </td></tr>
+        <tr><td style="padding:32px 40px">
+          <h1 style="margin:0 0 12px;font-size:20px;font-weight:600;color:#111827">Your credits are ready!</h1>
+          <p style="margin:0 0 24px;font-size:15px;color:#6b7280;line-height:1.6">
+            We just added <strong>${credits} credits</strong> to your account. You're all set to create your next UGC video ad.
+          </p>
+          <a href="${generateUrl}" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 28px;border-radius:8px">
+            Start generating
+          </a>
+        </td></tr>
+        <tr><td style="padding:20px 40px;background:#f9fafb;border-top:1px solid #f3f4f6">
+          <p style="margin:0;font-size:12px;color:#9ca3af">&copy; 2026 CineRads &middot; AI UGC Video Generator</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+                });
+                console.log(`Pack purchase email sent to ${userEmail} (${credits} credits)`);
+              }
+            } catch (emailErr) {
+              // Email failure should not block the webhook — log and continue
+              console.error("checkout: pack purchase email failed:", emailErr);
             }
           }
           break;
