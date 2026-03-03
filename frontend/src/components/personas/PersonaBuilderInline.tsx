@@ -732,6 +732,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
         }
       }>('generate-persona', {
         body: { name: store.name.trim(), description: quickDescription.trim(), image_count: 1 },
+        timeoutMs: 180_000,
       });
 
       const urls1 = result1.data.generated_image_urls ?? result1.data.generated_images ?? [];
@@ -761,6 +762,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
             attributes: result1.data.attributes,
             image_count: 1,
           },
+          timeoutMs: 180_000,
         });
 
         const urls2 = result2.data.generated_image_urls ?? result2.data.generated_images ?? [];
@@ -821,6 +823,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
           attributes,
           ...(store.personaId ? { persona_id: store.personaId } : {}),
         },
+        timeoutMs: 180_000,
       });
 
       const displayUrls = result.data.generated_image_urls ?? result.data.generated_images;
