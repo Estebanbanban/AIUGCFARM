@@ -376,9 +376,10 @@ export default function GeneratePage() {
   const offer = useFirstPurchaseOffer();
   const { data: generations } = useGenerations();
 
-  // Auto-fire composites when arriving at Section 3 (step >= 4) via cold restore
+  // Auto-fire composites when arriving at Section 3 (step >= 4) via cold restore.
+  // Also re-fires if compositeImages is empty (e.g. after returning from Stripe checkout).
   useEffect(() => {
-    if (store.compositeImagePath) return;
+    if (store.compositeImagePath && compositeImages.length > 0) return;
     if (
       store.step >= 4 &&
       compositeImages.length === 0 &&

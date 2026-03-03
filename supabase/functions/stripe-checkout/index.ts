@@ -119,8 +119,11 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      // If user was mid-generation (has a generation_id), send back to the setup page (/generate)
+      // so their product/persona/composite state is still there. The CheckoutSuccessHandler
+      // on that page will toast + close the paywall, then they can re-click Generate Video.
       const packSuccessUrl = generation_id
-        ? `${FRONTEND_URL}/generate/${generation_id}?checkout=success&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`
+        ? `${FRONTEND_URL}/generate?checkout=success&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`
         : `${FRONTEND_URL}/dashboard?checkout=success&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`;
 
       const sessionParams: Stripe.Checkout.SessionCreateParams = {
