@@ -37,6 +37,7 @@ export function usePersona(id: string) {
       return data;
     },
     enabled: !!id,
+    retry: false,
   });
 }
 

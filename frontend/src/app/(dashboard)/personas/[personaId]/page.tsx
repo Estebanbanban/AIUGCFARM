@@ -74,6 +74,7 @@ function buildAttributeList(attrs: PersonaAttributes) {
   return [
     { label: "Gender", value: attrs.gender },
     { label: "Age Range", value: attrs.age },
+    { label: "Ethnicity", value: attrs.ethnicity },
     { label: "Hair Color", value: attrs.hair_color },
     { label: "Hair Style", value: attrs.hair_style },
     { label: "Eye Color", value: attrs.eye_color },

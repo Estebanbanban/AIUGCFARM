@@ -43,7 +43,7 @@ function endpoint(): string {
 /** Call Gemini with a text prompt, return a single generated image. */
 async function generateSingleImage(prompt: string): Promise<GeneratedImage> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 50_000); // 50s per image max
+  const timeout = setTimeout(() => controller.abort(), 60_000); // 60s per image max
 
   try {
     const res = await fetch(endpoint(), {
