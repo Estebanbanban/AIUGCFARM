@@ -375,6 +375,7 @@ Deno.serve(async (req: Request) => {
       if (!resolvedAttributes || Object.keys(resolvedAttributes ?? {}).length === 0) {
         try {
           resolvedAttributes = await descriptionToAttributes(description.trim());
+          console.log(`[generate-persona] description→attrs: ${Date.now() - t0}ms`);
           // Validate after parsing and fall back if invalid
           const valErr = validateAttributes(resolvedAttributes as Record<string, unknown>);
           if (valErr) {
@@ -409,6 +410,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const validAttrs = resolvedAttributes as PersonaAttributes;
+    const t0 = Date.now();
     const hasPersonaId = typeof persona_id === "string" && persona_id.length > 0;
     const isProgressiveAppend = hasPersonaId && imageCount === 1;
     const isRegeneration = hasPersonaId && !isProgressiveAppend;
@@ -478,9 +480,21 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Generate rich UGC scene prompt via OpenRouter (falls back to basic descriptor)
-    const { prompt: scenePrompt, generated: promptGenerated } = await generateScenePrompt(validAttrs);
-    console.log(`Scene prompt (${promptGenerated ? "LLM" : "fallback"}):`, scenePrompt);
+    // Reuse scene_prompt if already stored in attributes (avoids redundant OpenRouter call on
+    // progressive-append and regeneration requests). Only generate when absent.
+    const cachedScenePrompt = typeof (validAttrs as Record<string, unknown>).scene_prompt === "string"
+      ? (validAttrs as Record<string, unknown>).scene_prompt as string
+      : null;
+
+    let scenePrompt: string;
+    if (cachedScenePrompt) {
+      scenePrompt = cachedScenePrompt;
+      console.log(`[generate-persona] scene prompt: reused cached (${Date.now() - t0}ms total)`);
+    } else {
+      const { prompt, generated } = await generateScenePrompt(validAttrs);
+      scenePrompt = prompt;
+      console.log(`[generate-persona] scene prompt (${generated ? "LLM" : "fallback"}): ${Date.now() - t0}ms`);
+    }
 
     // Build final image prompt: scene context + explicit physical attributes pinned
     // This guarantees Gemini renders the correct skin tone, gender, hair, etc.
@@ -488,7 +502,9 @@ Deno.serve(async (req: Request) => {
     console.log("Image prompt:", imagePrompt);
 
     // Generate images via Gemini / NanoBanana 2 (with retry)
+    console.log(`[generate-persona] starting Gemini (count=${imageCount}): ${Date.now() - t0}ms`);
     const images = await generateImages(imagePrompt, imageCount);
+    console.log(`[generate-persona] Gemini done: ${Date.now() - t0}ms`);
 
     // Upload all generated images in parallel
     const uploadResults = await Promise.all(
@@ -513,6 +529,7 @@ Deno.serve(async (req: Request) => {
     if (storagePaths.length === 0) {
       throw new Error("All image uploads failed");
     }
+    console.log(`[generate-persona] uploads done: ${Date.now() - t0}ms`);
 
     // Batch-sign all paths in a single request
     const { data: signedData } = await sb.storage

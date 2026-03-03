@@ -572,8 +572,7 @@ function TextCard({
 const PERSONA_STEPS = [
   { label: "Analyzing your description",  icon: <Cpu className="w-3 h-3" /> },
   { label: "Building visual scene",       icon: <FlaskConical className="w-3 h-3" /> },
-  { label: "Generating first portrait",   icon: <ImageIcon className="w-3 h-3" /> },
-  { label: "Generating second portrait",  icon: <Sparkles className="w-3 h-3" /> },
+  { label: "Generating portraits",        icon: <ImageIcon className="w-3 h-3" /> },
 ];
 
 // ── Main component ──────────────────────────────────────────────────────────
@@ -592,7 +591,6 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
   const [quickDescription, setQuickDescription] = useState('');
   const [isGeneratingQuick, setIsGeneratingQuick] = useState(false);
   const [regenCount, setRegenCount] = useState<number>(0);
-  const [isGeneratingSecond, setIsGeneratingSecond] = useState(false);
   const [generatingMessage, setGeneratingMessage] = useState(0);
   const [generatingElapsed, setGeneratingElapsed] = useState(0);
   const [loaderProgress, setLoaderProgress] = useState(0);
@@ -708,22 +706,21 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
   async function handleQuickCreate() {
     if (!store.name.trim() || !quickDescription.trim()) return;
     setIsGeneratingQuick(true);
-    setIsGeneratingSecond(false);
 
-    // Start progress simulation
+    // Start progress simulation: step 0 → 1 → 2 → Gemini completes
     setLoaderProgress(0);
     setLoaderStep(0);
     startSim(0, 15, 20_000, () => {
       setLoaderStep(1);
       startSim(15, 30, 15_000, () => {
         setLoaderStep(2);
-        startSim(30, 48, 40_000); // no onDone — real API will interrupt
+        startSim(30, 95, 55_000); // no onDone — real API will interrupt
       });
     });
 
     try {
-      // Call 1: generate first portrait (image_count=1)
-      const result1 = await callEdge<{
+      // Single call: both portraits generated in parallel on the backend
+      const result = await callEdge<{
         data: {
           id: string;
           generated_images: string[];
@@ -731,51 +728,15 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
           attributes: Record<string, unknown>;
         }
       }>('generate-persona', {
-        body: { name: store.name.trim(), description: quickDescription.trim(), image_count: 1 },
+        body: { name: store.name.trim(), description: quickDescription.trim(), image_count: 2 },
         timeoutMs: 180_000,
       });
 
-      const urls1 = result1.data.generated_image_urls ?? result1.data.generated_images ?? [];
-      store.setPersonaId(result1.data.id);
-      store.setGeneratedImages(urls1); // Show first image immediately
+      const urls = result.data.generated_image_urls ?? result.data.generated_images ?? [];
+      store.setPersonaId(result.data.id);
+      store.setGeneratedImages(urls);
       queryClient.invalidateQueries({ queryKey: ['personas'] });
 
-      // Transition to step 3
-      stopSim();
-      setLoaderStep(3);
-      setLoaderProgress(50);
-      startSim(50, 98, 42_000); // no onDone — real API will interrupt
-
-      // Call 2: generate second portrait using same persona_id + attributes
-      setIsGeneratingSecond(true);
-      try {
-        const result2 = await callEdge<{
-          data: {
-            id: string;
-            generated_images: string[];
-            generated_image_urls: string[];
-          }
-        }>('generate-persona', {
-          body: {
-            persona_id: result1.data.id,
-            name: store.name.trim(),
-            attributes: result1.data.attributes,
-            image_count: 1,
-          },
-          timeoutMs: 180_000,
-        });
-
-        const urls2 = result2.data.generated_image_urls ?? result2.data.generated_images ?? [];
-        store.setGeneratedImages(urls2); // Update with both images
-        queryClient.invalidateQueries({ queryKey: ['personas'] });
-      } catch (err2) {
-        // Second image failed - that's OK, we still have the first one
-        console.warn('Second portrait generation failed:', err2);
-      } finally {
-        setIsGeneratingSecond(false);
-      }
-
-      // Finish progress
       stopSim();
       setLoaderProgress(100);
       setTimeout(() => {
@@ -1217,22 +1178,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                       )}
                     </button>
                   ))}
-                  {/* Second portrait loading placeholder */}
-                  {isGeneratingSecond && store.generatedImages.length === 1 && (
-                    <div className="relative flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl border-2 border-transparent bg-muted animate-pulse">
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
-                        <Loader2 className="size-6 animate-spin" />
-                        <span className="text-xs">Portrait 2</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
-                {isGeneratingSecond && (
-                  <div className="mt-3 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="size-3 animate-spin" />
-                    Generating 2nd portrait...
-                  </div>
-                )}
               </div>
             )}
 
