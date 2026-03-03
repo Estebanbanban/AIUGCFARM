@@ -196,6 +196,7 @@ function SidebarContent({
 
 function getPageTitle(pathname: string): string {
   if (pageTitles[pathname]) return pageTitles[pathname];
+  if (pathname === "/personas/new") return "Create Persona";
   if (pathname.startsWith("/personas/")) return "Persona Detail";
   if (pathname.startsWith("/products/")) return "Product Detail";
   if (pathname.startsWith("/generate/")) return "Generation";

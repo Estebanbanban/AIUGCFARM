@@ -204,41 +204,43 @@ export default function ProductsPage() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {atProductLimit && (
-            <Badge variant="outline" className={`text-xs ${approachingLimit ? 'bg-amber-500/10 text-amber-600 border-amber-500/30' : 'text-muted-foreground'}`}>
-              {atProductLimit && <AlertCircle className="size-3" />}
-              {productCount}/{productLimit} products
-            </Badge>
-          )}
-          <Button
-            variant="secondary"
-            disabled={atProductLimit}
-            onClick={() => {
-              if (atProductLimit) {
-                toast.error(`You've reached the ${productLimit} product limit for your ${plan} plan. Upgrade to add more.`);
-                return;
-              }
-              setShowImportDialog(true);
-            }}
-          >
-            <LinkIcon className="size-4" />
-            Import Product
-          </Button>
-          <Button
-            disabled={atProductLimit}
-            onClick={() => {
-              if (atProductLimit) {
-                toast.error(`You've reached the ${productLimit} product limit for your ${plan} plan. Upgrade to add more.`);
-                return;
-              }
-              setShowImportDialog(true);
-            }}
-          >
-            <Plus className="size-4" />
-            Add Manually
-          </Button>
-        </div>
+        {hasProducts && (
+          <div className="flex items-center gap-3">
+            {atProductLimit && (
+              <Badge variant="outline" className={`text-xs ${approachingLimit ? 'bg-amber-500/10 text-amber-600 border-amber-500/30' : 'text-muted-foreground'}`}>
+                {atProductLimit && <AlertCircle className="size-3" />}
+                {productCount}/{productLimit} products
+              </Badge>
+            )}
+            <Button
+              variant="secondary"
+              disabled={atProductLimit}
+              onClick={() => {
+                if (atProductLimit) {
+                  toast.error(`You've reached the ${productLimit} product limit for your ${plan} plan. Upgrade to add more.`);
+                  return;
+                }
+                setShowImportDialog(true);
+              }}
+            >
+              <LinkIcon className="size-4" />
+              Import Product
+            </Button>
+            <Button
+              disabled={atProductLimit}
+              onClick={() => {
+                if (atProductLimit) {
+                  toast.error(`You've reached the ${productLimit} product limit for your ${plan} plan. Upgrade to add more.`);
+                  return;
+                }
+                setShowImportDialog(true);
+              }}
+            >
+              <Plus className="size-4" />
+              Add Manually
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Error state */}

@@ -1136,7 +1136,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                 <Separator className="mb-3" />
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   {[
-                    { label: 'Name',      value: store.name || 'Not set' },
+                    { label: 'Name',      value: store.name || 'Enter a name...' },
                     { label: 'Gender',    value: genderLabels[store.gender] },
                     { label: 'Age',       value: ageRangeLabels[store.ageRange] },
                     { label: 'Ethnicity', value: store.ethnicity },
@@ -1212,7 +1212,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                 <Button
                   onClick={handleGenerate}
                   disabled={!store.name.trim() || store.isGenerating}
-                  className="w-full"
+                  className="w-full disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
                   size="lg"
                 >
                   {store.isGenerating ? (

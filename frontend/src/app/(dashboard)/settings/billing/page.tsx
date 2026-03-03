@@ -12,6 +12,7 @@ import {
   Film,
   Layers,
   AlertCircle,
+  Receipt,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -462,10 +463,10 @@ export default function BillingPage() {
           </div>
 
           {/* Triple */}
-          <div className="flex flex-col gap-2 rounded-xl border-2 border-emerald-500/30 bg-emerald-500/5 p-3">
+          <div className="flex flex-col gap-2 rounded-xl border-2 border-primary/30 bg-primary/5 p-3">
             <div className="flex items-center gap-2.5">
-              <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-500/10">
-                <Layers className="size-4 text-emerald-400" />
+              <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10">
+                <Layers className="size-4 text-primary" />
               </div>
               <span className="text-sm font-semibold">Triple Mode</span>
             </div>
@@ -477,8 +478,8 @@ export default function BillingPage() {
         </div>
 
         {/* Triple callout */}
-        <div className="mt-5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-          <p className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-emerald-400">
+        <div className="mt-5 rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
             Why Triple Mode is the smart choice
           </p>
           <p className="text-sm text-muted-foreground">
@@ -487,7 +488,7 @@ export default function BillingPage() {
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {["15 cr → 27 combos", "$0.56/combo (standard)", "vs $5/single video"].map((tag) => (
-              <span key={tag} className="rounded-md border border-emerald-500/20 bg-card px-2.5 py-1 text-xs text-muted-foreground">
+              <span key={tag} className="rounded-md border border-primary/20 bg-card px-2.5 py-1 text-xs text-muted-foreground">
                 {tag}
               </span>
             ))}
@@ -532,8 +533,14 @@ export default function BillingPage() {
               <Loader2 className="size-5 animate-spin text-muted-foreground" />
             </div>
           ) : !ledger || ledger.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-12 text-center">
-              <p className="text-sm text-muted-foreground">No credit history yet</p>
+            <div className="flex flex-col items-center gap-3 py-12 text-center">
+              <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+                <Receipt className="size-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">No credit history yet</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Your purchases and usage will appear here</p>
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">
