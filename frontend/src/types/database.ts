@@ -71,6 +71,7 @@ export interface PersonaAttributes {
   gender: string;
   skin_tone: string;
   age: string;
+  ethnicity?: string;
   hair_color: string;
   hair_style: string;
   eye_color: string;
