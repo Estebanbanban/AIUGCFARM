@@ -338,7 +338,7 @@ export default function GeneratePage() {
   const [showPreviewEditor, setShowPreviewEditor] = useState(false);
   const [previewEditPrompt, setPreviewEditPrompt] = useState("");
   const [ctaOpen, setCtaOpen] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+
   const [showMoreCta, setShowMoreCta] = useState(false);
 
   // Advanced mode state
@@ -1550,18 +1550,7 @@ export default function GeneratePage() {
                   </CollapsibleContent>
                 </Collapsible>
 
-                {/* Advanced options toggle */}
-                <button
-                  type="button"
-                  onClick={() => setShowAdvanced(v => !v)}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <Settings2 className="size-3.5" />
-                  {showAdvanced ? "Hide advanced options \u25B2" : "Advanced options \u25BC"}
-                </button>
-
-                {showAdvanced && (
-                  <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-5">
                     {/* Easy / Advanced mode tab */}
                     <div className="flex rounded-lg border border-border bg-muted/40 p-1 gap-1">
                       <button
@@ -1753,7 +1742,6 @@ export default function GeneratePage() {
                       </div>
                     </div>
                   </div>
-                )}
 
                 {requiresCommentKeyword && !commentKeyword && (
                   <div className="rounded-xl bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
