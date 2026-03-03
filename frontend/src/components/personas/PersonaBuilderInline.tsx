@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { createClient } from '@/lib/supabase/client';
 import { resolvePersonaImageUrl } from '@/hooks/use-personas';
@@ -8,7 +8,7 @@ import Image from 'next/image';
 import {
   Loader2, Sparkles, Check, User, ImageIcon, X,
   ChevronDown, ChevronUp, Eye, Palette, Clock,
-  Shirt, Watch, Wand2,
+  Shirt, Watch, Wand2, Cpu, FlaskConical,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { NanoBananaLoader } from '@/components/ui/nano-loader';
 import { usePersonaBuilderStore } from '@/stores/persona-builder';
 import { useProfile } from '@/hooks/use-profile';
 import {
@@ -568,6 +569,13 @@ function TextCard({
   );
 }
 
+const PERSONA_STEPS = [
+  { label: "Analyzing your description",  icon: <Cpu className="w-3 h-3" /> },
+  { label: "Building visual scene",       icon: <FlaskConical className="w-3 h-3" /> },
+  { label: "Generating first portrait",   icon: <ImageIcon className="w-3 h-3" /> },
+  { label: "Generating second portrait",  icon: <Sparkles className="w-3 h-3" /> },
+];
+
 // ── Main component ──────────────────────────────────────────────────────────
 
 interface PersonaBuilderInlineProps {
@@ -587,11 +595,40 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
   const [isGeneratingSecond, setIsGeneratingSecond] = useState(false);
   const [generatingMessage, setGeneratingMessage] = useState(0);
   const [generatingElapsed, setGeneratingElapsed] = useState(0);
+  const [loaderProgress, setLoaderProgress] = useState(0);
+  const [loaderStep, setLoaderStep] = useState(-1);
+  const progressSimRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Theme detection ────────────────────────────────────────────────────────
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  // ── Progress simulation helpers ────────────────────────────────────────────
+  function startSim(fromPct: number, toPct: number, durationMs: number, onDone?: () => void) {
+    if (progressSimRef.current) clearInterval(progressSimRef.current);
+    const start = Date.now();
+    progressSimRef.current = setInterval(() => {
+      const t = Math.min((Date.now() - start) / durationMs, 1);
+      const eased = 1 - Math.pow(1 - t, 2);
+      setLoaderProgress(Math.round(fromPct + (toPct - fromPct) * eased));
+      if (t >= 1) {
+        clearInterval(progressSimRef.current!);
+        progressSimRef.current = null;
+        onDone?.();
+      }
+    }, 80);
+  }
+
+  function stopSim() {
+    if (progressSimRef.current) {
+      clearInterval(progressSimRef.current);
+      progressSimRef.current = null;
+    }
+  }
+
+  // Clean up interval on unmount
+  useEffect(() => () => stopSim(), []);
 
   // ── Load regen_count on mount when resuming an existing persona ────────────
   useEffect(() => {
@@ -673,6 +710,17 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
     setIsGeneratingQuick(true);
     setIsGeneratingSecond(false);
 
+    // Start progress simulation
+    setLoaderProgress(0);
+    setLoaderStep(0);
+    startSim(0, 15, 20_000, () => {
+      setLoaderStep(1);
+      startSim(15, 30, 15_000, () => {
+        setLoaderStep(2);
+        startSim(30, 48, 40_000); // no onDone — real API will interrupt
+      });
+    });
+
     try {
       // Call 1: generate first portrait (image_count=1)
       const result1 = await callEdge<{
@@ -690,6 +738,12 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
       store.setPersonaId(result1.data.id);
       store.setGeneratedImages(urls1); // Show first image immediately
       queryClient.invalidateQueries({ queryKey: ['personas'] });
+
+      // Transition to step 3
+      stopSim();
+      setLoaderStep(3);
+      setLoaderProgress(50);
+      startSim(50, 98, 42_000); // no onDone — real API will interrupt
 
       // Call 2: generate second portrait using same persona_id + attributes
       setIsGeneratingSecond(true);
@@ -719,10 +773,21 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
         setIsGeneratingSecond(false);
       }
 
+      // Finish progress
+      stopSim();
+      setLoaderProgress(100);
+      setTimeout(() => {
+        setLoaderStep(-1);
+        setLoaderProgress(0);
+      }, 800);
+
       toast.success('Persona generated! Select your preferred portrait.');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to generate persona';
       toast.error(msg);
+      stopSim();
+      setLoaderStep(-1);
+      setLoaderProgress(0);
     } finally {
       setIsGeneratingQuick(false);
     }
@@ -1032,8 +1097,20 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
         <div className="flex flex-col gap-4">
           <div className="sticky top-6">
 
-            {/* Generating skeleton (Quick Create or Visual Builder) */}
-            {(isGeneratingQuick || store.isGenerating) && store.generatedImages.length === 0 && (
+            {/* Generating loader (Quick Create) */}
+            {isGeneratingQuick && store.generatedImages.length === 0 && (
+              <NanoBananaLoader
+                title="Creating Your Persona"
+                subtitle="Generating unique portraits — usually 60–90 seconds"
+                steps={PERSONA_STEPS}
+                currentStep={loaderStep}
+                progress={loaderProgress}
+                className="min-h-[400px]"
+              />
+            )}
+
+            {/* Generating skeleton (Visual Builder - custom mode) */}
+            {store.isGenerating && !isGeneratingQuick && store.generatedImages.length === 0 && (
               <div className="rounded-xl border border-border bg-card p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <p className="text-sm font-medium text-foreground">
