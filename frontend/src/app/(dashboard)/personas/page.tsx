@@ -24,7 +24,7 @@ import {
   useDeletePersona,
   usePersonas,
 } from "@/hooks/use-personas";
-import { getSignedImageUrls, isExternalUrl } from "@/lib/storage";
+import { getSignedImageUrls, isExternalUrl, preloadImages } from "@/lib/storage";
 import { useProfile, PERSONA_SLOT_LIMITS } from "@/hooks/use-profile";
 import { OptimizedImage } from "@/components/ui/optimized-image";
 import type { Persona } from "@/types/database";
@@ -59,6 +59,9 @@ function useResolvedImages(personas: Persona[] | undefined) {
         map[id] = signed === "/placeholder-product.svg" ? null : signed;
       });
       setImageMap(map);
+      // Preload all resolved images into browser cache so detail page is instant
+      preloadImages(urls);
+      preloadImages(external.map(([, url]) => url));
     });
 
     return () => { cancelled = true; };
