@@ -127,9 +127,18 @@ export async function submitKlingJob(params: {
 export async function checkKlingJob(jobId: string): Promise<KlingJobStatus> {
   const token = await generateKlingToken();
 
-  const res = await fetch(`${KLING_BASE}/videos/image2video/${jobId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  let res: Response;
+  try {
+    res = await fetch(`${KLING_BASE}/videos/image2video/${jobId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!res.ok) {
     let errBody: string;

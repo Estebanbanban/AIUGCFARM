@@ -534,6 +534,7 @@ Deno.serve(async (req: Request) => {
     // Generating in parallel (Promise.all) keeps multiple large base64 buffers in RAM
     // simultaneously and triggers WORKER_LIMIT on Supabase's free/pro tiers.
     const storagePaths: string[] = [];
+    let failedCount = 0;
     for (let i = 0; i < imageCount; i++) {
       console.log(`[generate-persona] Gemini image ${i + 1}/${imageCount}: ${Date.now() - t0}ms`);
       try {
@@ -551,17 +552,18 @@ Deno.serve(async (req: Request) => {
           });
         if (uploadErr) {
           console.error(`Persona image ${i + 1} upload failed: ${uploadErr.message}`);
+          failedCount++;
         } else {
           storagePaths.push(storagePath);
         }
       } catch (imgErr) {
         console.error(`Persona image ${i + 1} generation failed:`, imgErr);
-        // Continue — if we end up with at least 1 image we can still succeed
+        failedCount++;
       }
     }
 
-    if (storagePaths.length === 0) {
-      throw new Error("All image generations failed");
+    if (failedCount === imageCount) {
+      throw new Error(`All ${imageCount} image generation(s) failed`);
     }
     console.log(`[generate-persona] all images done: ${Date.now() - t0}ms`);
 

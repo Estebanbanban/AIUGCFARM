@@ -20,6 +20,32 @@ Deno.serve(async (req: Request) => {
     const userId = await requireUserId(req);
     const sb = getAdminClient();
 
+    // Per-user daily limit for composite image generations
+    const { data: profile } = await sb
+      .from("profiles")
+      .select("plan")
+      .eq("id", userId)
+      .single();
+    const userPlan = profile?.plan ?? "free";
+    const dailyLimit = userPlan === "free" ? 10 : 50;
+
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+    const { count: todayCount } = await sb
+      .from("credit_ledger")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_id", userId)
+      .eq("reason", "composite_generation")
+      .gte("created_at", todayStart.toISOString());
+
+    if ((todayCount ?? 0) >= dailyLimit) {
+      return json(
+        { detail: `Daily composite generation limit reached (${dailyLimit}/day). Try again tomorrow.` },
+        cors,
+        429,
+      );
+    }
+
     const { product_id, persona_id, format = "9:16" } = await req.json();
 
     if (!product_id) return json({ detail: "product_id is required" }, cors, 400);
@@ -161,6 +187,13 @@ Deno.serve(async (req: Request) => {
     if (results.length === 0) {
       throw new Error("All composite image generations failed");
     }
+
+    // Log composite generation for daily limit tracking
+    await sb.from("credit_ledger").insert({
+      owner_id: userId,
+      amount: 0,
+      reason: "composite_generation",
+    });
 
     return json({ data: { images: results } }, cors, 200);
   } catch (e: unknown) {
