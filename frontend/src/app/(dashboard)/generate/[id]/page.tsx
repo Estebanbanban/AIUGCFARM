@@ -1515,9 +1515,9 @@ export default function GenerationDetailPage() {
       )}
 
       {/* ---------------------------------------------------------------- */}
-      {/*  Skeleton segment cards (during generation)                       */}
+      {/*  Skeleton segment cards (only shown during stale/long wait)       */}
       {/* ---------------------------------------------------------------- */}
-      {isProcessing && (
+      {isProcessing && isStale && (
         <div>
           <h2 className="mb-4 text-lg font-semibold text-foreground">
             Video Segments
