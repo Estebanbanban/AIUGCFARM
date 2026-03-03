@@ -120,6 +120,7 @@ export function OnboardingOverlay() {
     function handleResume() {
       localStorage.removeItem(SKIP_KEY);
       setSkipped(false);
+      setHasActiveWizardSession(false);
       setView("checklist");
     }
     window.addEventListener("onboarding:resume", handleResume);

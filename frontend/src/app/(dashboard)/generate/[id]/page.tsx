@@ -975,7 +975,11 @@ const RENDER_STEPS = [
   { label: "Finalizing video",           icon: <Sparkles className="w-3 h-3" /> },
 ];
 
-function statusToLoader(status: string, elapsedMs: number): { step: number; progress: number } {
+function statusToLoader(
+  status: string,
+  elapsedMs: number,
+  segmentProgress?: { completed: number; total: number } | null,
+): { step: number; progress: number } {
   switch (status) {
     case "pending":
     case "scripting":
@@ -985,8 +989,14 @@ function statusToLoader(status: string, elapsedMs: number): { step: number; prog
       return { step: 1, progress: Math.min(15 + elapsedMs / 30_000 * 10, 24) };
     case "submitting_jobs":
       return { step: 1, progress: Math.min(25 + elapsedMs / 20_000 * 10, 34) };
-    case "generating_segments":
+    case "generating_segments": {
+      // Use real segment progress when available (accurate) — fall back to elapsed time
+      if (segmentProgress && segmentProgress.total > 0) {
+        const realPct = (segmentProgress.completed / segmentProgress.total) * 55 + 35;
+        return { step: 2, progress: Math.min(realPct, 90) };
+      }
       return { step: 2, progress: Math.min(35 + elapsedMs / 300_000 * 55, 90) };
+    }
     case "completed":
       return { step: 4, progress: 100 };
     case "failed":
@@ -1088,13 +1098,14 @@ export default function GenerationDetailPage() {
   const isFailed = status === "failed";
   const isProcessing = !isComplete && !isFailed;
 
-  // Compute loader info from status and elapsed time
-  const loaderInfo = statusToLoader(status, renderElapsed);
   const skeletonCount = gen?.mode === "triple" ? 9 : 3;
 
   const segments = gen?.segments ?? null;
   const script = gen?.script ?? null;
   const progress = gen?.progress;
+
+  // Compute loader info from status and elapsed time (with real segment progress when available)
+  const loaderInfo = statusToLoader(status, renderElapsed, progress);
 
   const combosToExport = useMemo(() => {
     if (!batchMode || !segments) return [];

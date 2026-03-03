@@ -4,6 +4,17 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const EDGE_URL = `${supabaseUrl}/functions/v1`;
 
+/** Edge function error that carries the HTTP status code for precise frontend handling. */
+export class EdgeError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "EdgeError";
+  }
+}
+
 const DEFAULT_EDGE_TIMEOUT_MS = 120_000;
 
 async function parseEdgeError(res: Response): Promise<string> {
@@ -104,11 +115,11 @@ export async function callEdge<T>(
 
   if (res.status === 401) {
     await supabase.auth.signOut();
-    throw new Error("Authentication required. Please sign in again.");
+    throw new EdgeError(401, "Authentication required. Please sign in again.");
   }
 
   if (!res.ok) {
-    throw new Error(await parseEdgeError(res));
+    throw new EdgeError(res.status, await parseEdgeError(res));
   }
   return res.json();
 }
@@ -137,7 +148,7 @@ export async function callEdgePublic<T>(
   }, timeoutMs);
 
   if (!res.ok) {
-    throw new Error(await parseEdgeError(res));
+    throw new EdgeError(res.status, await parseEdgeError(res));
   }
   return res.json();
 }
@@ -177,11 +188,11 @@ export async function callEdgeMultipart<T>(
 
   if (res.status === 401) {
     await supabase.auth.signOut();
-    throw new Error("Authentication required. Please sign in again.");
+    throw new EdgeError(401, "Authentication required. Please sign in again.");
   }
 
   if (!res.ok) {
-    throw new Error(await parseEdgeError(res));
+    throw new EdgeError(res.status, await parseEdgeError(res));
   }
   return res.json();
 }

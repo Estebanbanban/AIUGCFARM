@@ -92,7 +92,7 @@ import {
 } from "@/lib/datafast";
 import { AdvancedModePanel } from "@/components/generate/AdvancedModePanel";
 import { NanoBananaLoader } from "@/components/ui/nano-loader";
-import { callEdge } from "@/lib/api";
+import { callEdge, EdgeError } from "@/lib/api";
 import type { GenerateSegmentScriptResponse, AdvancedSegmentsInput } from "@/types/api";
 import type { AdvancedSegmentConfig, AdvancedSegmentsConfig } from "@/types/database";
 
@@ -455,7 +455,7 @@ export default function GeneratePage() {
   const isFirstVideo = profile?.first_video_discount_used === false;
   const effectiveCost = creditCost;
 
-  const hasEnoughCredits = creditsLoading || isUnlimitedCredits || creditsRemaining >= effectiveCost;
+  const hasEnoughCredits = isUnlimitedCredits || creditsRemaining >= effectiveCost;
   const requiresCommentKeyword = store.ctaStyle === "comment_keyword";
   const commentKeyword = store.ctaCommentKeyword.trim().replace(/[^a-zA-Z0-9 _-]/g, "");
 
@@ -817,11 +817,19 @@ export default function GeneratePage() {
           router.push(`/generate/${genId}`);
           toast.success("Generation started!");
         },
-        onError: (err) => {
+        onError: (err: Error) => {
           stopVideoSim();
           setVideoLoaderStep(-1);
           setVideoLoaderProgress(0);
-          toast.error(err.message || "Failed to start generation");
+          // Backend 402 = insufficient credits → show paywall instead of toast
+          if (err instanceof EdgeError && err.status === 402) {
+            trackPaywallShown("insufficient_credits");
+            offer.startOffer();
+            setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
+            setShowPaywall(true);
+          } else {
+            toast.error(err.message || "Failed to start generation");
+          }
         },
       },
     );
@@ -2057,12 +2065,14 @@ export default function GeneratePage() {
                     {/* Generate Video */}
                     <Button
                       onClick={handleApproveAndGenerate}
-                      disabled={approveAndGenerate.isPending}
+                      disabled={approveAndGenerate.isPending || creditsLoading}
                       size="lg"
                       className="w-full"
                     >
                       {approveAndGenerate.isPending ? (
                         <><Loader2 className="size-4 animate-spin" />Starting generation...</>
+                      ) : creditsLoading ? (
+                        <><Loader2 className="size-4 animate-spin" />Checking credits...</>
                       ) : (
                         <><Zap className="size-4" />Generate Video</>
                       )}
@@ -2147,12 +2157,14 @@ export default function GeneratePage() {
                     ) : store.pendingScript ? (
                       <Button
                         onClick={handleApproveAndGenerate}
-                        disabled={approveAndGenerate.isPending}
+                        disabled={approveAndGenerate.isPending || creditsLoading}
                         size="lg"
                         className="w-full"
                       >
                         {approveAndGenerate.isPending ? (
                           <><Loader2 className="size-4 animate-spin" />Starting generation...</>
+                        ) : creditsLoading ? (
+                          <><Loader2 className="size-4 animate-spin" />Checking credits...</>
                         ) : (
                           <><Zap className="size-4" />Generate Video</>
                         )}
