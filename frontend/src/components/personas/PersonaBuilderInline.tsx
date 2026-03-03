@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { createClient } from '@/lib/supabase/client';
 import { resolvePersonaImageUrl } from '@/hooks/use-personas';
@@ -8,7 +8,7 @@ import Image from 'next/image';
 import {
   Loader2, Sparkles, Check, User, ImageIcon, X,
   ChevronDown, ChevronUp, Eye, Palette, Clock,
-  Shirt, Watch, Wand2,
+  Shirt, Watch, Wand2, Cpu, FlaskConical,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { NanoBananaLoader } from '@/components/ui/nano-loader';
 import { usePersonaBuilderStore } from '@/stores/persona-builder';
 import { useProfile } from '@/hooks/use-profile';
 import {
@@ -568,6 +569,12 @@ function TextCard({
   );
 }
 
+const PERSONA_STEPS = [
+  { label: "Analyzing your description",  icon: <Cpu className="w-3 h-3" /> },
+  { label: "Building visual scene",       icon: <FlaskConical className="w-3 h-3" /> },
+  { label: "Generating portraits",        icon: <ImageIcon className="w-3 h-3" /> },
+];
+
 // ── Main component ──────────────────────────────────────────────────────────
 
 interface PersonaBuilderInlineProps {
@@ -584,11 +591,43 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
   const [quickDescription, setQuickDescription] = useState('');
   const [isGeneratingQuick, setIsGeneratingQuick] = useState(false);
   const [regenCount, setRegenCount] = useState<number>(0);
+  const [generatingMessage, setGeneratingMessage] = useState(0);
+  const [generatingElapsed, setGeneratingElapsed] = useState(0);
+  const [loaderProgress, setLoaderProgress] = useState(0);
+  const [loaderStep, setLoaderStep] = useState(-1);
+  const progressSimRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Theme detection ────────────────────────────────────────────────────────
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  // ── Progress simulation helpers ────────────────────────────────────────────
+  function startSim(fromPct: number, toPct: number, durationMs: number, onDone?: () => void) {
+    if (progressSimRef.current) clearInterval(progressSimRef.current);
+    const start = Date.now();
+    progressSimRef.current = setInterval(() => {
+      const t = Math.min((Date.now() - start) / durationMs, 1);
+      const eased = 1 - Math.pow(1 - t, 2);
+      setLoaderProgress(Math.round(fromPct + (toPct - fromPct) * eased));
+      if (t >= 1) {
+        clearInterval(progressSimRef.current!);
+        progressSimRef.current = null;
+        onDone?.();
+      }
+    }, 80);
+  }
+
+  function stopSim() {
+    if (progressSimRef.current) {
+      clearInterval(progressSimRef.current);
+      progressSimRef.current = null;
+    }
+  }
+
+  // Clean up interval on unmount
+  useEffect(() => () => stopSim(), []);
+
 
   // ── Load regen_count on mount when resuming an existing persona ────────────
   useEffect(() => {
@@ -605,6 +644,27 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
       });
     return () => { cancelled = true; };
   }, [store.personaId, profile?.plan]);
+
+  // ── Generating message rotation ────────────────────────────────────────────
+  const GENERATING_MESSAGES = [
+    "Designing your AI persona...",
+    "Rendering your portrait...",
+    "Crafting your look...",
+    "Almost there...",
+    "Adding final touches...",
+  ];
+
+  useEffect(() => {
+    if (!isGeneratingQuick && !store.isGenerating) {
+      setGeneratingMessage(0);
+      setGeneratingElapsed(0);
+      return;
+    }
+    const msgInterval = setInterval(() => setGeneratingMessage(m => (m + 1) % GENERATING_MESSAGES.length), 3000);
+    const timeInterval = setInterval(() => setGeneratingElapsed(s => s + 1), 1000);
+    return () => { clearInterval(msgInterval); clearInterval(timeInterval); };
+  }, [isGeneratingQuick, store.isGenerating]);
+
 
   // ── Preload all static persona option images on mount ──────────────────────
   useEffect(() => {
@@ -647,23 +707,74 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
 
   async function handleQuickCreate() {
     if (!store.name.trim() || !quickDescription.trim()) return;
-
     setIsGeneratingQuick(true);
+
+    // Step 0 → 1: OpenRouter calls (description→attrs + scene prompt)
+    setLoaderProgress(0);
+    setLoaderStep(0);
+    startSim(0, 15, 20_000, () => {
+      setLoaderStep(1);
+      startSim(15, 30, 15_000); // no onDone — phase 2 will snap to step 2
+    });
+
     try {
-      const result = await callEdge<{
-        data: { id: string; generated_images: string[]; generated_image_urls: string[] }
+      // ── Phase 1: init ──────────────────────────────────────────────────────
+      // Create persona record + resolve attributes (OpenRouter only, ~15s).
+      // Returns persona_id + attributes (with scene_prompt) immediately.
+      const initResult = await callEdge<{
+        data: { id: string; attributes: Record<string, unknown> };
       }>('generate-persona', {
-        body: { name: store.name.trim(), description: quickDescription.trim() },
+        body: { name: store.name.trim(), description: quickDescription.trim(), image_count: 0 },
+        timeoutMs: 60_000,
       });
 
-      const displayUrls = result.data.generated_image_urls ?? result.data.generated_images;
-      store.setPersonaId(result.data.id);
-      store.setGeneratedImages(displayUrls);
+      const { id: personaId, attributes } = initResult.data;
+      store.setPersonaId(personaId);
+
+      // ── Phase 2: parallel image generation ────────────────────────────────
+      // Both edge function calls run simultaneously, each generating 1 image
+      // in its own worker (separate memory budget → no WORKER_LIMIT).
+      stopSim();
+      setLoaderStep(2);
+      startSim(30, 95, 55_000); // no onDone — Gemini responses will interrupt
+
+      const imageCallBody = { persona_id: personaId, name: store.name.trim(), attributes, image_count: 1 };
+      const [res1, res2] = await Promise.allSettled([
+        callEdge<{ data: { generated_image_urls: string[] } }>('generate-persona', {
+          body: imageCallBody,
+          timeoutMs: 180_000,
+        }),
+        callEdge<{ data: { generated_image_urls: string[] } }>('generate-persona', {
+          body: imageCallBody,
+          timeoutMs: 180_000,
+        }),
+      ]);
+
+      // Collect URLs from whichever calls succeeded
+      const urls: string[] = [];
+      if (res1.status === 'fulfilled') urls.push(...(res1.value.data.generated_image_urls ?? []));
+      if (res2.status === 'fulfilled') urls.push(...(res2.value.data.generated_image_urls ?? []));
+
+      if (urls.length === 0) {
+        const rej = res1.status === 'rejected' ? res1 : (res2.status === 'rejected' ? res2 : null);
+        const err = rej && 'reason' in rej ? rej.reason : new Error('Both portrait generations failed');
+        throw err instanceof Error ? err : new Error('Both portrait generations failed');
+      }
+
+      store.setGeneratedImages(urls);
       queryClient.invalidateQueries({ queryKey: ['personas'] });
-      toast.success('Persona generated! Select your preferred image below.');
+
+      stopSim();
+      setLoaderProgress(100);
+      setTimeout(() => { setLoaderStep(-1); setLoaderProgress(0); }, 800);
+
+      toast.success('Persona generated! Select your preferred portrait.');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to generate persona';
       toast.error(msg);
+      stopSim();
+      setLoaderStep(-1);
+      setLoaderProgress(0);
     } finally {
       setIsGeneratingQuick(false);
     }
@@ -697,6 +808,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
           attributes,
           ...(store.personaId ? { persona_id: store.personaId } : {}),
         },
+        timeoutMs: 180_000,
       });
 
       const displayUrls = result.data.generated_image_urls ?? result.data.generated_images;
@@ -752,10 +864,10 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
       )}>
 
         {/* ── Left: Sims-style criteria builder ─────────────────────── */}
-        <fieldset disabled={store.isGenerating || store.isSaving} className="min-w-0">
+        <fieldset disabled={store.isGenerating || store.isSaving || isGeneratingQuick} className="min-w-0">
           <div className={cn(
             'flex flex-col gap-5 transition-opacity',
-            (store.isGenerating || store.isSaving) && 'pointer-events-none opacity-50',
+            (store.isGenerating || store.isSaving || isGeneratingQuick) && 'pointer-events-none opacity-50',
           )}>
 
             {/* Persona Name (always visible) */}
@@ -973,23 +1085,49 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
         <div className="flex flex-col gap-4">
           <div className="sticky top-6">
 
-            {/* Generating skeleton */}
-            {store.isGenerating && store.generatedImages.length === 0 && (
+            {/* Generating loader (Quick Create) */}
+            {isGeneratingQuick && store.generatedImages.length === 0 && (
+              <NanoBananaLoader
+                title="Creating Your Persona"
+                subtitle="Generating unique portraits — usually 60–90 seconds"
+                steps={PERSONA_STEPS}
+                currentStep={loaderStep}
+                progress={loaderProgress}
+                className="min-h-[400px]"
+              />
+            )}
+
+            {/* Generating skeleton (Visual Builder - custom mode) */}
+            {store.isGenerating && !isGeneratingQuick && store.generatedImages.length === 0 && (
               <div className="rounded-xl border border-border bg-card p-4">
-                <p className="mb-3 text-sm font-medium text-foreground">Generating…</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {[0, 1, 2, 3].map((i) => (
-                    <div key={i} className="aspect-square animate-pulse rounded-xl bg-muted" />
-                  ))}
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-medium text-foreground">
+                    {GENERATING_MESSAGES[generatingMessage]}
+                  </p>
+                  <span className="text-xs text-muted-foreground">{generatingElapsed}s</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="relative flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl border-2 border-transparent bg-muted animate-pulse">
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
+                      <User className="size-8" />
+                      <span className="text-xs">Portrait 1</span>
+                    </div>
+                  </div>
+                  <div className="relative flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl border-2 border-transparent bg-muted animate-pulse">
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
+                      <User className="size-8" />
+                      <span className="text-xs">Portrait 2</span>
+                    </div>
+                  </div>
                 </div>
                 <p className="mt-3 text-center text-xs text-muted-foreground">
-                  May take up to 30 seconds
+                  Expected time: ~35-45 seconds per portrait
                 </p>
               </div>
             )}
 
             {/* Attribute summary (before generating) */}
-            {store.generatedImages.length === 0 && !store.isGenerating && (
+            {store.generatedImages.length === 0 && !store.isGenerating && !isGeneratingQuick && (
               <div className="rounded-xl border border-border bg-card p-4">
                 <p className="mb-3 text-sm font-semibold text-foreground">Persona Preview</p>
                 <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-primary/10">

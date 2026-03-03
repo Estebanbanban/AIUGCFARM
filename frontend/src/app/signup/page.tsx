@@ -169,15 +169,6 @@ export default function SignupPage() {
           </Link>
         </div>
 
-        {/* Discount highlight */}
-        <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 flex items-center gap-3">
-          <span className="text-lg">🎬</span>
-          <div>
-            <p className="text-sm font-semibold text-zinc-900">Your first video is 50% OFF</p>
-            <p className="text-xs text-zinc-500">Applied automatically after signup — no code needed</p>
-          </div>
-        </div>
-
         {/* Card */}
         <div className="rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
           <div className="mb-6 text-center">

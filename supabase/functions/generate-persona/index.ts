@@ -49,6 +49,18 @@ interface PersonaAttributes {
   accessories: string[];
 }
 
+const FALLBACK_ATTRIBUTES: PersonaAttributes = {
+  gender: "female",
+  age: "25_35",
+  ethnicity: "mixed",
+  hair_color: "brown",
+  hair_style: "casual straight",
+  eye_color: "brown",
+  body_type: "average",
+  clothing_style: "casual modern",
+  accessories: [],
+};
+
 /**
  * Validate the incoming attributes object. Returns a user-friendly error
  * message if validation fails, or `null` when the input is valid.
@@ -330,9 +342,9 @@ function buildImagePrompt(attributes: PersonaAttributes, scenePrompt: string): s
 /*  NanoBanana API                                                    */
 /* ------------------------------------------------------------------ */
 
-/** Generate persona images via Gemini (NanoBanana 2), with retry. */
-function generateImages(prompt: string): Promise<GeneratedImage[]> {
-  return withRetry(() => generateImagesFromPrompt(prompt, 2), 3, 500);
+/** Generate persona images via Gemini (NanoBanana 2), single attempt (no retry). */
+function generateImages(prompt: string, count = 2): Promise<GeneratedImage[]> {
+  return withRetry(() => generateImagesFromPrompt(prompt, count), 1, 0);
 }
 
 /* ------------------------------------------------------------------ */
@@ -351,7 +363,14 @@ Deno.serve(async (req: Request) => {
     const userId = await requireUserId(req);
     const sb = getAdminClient();
 
-    const { name, attributes, description, persona_id } = await req.json();
+    const req_body = await req.json();
+    const { name, attributes, description, persona_id } = req_body;
+    // 0 = init-only (create persona + resolve attributes, no image generation)
+    // 1 = generate a single image (used for parallel calls from the frontend)
+    // 2 = generate two images sequentially (Visual Builder / legacy)
+    const imageCount = typeof req_body.image_count === "number"
+      ? Math.min(Math.max(0, req_body.image_count), 2)
+      : 2;
 
     // Description mode: use OpenRouter to parse free-form description into structured attributes
     let resolvedAttributes = attributes;
@@ -359,13 +378,16 @@ Deno.serve(async (req: Request) => {
       if (!resolvedAttributes || Object.keys(resolvedAttributes ?? {}).length === 0) {
         try {
           resolvedAttributes = await descriptionToAttributes(description.trim());
+          console.log(`[generate-persona] description→attrs: ${Date.now() - t0}ms`);
+          // Validate after parsing and fall back if invalid
+          const valErr = validateAttributes(resolvedAttributes as Record<string, unknown>);
+          if (valErr) {
+            console.warn("descriptionToAttributes returned invalid attrs:", valErr, "using fallback");
+            resolvedAttributes = { ...FALLBACK_ATTRIBUTES };
+          }
         } catch (err) {
-          console.error("Failed to parse description into attributes:", err);
-          return json(
-            { detail: "Could not understand the persona description. Please try again or use manual attribute selection." },
-            cors,
-            400,
-          );
+          console.error("Failed to parse description, using fallback:", err);
+          resolvedAttributes = { ...FALLBACK_ATTRIBUTES };
         }
       }
     }
@@ -377,14 +399,24 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "Either 'attributes' or 'description' is required" }, cors, 400);
     }
 
-    // Validate attributes
+    // Validate attributes — fix missing/invalid fields with fallback values instead of 400
     const validationError = validateAttributes(resolvedAttributes as Record<string, unknown>);
     if (validationError) {
-      return json({ detail: validationError }, cors, 400);
+      console.warn("Attribute validation failed:", validationError, "— merging with fallback");
+      resolvedAttributes = { ...FALLBACK_ATTRIBUTES, ...resolvedAttributes };
+      // Re-validate after merge; if still invalid, use pure fallback
+      const revalidationError = validateAttributes(resolvedAttributes as Record<string, unknown>);
+      if (revalidationError) {
+        console.warn("Re-validation still failed:", revalidationError, "— using pure fallback");
+        resolvedAttributes = { ...FALLBACK_ATTRIBUTES };
+      }
     }
 
     const validAttrs = resolvedAttributes as PersonaAttributes;
-    const isRegeneration = typeof persona_id === "string" && persona_id.length > 0;
+    const t0 = Date.now();
+    const hasPersonaId = typeof persona_id === "string" && persona_id.length > 0;
+    const isProgressiveAppend = hasPersonaId && imageCount === 1;
+    const isRegeneration = hasPersonaId && !isProgressiveAppend;
 
     // Fetch profile once — used for slot limit + regen rate limit
     const { data: profile } = await sb
@@ -395,18 +427,22 @@ Deno.serve(async (req: Request) => {
     const plan = profile?.plan ?? "free";
     const isAdmin = profile?.role === "admin";
 
-    // If regenerating, verify the persona exists and belongs to the user
+    // If regenerating or appending, verify the persona exists and belongs to the user
     let existingRegenCount = 0;
-    if (isRegeneration) {
+    let existingGeneratedImages: string[] = [];
+    if (hasPersonaId) {
       const { data: existing } = await sb
         .from("personas")
-        .select("id, owner_id, regen_count")
+        .select("id, owner_id, regen_count, generated_images")
         .eq("id", persona_id)
         .single();
       if (!existing || existing.owner_id !== userId) {
         return json({ detail: "Persona not found" }, cors, 404);
       }
       existingRegenCount = existing.regen_count ?? 0;
+      existingGeneratedImages = Array.isArray(existing.generated_images)
+        ? existing.generated_images
+        : [];
       // Free-tier rate limit: cap at FREE_REGEN_LIMIT regenerations per persona
       if (!isAdmin && plan === "free" && existingRegenCount >= FREE_REGEN_LIMIT) {
         return json(
@@ -421,8 +457,8 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Check plan persona slots (skip for regeneration — not creating a new slot)
-    if (!isRegeneration) {
+    // Check plan persona slots (skip for regeneration/progressive append — not creating a new slot)
+    if (!isRegeneration && !isProgressiveAppend) {
       const maxPersonas = PERSONA_LIMITS[plan] ?? 0;
 
       if (!isAdmin) {
@@ -447,21 +483,64 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Generate rich UGC scene prompt via OpenRouter (falls back to basic descriptor)
-    const { prompt: scenePrompt, generated: promptGenerated } = await generateScenePrompt(validAttrs);
-    console.log(`Scene prompt (${promptGenerated ? "LLM" : "fallback"}):`, scenePrompt);
+    // Reuse scene_prompt if already stored in attributes (avoids redundant OpenRouter call on
+    // progressive-append and regeneration requests). Only generate when absent.
+    const cachedScenePrompt = typeof (validAttrs as Record<string, unknown>).scene_prompt === "string"
+      ? (validAttrs as Record<string, unknown>).scene_prompt as string
+      : null;
+
+    let scenePrompt: string;
+    if (cachedScenePrompt) {
+      scenePrompt = cachedScenePrompt;
+      console.log(`[generate-persona] scene prompt: reused cached (${Date.now() - t0}ms total)`);
+    } else {
+      const { prompt, generated } = await generateScenePrompt(validAttrs);
+      scenePrompt = prompt;
+      console.log(`[generate-persona] scene prompt (${generated ? "LLM" : "fallback"}): ${Date.now() - t0}ms`);
+    }
+
+    // Persist scene_prompt alongside attributes so parallel / follow-up calls can reuse it
+    const attributesToSave = { ...validAttrs, scene_prompt: scenePrompt };
+
+    // ── Init mode (image_count: 0) ──────────────────────────────────────────
+    // Create the persona record with resolved attributes but no images yet.
+    // The frontend will then fire parallel image-generation calls using the
+    // returned persona_id + attributes.
+    if (imageCount === 0 && !hasPersonaId) {
+      const { data: initPersona, error: initErr } = await sb
+        .from("personas")
+        .insert({
+          owner_id: userId,
+          name,
+          attributes: attributesToSave,
+          generated_images: [],
+          selected_image_url: null,
+          is_active: true,
+          regen_count: 0,
+        })
+        .select("id, name, attributes")
+        .single();
+      if (initErr) throw new Error(`DB insert failed: ${initErr.message}`);
+      console.log(`[generate-persona] init done: ${Date.now() - t0}ms`);
+      return json({ data: { id: initPersona.id, attributes: validAttrs } }, cors, 201);
+    }
 
     // Build final image prompt: scene context + explicit physical attributes pinned
     // This guarantees Gemini renders the correct skin tone, gender, hair, etc.
     const imagePrompt = buildImagePrompt(validAttrs, scenePrompt);
     console.log("Image prompt:", imagePrompt);
 
-    // Generate images via Gemini / NanoBanana 2 (with retry)
-    const images = await generateImages(imagePrompt);
+    // Generate and upload images one at a time to stay within edge-function memory limits.
+    // Generating in parallel (Promise.all) keeps multiple large base64 buffers in RAM
+    // simultaneously and triggers WORKER_LIMIT on Supabase's free/pro tiers.
+    const storagePaths: string[] = [];
+    for (let i = 0; i < imageCount; i++) {
+      console.log(`[generate-persona] Gemini image ${i + 1}/${imageCount}: ${Date.now() - t0}ms`);
+      try {
+        const [image] = await generateImages(imagePrompt, 1);
+        console.log(`[generate-persona] Gemini image ${i + 1} done: ${Date.now() - t0}ms`);
 
-    // Upload all generated images in parallel
-    const uploadResults = await Promise.all(
-      images.map(async (image) => {
+        // Upload immediately so the buffer can be GC'd before the next image
         const ext = image.mimeType.includes("png") ? "png" : "jpg";
         const storagePath = `${userId}/${crypto.randomUUID()}.${ext}`;
         const { error: uploadErr } = await sb.storage
@@ -471,30 +550,51 @@ Deno.serve(async (req: Request) => {
             upsert: false,
           });
         if (uploadErr) {
-          console.error(`Persona image upload failed: ${uploadErr.message}`);
-          return null;
+          console.error(`Persona image ${i + 1} upload failed: ${uploadErr.message}`);
+        } else {
+          storagePaths.push(storagePath);
         }
-        return storagePath;
-      }),
-    );
-
-    const storagePaths = uploadResults.filter(Boolean) as string[];
-    if (storagePaths.length === 0) {
-      throw new Error("All image uploads failed");
+      } catch (imgErr) {
+        console.error(`Persona image ${i + 1} generation failed:`, imgErr);
+        // Continue — if we end up with at least 1 image we can still succeed
+      }
     }
 
-    // Batch-sign all paths in a single request
+    if (storagePaths.length === 0) {
+      throw new Error("All image generations failed");
+    }
+    console.log(`[generate-persona] all images done: ${Date.now() - t0}ms`);
+
+    // Save persona record — atomic RPC append on progressive, UPDATE on regen, INSERT on new
+    if (isProgressiveAppend) {
+      // Atomic append: avoids the read-modify-write race condition when two parallel
+      // edge function calls append images to the same persona simultaneously.
+      const { error: rpcError } = await sb.rpc("append_persona_image", {
+        p_persona_id: persona_id,
+        p_owner_id: userId,
+        p_image_path: storagePaths[0],
+      });
+      if (rpcError) throw new Error(`DB append failed: ${rpcError.message}`);
+
+      // Sign just the new image — the frontend merges responses from parallel calls
+      const { data: signedData } = await sb.storage
+        .from("persona-images")
+        .createSignedUrls(storagePaths, 3600);
+      const signedUrls = (signedData ?? []).map((d) => d.signedUrl).filter(Boolean) as string[];
+
+      return json(
+        { data: { id: persona_id, generated_image_urls: signedUrls, attributes: validAttrs } },
+        cors,
+        201,
+      );
+    }
+
+    // Regen / new-insert paths: sign all generated images and save record
     const { data: signedData } = await sb.storage
       .from("persona-images")
       .createSignedUrls(storagePaths, 3600);
-    const signedUrls = (signedData ?? [])
-      .map((d) => d.signedUrl)
-      .filter(Boolean) as string[];
+    const signedUrls = (signedData ?? []).map((d) => d.signedUrl).filter(Boolean) as string[];
 
-    // Persist scene_prompt alongside attributes so generate-video can reuse it
-    const attributesToSave = { ...validAttrs, scene_prompt: scenePrompt };
-
-    // Save persona record  -  UPDATE on regeneration, INSERT on new creation
     let persona;
     if (isRegeneration) {
       const { data, error } = await sb
@@ -503,7 +603,7 @@ Deno.serve(async (req: Request) => {
           name,
           attributes: attributesToSave,
           generated_images: storagePaths,
-          selected_image_url: null, // reset selection on regeneration
+          selected_image_url: null,
           regen_count: existingRegenCount + 1,
         })
         .eq("id", persona_id)
@@ -530,14 +630,8 @@ Deno.serve(async (req: Request) => {
       persona = data;
     }
 
-    // Return signed URLs to the frontend for immediate display
     return json(
-      {
-        data: {
-          ...persona,
-          generated_image_urls: signedUrls,
-        },
-      },
+      { data: { ...persona, generated_image_urls: signedUrls, attributes: validAttrs } },
       cors,
       201,
     );

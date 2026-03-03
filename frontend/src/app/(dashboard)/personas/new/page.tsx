@@ -626,6 +626,7 @@ function NewPersonaPageInner() {
           attributes,
           ...(store.personaId ? { persona_id: store.personaId } : {}),
         },
+        timeoutMs: 180_000,
       });
 
       const displayUrls = result.data.generated_image_urls ?? result.data.generated_images;
@@ -634,7 +635,13 @@ function NewPersonaPageInner() {
       toast.success(`${displayUrls.length} persona images generated!`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to generate persona";
-      toast.error(message);
+      // If the stored personaId is stale/deleted, reset it so next attempt creates a new persona
+      if (message.includes("Persona not found") && store.personaId) {
+        store.setPersonaId(null);
+        toast.error("Previous persona session expired. Please try again.");
+      } else {
+        toast.error(message);
+      }
     } finally {
       store.setIsGenerating(false);
     }
@@ -679,6 +686,7 @@ function NewPersonaPageInner() {
           name: personaName.trim(),
           description: quickDescription.trim(),
         },
+        timeoutMs: 180_000,
       });
 
       const displayUrls = result.data.generated_image_urls ?? result.data.generated_images;

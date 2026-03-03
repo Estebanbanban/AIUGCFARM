@@ -82,6 +82,26 @@ async function ensureProfileExists(userId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Browser-like headers to bypass basic bot detection (Cloudflare, etc.)
+// ---------------------------------------------------------------------------
+
+const BROWSER_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept":
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Accept-Encoding": "gzip, deflate, br",
+  "Cache-Control": "no-cache",
+  "Pragma": "no-cache",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1",
+};
+
+// ---------------------------------------------------------------------------
 // Shopify scraper  -  paginate with limit=30, cap at 50 total products
 // ---------------------------------------------------------------------------
 
@@ -95,7 +115,7 @@ async function tryShopify(origin: string): Promise<ProductData[] | null> {
     while (allProducts.length < MAX_TOTAL) {
       const res = await fetch(
         `${origin}/products.json?limit=${PER_PAGE}&page=${page}`,
-        { headers: { "User-Agent": "UGCFarmAI/1.0" } },
+        { headers: BROWSER_HEADERS },
       );
       if (!res.ok) return page === 1 ? null : allProducts;
 
@@ -151,6 +171,7 @@ async function isAllowedByRobots(
     const controller = new AbortController();
     setTimeout(() => controller.abort(), 3000);
     const res = await fetch(`${origin}/robots.txt`, {
+      headers: BROWSER_HEADERS,
       signal: controller.signal,
     });
     if (!res.ok) return true;
@@ -239,9 +260,16 @@ async function scrapeGeneric(
   }
 
   const res = await fetch(url, {
-    headers: { "User-Agent": "UGCFarmAI/1.0" },
+    headers: BROWSER_HEADERS,
     redirect: "follow",
   });
+
+  if (res.status === 403 || res.status === 401 || res.status === 429) {
+    throw new Error(
+      `This website blocks automated access (HTTP ${res.status}). ` +
+      `Try pasting a direct product page URL, or use the manual upload option.`,
+    );
+  }
   if (!res.ok) throw new Error(`Failed to fetch URL: ${res.status}`);
 
   // Validate Content-Type is HTML
@@ -559,7 +587,11 @@ Deno.serve(async (req: Request) => {
       msg.includes("private") ||
       msg.includes("loopback") ||
       msg.includes("internal") ||
-      msg.includes("Content-Type")
+      msg.includes("Content-Type") ||
+      msg.includes("blocks automated") ||
+      msg.includes("HTTP 403") ||
+      msg.includes("HTTP 401") ||
+      msg.includes("HTTP 429")
     ) {
       return json({ detail: msg }, cors, 400);
     }

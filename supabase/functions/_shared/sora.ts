@@ -1,4 +1,4 @@
-const SORA_BASE = "https://api.openai.com/v1/video/generations";
+const SORA_BASE = "https://api.openai.com/v1/videos/generations";
 
 export interface SoraSubmitResult {
   job_id: string;
@@ -38,9 +38,10 @@ export async function submitSoraJob(params: {
   const duration = params.duration <= 5 ? 5 : 10;
 
   const form = new FormData();
-  form.append("model", "sora-1.0");
+  form.append("model", "sora-2");
   form.append("prompt", params.prompt);
   form.append("duration", String(duration));
+  form.append("resolution", "720x1280");  // Portrait 9:16
   form.append("image", params.composite_image_blob, "composite.jpg");
 
   const res = await fetch(SORA_BASE, {
@@ -74,7 +75,7 @@ export async function submitSoraJob(params: {
   return {
     job_id: jobId as string,
     status: (body.status as string) ?? "pending",
-    model_name: "sora-1.0",
+    model_name: "sora-2",
   };
 }
 

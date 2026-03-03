@@ -101,7 +101,7 @@ const jsonLd = {
           name: "Is there a free trial?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Brand import and AI persona creation are completely free — no credit card required. Your first video generation is 50% off, applied automatically.",
+            text: "Brand import and AI persona creation are completely free — no credit card required. Import your brand, build your AI persona, and explore the platform before generating your first video.",
           },
         },
         {

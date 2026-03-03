@@ -10,6 +10,7 @@ import {
   Loader2,
   AlertCircle,
   Clock,
+  Cpu,
   FileText,
   Video,
   RefreshCw,
@@ -25,6 +26,7 @@ import {
   CheckSquare,
   Square,
   Sparkles,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -46,6 +48,7 @@ import { useVideoStitcher, STITCH_STATUS_LABELS } from "@/hooks/use-video-stitch
 import { useZipDownload } from "@/hooks/use-zip-download";
 import { useBatchStitcher } from "@/hooks/use-batch-stitcher";
 import { useWatchedGenerationsStore } from "@/stores/watched-generations";
+import { NanoBananaLoader } from "@/components/ui/nano-loader";
 
 /* -------------------------------------------------------------------------- */
 /*  Status configuration                                                      */
@@ -962,6 +965,38 @@ function CombinationPreview({
 }
 
 /* -------------------------------------------------------------------------- */
+/*  NanoBananaLoader rendering steps                                          */
+/* -------------------------------------------------------------------------- */
+
+const RENDER_STEPS = [
+  { label: "Preparing video pipeline",   icon: <Cpu className="w-3 h-3" /> },
+  { label: "Submitting to Kling AI",     icon: <Zap className="w-3 h-3" /> },
+  { label: "Rendering video segments",   icon: <Video className="w-3 h-3" /> },
+  { label: "Finalizing video",           icon: <Sparkles className="w-3 h-3" /> },
+];
+
+function statusToLoader(status: string, elapsedMs: number): { step: number; progress: number } {
+  switch (status) {
+    case "pending":
+    case "scripting":
+      return { step: 0, progress: Math.min(elapsedMs / 60_000 * 15, 14) };
+    case "awaiting_approval":
+    case "locking":
+      return { step: 1, progress: Math.min(15 + elapsedMs / 30_000 * 10, 24) };
+    case "submitting_jobs":
+      return { step: 1, progress: Math.min(25 + elapsedMs / 20_000 * 10, 34) };
+    case "generating_segments":
+      return { step: 2, progress: Math.min(35 + elapsedMs / 300_000 * 55, 90) };
+    case "completed":
+      return { step: 4, progress: 100 };
+    case "failed":
+      return { step: -1, progress: 0 };
+    default:
+      return { step: 0, progress: 5 };
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Main page component                                                       */
 /* -------------------------------------------------------------------------- */
 
@@ -975,6 +1010,10 @@ export default function GenerationDetailPage() {
   // Stale timeout state — must be declared before useGenerationStatus so it can be passed in
   const pageOpenedAt = useRef(Date.now());
   const [isStale, setIsStale] = useState(false);
+
+  // NanoBananaLoader elapsed time tracking
+  const renderStartedAt = useRef(Date.now());
+  const [renderElapsed, setRenderElapsed] = useState(0);
 
   const {
     data: gen,
@@ -1035,11 +1074,22 @@ export default function GenerationDetailPage() {
   const [lastChecked, setLastChecked] = useState(new Date());
   const [secondsAgo, setSecondsAgo] = useState(0);
 
+  // Tick renderElapsed every second for NanoBananaLoader progress
+  useEffect(() => {
+    const id = setInterval(() => {
+      setRenderElapsed(Date.now() - renderStartedAt.current);
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const status = (gen?.status as GenerationStatus) ?? "pending";
   const config = statusConfig[status] ?? statusConfig.scripting;
   const isComplete = status === "completed";
   const isFailed = status === "failed";
   const isProcessing = !isComplete && !isFailed;
+
+  // Compute loader info from status and elapsed time
+  const loaderInfo = statusToLoader(status, renderElapsed);
   const skeletonCount = gen?.mode === "triple" ? 9 : 3;
 
   const segments = gen?.segments ?? null;
@@ -1332,10 +1382,13 @@ export default function GenerationDetailPage() {
       {/*  Engaging generation loading screen                               */}
       {/* ---------------------------------------------------------------- */}
       {isProcessing && !isStale && (
-        <VideoGeneratingScreen
-          productName={watchedGen?.productName}
-          progress={progress}
-          status={status}
+        <NanoBananaLoader
+          title="Generating Your Video"
+          subtitle="Kling AI is rendering your video \u2014 usually 3\u201310 minutes"
+          steps={RENDER_STEPS}
+          currentStep={loaderInfo.step}
+          progress={loaderInfo.progress}
+          className="min-h-[400px]"
         />
       )}
 
@@ -1462,9 +1515,9 @@ export default function GenerationDetailPage() {
       )}
 
       {/* ---------------------------------------------------------------- */}
-      {/*  Skeleton segment cards (during generation)                       */}
+      {/*  Skeleton segment cards (only shown during stale/long wait)       */}
       {/* ---------------------------------------------------------------- */}
-      {isProcessing && (
+      {isProcessing && isStale && (
         <div>
           <h2 className="mb-4 text-lg font-semibold text-foreground">
             Video Segments

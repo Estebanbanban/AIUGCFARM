@@ -25,7 +25,7 @@ interface PersonaBuilderState {
   selectImage: (index: number) => void;
   setIsGenerating: (val: boolean) => void;
   setIsSaving: (val: boolean) => void;
-  setPersonaId: (id: string) => void;
+  setPersonaId: (id: string | null) => void;
   initFromPersona: (persona: {
     id: string;
     name: string;

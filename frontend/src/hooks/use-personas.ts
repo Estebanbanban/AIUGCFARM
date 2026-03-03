@@ -24,6 +24,7 @@ export function usePersonas() {
 }
 
 export function usePersona(id: string) {
+  const queryClient = useQueryClient();
   return useQuery<Persona>({
     queryKey: ["personas", id],
     queryFn: async () => {
@@ -37,6 +38,16 @@ export function usePersona(id: string) {
       return data;
     },
     enabled: !!id,
+    retry: 2,
+    // Seed from the list cache so the detail page renders instantly on
+    // navigation (no loading flash) and never shows "Not found" for a
+    // persona the user just navigated from.
+    initialData: () => {
+      const personas = queryClient.getQueryData<Persona[]>(["personas"]);
+      return personas?.find((p) => p.id === id);
+    },
+    initialDataUpdatedAt: () =>
+      queryClient.getQueryState(["personas"])?.dataUpdatedAt,
   });
 }
 
