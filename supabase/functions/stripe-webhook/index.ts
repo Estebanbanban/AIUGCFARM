@@ -338,9 +338,9 @@ Deno.serve(async (req: Request) => {
           const priceStarter        = Deno.env.get("STRIPE_PRICE_STARTER");
           const priceGrowth         = Deno.env.get("STRIPE_PRICE_GROWTH");
           const priceScale          = Deno.env.get("STRIPE_PRICE_SCALE");
-          const priceStarterAnnual  = Deno.env.get("STRIPE_PRICE_STARTER_ANNUAL") ?? "price_1T661MDofGNcXNHKPIpj3KOE";
-          const priceGrowthAnnual   = Deno.env.get("STRIPE_PRICE_GROWTH_ANNUAL")  ?? "price_1T662PDofGNcXNHKinIVq4Ft";
-          const priceScaleAnnual    = Deno.env.get("STRIPE_PRICE_SCALE_ANNUAL")   ?? "price_1T663BDofGNcXNHKAymouo25";
+          const priceStarterAnnual  = Deno.env.get("STRIPE_PRICE_STARTER_ANNUAL");
+          const priceGrowthAnnual   = Deno.env.get("STRIPE_PRICE_GROWTH_ANNUAL");
+          const priceScaleAnnual    = Deno.env.get("STRIPE_PRICE_SCALE_ANNUAL");
           if (priceId === priceStarter || priceId === priceStarterAnnual) plan = "starter";
           else if (priceId === priceGrowth || priceId === priceGrowthAnnual) plan = "growth";
           else if (priceId === priceScale || priceId === priceScaleAnnual) plan = "scale";
@@ -527,7 +527,7 @@ Deno.serve(async (req: Request) => {
 
         const { error: ledgerErr } = await sb.from("credit_ledger").insert({
           owner_id: userId,
-          amount: -creditsToDeduct,
+          amount: creditsToDeduct,
           reason: "refund",
         });
         if (ledgerErr) {

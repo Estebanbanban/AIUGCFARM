@@ -308,7 +308,9 @@ Deno.serve(async (req: Request) => {
           console.error("Video job check failed:", errMsg);
           const statusMatch = errMsg.match(/(?:Kling|Sora) status error (\d{3})/);
           const httpStatus = statusMatch ? parseInt(statusMatch[1], 10) : 0;
-          const isPermanent = httpStatus >= 400 && httpStatus < 500 && httpStatus !== 429;
+          const isPermanentHttp = httpStatus >= 400 && httpStatus < 500 && httpStatus !== 429;
+          const permanentBodyPatterns = /INVALID_IMAGE|content.?policy|NSFW|MODERATION|banned|blocked/i;
+          const isPermanent = isPermanentHttp || permanentBodyPatterns.test(errMsg);
           if (isPermanent) {
             anyFailed = true;
             failedMessage = `Video API error (${httpStatus}) — ${errMsg}`;
@@ -368,8 +370,13 @@ Deno.serve(async (req: Request) => {
             })
           );
         } else if (klingResult.status === "failed") {
+          const errMsg = klingResult.error_message || "";
+          const permanentContentPatterns = /INVALID_IMAGE|content.?policy|NSFW|MODERATION|banned|blocked/i;
           anyFailed = true;
-          failedMessage = klingResult.error_message || `Video generation failed for segment ${jobKey}`;
+          failedMessage = errMsg || `Video generation failed for segment ${jobKey}`;
+          if (permanentContentPatterns.test(errMsg)) {
+            failedMessage = `Content policy violation: ${errMsg}`;
+          }
         }
       }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FFmpeg } from "@ffmpeg/ffmpeg";
 
 // Singleton - load once, reuse across stitches
@@ -215,6 +215,13 @@ export function useVideoStitcher() {
   const [stitchedUrl, setStitchedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const prevBlobUrl = useRef<string | null>(null);
+
+  // Reset the busy flag on unmount so a remount doesn't get stuck
+  useEffect(() => {
+    return () => {
+      ffmpegBusy = false;
+    };
+  }, []);
 
   const stitch = useCallback(
     async (hookUrl: string, bodyUrl: string, ctaUrl: string) => {
