@@ -38,8 +38,7 @@ import {
 import { usePersonas } from "@/hooks/use-personas";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { useRouter } from "next/navigation";
-import { Suspense } from "react";
-import { CheckoutSuccessHandler } from "@/components/checkout/CheckoutSuccessHandler";
+
 import { useProducts } from "@/hooks/use-products";
 
 
@@ -155,9 +154,6 @@ export default function DashboardPage() {
 
   return (
     <>
-    <Suspense>
-      <CheckoutSuccessHandler />
-    </Suspense>
     <div className="flex flex-col gap-6">
       <FadeInUp>
         <Card className="border-border bg-card border-l-4 border-primary">
