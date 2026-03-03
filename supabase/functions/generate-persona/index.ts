@@ -365,8 +365,11 @@ Deno.serve(async (req: Request) => {
 
     const req_body = await req.json();
     const { name, attributes, description, persona_id } = req_body;
+    // 0 = init-only (create persona + resolve attributes, no image generation)
+    // 1 = generate a single image (used for parallel calls from the frontend)
+    // 2 = generate two images sequentially (Visual Builder / legacy)
     const imageCount = typeof req_body.image_count === "number"
-      ? Math.min(Math.max(1, req_body.image_count), 2)
+      ? Math.min(Math.max(0, req_body.image_count), 2)
       : 2;
 
     // Description mode: use OpenRouter to parse free-form description into structured attributes
@@ -496,6 +499,32 @@ Deno.serve(async (req: Request) => {
       console.log(`[generate-persona] scene prompt (${generated ? "LLM" : "fallback"}): ${Date.now() - t0}ms`);
     }
 
+    // Persist scene_prompt alongside attributes so parallel / follow-up calls can reuse it
+    const attributesToSave = { ...validAttrs, scene_prompt: scenePrompt };
+
+    // ── Init mode (image_count: 0) ──────────────────────────────────────────
+    // Create the persona record with resolved attributes but no images yet.
+    // The frontend will then fire parallel image-generation calls using the
+    // returned persona_id + attributes.
+    if (imageCount === 0 && !hasPersonaId) {
+      const { data: initPersona, error: initErr } = await sb
+        .from("personas")
+        .insert({
+          owner_id: userId,
+          name,
+          attributes: attributesToSave,
+          generated_images: [],
+          selected_image_url: null,
+          is_active: true,
+          regen_count: 0,
+        })
+        .select("id, name, attributes")
+        .single();
+      if (initErr) throw new Error(`DB insert failed: ${initErr.message}`);
+      console.log(`[generate-persona] init done: ${Date.now() - t0}ms`);
+      return json({ data: { id: initPersona.id, attributes: validAttrs } }, cors, 201);
+    }
+
     // Build final image prompt: scene context + explicit physical attributes pinned
     // This guarantees Gemini renders the correct skin tone, gender, hair, etc.
     const imagePrompt = buildImagePrompt(validAttrs, scenePrompt);
@@ -536,62 +565,45 @@ Deno.serve(async (req: Request) => {
     }
     console.log(`[generate-persona] all images done: ${Date.now() - t0}ms`);
 
-    // Batch-sign all paths in a single request
-    const { data: signedData } = await sb.storage
-      .from("persona-images")
-      .createSignedUrls(storagePaths, 3600);
-    const signedUrls = (signedData ?? [])
-      .map((d) => d.signedUrl)
-      .filter(Boolean) as string[];
-
-    // Persist scene_prompt alongside attributes so generate-video can reuse it
-    const attributesToSave = { ...validAttrs, scene_prompt: scenePrompt };
-
-    // Save persona record — UPDATE on regeneration, APPEND on progressive, INSERT on new
-    let persona;
+    // Save persona record — atomic RPC append on progressive, UPDATE on regen, INSERT on new
     if (isProgressiveAppend) {
-      // Progressive generation: append new image(s) to the existing persona's array
-      const mergedImages = [...existingGeneratedImages, ...storagePaths];
-      const { data, error } = await sb
-        .from("personas")
-        .update({
-          generated_images: mergedImages,
-          regen_count: existingRegenCount + 1,
-        })
-        .eq("id", persona_id)
-        .eq("owner_id", userId)
-        .select("id, name, attributes, generated_images, selected_image_url")
-        .single();
-      if (error) throw new Error(`DB update failed: ${error.message}`);
+      // Atomic append: avoids the read-modify-write race condition when two parallel
+      // edge function calls append images to the same persona simultaneously.
+      const { error: rpcError } = await sb.rpc("append_persona_image", {
+        p_persona_id: persona_id,
+        p_owner_id: userId,
+        p_image_path: storagePaths[0],
+      });
+      if (rpcError) throw new Error(`DB append failed: ${rpcError.message}`);
 
-      // Sign ALL images (existing + new) so the frontend gets the full set
-      const { data: allSignedData } = await sb.storage
+      // Sign just the new image — the frontend merges responses from parallel calls
+      const { data: signedData } = await sb.storage
         .from("persona-images")
-        .createSignedUrls(mergedImages, 3600);
-      const allSignedUrls = (allSignedData ?? [])
-        .map((d) => d.signedUrl)
-        .filter(Boolean) as string[];
+        .createSignedUrls(storagePaths, 3600);
+      const signedUrls = (signedData ?? []).map((d) => d.signedUrl).filter(Boolean) as string[];
 
-      persona = data;
       return json(
-        {
-          data: {
-            ...persona,
-            generated_image_urls: allSignedUrls,
-            attributes: validAttrs,
-          },
-        },
+        { data: { id: persona_id, generated_image_urls: signedUrls, attributes: validAttrs } },
         cors,
         201,
       );
-    } else if (isRegeneration) {
+    }
+
+    // Regen / new-insert paths: sign all generated images and save record
+    const { data: signedData } = await sb.storage
+      .from("persona-images")
+      .createSignedUrls(storagePaths, 3600);
+    const signedUrls = (signedData ?? []).map((d) => d.signedUrl).filter(Boolean) as string[];
+
+    let persona;
+    if (isRegeneration) {
       const { data, error } = await sb
         .from("personas")
         .update({
           name,
           attributes: attributesToSave,
           generated_images: storagePaths,
-          selected_image_url: null, // reset selection on regeneration
+          selected_image_url: null,
           regen_count: existingRegenCount + 1,
         })
         .eq("id", persona_id)
@@ -618,15 +630,8 @@ Deno.serve(async (req: Request) => {
       persona = data;
     }
 
-    // Return signed URLs to the frontend for immediate display
     return json(
-      {
-        data: {
-          ...persona,
-          generated_image_urls: signedUrls,
-          attributes: validAttrs,
-        },
-      },
+      { data: { ...persona, generated_image_urls: signedUrls, attributes: validAttrs } },
       cors,
       201,
     );

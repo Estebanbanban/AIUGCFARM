@@ -707,42 +707,64 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
     if (!store.name.trim() || !quickDescription.trim()) return;
     setIsGeneratingQuick(true);
 
-    // Start progress simulation: step 0 → 1 → 2 → Gemini completes
+    // Step 0 → 1: OpenRouter calls (description→attrs + scene prompt)
     setLoaderProgress(0);
     setLoaderStep(0);
     startSim(0, 15, 20_000, () => {
       setLoaderStep(1);
-      startSim(15, 30, 15_000, () => {
-        setLoaderStep(2);
-        startSim(30, 95, 55_000); // no onDone — real API will interrupt
-      });
+      startSim(15, 30, 15_000); // no onDone — phase 2 will snap to step 2
     });
 
     try {
-      // Single call: both portraits generated in parallel on the backend
-      const result = await callEdge<{
-        data: {
-          id: string;
-          generated_images: string[];
-          generated_image_urls: string[];
-          attributes: Record<string, unknown>;
-        }
+      // ── Phase 1: init ──────────────────────────────────────────────────────
+      // Create persona record + resolve attributes (OpenRouter only, ~15s).
+      // Returns persona_id + attributes (with scene_prompt) immediately.
+      const initResult = await callEdge<{
+        data: { id: string; attributes: Record<string, unknown> };
       }>('generate-persona', {
-        body: { name: store.name.trim(), description: quickDescription.trim(), image_count: 2 },
-        timeoutMs: 180_000,
+        body: { name: store.name.trim(), description: quickDescription.trim(), image_count: 0 },
+        timeoutMs: 60_000,
       });
 
-      const urls = result.data.generated_image_urls ?? result.data.generated_images ?? [];
-      store.setPersonaId(result.data.id);
+      const { id: personaId, attributes } = initResult.data;
+      store.setPersonaId(personaId);
+
+      // ── Phase 2: parallel image generation ────────────────────────────────
+      // Both edge function calls run simultaneously, each generating 1 image
+      // in its own worker (separate memory budget → no WORKER_LIMIT).
+      stopSim();
+      setLoaderStep(2);
+      startSim(30, 95, 55_000); // no onDone — Gemini responses will interrupt
+
+      const imageCallBody = { persona_id: personaId, name: store.name.trim(), attributes, image_count: 1 };
+      const [res1, res2] = await Promise.allSettled([
+        callEdge<{ data: { generated_image_urls: string[] } }>('generate-persona', {
+          body: imageCallBody,
+          timeoutMs: 180_000,
+        }),
+        callEdge<{ data: { generated_image_urls: string[] } }>('generate-persona', {
+          body: imageCallBody,
+          timeoutMs: 180_000,
+        }),
+      ]);
+
+      // Collect URLs from whichever calls succeeded
+      const urls: string[] = [];
+      if (res1.status === 'fulfilled') urls.push(...(res1.value.data.generated_image_urls ?? []));
+      if (res2.status === 'fulfilled') urls.push(...(res2.value.data.generated_image_urls ?? []));
+
+      if (urls.length === 0) {
+        const rej = res1.status === 'rejected' ? res1 : (res2.status === 'rejected' ? res2 : null);
+        const err = rej && 'reason' in rej ? rej.reason : new Error('Both portrait generations failed');
+        throw err instanceof Error ? err : new Error('Both portrait generations failed');
+      }
+
       store.setGeneratedImages(urls);
       queryClient.invalidateQueries({ queryKey: ['personas'] });
 
       stopSim();
       setLoaderProgress(100);
-      setTimeout(() => {
-        setLoaderStep(-1);
-        setLoaderProgress(0);
-      }, 800);
+      setTimeout(() => { setLoaderStep(-1); setLoaderProgress(0); }, 800);
 
       toast.success('Persona generated! Select your preferred portrait.');
     } catch (err) {
