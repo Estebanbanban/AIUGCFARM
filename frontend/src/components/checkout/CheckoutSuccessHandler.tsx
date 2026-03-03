@@ -5,7 +5,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { PurchaseSuccessModal } from "@/components/checkout/PurchaseSuccessModal";
-import type { PlanTier, CreditPackKey } from "@/lib/stripe";
+import type { PlanTier, CreditPackKey, SingleVideoPackKey } from "@/lib/stripe";
 import { PLANS, CREDIT_PACKS, SINGLE_VIDEO_PACKS } from "@/lib/stripe";
 import { trackPurchaseConfirmed } from "@/lib/datafast";
 import type { Profile } from "@/types/database";
@@ -17,7 +17,7 @@ export function CheckoutSuccessHandler() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [plan, setPlan] = useState<PlanTier | null>(null);
-  const [pack, setPack] = useState<CreditPackKey | null>(null);
+  const [pack, setPack] = useState<CreditPackKey | SingleVideoPackKey | null>(null);
   const isOnGeneratePage = pathname?.startsWith("/generate");
 
   useEffect(() => {
@@ -116,8 +116,7 @@ export function CheckoutSuccessHandler() {
       setOpen(true);
       router.replace("/dashboard");
     } else if (packParam && packParam in SINGLE_VIDEO_PACKS) {
-      // Single video packs (single_standard / single_hd) — treat as credit pack
-      setPack("pack_10" as CreditPackKey);
+      setPack(packParam as SingleVideoPackKey);
       setOpen(true);
       router.replace("/dashboard");
     }

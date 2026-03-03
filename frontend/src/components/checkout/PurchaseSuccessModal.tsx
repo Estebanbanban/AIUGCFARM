@@ -18,14 +18,14 @@ import {
   TrendingUp,
   Video,
 } from "lucide-react";
-import { PLANS, CREDIT_PACKS, type PlanTier, type CreditPackKey } from "@/lib/stripe";
+import { PLANS, CREDIT_PACKS, SINGLE_VIDEO_PACKS, type PlanTier, type CreditPackKey, type SingleVideoPackKey } from "@/lib/stripe";
 import { cn } from "@/lib/utils";
 
 interface PurchaseSuccessModalProps {
   open: boolean;
   onClose: () => void;
   plan?: PlanTier | null;
-  pack?: CreditPackKey | null;
+  pack?: CreditPackKey | SingleVideoPackKey | null;
 }
 
 const PLAN_PERKS: Record<PlanTier, { icon: React.ElementType; headline: string; sub: string; bullets: string[]; highlight: string }> = {
@@ -73,7 +73,29 @@ const PLAN_PERKS: Record<PlanTier, { icon: React.ElementType; headline: string; 
   },
 };
 
-const PACK_PERKS: Record<CreditPackKey, { headline: string; sub: string; highlight: string; bullets: string[] }> = {
+const PACK_PERKS: Record<CreditPackKey | SingleVideoPackKey, { headline: string; sub: string; highlight: string; bullets: string[] }> = {
+  single_standard: {
+    headline: "Your video is being generated. 🎬",
+    sub: "5 credits added — your standard video is queued and will be ready in a few minutes.",
+    highlight: "5 credits added to your account",
+    bullets: [
+      "1 complete standard video (Hook → Body → CTA)",
+      "AI-written script tailored to your product",
+      "MP4 download, no watermarks",
+      "Credits carry over — use them anytime",
+    ],
+  },
+  single_hd: {
+    headline: "HD video incoming. 🎬",
+    sub: "10 credits added — your HD video is queued and will be ready in a few minutes.",
+    highlight: "10 credits added to your account",
+    bullets: [
+      "1 complete HD video (Hook → Body → CTA)",
+      "Kling 3.0 · Best quality for final ads",
+      "1080p MP4 download, no watermarks",
+      "Credits carry over — use them anytime",
+    ],
+  },
   pack_10: {
     headline: "Credits loaded. Let's make something. 🎬",
     sub: "Your 10 credits are ready to use right now. That's 2 complete video ads - go test your first hook.",
@@ -156,17 +178,20 @@ export function PurchaseSuccessModal({ open, onClose, plan, pack }: PurchaseSucc
   }, [open, fire]);
 
   const isPlan = plan && plan in PLANS;
-  const isPack = pack && pack in CREDIT_PACKS;
+  const isPack = pack && (pack in CREDIT_PACKS || pack in SINGLE_VIDEO_PACKS);
 
   if (!isPlan && !isPack) return null;
 
   const planData = isPlan ? PLAN_PERKS[plan as PlanTier] : null;
-  const packData = isPack ? PACK_PERKS[pack as CreditPackKey] : null;
+  const packData = isPack ? PACK_PERKS[pack as CreditPackKey | SingleVideoPackKey] : null;
   const data = planData ?? packData!;
 
   const Icon = planData ? planData.icon : Video;
-  const planName = isPlan ? PLANS[plan as PlanTier].name : isPack ? CREDIT_PACKS[pack as CreditPackKey].name : "";
-  const planPrice = isPlan ? `$${PLANS[plan as PlanTier].price}/mo` : isPack ? `$${CREDIT_PACKS[pack as CreditPackKey].price}` : "";
+  const packInfo = isPack
+    ? (pack in CREDIT_PACKS ? CREDIT_PACKS[pack as CreditPackKey] : SINGLE_VIDEO_PACKS[pack as SingleVideoPackKey])
+    : null;
+  const planName = isPlan ? PLANS[plan as PlanTier].name : packInfo?.name ?? "";
+  const planPrice = isPlan ? `$${PLANS[plan as PlanTier].price}/mo` : packInfo ? `$${packInfo.price}` : "";
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
