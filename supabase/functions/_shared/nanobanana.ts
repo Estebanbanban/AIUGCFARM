@@ -1,7 +1,8 @@
 /**
  * NanoBanana (Google Gemini image generation) helper.
  *
- * NanoBanana 2 = gemini-3.1-flash-image-preview
+ * NanoBanana 2 = gemini-3.1-flash-image-preview  (primary)
+ * NanoBanana 1 = gemini-2.0-flash-preview-image-generation  (fallback)
  * API key env:  NANOBANANA_API_KEY (Google Gemini API key)
  * API docs:     https://ai.google.dev/gemini-api/docs/image-generation
  */
@@ -17,10 +18,13 @@ function uint8ArrayToBase64(buf: Uint8Array): string {
 }
 
 const GEMINI_API_KEY = Deno.env.get("NANOBANANA_API_KEY");
-// NanoBanana 2 image generation model (Gemini API)
-// Docs: https://ai.google.dev/gemini-api/docs/image-generation
-const GEMINI_MODEL = "gemini-3.1-flash-image-preview";
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
+// NanoBanana 2 = primary model (Gemini API)
+const GEMINI_MODEL_V2 = "gemini-3.1-flash-image-preview";
+// NanoBanana 1 = classic fallback model (same API, more stable)
+const GEMINI_MODEL_V1 = "gemini-2.0-flash-preview-image-generation";
+// Keep the existing export alias pointing to v2 (composite/edit functions use it directly)
+const GEMINI_MODEL = GEMINI_MODEL_V2;
 
 export interface GeneratedImage {
   data: Uint8Array;
@@ -35,18 +39,18 @@ export interface ProductReferenceContext {
   currency?: string;
 }
 
-function endpoint(): string {
+function endpoint(model: string): string {
   if (!GEMINI_API_KEY) throw new Error("NANOBANANA_API_KEY (Gemini API key) is not configured");
-  return `${GEMINI_BASE}/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+  return `${GEMINI_BASE}/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
 }
 
-/** Call Gemini with a text prompt, return a single generated image. */
-async function generateSingleImage(prompt: string): Promise<GeneratedImage> {
+/** Call Gemini with a text prompt and a specific model, return a single generated image. */
+async function generateSingleImage(prompt: string, model: string): Promise<GeneratedImage> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60_000); // 60s per image max
 
   try {
-    const res = await fetch(endpoint(), {
+    const res = await fetch(endpoint(model), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -79,14 +83,32 @@ async function generateSingleImage(prompt: string): Promise<GeneratedImage> {
 }
 
 /**
- * Generate `count` images from a text prompt in parallel.
+ * Generate one image, trying NanoBanana 2 (v2) first and falling back to
+ * NanoBanana 1 (v1) if v2 fails. This ensures the user always gets a persona
+ * image even when the primary model is unavailable or returns an error.
+ */
+async function generateSingleImageWithFallback(prompt: string): Promise<GeneratedImage> {
+  try {
+    return await generateSingleImage(prompt, GEMINI_MODEL_V2);
+  } catch (errV2) {
+    console.warn(
+      `[nanobanana] NanoBanana 2 (${GEMINI_MODEL_V2}) failed, falling back to NanoBanana 1 (${GEMINI_MODEL_V1}):`,
+      errV2 instanceof Error ? errV2.message : errV2,
+    );
+    return await generateSingleImage(prompt, GEMINI_MODEL_V1);
+  }
+}
+
+/**
+ * Generate `count` images from a text prompt (used for persona generation).
+ * Tries NanoBanana 2 first; automatically falls back to NanoBanana 1 per image if v2 fails.
  * Returns raw image buffers — caller uploads to storage.
  */
 export async function generateImagesFromPrompt(
   prompt: string,
   count = 4,
 ): Promise<GeneratedImage[]> {
-  return Promise.all(Array.from({ length: count }, () => generateSingleImage(prompt)));
+  return Promise.all(Array.from({ length: count }, () => generateSingleImageWithFallback(prompt)));
 }
 
 /**
@@ -155,7 +177,7 @@ export async function generateCompositeFromImages(
     ? `${framingRule} ${multiImageInstruction} ${productContextPrompt} ${scenePrompt} The person is filming themselves POV-style (arm extended, front-camera angle, slight wide-angle distortion), naturally holding and showcasing the product which is clearly visible in frame. iPhone selfie aesthetic, talking-to-camera energy. ${formatHint}`
     : `${framingRule} ${multiImageInstruction} ${productContextPrompt} UGC phone selfie: extreme close-up POV, front-camera angle, arm extended at selfie distance, slight wide-angle distortion. The person looks directly into the lens while naturally holding the product near their upper chest — the product is clearly visible in frame. Natural window lighting, authentic imperfections, talking-to-camera energy. ${formatHint}`;
 
-  const res = await fetch(endpoint(), {
+  const res = await fetch(endpoint(GEMINI_MODEL), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -223,7 +245,7 @@ export async function editCompositeFromReference(
     formatHint,
   ].join(" ");
 
-  const res = await fetch(endpoint(), {
+  const res = await fetch(endpoint(GEMINI_MODEL), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
