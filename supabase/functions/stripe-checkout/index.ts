@@ -120,7 +120,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const packSuccessUrl = generation_id
-        ? `${FRONTEND_URL}/generate/${generation_id}?checkout=success&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`
+        ? `${FRONTEND_URL}/generate?checkout=success&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`
         : `${FRONTEND_URL}/dashboard?checkout=success&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`;
 
       const sessionParams: Stripe.Checkout.SessionCreateParams = {
