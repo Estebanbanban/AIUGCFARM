@@ -921,7 +921,9 @@ export default function GeneratePage() {
 
   async function handleBuyPack(pack: CreditPackKey | SingleVideoPackKey) {
     const isSingleVideo = pack === "single_standard" || pack === "single_hd";
-    const couponId = isSingleVideo && isFirstVideo ? COUPON_50_OFF_FIRST_VIDEO : COUPON_30_OFF;
+    const couponId = isSingleVideo
+      ? (isFirstVideo ? COUPON_50_OFF_FIRST_VIDEO : undefined)
+      : COUPON_30_OFF;
     buyCredits.mutate({ pack, couponId, generation_id: store.pendingGenerationId ?? undefined }, {
       onSuccess: (url) => {
         if (pack in { pack_10: 1, pack_30: 1, pack_100: 1 }) {
@@ -1669,8 +1671,8 @@ export default function GeneratePage() {
                               : "border-border hover:border-muted-foreground/30",
                           )}
                         >
-                          <p className="text-sm font-semibold">Kling 2.6</p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">Faster · great for testing</p>
+                          <p className="text-sm font-semibold">Standard</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">Kling 2.6 · Faster, great for testing</p>
                         </button>
                         <button
                           type="button"
@@ -1686,10 +1688,7 @@ export default function GeneratePage() {
                               : "border-border hover:border-muted-foreground/30",
                           )}
                         >
-                          <div className="flex w-full items-center justify-between">
-                            <p className="text-sm font-semibold">Kling V3</p>
-                            <Badge variant="secondary" className="text-[10px]">2x cr</Badge>
-                          </div>
+                          <p className="text-sm font-semibold">High Quality</p>
                           <p className="mt-0.5 text-xs text-muted-foreground">Best quality · final ads</p>
                         </button>
                       </div>
@@ -1723,10 +1722,7 @@ export default function GeneratePage() {
                                 : "border-border hover:border-muted-foreground/30",
                             )}
                           >
-                            <div className="flex w-full items-center justify-between">
-                              <p className="text-sm font-semibold">Sora 2 ✨</p>
-                              <Badge variant="secondary" className="text-[10px]">+$3/vid</Badge>
-                            </div>
+                            <p className="text-sm font-semibold">Sora 2 ✨</p>
                             <p className="mt-0.5 text-xs text-muted-foreground">Premium · OpenAI</p>
                           </button>
                         </div>
@@ -1753,6 +1749,9 @@ export default function GeneratePage() {
                           </button>
                         ))}
                       </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Audio is rendered in English by the AI model. Script language affects the on-screen text only.
+                      </p>
                     </div>
                   </div>
 
@@ -2263,7 +2262,14 @@ export default function GeneratePage() {
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  {store.quality === "hd" ? "1 HD Video" : "1 Standard Video"}
+                  <>
+                    {store.quality === "hd" ? "1 HD Video" : "1 Standard Video"}
+                    {isFirstVideo && (
+                      <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                        -50%
+                      </span>
+                    )}
+                  </>
                 </button>
                 <button
                   type="button"

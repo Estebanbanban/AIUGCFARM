@@ -1,8 +1,9 @@
 "use client";
 
 import React from "react";
-import { CheckCircle2, Sparkles, Zap } from "lucide-react";
+import { CheckCircle2, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/ui/Logo";
 
 export interface NanoBananaLoaderProps {
   title: string;
@@ -11,6 +12,7 @@ export interface NanoBananaLoaderProps {
   currentStep: number;
   progress: number;
   className?: string;
+  progressLabel?: string;
 }
 
 function HudSpinner() {
@@ -31,9 +33,7 @@ function HudSpinner() {
         )}
       />
       {/* Center icon */}
-      <Sparkles
-        className="w-8 h-8 text-amber-500 animate-pulse drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]"
-      />
+      <Logo variant="icon" size="sm" theme="auto" className="opacity-90" />
     </div>
   );
 }
@@ -45,6 +45,7 @@ export function NanoBananaLoader({
   currentStep,
   progress,
   className,
+  progressLabel,
 }: NanoBananaLoaderProps) {
   const clampedProgress = Math.max(0, Math.min(100, progress));
 
@@ -58,9 +59,9 @@ export function NanoBananaLoader({
       {/* Title */}
       {title && (
         <div className="text-center space-y-1">
-          <h3 className="text-lg font-semibold text-zinc-100">{title}</h3>
+          <h3 className="text-lg font-semibold text-foreground">{title}</h3>
           {subtitle && (
-            <p className="text-sm text-zinc-500">{subtitle}</p>
+            <p className="text-sm text-muted-foreground">{subtitle}</p>
           )}
         </div>
       )}
@@ -79,7 +80,7 @@ export function NanoBananaLoader({
           {/* Progress label + percentage */}
           <div className="w-full flex items-center justify-between font-mono text-xs">
             <span className="text-amber-500 uppercase tracking-wider">
-              Traitement IA
+              {progressLabel ?? "Processing"}
             </span>
             <span className="text-amber-500 tabular-nums">
               {Math.round(clampedProgress)}%
@@ -146,7 +147,7 @@ export function NanoBananaLoader({
 
       {/* Stats footer */}
       <div className="w-full max-w-md flex items-center justify-between px-2 text-[10px] font-mono uppercase tracking-widest text-zinc-700">
-        <span>N-Banana</span>
+        <span>CineRads</span>
         <span className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           Online
