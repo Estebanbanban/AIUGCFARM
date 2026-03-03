@@ -27,6 +27,7 @@ import {
   ChevronUp,
   ChevronRight,
   Settings2,
+  FlaskConical,
 } from "lucide-react";
 import { useFirstPurchaseOffer, COUPON_30_OFF, COUPON_50_OFF_FIRST_VIDEO } from "@/hooks/use-first-purchase-offer";
 import { toast } from "sonner";
@@ -90,6 +91,7 @@ import {
   trackCreditsPurchased,
 } from "@/lib/datafast";
 import { AdvancedModePanel } from "@/components/generate/AdvancedModePanel";
+import { NanoBananaLoader } from "@/components/ui/nano-loader";
 import { callEdge } from "@/lib/api";
 import type { GenerateSegmentScriptResponse, AdvancedSegmentsInput } from "@/types/api";
 import type { AdvancedSegmentConfig, AdvancedSegmentsConfig } from "@/types/database";
@@ -275,6 +277,12 @@ const PLAN_BENEFITS: Record<PlanTier, string[]> = {
   scale: ["Highest rendering priority", "Watermark-free exports", "Commercial use license", "Dedicated manager", "Custom API limits"],
 };
 
+const VIDEO_GEN_STEPS = [
+  { label: "Creating scene previews",    icon: <ImageIcon className="w-3 h-3" /> },
+  { label: "Writing ad script",          icon: <FlaskConical className="w-3 h-3" /> },
+  { label: "Launching video generation", icon: <Zap className="w-3 h-3" /> },
+];
+
 export default function GeneratePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -338,6 +346,11 @@ export default function GeneratePage() {
 
   // Tracks config changed after auto-fired script
   const [scriptConfigChanged, setScriptConfigChanged] = useState(false);
+
+  // NanoBananaLoader state for video generation flow
+  const [videoLoaderProgress, setVideoLoaderProgress] = useState(0);
+  const [videoLoaderStep, setVideoLoaderStep] = useState(-1);
+  const videoSimRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Tracks which format was used to fire background composite generation
   const generationFiredForFormat = useRef<string | null>(null);
@@ -557,6 +570,30 @@ export default function GeneratePage() {
     setScrapeError(null);
   }
 
+  // ── Video loader simulation helpers ──────────────────────────────────────
+
+  function startVideoSim(fromPct: number, toPct: number, durationMs: number, onDone?: () => void) {
+    if (videoSimRef.current) clearInterval(videoSimRef.current);
+    const start = Date.now();
+    videoSimRef.current = setInterval(() => {
+      const t = Math.min((Date.now() - start) / durationMs, 1);
+      const eased = 1 - Math.pow(1 - t, 2);
+      setVideoLoaderProgress(Math.round(fromPct + (toPct - fromPct) * eased));
+      if (t >= 1) {
+        clearInterval(videoSimRef.current!);
+        videoSimRef.current = null;
+        onDone?.();
+      }
+    }, 80);
+  }
+
+  function stopVideoSim() {
+    if (videoSimRef.current) { clearInterval(videoSimRef.current); videoSimRef.current = null; }
+  }
+
+  // Cleanup interval on unmount
+  useEffect(() => () => stopVideoSim(), []);
+
   // ── Composite preview handlers ───────────────────────────────────────────
 
   async function handleGenerateComposites(formatOverride?: "9:16" | "16:9", personaIdOverride?: string) {
@@ -569,14 +606,24 @@ export default function GeneratePage() {
     store.setCompositeImagePath(null);
     setPreviewEditPrompt("");
 
+    setVideoLoaderStep(0);
+    setVideoLoaderProgress(0);
+    startVideoSim(0, 24, 45_000);
+
     generateComposites.mutate(
       { product_id: store.productId, persona_id: personaId, format },
       {
         onSuccess: (result) => {
+          stopVideoSim();
+          setVideoLoaderStep(-1);
+          setVideoLoaderProgress(0);
           setCompositeImages(result.images);
           trackPreviewGenerated();
         },
         onError: (err) => {
+          stopVideoSim();
+          setVideoLoaderStep(-1);
+          setVideoLoaderProgress(0);
           toast.error(err.message || "Failed to generate preview images");
         },
       },
@@ -594,6 +641,10 @@ export default function GeneratePage() {
       if (store.ctaStyle === "comment_keyword" && !store.ctaCommentKeyword.trim()) return;
       store.clearPendingScript();
       setScriptConfigChanged(false);
+      setVideoLoaderStep(1);
+      setVideoLoaderProgress(25);
+      startVideoSim(25, 49, 75_000);
+
       generateScript.mutate(
         {
           product_id: store.productId,
@@ -607,6 +658,9 @@ export default function GeneratePage() {
         },
         {
           onSuccess: (result) => {
+            stopVideoSim();
+            setVideoLoaderStep(-1);
+            setVideoLoaderProgress(0);
             if (scriptAutoFireToken.current !== token) return;
             if (result.script) {
               trackScriptGenerated(store.mode, store.quality);
@@ -618,6 +672,9 @@ export default function GeneratePage() {
             }
           },
           onError: () => {
+            stopVideoSim();
+            setVideoLoaderStep(-1);
+            setVideoLoaderProgress(0);
             toast.error("Script generation failed. Click 'Generate Script' to retry.");
           },
         },
@@ -664,6 +721,9 @@ export default function GeneratePage() {
       return;
     }
     setScriptConfigChanged(false);
+    setVideoLoaderStep(1);
+    setVideoLoaderProgress(25);
+    startVideoSim(25, 49, 75_000);
 
     generateScript.mutate(
       {
@@ -679,6 +739,9 @@ export default function GeneratePage() {
       },
       {
         onSuccess: (result) => {
+          stopVideoSim();
+          setVideoLoaderStep(-1);
+          setVideoLoaderProgress(0);
           if (result.script) {
             trackScriptGenerated(store.mode, store.quality);
             store.setPendingScript(
@@ -692,6 +755,9 @@ export default function GeneratePage() {
           }
         },
         onError: (err) => {
+          stopVideoSim();
+          setVideoLoaderStep(-1);
+          setVideoLoaderProgress(0);
           toast.error(err.message || "Failed to generate script");
         },
       },
@@ -731,6 +797,10 @@ export default function GeneratePage() {
         ? buildAdvancedSegmentsInput(store.advancedSegments)
         : undefined;
 
+    setVideoLoaderStep(2);
+    setVideoLoaderProgress(50);
+    startVideoSim(50, 59, 10_000);
+
     approveAndGenerate.mutate(
       {
         generation_id: store.pendingGenerationId,
@@ -748,6 +818,9 @@ export default function GeneratePage() {
           toast.success("Generation started!");
         },
         onError: (err) => {
+          stopVideoSim();
+          setVideoLoaderStep(-1);
+          setVideoLoaderProgress(0);
           toast.error(err.message || "Failed to start generation");
         },
       },
@@ -1364,8 +1437,20 @@ export default function GeneratePage() {
           </div>
 
           <div className="p-5 flex flex-col gap-5">
+            {/* ── NanoBananaLoader overlay ─────────────────────────── */}
+            {videoLoaderStep >= 0 && (
+              <NanoBananaLoader
+                title="Creating Your Video"
+                subtitle="This usually takes 1\u20133 minutes"
+                steps={VIDEO_GEN_STEPS}
+                currentStep={videoLoaderStep}
+                progress={videoLoaderProgress}
+                className="min-h-[350px]"
+              />
+            )}
+
             {/* ── Easy Mode ─────────────────────────────────────────── */}
-            {!store.advancedMode && (
+            {!store.advancedMode && videoLoaderStep < 0 && (
               <div className="flex flex-col gap-5">
                 {/* CTA style - collapsible */}
                 <Collapsible open={ctaOpen} onOpenChange={setCtaOpen}>
@@ -1998,7 +2083,7 @@ export default function GeneratePage() {
             )}
 
             {/* ── Advanced Mode ─────────────────────────────────────── */}
-            {store.advancedMode && (
+            {store.advancedMode && videoLoaderStep < 0 && (
               <div className="flex flex-col gap-5">
                 {isInitializingAdvanced ? (
                   <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-muted/40 py-12">
