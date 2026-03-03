@@ -1,0 +1,328 @@
+{
+  "config": {
+    "configFile": "/Users/estebanronsin/Sites/AIUGC/frontend/playwright.config.ts",
+    "rootDir": "/Users/estebanronsin/Sites/AIUGC/frontend/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/estebanronsin/Sites/AIUGC/docs/qa-flows/artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/estebanronsin/Sites/AIUGC/frontend/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "../docs/qa-flows/report",
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "../docs/qa-flows/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "runAgents": "none",
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.58.2",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "flow-2-signup-onboarding.spec.ts",
+      "file": "flow-2-signup-onboarding.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Flow 2 — Signup & Onboarding",
+          "file": "flow-2-signup-onboarding.spec.ts",
+          "line": 11,
+          "column": 6,
+          "specs": [
+            {
+              "title": "signup form submission",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6692,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "After signup: https://accounts.google.com/v3/signin/identifier?opparams=%253Fredirect_to%253Dhttp%25253A%25252F%25252Flocalhost%25253A4000%25252Fauth%25252Fcallback&dsh=S-1523964320%3A1772320159443785&client_id=90961515622-g4fghv4tg4fh58s3ruh4sjh7j7piq0n0.apps.googleusercontent.com&o2v=2&redirect_uri=https%3A%2F%2Fnuodqvvgfwptnnlvmqbe.supabase.co%2Fauth%2Fv1%2Fcallback&response_type=code&scope=email+profile&service=lso&state=b548bf42-e255-4dc7-b2c6-0e29802efecc&flowName=GeneralOAuthFlow&continue=https%3A%2F%2Faccounts.google.com%2Fsignin%2Foauth%2Fconsent%3Fauthuser%3Dunknown%26part%3DAJi8hAPpGBMju1BT4PFqYOs3Tj-KkiycyhmXvm9azFtL6G8_0ofjh0kMOEPZ6OgqhNotItV-3McJ0igNylZmZ1aIC8bi_Eeeamvy4I2N9UbBNHkMCQlumdfc2voyk49-_gOydIQBMSwNY_Z5qZTbcIKOo0soGPC27YwZAkq-PyV0gSautWPMo5tHMVKnHLA33z_CnV11amxpdJxNEKAWO3DWPHDFI_ZocJ6cStMbY0_D_s4uvoGaWugcCWzAh8I6GB4QQYJTU_wjSTjx-8P8xt-fY_4ZIUClgLUR-4pjbNVU5pWFGQIRD7LbUkEY49UKqYMPyfXNevT2ZdPx-FhwgSgXP-Nu2Lhyswck9yN8urJ5pyAmuTcGQ6NuXOiG-OA7li1TyFuylO3Uq8QxnpEE2DCQeCTwMKKbDsmXMg9DzmL9NkyWSY1-LaW54bETBRqgMJDLnYLPF1caBBqswz5p4c-uMdnZSB6SWSkMgaKKW0FFWPbMv-qYQzs%26flowName%3DGeneralOAuthFlow%26as%3DS-1523964320%253A1772320159443785%26client_id%3D90961515622-g4fghv4tg4fh58s3ruh4sjh7j7piq0n0.apps.googleusercontent.com%26requestPath%3D%252Fsignin%252Foauth%252Fconsent%23&app_domain=https%3A%2F%2Fnuodqvvgfwptnnlvmqbe.supabase.co&rart=ANgoxcePWjTffpmwbsOtcTQh3roI4Pe0qjwA4RUicixM0rjbC6UgWgdnrVI3sJk3kopOipqIND5ZYHofj1M561PSih1j2G89Tp06NyNhXJvbHi3O7CmTB7w\n"
+                        },
+                        {
+                          "text": "Page contains 'confirm': false\n"
+                        },
+                        {
+                          "text": "Page contains 'dashboard': false\n"
+                        }
+                      ],
+                      "stderr": [
+                        {
+                          "text": "(node:10478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+                        }
+                      ],
+                      "retry": 0,
+                      "startTime": "2026-02-28T23:09:15.312Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/estebanronsin/Sites/AIUGC/docs/qa-flows/artifacts/flow-2-signup-onboarding-F-d21ab-ding-signup-form-submission-chromium/test-finished-1.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8248cea9bf6d46e8721f-bd6d6f553ae380cd4b23",
+              "file": "flow-2-signup-onboarding.spec.ts",
+              "line": 12,
+              "column": 7
+            },
+            {
+              "title": "injected session → dashboard",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4125,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "Dashboard URL: http://localhost:4000/dashboard\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-02-28T23:09:22.712Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/estebanronsin/Sites/AIUGC/docs/qa-flows/artifacts/flow-2-signup-onboarding-F-fb5b4-njected-session-→-dashboard-chromium/test-finished-1.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8248cea9bf6d46e8721f-4c268ae2b716e365e36a",
+              "file": "flow-2-signup-onboarding.spec.ts",
+              "line": 38,
+              "column": 7
+            },
+            {
+              "title": "generate page — step 1 product (no products yet)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4561,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "Has 'import': true\n"
+                        },
+                        {
+                          "text": "Has 'product': true\n"
+                        },
+                        {
+                          "text": "Current URL: http://localhost:4000/generate\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-02-28T23:09:26.845Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/estebanronsin/Sites/AIUGC/docs/qa-flows/artifacts/flow-2-signup-onboarding-F-da763--1-product-no-products-yet--chromium/test-finished-1.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8248cea9bf6d46e8721f-88acda030453ecc1c906",
+              "file": "flow-2-signup-onboarding.spec.ts",
+              "line": 56,
+              "column": 7
+            },
+            {
+              "title": "generate page — product import via URL",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3621,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-02-28T23:09:31.413Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/estebanronsin/Sites/AIUGC/docs/qa-flows/artifacts/flow-2-signup-onboarding-F-d2af0-ge-—-product-import-via-URL-chromium/test-finished-1.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8248cea9bf6d46e8721f-72a9635d74c3ee2ee8d4",
+              "file": "flow-2-signup-onboarding.spec.ts",
+              "line": 72,
+              "column": 7
+            },
+            {
+              "title": "generate page — step 2 persona (sidebar + button)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3479,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "✅ + button visible next to credits\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-02-28T23:09:35.040Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/estebanronsin/Sites/AIUGC/docs/qa-flows/artifacts/flow-2-signup-onboarding-F-f1576-p-2-persona-sidebar-button--chromium/test-finished-1.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8248cea9bf6d46e8721f-50fb3de7dd348efb35b5",
+              "file": "flow-2-signup-onboarding.spec.ts",
+              "line": 92,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-02-28T23:09:14.767Z",
+    "duration": 23788.858,
+    "expected": 5,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

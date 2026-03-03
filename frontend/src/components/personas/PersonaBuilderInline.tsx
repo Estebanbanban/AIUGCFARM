@@ -628,6 +628,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
   // Clean up interval on unmount
   useEffect(() => () => stopSim(), []);
 
+
   // ── Load regen_count on mount when resuming an existing persona ────────────
   useEffect(() => {
     if (!store.personaId || profile?.plan !== 'free') return;
@@ -663,6 +664,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
     const timeInterval = setInterval(() => setGeneratingElapsed(s => s + 1), 1000);
     return () => { clearInterval(msgInterval); clearInterval(timeInterval); };
   }, [isGeneratingQuick, store.isGenerating]);
+
 
   // ── Preload all static persona option images on mount ──────────────────────
   useEffect(() => {
