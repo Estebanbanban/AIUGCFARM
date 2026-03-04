@@ -188,7 +188,7 @@ export default function DashboardPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground">
-                  Get started — {[hasProduct, hasPersonaWithImage, hasCompletedGeneration].filter(Boolean).length}/3 steps complete
+                  Get started - {[hasProduct, hasPersonaWithImage, hasCompletedGeneration].filter(Boolean).length}/3 steps complete
                 </p>
                 <Progress
                   value={Math.round(([hasProduct, hasPersonaWithImage, hasCompletedGeneration].filter(Boolean).length / 3) * 100)}
@@ -201,7 +201,6 @@ export default function DashboardPage() {
                 className="shrink-0 gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
                 onClick={() => window.dispatchEvent(new CustomEvent("onboarding:resume"))}
               >
-                <Sparkles className="size-3.5" />
                 Open Tutorial
               </Button>
             </CardContent>

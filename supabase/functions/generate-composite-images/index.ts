@@ -46,7 +46,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { product_id, persona_id, format = "9:16" } = await req.json();
+    const { product_id, persona_id, format = "9:16", selected_images } = await req.json();
 
     if (!product_id) return json({ detail: "product_id is required" }, cors, 400);
     if (!persona_id) return json({ detail: "persona_id is required" }, cors, 400);
@@ -82,9 +82,14 @@ Deno.serve(async (req: Request) => {
     const personaSignedUrl = personaSignedUrlData.signedUrl;
 
     // Product image URLs (multiple references improve output fidelity).
-    const productImagePaths = ((product.images as string[]) ?? [])
-      .filter((img) => typeof img === "string" && img.trim().length > 0)
-      .slice(0, MAX_PRODUCT_REFERENCE_IMAGES);
+    // If the frontend sent selected_images, use only those (must be a subset of product.images).
+    const allImages = ((product.images as string[]) ?? [])
+      .filter((img) => typeof img === "string" && img.trim().length > 0);
+    const productImagePaths = (
+      Array.isArray(selected_images) && selected_images.length > 0
+        ? selected_images.filter((img: string) => allImages.includes(img))
+        : allImages
+    ).slice(0, MAX_PRODUCT_REFERENCE_IMAGES);
     if (productImagePaths.length === 0) {
       throw new Error("Product has no images available");
     }

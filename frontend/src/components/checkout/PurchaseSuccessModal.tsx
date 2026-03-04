@@ -76,7 +76,7 @@ const PLAN_PERKS: Record<PlanTier, { icon: React.ElementType; headline: string; 
 const PACK_PERKS: Record<CreditPackKey | SingleVideoPackKey, { headline: string; sub: string; highlight: string; bullets: string[] }> = {
   single_standard: {
     headline: "Your video is on its way. 🎬",
-    sub: "5 credits loaded — enough for one complete standard video (Hook → Body → CTA). Hit generate and you're done.",
+    sub: "5 credits loaded - enough for one complete standard video (Hook → Body → CTA). Hit generate and you're done.",
     highlight: "5 credits added · 1 standard video ready",
     bullets: [
       "1 complete standard video (Hook → Body → CTA)",
@@ -87,7 +87,7 @@ const PACK_PERKS: Record<CreditPackKey | SingleVideoPackKey, { headline: string;
   },
   single_hd: {
     headline: "HD video incoming. 🎬",
-    sub: "10 credits loaded — enough for one complete HD video (Hook → Body → CTA). Higher res, sharper results.",
+    sub: "10 credits loaded - enough for one complete HD video (Hook → Body → CTA). Higher res, sharper results.",
     highlight: "10 credits added · 1 HD video ready",
     bullets: [
       "1 complete HD video (Hook → Body → CTA)",

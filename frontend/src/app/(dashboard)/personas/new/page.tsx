@@ -8,7 +8,7 @@ import { resolvePersonaImageUrl, usePersonas } from "@/hooks/use-personas";
 import { useProfile, PERSONA_SLOT_LIMITS } from "@/hooks/use-profile";
 import Image from "next/image";
 import {
-  ArrowLeft, Loader2, Sparkles, Check, User, ImageIcon,
+  ArrowLeft, Loader2, Check, User, ImageIcon,
   ChevronDown, Eye, Palette, Clock, Shirt, Watch, Wand2, AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -730,7 +730,7 @@ function NewPersonaPageInner() {
               Free plan: 1 persona slot
             </p>
             <p className="text-xs text-amber-600/80 dark:text-amber-500/80 mt-0.5">
-              Choose carefully — you can customize it later, but you can only create 1 persona on the free plan.
+              Choose carefully - you can customize it later, but you can only create 1 persona on the free plan.
             </p>
           </div>
         </div>
@@ -810,7 +810,6 @@ function NewPersonaPageInner() {
               </>
             ) : (
               <>
-                <Sparkles className="size-4" />
                 Generate Persona
               </>
             )}
@@ -1154,7 +1153,6 @@ function NewPersonaPageInner() {
                     </>
                   ) : (
                     <>
-                      <Sparkles className="size-4" />
                       Generate Persona
                     </>
                   )}
@@ -1196,7 +1194,6 @@ function NewPersonaPageInner() {
                       </>
                     ) : (
                       <>
-                        <Sparkles className="size-4" />
                         Regenerate
                       </>
                     )}

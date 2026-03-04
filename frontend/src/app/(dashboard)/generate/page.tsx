@@ -17,7 +17,6 @@ import {
   Upload,
   Plus,
   Pencil,
-  Sparkles,
   TrendingUp,
   Star,
   Clock,
@@ -224,6 +223,50 @@ function useResolvedProductImages(
   }, [products]);
 
   return imageMap;
+}
+
+/**
+ * Resolve ALL image URLs for a single product (for the image selector).
+ * Returns a map of raw path -> signed URL.
+ */
+function useResolvedAllProductImages(
+  product: { images: string[] } | undefined,
+) {
+  const [urlMap, setUrlMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!product?.images || product.images.length === 0) {
+      setUrlMap({});
+      return;
+    }
+    let cancelled = false;
+    async function resolve() {
+      const result: Record<string, string> = {};
+      const toSign: string[] = [];
+
+      for (const raw of product!.images) {
+        if (!raw || typeof raw !== "string") continue;
+        if (isExternalUrl(raw)) {
+          result[raw] = raw;
+        } else {
+          toSign.push(raw);
+        }
+      }
+
+      if (toSign.length > 0) {
+        const signedUrls = await getSignedImageUrls("product-images", toSign);
+        signedUrls.forEach((url, i) => {
+          if (url) result[toSign[i]] = url;
+        });
+      }
+
+      if (!cancelled) setUrlMap(result);
+    }
+    resolve();
+    return () => { cancelled = true; };
+  }, [product]);
+
+  return urlMap;
 }
 
 function useResolvedPersonaImages(personas: Persona[] | undefined) {
@@ -438,6 +481,7 @@ export default function GeneratePage() {
   const activePersonas = personas ?? [];
 
   const selectedProduct = confirmedProducts.find((p) => p.id === store.productId);
+  const selectedProductAllImages = useResolvedAllProductImages(selectedProduct);
   const selectedPersona = activePersonas.find((p) => p.id === store.personaId);
 
   const creditsRemaining = credits?.remaining ?? 0;
@@ -478,6 +522,7 @@ export default function GeneratePage() {
     setScriptConfigChanged(false);
     if (section === 1) {
       // Also clear format so user explicitly re-chooses
+      store.setSelectedProductImages([]);
       store.setStep(1);
       setSection1SubStep(1);
     } else {
@@ -608,24 +653,21 @@ export default function GeneratePage() {
     store.setCompositeImagePath(null);
     setPreviewEditPrompt("");
 
-    setVideoLoaderStep(0);
-    setVideoLoaderProgress(0);
-    startVideoSim(0, 24, 45_000);
-
     generateComposites.mutate(
-      { product_id: store.productId, persona_id: personaId, format },
+      {
+        product_id: store.productId,
+        persona_id: personaId,
+        format,
+        ...(store.selectedProductImages.length > 0 && {
+          selected_images: store.selectedProductImages,
+        }),
+      },
       {
         onSuccess: (result) => {
-          stopVideoSim();
-          setVideoLoaderStep(-1);
-          setVideoLoaderProgress(0);
           setCompositeImages(result.images);
           trackPreviewGenerated();
         },
         onError: (err) => {
-          stopVideoSim();
-          setVideoLoaderStep(-1);
-          setVideoLoaderProgress(0);
           toast.error(err.message || "Failed to generate preview images");
         },
       },
@@ -986,7 +1028,7 @@ export default function GeneratePage() {
 
   const paywallHeadline =
     videosGenerated === 0
-      ? "Create your first UGC ad — in seconds."
+      ? "Create your first UGC ad - in seconds."
       : videosGenerated === 1
       ? "It works. Now scale your production."
       : "Scale your ad production.";
@@ -1040,7 +1082,7 @@ export default function GeneratePage() {
           <div className="flex items-center gap-3">
             <AlertCircle className="size-4 shrink-0 text-amber-400" />
             <p className="text-sm text-amber-400">
-              You have a script awaiting approval — no credits charged yet.
+              You have a script awaiting approval - no credits charged yet.
             </p>
           </div>
           <Button
@@ -1262,6 +1304,75 @@ export default function GeneratePage() {
                 </div>
               ) : null}
             </div>
+
+            {/* Product image selector (when selected product has >1 image) */}
+            {selectedProduct && selectedProduct.images.length > 1 && store.productId && (
+              <div className="flex flex-col gap-2">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Reference images
+                  <span className="text-xs font-normal ml-1.5">
+                    ({store.selectedProductImages.length > 0
+                      ? store.selectedProductImages.length
+                      : Math.min(selectedProduct.images.length, 4)} of {Math.min(selectedProduct.images.length, 4)} selected)
+                  </span>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Select which product images the AI should reference when creating your preview. All images are used by default.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedProduct.images.slice(0, 4).map((imgPath, idx) => {
+                    const resolvedUrl = selectedProductAllImages[imgPath];
+                    const isSelected =
+                      store.selectedProductImages.length === 0 ||
+                      store.selectedProductImages.includes(imgPath);
+                    return (
+                      <button
+                        key={imgPath}
+                        type="button"
+                        onClick={() => {
+                          const current = store.selectedProductImages.length === 0
+                            ? selectedProduct.images.slice(0, 4)
+                            : [...store.selectedProductImages];
+                          if (current.includes(imgPath)) {
+                            if (current.length <= 1) return;
+                            store.setSelectedProductImages(current.filter((p) => p !== imgPath));
+                          } else {
+                            store.setSelectedProductImages([...current, imgPath]);
+                          }
+                        }}
+                        className={cn(
+                          "relative size-16 rounded-lg overflow-hidden border-2 transition-all shrink-0",
+                          isSelected
+                            ? "border-primary ring-1 ring-primary/30"
+                            : "border-border opacity-50 hover:opacity-75",
+                        )}
+                      >
+                        {resolvedUrl ? (
+                          <img
+                            src={resolvedUrl}
+                            alt={`Product image ${idx + 1}`}
+                            className="size-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <div className="size-full bg-muted flex items-center justify-center">
+                            <ImageIcon className="size-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
+                            <div className="size-4 rounded-full bg-primary flex items-center justify-center">
+                              <Check className="size-2.5 text-primary-foreground" />
+                            </div>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
           </div>
         )}
@@ -1941,7 +2052,6 @@ export default function GeneratePage() {
                               size="sm"
                               onClick={() => setShowPreviewEditor((prev) => !prev)}
                             >
-                              <Sparkles className="size-3.5" />
                               {showPreviewEditor ? "Hide" : "Edit"}
                             </Button>
                           </div>
@@ -1968,7 +2078,7 @@ export default function GeneratePage() {
                                 {editComposite.isPending ? (
                                   <><Loader2 className="size-3.5 animate-spin" />Applying...</>
                                 ) : (
-                                  <><Sparkles className="size-3.5" />Apply Edit</>
+                                  <>Apply Edit</>
                                 )}
                               </Button>
                             </div>
@@ -2001,15 +2111,7 @@ export default function GeneratePage() {
                 </div>
 
                 {/* ── Script / Generate area ────────────────────────── */}
-                {generateComposites.isPending && !store.compositeImagePath ? (
-                  <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-8 text-center">
-                    <Loader2 className="size-7 animate-spin text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Preparing your scene…</p>
-                      <p className="text-xs text-muted-foreground mt-1">We're generating a personalized preview with your persona & product. This takes a few seconds.</p>
-                    </div>
-                  </div>
-                ) : generateScript.isPending ? (
+                {generateScript.isPending ? (
                   <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-8 text-center">
                     <Loader2 className="size-7 animate-spin text-primary" />
                     <div>
@@ -2168,12 +2270,15 @@ export default function GeneratePage() {
                 ) : (
                   <Button
                     onClick={handleGenerateScript}
-                    disabled={requiresCommentKeyword && !commentKeyword}
+                    disabled={(requiresCommentKeyword && !commentKeyword) || generateComposites.isPending || !store.compositeImagePath}
                     size="lg"
                     className="w-full"
                   >
-                    <Sparkles className="size-4" />
-                    Generate Script
+                    {generateComposites.isPending ? (
+                      <><Loader2 className="size-4 animate-spin" />Waiting for scene preview...</>
+                    ) : (
+                      <>Generate Script</>
+                    )}
                   </Button>
                 )}
               </div>
@@ -2225,15 +2330,7 @@ export default function GeneratePage() {
                     </div>
 
                     {/* Generate buttons for advanced mode */}
-                    {generateComposites.isPending && !store.compositeImagePath ? (
-                      <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-8 text-center">
-                        <Loader2 className="size-7 animate-spin text-muted-foreground" />
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">Preparing your scene…</p>
-                          <p className="text-xs text-muted-foreground mt-1">We're generating a personalized preview with your persona & product. This takes a few seconds.</p>
-                        </div>
-                      </div>
-                    ) : generateScript.isPending ? (
+                    {generateScript.isPending ? (
                       <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-8 text-center">
                         <Loader2 className="size-7 animate-spin text-primary" />
                         <div>
@@ -2259,11 +2356,15 @@ export default function GeneratePage() {
                     ) : (
                       <Button
                         onClick={handleGenerateScript}
+                        disabled={generateComposites.isPending || !store.compositeImagePath}
                         size="lg"
                         className="w-full"
                       >
-                        <Sparkles className="size-4" />
-                        Generate Script
+                        {generateComposites.isPending ? (
+                          <><Loader2 className="size-4 animate-spin" />Waiting for scene preview...</>
+                        ) : (
+                          <>Generate Script</>
+                        )}
                       </Button>
                     )}
                   </>

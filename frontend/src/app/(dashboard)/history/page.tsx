@@ -169,7 +169,6 @@ export default function HistoryPage() {
             </div>
             <Button asChild className="bg-primary hover:bg-primary/90">
               <Link href="/generate">
-                <Sparkles className="size-4" />
                 Create Your First Video
               </Link>
             </Button>
@@ -333,7 +332,7 @@ export default function HistoryPage() {
                         <FileText className="mt-0.5 size-3.5 shrink-0 text-amber-400" />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-xs text-amber-400">
-                            Script ready — no credits charged yet
+                            Script ready - no credits charged yet
                           </p>
                           <Link
                             href="/dashboard"

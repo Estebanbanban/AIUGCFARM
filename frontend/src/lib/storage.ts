@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 
-const CACHE_TTL = 50 * 60 * 1000; // 50 min — signed URLs expire at 60 min
+const CACHE_TTL = 50 * 60 * 1000; // 50 min - signed URLs expire at 60 min
 const LS_KEY = "ugc_img_cache";
 
 type CacheEntry = { url: string; expiry: number };
@@ -51,7 +51,7 @@ function flushToLocalStorage() {
 
 /**
  * Preload image URLs into the browser cache so they display instantly
- * on the next render. Fire-and-forget — never awaited.
+ * on the next render. Fire-and-forget - never awaited.
  */
 export function preloadImages(urls: string[]): void {
   if (typeof window === "undefined") return;

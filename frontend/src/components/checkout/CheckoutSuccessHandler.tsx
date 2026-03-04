@@ -58,10 +58,10 @@ export function CheckoutSuccessHandler() {
 
       const fresh = queryClient.getQueryData<Profile>(["profile"]);
       if (fresh && fresh.plan !== "free") {
-        // Webhook has processed — server now returns the paid plan
+        // Webhook has processed - server now returns the paid plan
         webhookConfirmed = true;
       } else if (fresh && fresh.plan === "free") {
-        // Webhook hasn't processed yet — restore optimistic value
+        // Webhook hasn't processed yet - restore optimistic value
         queryClient.setQueryData<Profile>(["profile"], (old) => {
           if (!old) return old;
           return { ...old, plan: expectedPlan as Profile["plan"] };
@@ -109,7 +109,7 @@ export function CheckoutSuccessHandler() {
       for (let t = 2_000; t <= 15_000; t += 2_000) {
         timers.push(setTimeout(invalidateCreditsOnly, t));
       }
-      toast.success("Payment confirmed! Your credits are ready — generate your video now");
+      toast.success("Payment confirmed! Your credits are ready - generate your video now");
       router.replace(pathname!);
       return () => { timers.forEach(clearTimeout); };
     }

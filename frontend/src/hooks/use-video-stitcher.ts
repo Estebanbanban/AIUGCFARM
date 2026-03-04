@@ -54,6 +54,9 @@ function parseDuration(log: string): number {
  *   silence_start: 0.000000
  *   silence_end: 0.542 | silence_duration: 0.542
  */
+const TRANSITION_BUFFER = 0.1; // 100ms breathing room at clip boundaries
+const MIN_TRAILING_SILENCE = 0.3; // Only cut trailing silence longer than 300ms
+
 function getSpeechBounds(
   log: string,
   duration: number,
@@ -70,8 +73,9 @@ function getSpeechBounds(
   let speechEnd = duration;
 
   // Leading silence: first silence starts at or very close to 0
+  // Keep TRANSITION_BUFFER of pre-speech audio so clips don't feel cut mid-breath
   if (silenceStarts.length > 0 && silenceStarts[0] < 0.15) {
-    speechStart = silenceEnds[0] ?? 0;
+    speechStart = Math.max(0, (silenceEnds[0] ?? 0) - TRANSITION_BUFFER);
   }
 
   // Trailing silence: last silence_start has no matching silence_end
@@ -85,8 +89,10 @@ function getSpeechBounds(
     // Only treat as trailing if it's not the same silence as the leading one
     const isDifferentFromLeading =
       silenceStarts.length > 1 || silenceStarts[0] >= 0.15;
-    if (isLastSilenceTrailing && isDifferentFromLeading) {
-      speechEnd = lastStart;
+    // Only cut if trailing silence is long enough to be noticeable
+    const trailingSilenceDuration = duration - lastStart;
+    if (isLastSilenceTrailing && isDifferentFromLeading && trailingSilenceDuration > MIN_TRAILING_SILENCE) {
+      speechEnd = lastStart + TRANSITION_BUFFER; // keep 100ms after last word
     }
   }
 

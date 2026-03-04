@@ -28,6 +28,7 @@ interface GenerationWizardState {
   ctaCommentKeyword: string;
   language: string;
   compositeImagePath: string | null;
+  selectedProductImages: string[];
   pendingGenerationId: string | null;
   pendingScript: PendingScript | null;
   creditsToCharge: number | null;
@@ -57,6 +58,7 @@ interface GenerationWizardState {
   setCtaCommentKeyword: (keyword: string) => void;
   setLanguage: (lang: string) => void;
   setCompositeImagePath: (path: string | null) => void;
+  setSelectedProductImages: (images: string[]) => void;
   setPendingScript: (id: string, script: PendingScript, credits: number) => void;
   updateScriptSection: (type: "hooks" | "bodies" | "ctas", index: number, text: string) => void;
   clearPendingScript: () => void;
@@ -94,6 +96,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
       ctaCommentKeyword: "",
       language: "en",
       compositeImagePath: null,
+      selectedProductImages: [],
       pendingGenerationId: null,
       pendingScript: null,
       creditsToCharge: null,
@@ -107,6 +110,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
       setProductId: (id) =>
         set((state) => {
           state.productId = id;
+          state.selectedProductImages = [];
         }),
       setPersonaId: (id) =>
         set((state) => {
@@ -143,6 +147,10 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
       setCompositeImagePath: (path) =>
         set((state) => {
           state.compositeImagePath = path;
+        }),
+      setSelectedProductImages: (images) =>
+        set((state) => {
+          state.selectedProductImages = images;
         }),
       setPendingScript: (id, script, credits) =>
         set((state) => {
@@ -207,6 +215,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
           ctaCommentKeyword: "",
           language: "en" as const,
           compositeImagePath: null,
+          selectedProductImages: [],
           pendingGenerationId: null,
           pendingScript: null,
           creditsToCharge: null,
@@ -242,6 +251,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
         ctaCommentKeyword: state.ctaCommentKeyword,
         language: state.language,
         compositeImagePath: state.compositeImagePath,
+        selectedProductImages: state.selectedProductImages,
         pendingGenerationId: state.pendingGenerationId,
         pendingScript: state.pendingScript,
         creditsToCharge: state.creditsToCharge,

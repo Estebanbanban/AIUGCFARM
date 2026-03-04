@@ -62,7 +62,7 @@ const STEPS = [
     key: "persona" as const,
     label: "Persona",
     title: "Create your AI creator",
-    description: "Create your AI spokesperson — customize look, style & vibe. They'll star in every video you make. (~5 min)",
+    description: "Create your AI spokesperson - customize look, style & vibe. They'll star in every video you make. (~5 min)",
     icon: User,
     doneKey: "hasPersonaWithImage" as const,
     view: "step-persona" as WizardView,
@@ -162,7 +162,7 @@ export function OnboardingOverlay() {
 
   const handleLaunchGenerator = () => {
     const wizardStore = useGenerationWizardStore.getState();
-    // Only initialize wizard for a fresh start — if the user already has
+    // Only initialize wizard for a fresh start - if the user already has
     // composites or a pending script in the store, preserve their session
     // entirely so we don't trigger expensive regeneration.
     const hasPriorSession = !!(wizardStore.compositeImagePath || wizardStore.pendingScript || wizardStore.pendingGenerationId);
@@ -243,7 +243,7 @@ export function OnboardingOverlay() {
   return (
     <AnimatePresence>
       <>
-        {/* Backdrop — blurs & dims all content behind the modal */}
+        {/* Backdrop - blurs & dims all content behind the modal */}
         <motion.div
           key="onboarding-backdrop"
           initial={{ opacity: 0 }}
@@ -270,7 +270,7 @@ export function OnboardingOverlay() {
               modalWidth,
             )}
           >
-            {/* Header — always visible */}
+            {/* Header - always visible */}
             <WizardHeader
               view={view}
               completedCount={completedCount}
@@ -308,7 +308,7 @@ export function OnboardingOverlay() {
               )}
             </div>
 
-            {/* Footer skip — only shown on checklist */}
+            {/* Footer skip - only shown on checklist */}
             {view === "checklist" && (
               <div className="shrink-0 border-t border-border px-6 py-3">
                 <button
@@ -611,7 +611,7 @@ function BrandImportView({
   }
 
   function handleUploadSuccess() {
-    // ManualUploadForm does not invalidate the RQ cache — we do it here
+    // ManualUploadForm does not invalidate the RQ cache - we do it here
     queryClient.invalidateQueries({ queryKey: ["products"] });
     setShowSuccess(true);
     setTimeout(onComplete, 1500);
@@ -648,7 +648,7 @@ function BrandImportView({
           <div className="text-center">
             <p className="font-semibold text-foreground">Brand already imported</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {products.length} product{products.length > 1 ? "s" : ""} ready — {products[0].name}
+              {products.length} product{products.length > 1 ? "s" : ""} ready - {products[0].name}
             </p>
           </div>
           <div className="flex gap-3">
@@ -913,11 +913,11 @@ function PersonaView({
         </p>
       </div>
 
-      {/* Existing personas without images — offer to add photo inline */}
+      {/* Existing personas without images - offer to add photo inline */}
       {hasExistingPersonas && (
         <div className="flex flex-col gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
           <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
-            You already have {personasWithoutImage.length === 1 ? "a persona" : "personas"} — just need a profile photo:
+            You already have {personasWithoutImage.length === 1 ? "a persona" : "personas"} - just need a profile photo:
           </p>
           {personasWithoutImage.map((persona) => (
             <div
@@ -942,9 +942,7 @@ function PersonaView({
               >
                 {generateImages.isPending ? (
                   <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="size-3.5" />
-                )}
+                ) : null}
                 Add photo
               </Button>
             </div>
@@ -1064,7 +1062,7 @@ function VideoLaunchView({
   );
 }
 
-// ─── Guide Banner (step 3 — no blur) ─────────────────────────────────────────
+// ─── Guide Banner (step 3 - no blur) ─────────────────────────────────────────
 
 function GuideBanner({
   onGoGenerate,

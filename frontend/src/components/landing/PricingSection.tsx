@@ -109,7 +109,7 @@ export function PricingSection() {
             pricing
           </h2>
           <p className="text-muted-foreground mt-3 text-base">
-            Start for free — create your brand and AI persona at no cost.<br />
+            Start for free - create your brand and AI persona at no cost.<br />
             Pay only when you generate: from $3/video or subscribe from $20/month.
           </p>
 
