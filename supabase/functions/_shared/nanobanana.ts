@@ -1,8 +1,8 @@
 /**
  * NanoBanana (Google Gemini image generation) helper.
  *
- * NanoBanana 2 = gemini-3.1-flash-image-preview  (primary)
- * NanoBanana 1 = gemini-2.0-flash-preview-image-generation  (fallback)
+ * NanoBanana 2 = gemini-2.5-flash-image            (primary  — stable)
+ * NanoBanana 1 = gemini-3.1-flash-image-preview    (fallback — newer but slower)
  * API key env:  NANOBANANA_API_KEY (Google Gemini API key)
  * API docs:     https://ai.google.dev/gemini-api/docs/image-generation
  */
@@ -19,10 +19,10 @@ function uint8ArrayToBase64(buf: Uint8Array): string {
 
 const GEMINI_API_KEY = Deno.env.get("NANOBANANA_API_KEY");
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
-// NanoBanana 2 = primary model (Gemini API)
-const GEMINI_MODEL_V2 = "gemini-3.1-flash-image-preview";
-// NanoBanana 1 = classic fallback model (same API, more stable)
-const GEMINI_MODEL_V1 = "gemini-2.0-flash-preview-image-generation";
+// NanoBanana 2 = primary model — gemini-2.5-flash-image (stable, replaces deprecated gemini-2.0-flash-preview-image-generation)
+const GEMINI_MODEL_V2 = "gemini-2.5-flash-image";
+// NanoBanana 1 = fallback — gemini-3.1-flash-image-preview (newer, heavier, needs longer timeout)
+const GEMINI_MODEL_V1 = "gemini-3.1-flash-image-preview";
 // Keep the existing export alias pointing to v2 (composite/edit functions use it directly)
 const GEMINI_MODEL = GEMINI_MODEL_V2;
 
@@ -47,7 +47,7 @@ function endpoint(model: string): string {
 /** Call Gemini with a text prompt and a specific model, return a single generated image. */
 async function generateSingleImage(prompt: string, model: string): Promise<GeneratedImage> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60_000); // 60s per image max
+  const timeout = setTimeout(() => controller.abort(), 120_000); // 120s per image max
 
   try {
     const res = await fetch(endpoint(model), {

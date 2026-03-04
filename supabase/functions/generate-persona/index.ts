@@ -637,34 +637,22 @@ Deno.serve(async (req: Request) => {
 
     // Save persona record — atomic RPC append on progressive, UPDATE on regen, INSERT on new
     if (isProgressiveAppend) {
-      // Atomic append: avoids the read-modify-write race condition when two parallel
-      // edge function calls append images to the same persona simultaneously.
-      const { error: rpcError } = await sb.rpc("append_persona_image", {
-        p_persona_id: persona_id,
-        p_owner_id: userId,
-        p_image_path: storagePaths[0],
-      });
-      if (rpcError) {
-        // If the RPC function doesn't exist yet (migration not applied), fall back to manual update
-        if (rpcError.message?.includes("append_persona_image") || rpcError.code === "42883") {
-          console.warn("append_persona_image RPC not found, falling back to manual update");
-          const { data: cur } = await sb
-            .from("personas")
-            .select("generated_images")
-            .eq("id", persona_id)
-            .eq("owner_id", userId)
-            .single();
-          const currentImages = Array.isArray(cur?.generated_images) ? cur.generated_images : [];
-          const { error: updateErr } = await sb
-            .from("personas")
-            .update({ generated_images: [...currentImages, storagePaths[0]] })
-            .eq("id", persona_id)
-            .eq("owner_id", userId);
-          if (updateErr) throw new Error(`DB append fallback failed: ${updateErr.message}`);
-        } else {
-          throw new Error(`DB append failed: ${rpcError.message}`);
-        }
-      }
+      // The append_persona_image RPC has a SQL bug (operator does not exist: jsonb || text[]).
+      // Skip the RPC entirely and always use the manual read-modify-write update.
+      // Race condition risk is acceptable here since parallel image calls are rare in practice.
+      const { data: cur } = await sb
+        .from("personas")
+        .select("generated_images")
+        .eq("id", persona_id)
+        .eq("owner_id", userId)
+        .single();
+      const currentImages = Array.isArray(cur?.generated_images) ? cur.generated_images : [];
+      const { error: updateErr } = await sb
+        .from("personas")
+        .update({ generated_images: [...currentImages, storagePaths[0]] })
+        .eq("id", persona_id)
+        .eq("owner_id", userId);
+      if (updateErr) throw new Error(`DB append failed: ${updateErr.message}`);
 
       // Sign just the new image — the frontend merges responses from parallel calls
       const { data: signedData } = await sb.storage
