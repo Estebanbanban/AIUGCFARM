@@ -54,8 +54,8 @@ function parseDuration(log: string): number {
  *   silence_start: 0.000000
  *   silence_end: 0.542 | silence_duration: 0.542
  */
-const TRANSITION_BUFFER = 0.1; // 100ms breathing room at clip boundaries
-const MIN_TRAILING_SILENCE = 0.3; // Only cut trailing silence longer than 300ms
+const TRANSITION_BUFFER = 0.08; // 80ms breathing room at clip boundaries
+const MIN_TRAILING_SILENCE = 0.15; // Cut trailing silence longer than 150ms
 
 function getSpeechBounds(
   log: string,
@@ -73,8 +73,9 @@ function getSpeechBounds(
   let speechEnd = duration;
 
   // Leading silence: first silence starts at or very close to 0
-  // Keep TRANSITION_BUFFER of pre-speech audio so clips don't feel cut mid-breath
-  if (silenceStarts.length > 0 && silenceStarts[0] < 0.15) {
+  // Kling often has 200-400ms of ambient silence before speech starts.
+  // Keep TRANSITION_BUFFER of pre-speech audio so clips don't feel cut mid-breath.
+  if (silenceStarts.length > 0 && silenceStarts[0] < 0.5) {
     speechStart = Math.max(0, (silenceEnds[0] ?? 0) - TRANSITION_BUFFER);
   }
 
@@ -119,7 +120,7 @@ async function detectSpeechBounds(
     "-i",
     filename,
     "-af",
-    "silencedetect=n=-40dB:d=0.1",
+    "silencedetect=n=-30dB:d=0.08",
     "-f",
     "null",
     "-",
