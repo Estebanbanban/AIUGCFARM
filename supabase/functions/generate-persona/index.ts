@@ -477,11 +477,14 @@ Deno.serve(async (req: Request) => {
       const maxPersonas = PERSONA_LIMITS[plan] ?? 0;
 
       if (!isAdmin) {
+        // Only count personas that have at least one generated image — ghost personas
+        // created during init mode (empty generated_images) don't consume a slot.
         const { count: currentCount } = await sb
           .from("personas")
           .select("id", { count: "exact", head: true })
           .eq("owner_id", userId)
-          .eq("is_active", true);
+          .eq("is_active", true)
+          .neq("generated_images", "[]");
 
         if ((currentCount ?? 0) >= maxPersonas) {
           return json(
@@ -522,6 +525,30 @@ Deno.serve(async (req: Request) => {
     // The frontend will then fire parallel image-generation calls using the
     // returned persona_id + attributes.
     if (imageCount === 0 && !hasPersonaId) {
+      // Reuse any existing ghost persona (empty generated_images) so retries
+      // after a failed generation don't accumulate wasted slots.
+      const { data: existingGhost } = await sb
+        .from("personas")
+        .select("id")
+        .eq("owner_id", userId)
+        .eq("is_active", true)
+        .eq("generated_images", "[]")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingGhost) {
+        const { data: updated, error: updateErr } = await sb
+          .from("personas")
+          .update({ name, attributes: attributesToSave })
+          .eq("id", existingGhost.id)
+          .select("id, name, attributes")
+          .single();
+        if (updateErr) throw new Error(`DB update ghost persona failed: ${updateErr.message}`);
+        console.log(`[generate-persona] init (reused ghost ${existingGhost.id}): ${Date.now() - t0}ms`);
+        return json({ data: { id: updated!.id, attributes: validAttrs } }, cors, 201);
+      }
+
       let initPersona;
       const { data: d1, error: e1 } = await sb
         .from("personas")
