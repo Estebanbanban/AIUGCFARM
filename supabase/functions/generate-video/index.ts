@@ -593,6 +593,7 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const { phase, generation_id, override_script, video_provider, video_quality: quality_override } = body;
     const provider = (video_provider === "sora" ? "sora" : "kling") as "kling" | "sora";
+    const VALID_LANGUAGES = new Set(["en","es","fr","de","it","pt","ja","zh","ar","ru"]);
 
     // ══════════════════════════════════════════════════════════════════
     // PHASE "full" — Approve an existing awaiting_approval generation
@@ -626,7 +627,38 @@ Deno.serve(async (req: Request) => {
         .select("id");
 
       if (lockErr || !lockRows || lockRows.length === 0) {
-        // Another request already transitioned the status — return 409
+        // Another request may have already transitioned the status.
+        // If it's already in progress/completed, treat as idempotent success.
+        const { data: currentGen } = await sb
+          .from("generations")
+          .select("status")
+          .eq("id", generation_id)
+          .eq("owner_id", userId)
+          .maybeSingle();
+
+        const currentStatus = currentGen?.status as string | undefined;
+        const inFlightStatuses = new Set([
+          "locking",
+          "submitting_jobs",
+          "generating_segments",
+          "stitching",
+          "completed",
+        ]);
+
+        if (currentStatus && inFlightStatuses.has(currentStatus)) {
+          return json(
+            {
+              data: {
+                generation_id,
+                status: currentStatus,
+                deduplicated: true,
+              },
+            },
+            cors,
+            200,
+          );
+        }
+
         return errorResponse(
           ErrorCodes.INVALID_INPUT,
           "Generation is no longer awaiting approval (already processing or completed).",
@@ -636,6 +668,10 @@ Deno.serve(async (req: Request) => {
       }
 
       const resolvedMode = gen.mode as string;
+      const generationLanguageRaw = typeof gen.language === "string" ? gen.language : "en";
+      const resolvedLanguage = VALID_LANGUAGES.has(generationLanguageRaw)
+        ? generationLanguageRaw
+        : "en";
       // Allow the client to override quality (e.g. user switched standard → HD before approving)
       const resolvedQuality = (quality_override === "hd" || quality_override === "standard")
         ? quality_override
@@ -819,7 +855,6 @@ Deno.serve(async (req: Request) => {
       language?: string;
     };
 
-    const VALID_LANGUAGES = new Set(["en","es","fr","de","it","pt","ja","zh","ar","ru"]);
     const resolvedLanguage = VALID_LANGUAGES.has(language) ? language : "en";
 
     if (!product_id) return errorResponse(ErrorCodes.INVALID_INPUT, "product_id is required", 400, cors);
