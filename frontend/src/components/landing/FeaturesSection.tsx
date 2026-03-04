@@ -22,7 +22,7 @@ function GridPattern({ id }: { id: string }) {
 
 function AnimationProductImport() {
   return (
-    <div className="w-full rounded-2xl overflow-hidden border border-zinc-800 bg-[#0c0c0e] shadow-2xl">
+    <div className="w-full rounded-2xl overflow-hidden border border-border shadow-2xl bg-zinc-950">
       <svg viewBox="0 0 600 420" className="w-full h-auto block">
         <defs>
           <GridPattern id="pi-grid" />
@@ -152,7 +152,7 @@ function AnimationProductImport() {
 
 function AnimationPersonaBuilder() {
   return (
-    <div className="w-full rounded-2xl overflow-hidden border border-zinc-800 bg-[#0c0c0e] shadow-2xl">
+    <div className="w-full rounded-2xl overflow-hidden border border-border shadow-2xl bg-zinc-950">
       <svg viewBox="0 0 600 420" className="w-full h-auto block">
         <defs>
           <GridPattern id="pb-grid" />
@@ -286,7 +286,7 @@ function AnimationVideoGeneration() {
   const P = 1116; // perimeter of 480×88 rect with rx=12
 
   return (
-    <div className="w-full rounded-2xl overflow-hidden border border-zinc-800 bg-[#0c0c0e] shadow-2xl">
+    <div className="w-full rounded-2xl overflow-hidden border border-border shadow-2xl bg-zinc-950">
       <svg viewBox="0 0 600 420" className="w-full h-auto block">
         <defs>
           <GridPattern id="vg-grid" />
@@ -384,7 +384,7 @@ function AnimationSegmentMixer() {
   const W = 140, H = 70;
 
   return (
-    <div className="w-full rounded-2xl overflow-hidden border border-zinc-800 bg-[#0c0c0e] shadow-2xl">
+    <div className="w-full rounded-2xl overflow-hidden border border-border shadow-2xl bg-zinc-950">
       <svg viewBox="0 0 600 420" className="w-full h-auto block">
         <defs>
           <GridPattern id="sm-grid" />

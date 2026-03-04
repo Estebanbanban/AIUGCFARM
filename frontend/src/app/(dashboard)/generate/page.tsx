@@ -637,6 +637,14 @@ export default function GeneratePage() {
     setShowPreviewEditor(false);
     const path = compositeImages[idx].path;
     store.setCompositeImagePath(path);
+    // Paywall pre-check: skip auto-fire script gen if no credits
+    if (!isUnlimitedCredits && creditsRemaining < effectiveCost) {
+      trackPaywallShown("insufficient_credits");
+      offer.startOffer();
+      setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
+      setShowPaywall(true);
+      return;
+    }
     // Auto-fire script generation in background
     const token = ++scriptAutoFireToken.current;
     if (store.productId && store.personaId) {
