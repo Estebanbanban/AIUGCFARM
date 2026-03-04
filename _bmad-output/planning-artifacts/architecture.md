@@ -83,6 +83,12 @@ Full-stack TypeScript SaaS application with serverless backend.
 | **AI  -  Scripts** | OpenAI API (GPT-4o) | Best-in-class text generation for ad scripts |
 | **AI  -  Images** | NanoBanana API | Persona image generation from attribute prompts |
 | **AI  -  Video** | Kling 3.0 API | UGC-style video generation with lip-sync |
+| **Data Fetching** | TanStack React Query v5 | Server state, caching, stale-while-revalidate |
+| **Client State** | Zustand v4 | Multi-step generation wizard + localStorage persistence |
+| **Error Tracking** | Sentry Browser SDK + Sentry SDK (Deno) | Error tracking + performance monitoring (frontend + edge functions) |
+| **Analytics** | DataFast | Analytics event pipeline (client-side, `lib/datafast.ts`) |
+| **Animations** | canvas-confetti | Post-purchase UX celebration animation |
+| **Testing** | Vitest + Playwright | Unit tests and e2e tests |
 | **Hosting** | Vercel (frontend) + Supabase (everything else) | 2 services total, minimal ops |
 
 ### Architectural Decisions Provided by Starter
@@ -187,6 +193,8 @@ CREATE TABLE profiles (
   avatar_url TEXT,
   plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'starter', 'growth', 'scale')),
   role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
+  first_video_discount_used BOOLEAN NOT NULL DEFAULT false, -- tracks 50% first-video discount eligibility
+  banned_at TIMESTAMPTZ, -- admin ban timestamp (null = not banned)
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -285,12 +293,16 @@ CREATE TABLE generations (
   product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   persona_id UUID NOT NULL REFERENCES personas(id) ON DELETE CASCADE,
   mode TEXT NOT NULL DEFAULT 'easy' CHECK (mode IN ('easy', 'expert')),
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'scripting', 'generating_image', 'generating_video', 'stitching', 'completed', 'failed')),
-  script JSONB, -- { hook: { text, duration }, body: { text, duration }, cta: { text, duration } }
-  composite_image_url TEXT, -- persona + product composite
-  videos JSONB DEFAULT '[]', -- array of 4 { url, thumbnail_url, duration, variation_index }
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'scripting', 'awaiting_approval', 'locking', 'submitting_jobs', 'generating_segments', 'completed', 'failed')),
+  video_quality TEXT, -- 'standard' | 'hd'
+  kling_model TEXT, -- actual model used ('kling-v2-6' | 'kling-v3')
+  script JSONB, -- { hooks: [], bodies: [], ctas: [] } — final reviewed script
+  script_raw JSONB, -- pre-review script before coherence pass
+  override_script JSONB, -- user-edited script overrides from approval step
+  composite_image_url TEXT, -- storage path to persona + product composite
+  videos JSONB DEFAULT '[]', -- array of { url, thumbnail_url, duration, variation_index }
   error_message TEXT,
-  external_job_ids JSONB DEFAULT '{}', -- { hook_job_id, body_job_id, cta_job_id, ... }
+  external_job_ids JSONB DEFAULT '{}', -- { hook_1_job_id, body_1_job_id, cta_1_job_id, ... }
   started_at TIMESTAMPTZ,
   completed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -442,6 +454,8 @@ WITH CHECK (
 | `credits.ts` | `checkCredits(userId)` / `debitCredit(userId, generationId)` |
 | `ssrf.ts` | `validateUrl(url)`  -  block private IPs, enforce scheme |
 | `rate-limit.ts` | In-memory rate limiter (IP-based for public, user-based for auth) |
+| `sentry.ts` | `captureException(error, context)` — error capture for edge functions via Sentry SDK (Deno) |
+| `retry.ts` | Exponential backoff retry wrapper for external API calls |
 
 ### Endpoints
 
@@ -510,25 +524,33 @@ Output: { persona: Persona }
 
 #### Video Generation
 
-**`generate-video/`**  -  POST
+**`generate-video/`**  -  POST (Two-Phase)
 ```
-Input:  { product_id: string, persona_id: string, mode: 'easy' }
+Phase 1 — Script Generation (phase="script"):
+Input:  { product_id, persona_id, mode, video_quality, format, cta_style, phase: "script" }
 Auth:   Required
 Flow:
-  1. Check credit balance >= 1
-  2. Debit 1 credit (reserve via ledger entry)
-  3. Create generation record (status: 'scripting')
-  4. Call OpenAI → generate Hook/Body/CTA script from product data + brand tone
-  5. Update generation (status: 'generating_image', script saved)
-  6. Call NanoBanana → composite image (persona + product)
-  7. Upload composite to composite-images bucket
-  8. Update generation (status: 'generating_video')
-  9. For each segment (hook, body, cta) x 4 variations:
-     - Call Kling 3.0 API → get job_id
-     - Store job_ids in external_job_ids
-  10. Return generation_id to frontend
-Output: { generation_id: string, status: 'generating_video' }
-Timeout: Steps 1-9 take ~30-45s total. Kling processing continues async.
+  1. Create generation record (status: 'awaiting_approval')
+  2. Call OpenRouter → generate Hook/Body/CTA script variants
+  3. Coherence review pass → score & rewrite if < 70
+  4. Save script_raw (pre-review) and script (final) on generation
+  5. No credits charged — script phase is free
+Output: { generation_id, status: 'awaiting_approval', script, credits_to_charge }
+
+Phase 2 — Approval & Video Submission (phase="approve"):
+Input:  { generation_id, override_script? }
+Auth:   Required
+Flow:
+  1. Atomic lock: awaiting_approval → locking (prevents double-approval)
+  2. Check credit balance >= cost (revert to awaiting_approval with 402 if insufficient)
+  3. Debit credits → locking → submitting_jobs
+  4. For each segment × variant count: call Kling API → get job_ids
+  5. Store job_ids → status: generating_segments
+Output: { generation_id, status: 'generating_segments' }
+
+Status Flow:
+  awaiting_approval → locking → submitting_jobs → generating_segments → completed
+                                                                      ↘ failed
 ```
 
 **`video-status/`**  -  GET
@@ -1026,6 +1048,25 @@ STRIPE_PRICE_SCALE_MONTHLY=price_...
 - Credit system inherently rate-limits generation
 - Free trial: 1 credit (4 videos)  -  prevents bulk abuse
 - Unconfirmed scrape data purged after 24h (DR2)
+
+---
+
+## Observability
+
+### Error Tracking
+- Sentry captures all unhandled errors in frontend and edge functions
+- `supabase/functions/_shared/sentry.ts` exports `captureException(error, context)`
+- Environment variables: `SENTRY_DSN`, `SENTRY_ENVIRONMENT`
+
+### Analytics
+- DataFast tracks key conversion events (paywall shown, checkout started, credits purchased)
+- `frontend/src/lib/datafast.ts` exports typed event functions
+- Events: productImported, previewGenerated, scriptGenerated, videoGenerationStarted, paywallShown, checkoutStarted, creditsPurchased, purchaseConfirmed
+
+### Testing
+- Unit tests: Vitest (`frontend/vitest.config.ts`)
+- E2E tests: Playwright (`playwright.config.ts`)
+- CI: GitHub Actions (`.github/workflows/`)
 
 ---
 

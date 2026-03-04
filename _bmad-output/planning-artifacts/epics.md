@@ -31,21 +31,24 @@ Complete epic and story breakdown for AIUGC. Originally decomposed from PRD v2.0
 | 1 | Product Discovery - Landing, Scraping & Import | P0 | None | 6 | ✅ Complete |
 | 2 | User Authentication & Account Management | P0 | None | 6 | ✅ Complete |
 | 3 | AI Persona Creation | P0 | Epic 2 | 5 | ✅ Complete |
-| 4 | Paywall & Subscription Billing | P0 | Epic 2 | 7 | ✅ Complete |
+| 4 | Paywall & Subscription Billing | P0 | Epic 2 | 12 | ✅ Complete |
 | 5 | AI Script & POV Image Generation | P0 | Epic 1, 2, 3, 4 | 6 | ✅ Complete |
 | 6 | Video Segment Generation & Delivery | P0 | Epic 5 | 10 | ✅ Complete |
 | 7 | User Dashboard & Video Library | P1 | Epic 2, 6 | 3 | ✅ Complete |
 | 8 | Admin Panel & Operations | P1 | Epic 2 | 4 | ✅ Complete |
+| 9 | Observability & Platform Health | P1 | Epic 2, 8 | 5 | 🟡 Partial (2/5 Done) |
+| 10 | Automatic Video Variations | P2 | Epic 5, 6 | 4 | 🔲 Planned |
 
-**Total: 8 epics, 47 stories**
+**Total: 10 epics, 61 stories**
 
 **Dependency Graph:**
 ```
 Epic 1 (Products) ────────────────────┐
                                       ├─→ Epic 5 (Script & Image) ─→ Epic 6 (Video) ─→ Epic 7 (Dashboard)
-Epic 2 (Auth) ──→ Epic 3 (Personas) ──┤
-              └──→ Epic 4 (Billing) ──┘
-              └──→ Epic 8 (Admin)
+Epic 2 (Auth) ──→ Epic 3 (Personas) ──┤                                      │
+              └──→ Epic 4 (Billing) ──┘                                      │
+              └──→ Epic 8 (Admin) ──→ Epic 9 (Observability)                 │
+                                                                             └─→ Epic 10 (Variations)
 ```
 
 ---
@@ -60,6 +63,9 @@ FR21-FR26 → Epic 6 (`generate-video/` segment submission, `video-status/`, `re
 FR27-FR30 → Epic 6 (Advanced Mode: `generate-segment-script/`, `generate-segment-composite/`, `edit-composite-image/`)
 FR31-FR35 → Epic 4 (`stripe-checkout/`, `stripe-webhook/` Edge Functions, credit packs, first-video discount)
 FR37-FR38 → Epic 7 (`generation-history/` Edge Function, dashboard page, history page)
+
+FR (new) → Epic 4 Stories 4.9-4.13 (`stripe-checkout/`, `stripe-webhook/`, paywall modal, transactional email)
+NFR6, NFR7 → Epic 9 (`_shared/sentry.ts`, `lib/datafast.ts`, Sentry SDK)
 
 **Deferred FRs:**
 - FR23 (FFmpeg stitching) → Deferred (cannot run in Edge Functions; individual segments only)
@@ -159,6 +165,8 @@ Users subscribe via Stripe, purchase credit packs, receive credits, track balanc
 
 **FRs:** FR31-FR35 | **NFRs:** NFR13 | **Domain:** DR1 | **Arch:** `stripe-checkout/`, `stripe-webhook/`, `stripe-portal/`, `credit-balance/`, `subscriptions`, `credit_balances`, `credit_ledger` tables
 
+See `stories/epic-4-billing-stories.md` for detailed stories 4.9-4.13.
+
 ### [DONE] Story 4.2: Paywall Modal at Generation
 As the platform, I want to gate generation when credits exhausted. Paywall triggers based on credit balance vs generation cost (not subscription presence). Users with pack credits can generate without a subscription. CRO-optimized dialog with aspirational copy, value framing ($150-$500 traditional UGC comparison), "Most popular" badge on growth plan.
 
@@ -189,6 +197,99 @@ As a new user, I want 50% off my first video generation. `profiles.first_video_d
 As a user returning from Stripe checkout, I want confirmation that my purchase succeeded. `PurchaseSuccessModal.tsx` triggers on `/dashboard?checkout=success&plan=X` or `&pack=X`. Shows plan-specific benefits, emotional copy, confetti animation via `canvas-confetti`, CTA to generate first video. URL cleaned after detection via `router.replace()`.
 
 > **Not in original plan.** CRO improvement.
+
+### [DONE] Story 4.9: Annual Billing Option
+**Status:** ✅ Done
+**As a** user selecting a subscription plan,
+**I want** to choose between monthly and annual billing,
+**So that** I can save money by committing to an annual plan.
+
+**Acceptance Criteria:**
+- [ ] Billing frequency toggle (monthly/annual) displayed in subscription selection UI
+- [ ] Annual pricing tiers configured in Stripe with discount vs monthly
+- [ ] `stripe-checkout/` accepts `billing` parameter (`monthly` | `annual`)
+- [ ] Annual price IDs with hardcoded fallback values for campaigns
+- [ ] Subscription renewal dates tracked correctly for annual cycles
+
+**Implementation Notes:**
+- Key file(s): `supabase/functions/stripe-checkout/index.ts`, frontend subscription UI
+- Key behavior: `billing` parameter in checkout request selects monthly or annual Stripe price ID
+
+> **Not in original plan.** Added post-MVP launch to improve revenue model flexibility.
+
+### [DONE] Story 4.10: Single-Video Paywall Purchase
+**Status:** ✅ Done
+**As a** user who runs out of credits mid-generation,
+**I want** to purchase a single video (5cr standard / 10cr HD) directly from the paywall,
+**So that** I can complete my generation without committing to a plan or credit pack.
+
+**Acceptance Criteria:**
+- [ ] "Buy just one video" option shown in paywall modal when credits insufficient
+- [ ] Single-video products configured in Stripe (`single_standard`, `single_hd`)
+- [ ] `stripe-checkout/` handles single-video payment mode
+- [ ] `stripe-webhook/` processes single-video pack purchase events
+- [ ] Credits (5 or 10) added to balance on successful purchase
+
+**Implementation Notes:**
+- Key file(s): `supabase/functions/stripe-checkout/index.ts`, `supabase/functions/stripe-webhook/index.ts`, `frontend/src/lib/stripe.ts` (`SINGLE_VIDEO_PACKS`)
+- Key behavior: Paywall gate optimization — users can purchase exactly enough credits for one video without plan commitment
+
+> **Not in original plan.** Discovered during checkout UX testing.
+
+### [DONE] Story 4.11: First-Video 50% Discount
+**Status:** ✅ Done
+**As a** new user generating my first video,
+**I want** a 50% discount on my first generation,
+**So that** I can try the platform at a reduced cost.
+
+**Acceptance Criteria:**
+- [ ] `profiles.first_video_discount_used` boolean tracks eligibility
+- [ ] Cost calculated as `ceil(cost/2)` for first generation
+- [ ] Discount restored if first video fails (credits refunded + flag reset)
+- [ ] Discount clearly communicated in generation wizard cost summary
+- [ ] Replaces original free trial credits model (9 free credits removed)
+
+**Implementation Notes:**
+- Key file(s): `profiles` table (`first_video_discount_used` column), `supabase/functions/generate-video/index.ts`
+- Key behavior: Atomic discount application — flag set before credit debit, restored on failure
+
+> **Not in original plan.** Replaces FR34 (9 free segment credits).
+
+### [DONE] Story 4.12: 30-Minute Offer Banner
+**Status:** ✅ Done
+**As a** new user who has just signed up,
+**I want** to see a time-limited promotional offer,
+**So that** I feel urgency to make my first purchase.
+
+**Acceptance Criteria:**
+- [ ] Banner displayed to new users with countdown timer (30 minutes)
+- [ ] Promotional discount applied at checkout when banner is active
+- [ ] Banner dismissed after expiry or first purchase
+- [ ] Timer state persisted across page navigations
+
+**Implementation Notes:**
+- Key file(s): Frontend banner component, checkout flow integration
+- Key behavior: CRO optimization — urgency-driven conversion for new signups
+
+> **Not in original plan.** CRO improvement.
+
+### [DONE] Story 4.13: Post-Purchase Transactional Email
+**Status:** ✅ Done
+**As a** user who has just completed a purchase,
+**I want** to receive a confirmation email with my purchase details,
+**So that** I have a record of my transaction and know my credits are available.
+
+**Acceptance Criteria:**
+- [ ] Email sent on successful subscription or pack purchase
+- [ ] Email includes plan/pack name, credits added, total cost, billing date
+- [ ] Branded HTML template consistent with other transactional emails
+- [ ] Delivered via Resend API through `send-email/` hook or direct call
+
+**Implementation Notes:**
+- Key file(s): `supabase/functions/stripe-webhook/index.ts`, `supabase/functions/send-email/index.ts`
+- Key behavior: Triggered by `checkout.session.completed` webhook event
+
+> **Not in original plan.** Transactional email for purchase confirmation.
 
 ---
 
@@ -297,6 +398,8 @@ Returning users view generation history, browse video library, re-download segme
 
 **FRs:** FR37-FR38 | **NFRs:** NFR16 | **Depends on:** Epic 2, 6 | **Arch:** `generation-history/`, `credit-balance/`, `generations` table, dashboard page
 
+See `stories/epic-7-stories.md` for detailed story specifications.
+
 ### [DONE] Story 7.1: Dashboard Overview
 As a returning user, I want an account overview at `/dashboard`. Credit balance via `credit-balance/` (returns remaining credits, plan name, admin unlimited flag). Recent generations (latest with status badges). Quick-action buttons for "New Generation" and "New Persona". Draft resume: clicking an `awaiting_approval` generation hydrates the wizard to step 5 via `resumeFromGeneration`.
 
@@ -327,6 +430,237 @@ As an admin, I want unlimited credits for testing. `ADMIN_UNLIMITED_CREDITS = 2_
 
 ### [DONE] Story 8.4: Admin Security Model
 As the platform, I want admin operations to be secure. `profiles.role` column (`user` | `admin`). `profiles.banned_at` for ban functionality. Admin RLS policies were initially added (migration `0131_admin_panel.sql`) then **dropped** (migration `20260228000001_drop_admin_rls_policies.sql`) because they caused data leakage through the regular client. Admin panel now exclusively uses service role key — no admin-specific RLS policies.
+
+---
+
+## Epic 9: Observability & Platform Health
+
+Production monitoring, error tracking, analytics, and platform reliability tooling.
+
+**Depends on:** Epic 2, 8 | **Arch:** Sentry SDK, DataFast, `_shared/sentry.ts`, `lib/datafast.ts`
+
+See `stories/epic-9-stories.md` for detailed story specifications.
+
+> **Not in original plan.** Observability infrastructure added during and after Phase 1 implementation.
+
+### [DONE] Story 9.1: Sentry Error Tracking Integration
+**Status:** ✅ Done
+**As a** platform operator,
+**I want** automatic error capture in frontend and edge functions,
+**So that** production errors are tracked, triaged, and resolved quickly.
+
+**Acceptance Criteria:**
+- [ ] Sentry Browser SDK initialized in frontend with environment tag
+- [ ] `_shared/sentry.ts` exports `captureException(error, context)` for edge functions
+- [ ] Generation failures, API errors, and webhook failures captured automatically
+- [ ] Performance monitoring enabled for critical paths
+- [ ] Environment variables configured: `SENTRY_DSN`, `SENTRY_ENVIRONMENT`
+
+**Implementation Notes:**
+- Key file(s): `supabase/functions/_shared/sentry.ts`, `supabase/functions/stripe-webhook/index.ts`, frontend Sentry init
+- Key behavior: All unhandled errors captured; contextual metadata (user ID, generation ID) attached to error events
+
+### [DONE] Story 9.2: DataFast Analytics Event Tracking
+**Status:** ✅ Done
+**As a** product owner,
+**I want** key conversion events tracked via DataFast,
+**So that** I can analyze the user funnel and optimize conversion rates.
+
+**Acceptance Criteria:**
+- [ ] `lib/datafast.ts` exports typed event tracking functions
+- [ ] Events tracked: productImported, previewGenerated, scriptGenerated, videoGenerationStarted, paywallShown, checkoutStarted, creditsPurchased, purchaseConfirmed
+- [ ] Events fire at correct points in user journey
+- [ ] Event payloads include relevant context (product ID, plan name, etc.)
+
+**Implementation Notes:**
+- Key file(s): `frontend/src/lib/datafast.ts`
+- Key behavior: Client-side analytics pipeline — events sent to DataFast on key user actions across the conversion funnel
+
+### Story 9.3: Platform Health Dashboard (Admin)
+**Status:** 🔲 Deferred Phase 2
+**As an** admin,
+**I want** a real-time platform health dashboard,
+**So that** I can monitor error rates, API response times, and generation queue depth.
+
+**Acceptance Criteria:**
+- [ ] Real-time error rate and spike detection display
+- [ ] API response time percentiles (p50, p95, p99)
+- [ ] Generation queue depth and completion time trends
+- [ ] Webhook reliability metrics
+- [ ] Integration with Sentry for error drill-down
+
+**Implementation Notes:**
+- Depends on: Story 9.1 (Sentry), Story 8.1 (Admin Dashboard)
+- Key behavior: Admin-only dashboard page aggregating Sentry + DB metrics
+
+### Story 9.4: Redis-backed Rate Limiting
+**Status:** 🔲 Deferred Phase 2
+**As the** platform,
+**I want** Redis-backed rate limiting replacing the current in-memory limiter,
+**So that** rate limits are enforced consistently across all edge function instances.
+
+**Acceptance Criteria:**
+- [ ] Redis (e.g., Upstash) integrated as rate limit backend
+- [ ] Per-user and per-IP rate limits for scraping (10/min, 100/hour)
+- [ ] Per-user generation queue limits (3 concurrent)
+- [ ] Adaptive backoff for API failures
+- [ ] Graceful fallback to in-memory limiter if Redis unavailable
+
+**Implementation Notes:**
+- Key file(s): `supabase/functions/_shared/rate-limit.ts`
+- Key behavior: Replace in-memory Map with Redis-backed sliding window counter
+
+### Story 9.5: Generation Failure Recovery & Auto-Retry
+**Status:** 🔲 Deferred Phase 2
+**As a** user whose generation failed,
+**I want** automatic retry for transient failures and one-click manual retry,
+**So that** I don't lose my work or credits when temporary errors occur.
+
+**Acceptance Criteria:**
+- [ ] Automatic retry for transient failures (network, timeouts, 5xx) with exponential backoff
+- [ ] User-visible countdown during automatic retry
+- [ ] One-click manual retry button on failed generations
+- [ ] Failed generation state preserved for re-approval without re-scripting
+- [ ] Retry metrics tracked in Sentry
+
+**Implementation Notes:**
+- Key file(s): `supabase/functions/generate-video/index.ts`, `supabase/functions/video-status/index.ts`, frontend generation status page
+- Key behavior: Retry logic for individual API calls exists (`_shared/retry.ts`); this extends to user-facing workflow retry
+
+---
+
+## Epic 10: Automatic Video Variations
+
+> **Status: Planned — not yet implemented**
+
+Rather than every video segment using the same generic "person speaking to camera" prompt, each segment has a _variation type_ that shapes the visual style, movement, and composition — making generated videos feel intentionally designed, not repetitive. Variation types are categorized by segment role (Hook, Body, CTA) and are either system-randomized or user-selected depending on mode.
+
+**Depends on:** Epic 5, 6 | **Arch:** `generate-video/`, `generate-segment-script/`, `generate-segment-composite/`, generation wizard, `generations` table
+
+### Variation Type Catalog
+
+**Hook Types (10):**
+1. Product Reveal — product enters frame from off-screen dramatically
+2. Motion Blur Opener — fast camera pan settling on product
+3. Close-Up Texture — extreme macro detail of product surface
+4. Person Reaction — genuine emotion (surprise, delight) with product
+5. Before/After Split — problem state transitioning to product solution
+6. Bold Text Overlay — minimal motion, text-first hook
+7. Environmental Context — product shown in its natural use setting
+8. Unboxing Moment — package opening, first reveal
+9. Speed Ramp — slow motion to fast motion for energy
+10. Pattern Interrupt — unexpected visual that stops the scroll
+
+**Body Types (5):**
+1. Demo In Use — product being actively used / demonstrated
+2. Bring Closer — product physically approaches camera (intimacy)
+3. Side-By-Side — comparison view (before/after, with/without)
+4. Lifestyle Integration — product naturally placed in real environment
+5. Feature Callout — zoom to specific feature with visual highlight
+
+**CTA Types (5):**
+1. Urgency — limited time or stock (FOMO framing)
+2. Social Proof — customer count or testimonial snippet
+3. Discount Reveal — percentage off revealed with excitement
+4. Curiosity Gap — hint at what happens next, drive to act
+5. Direct Ask — simple, confident "try it" / "get yours"
+
+---
+
+### Story 10.1: Variation Type Data Model & Selection Engine
+**Status:** 🔲 Planned
+**As the** system,
+**I want** a structured data model for variation types and a selection engine that assigns types to segments,
+**So that** each generated segment uses a distinct, intentional visual style rather than a generic prompt.
+
+**Acceptance Criteria:**
+- [ ] Variation types defined as a typed catalog: `hook_types` (10), `body_types` (5), `cta_types` (5)
+- [ ] Each type entry includes: `id`, `slug`, `label`, `description`, `prompt_directive` (text injected into Kling/script prompts), `product_categories` (physical/digital/service suitability weights)
+- [ ] Selection engine accepts product category and segment role, returns a weighted-random type appropriate for that category
+- [ ] In Triple mode, the 3 variants per segment role each receive a different type (no duplicates within a role)
+- [ ] Selected variation types stored on the generation record (e.g., `generations.variation_selections` JSONB)
+- [ ] Variation type catalog stored as a shared constant accessible to both frontend and edge functions
+
+**Tasks:**
+1. Define TypeScript types for `VariationType`, `VariationCatalog`, `VariationSelection`
+2. Create the full catalog constant with all 20 types, prompt directives, and category weights
+3. Implement `selectVariationTypes(productCategory, mode)` utility in `_shared/`
+4. Add `variation_selections` JSONB column to `generations` table via migration
+5. Unit test: selection engine returns valid non-duplicate types per role; respects category weights
+
+---
+
+### Story 10.2: Prompt Integration — Variation-Aware Script & Image Generation
+**Status:** 🔲 Planned
+**As the** system,
+**I want** variation types to shape both the AI script text and the composite image prompt,
+**So that** the generated script and visuals match the intended variation style for each segment.
+
+**Acceptance Criteria:**
+- [ ] `generate-video/` (script phase) injects the variation type's `prompt_directive` into the OpenRouter prompt for each segment
+- [ ] Script generation prompt includes the variation label and description as context (e.g., "This hook segment uses the 'Product Reveal' style: product enters frame from off-screen dramatically")
+- [ ] `generate-composite-images/` and `generate-segment-composite/` incorporate variation type into the image generation prompt (e.g., composition, camera angle, framing directives)
+- [ ] Kling video submission prompt includes variation-specific motion/camera directives (e.g., "fast pan left to right" for Motion Blur Opener)
+- [ ] Coherence review pass considers variation type consistency (script tone matches visual style)
+- [ ] Per-segment script regeneration (`generate-segment-script/`) respects the assigned variation type
+
+**Tasks:**
+1. Update `generate-video/` script generation to read `variation_selections` and inject per-segment prompt directives
+2. Update composite image generation to include variation-specific composition/framing in NanoBanana prompt
+3. Update Kling submission to append motion/camera directives from variation type
+4. Update coherence review prompt to validate script-variation alignment
+5. Update `generate-segment-script/` to accept and use variation type context
+6. Integration test: end-to-end generation with variation types produces distinct prompts per segment
+
+---
+
+### Story 10.3: Standard Mode — Automatic Variation Assignment
+**Status:** 🔲 Planned
+**As a** user generating a video in Standard mode,
+**I want** the system to automatically assign variation types to each segment based on my product category,
+**So that** my videos have visual variety without requiring manual configuration.
+
+**Acceptance Criteria:**
+- [ ] In Standard mode, variation types are assigned automatically during script generation (no user input required)
+- [ ] Product category (physical / digital / service) influences type selection weights (e.g., "Unboxing Moment" weighted higher for physical products, "Demo In Use" weighted higher for digital)
+- [ ] Single mode: 1 type per segment role (3 total selections)
+- [ ] Triple mode: 3 different types per segment role (9 total selections, no duplicates within a role)
+- [ ] Generation status page (`/generate/[id]`) displays the assigned variation type label next to each segment
+- [ ] Variation type labels shown in segment review with a tooltip describing the style
+- [ ] Generation history (`/history`) shows variation types used per generation
+
+**Tasks:**
+1. Integrate `selectVariationTypes()` call into `generate-video/` at script generation phase
+2. Store selections in `generations.variation_selections` before script generation begins
+3. Update segment review page to display variation type labels and descriptions
+4. Update generation history API and UI to include variation type metadata
+5. QA: generate videos for physical, digital, and service products — verify type distribution is category-appropriate
+
+---
+
+### Story 10.4: Advanced Mode — User-Selected Variation Types
+**Status:** 🔲 Planned
+**As a** user generating a video in Advanced mode,
+**I want** to choose the variation type for each segment before generation,
+**So that** I have full creative control over the visual style of every segment in my video.
+
+**Acceptance Criteria:**
+- [ ] Advanced Mode panel in the generation wizard (step 4) shows a variation type selector for each segment
+- [ ] Selectors grouped by role: Hook type picker, Body type picker, CTA type picker
+- [ ] Each type displayed with label, short description, and a visual icon/thumbnail representing the style
+- [ ] In Triple mode, user selects 3 types per role (UI prevents duplicate selection within a role)
+- [ ] Selected types override the automatic selection engine
+- [ ] "Randomize" button available per role to let the system pick (same as Standard mode logic)
+- [ ] Selected variation types included in the wizard store and sent with the generation request
+- [ ] Per-segment script regeneration in Advanced Mode allows changing the variation type and regenerating the script to match
+
+**Tasks:**
+1. Add `VariationTypePicker` component with type cards showing label, description, and icon
+2. Integrate pickers into `AdvancedModePanel` for each segment role
+3. Update wizard store (`generation-wizard.ts`) to hold `variationSelections` in `advancedSegments`
+4. Update `generate-video/` to accept user-provided variation selections and skip automatic assignment
+5. Update `generate-segment-script/` to accept a `variation_type` parameter for per-segment regeneration
+6. QA: Advanced Mode — select types, generate, verify prompts and output match selections
 
 ---
 
