@@ -314,7 +314,10 @@ Deno.serve(async (req: Request) => {
           const isPermanent = isPermanentHttp || permanentBodyPatterns.test(errMsg);
           if (isPermanent) {
             anyFailed = true;
-            failedMessage = `Video API error (${httpStatus}) — ${errMsg}`;
+            // Use a generic message — don't expose raw API error details to client
+            failedMessage = httpStatus >= 400 && httpStatus < 500
+              ? "Video generation was rejected (content policy or invalid input). Please try a different image or script."
+              : "Video generation failed. Please try again.";
             break;
           }
           // Transient: treat as still-in-progress
@@ -367,17 +370,18 @@ Deno.serve(async (req: Request) => {
             })().catch((dlErr) => {
               console.error(`Video download/upload failed for ${jobKey}:`, dlErr);
               anyFailed = true;
-              failedMessage = dlErr instanceof Error ? dlErr.message : String(dlErr);
+              failedMessage = "Failed to save one or more video segments. Please try again.";
             })
           );
         } else if (klingResult.status === "failed") {
           const errMsg = klingResult.error_message || "";
           const permanentContentPatterns = /INVALID_IMAGE|content.?policy|NSFW|MODERATION|banned|blocked/i;
           anyFailed = true;
-          failedMessage = errMsg || `Video generation failed for segment ${jobKey}`;
-          if (permanentContentPatterns.test(errMsg)) {
-            failedMessage = `Content policy violation: ${errMsg}`;
-          }
+          // Don't expose raw API error details — log internally, show generic message
+          console.error(`Kling segment ${jobKey} failed:`, errMsg);
+          failedMessage = permanentContentPatterns.test(errMsg)
+            ? "Video generation was rejected. The image or script may have triggered a content policy check."
+            : "Video generation failed. Please try again.";
         }
       }
 

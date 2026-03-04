@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { calculateGenerationCost } from "@/lib/generation-cost";
 
 const PLAN_PRICES: Record<string, number> = {
   starter: 25,
@@ -295,6 +296,31 @@ export async function getGenerationStats() {
     pending: total - completed - failed,
     successRate: total ? Math.round((completed / total) * 100) : 0,
     avgDurationSec: Math.round(avgMs / 1000),
+  };
+}
+
+export async function getApiCostStats() {
+  const supabase = getAdminClient();
+  const { data } = await supabase
+    .from("generations")
+    .select("videos, video_quality, kling_model")
+    .eq("status", "completed");
+
+  let totalCostUsd = 0;
+  let totalBilledSeconds = 0;
+  const count = (data ?? []).length;
+
+  for (const gen of (data ?? [])) {
+    const cost = calculateGenerationCost(gen.videos, gen.video_quality, gen.kling_model);
+    totalCostUsd += cost.totalCostUsd;
+    totalBilledSeconds += cost.totalBilledSeconds;
+  }
+
+  return {
+    totalCostUsd,
+    totalBilledSeconds,
+    count,
+    avgCostUsd: count > 0 ? totalCostUsd / count : 0,
   };
 }
 

@@ -5,8 +5,8 @@ import { getAdminClient } from "../_shared/supabase.ts";
 import { withRetry } from "../_shared/retry.ts";
 import { generateCompositeFromImages } from "../_shared/nanobanana.ts";
 
-const COMPOSITE_COUNT = 4;
-const MAX_PRODUCT_REFERENCE_IMAGES = 4;
+const COMPOSITE_COUNT = 2; // 2×~45s = ~90s, well within Supabase 150s free-tier timeout
+const MAX_PRODUCT_REFERENCE_IMAGES = 2; // 2 product refs keeps RAM below WORKER_LIMIT
 
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req);
@@ -115,65 +115,51 @@ Deno.serve(async (req: Request) => {
     const scenePrompt = (persona.attributes as Record<string, unknown>)
       ?.scene_prompt as string | undefined;
 
-    // Generate COMPOSITE_COUNT composites — staggered to avoid Gemini 500 bursts.
-    // withRetry uses 5 attempts with 1s base delay (1s, 2s, 4s, 8s) per composite.
-    const staggeredTasks = Array.from({ length: COMPOSITE_COUNT }, (_, i) =>
-      new Promise<Awaited<ReturnType<typeof generateCompositeFromImages>>>((resolve, reject) => {
-        setTimeout(() => {
-          withRetry(
-            () => generateCompositeFromImages(
-              personaSignedUrl,
-              resolvedProductImageUrls,
-              {
-                name: typeof product.name === "string" ? product.name : undefined,
-                description: typeof product.description === "string"
-                  ? product.description
-                  : undefined,
-                category: typeof product.category === "string" ? product.category : undefined,
-                price: typeof product.price === "number" ? product.price : undefined,
-                currency: typeof product.currency === "string" ? product.currency : undefined,
-              },
-              scenePrompt,
-              format as "9:16" | "16:9",
-            ),
-            5,   // attempts
-            1000, // 1s base → 1s, 2s, 4s, 8s between retries
-          ).then(resolve).catch(reject);
-        }, i * 500); // stagger each by 500ms
-      })
-    );
-    const compositeResults = await Promise.allSettled(staggeredTasks);
+    // Generate composites SEQUENTIALLY and upload each one immediately after generation.
+    // Parallel generation keeps multiple large base64 buffers in RAM simultaneously and
+    // triggers WORKER_LIMIT on Supabase. Sequential + immediate upload lets the GC reclaim
+    // each buffer before the next composite starts.
+    const productContext = {
+      name: typeof product.name === "string" ? product.name : undefined,
+      description: typeof product.description === "string" ? product.description : undefined,
+      category: typeof product.category === "string" ? product.category : undefined,
+      price: typeof product.price === "number" ? product.price : undefined,
+      currency: typeof product.currency === "string" ? product.currency : undefined,
+    };
+    const uploadedPaths: string[] = [];
+    for (let i = 0; i < COMPOSITE_COUNT; i++) {
+      console.log(`[generate-composite-images] composite ${i + 1}/${COMPOSITE_COUNT}`);
+      try {
+        const composite = await withRetry(
+          () => generateCompositeFromImages(
+            personaSignedUrl,
+            resolvedProductImageUrls,
+            productContext,
+            scenePrompt,
+            format as "9:16" | "16:9",
+          ),
+          3,    // attempts
+          1000, // 1s base delay
+        );
 
-    // Upload successful composites in parallel
-    const uploadTasks = compositeResults
-      .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof generateCompositeFromImages>>> => {
-        if (r.status === "rejected") {
-          console.error("Composite generation failed:", r.reason);
-          return false;
-        }
-        return true;
-      })
-      .map(async (r) => {
-        const composite = r.value;
+        // Upload immediately so the buffer can be GC'd before the next composite
         const ext = composite.mimeType.includes("png") ? "png" : "jpg";
         const storagePath = `${userId}/preview/${crypto.randomUUID()}.${ext}`;
-
         const { error: uploadErr } = await sb.storage
           .from("composite-images")
           .upload(storagePath, composite.data, {
             contentType: composite.mimeType,
             upsert: false,
           });
-
         if (uploadErr) {
-          console.error(`Composite upload failed: ${uploadErr.message}`);
-          return null;
+          console.error(`Composite ${i + 1} upload failed: ${uploadErr.message}`);
+        } else {
+          uploadedPaths.push(storagePath);
         }
-
-        return storagePath;
-      });
-
-    const uploadedPaths = (await Promise.all(uploadTasks)).filter((p): p is string => p !== null);
+      } catch (compositeErr) {
+        console.error(`Composite ${i + 1} generation failed:`, compositeErr);
+      }
+    }
 
     // Batch sign all uploaded composite URLs
     let results: Array<{ path: string; signed_url: string }> = [];

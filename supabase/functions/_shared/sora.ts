@@ -44,11 +44,25 @@ export async function submitSoraJob(params: {
   form.append("resolution", "720x1280");  // Portrait 9:16
   form.append("image", params.composite_image_blob, "composite.jpg");
 
-  const res = await fetch(SORA_BASE, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: form,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20_000);
+
+  let res: Response;
+  try {
+    res = await fetch(SORA_BASE, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("Sora API submission timed out after 20s. The service may be under load — please retry.");
+    }
+    throw err;
+  }
+  clearTimeout(timeoutId);
 
   if (!res.ok) {
     let errBody: string;

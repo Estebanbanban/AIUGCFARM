@@ -488,6 +488,7 @@ async function submitAllKlingJobs(
   klingModel: string,
   provider: "kling" | "sora" = "kling",
   compositeImageBlob?: Blob,
+  language = "en",
 ): Promise<{ jobIds: Record<string, string>; modelUsed: string }> {
   const jobEntries: Array<[string, string]> = [];
   const jobModels: string[] = [];
@@ -496,7 +497,11 @@ async function submitAllKlingJobs(
   const jobSubmissions = segmentTypes.flatMap((segType) =>
     script[segType].map((segment, i) => {
       const jobKey = `${SEG_KEY[segType]}_${i + 1}`;
-      const prompt = `A UGC creator speaking directly to camera, saying: "${segment.text}" Natural, authentic talking-head style, casual handheld selfie aesthetic.`;
+      // When script is non-English, include a language hint so Kling's voice synthesis
+      // uses the correct language and accent instead of defaulting to English.
+      const langName = language !== "en" ? (LANGUAGE_NAMES[language] ?? null) : null;
+      const speakingHint = langName ? `, speaking ${langName}` : "";
+      const prompt = `A UGC creator speaking directly to camera${speakingHint}, saying: "${segment.text}" Natural, authentic talking-head style, casual handheld selfie aesthetic.`;
       const textDuration = estimateDuration(segment.text);
       const scriptDuration = segment.duration_seconds <= 5 ? 5 : 10;
       const duration = Math.max(textDuration, scriptDuration);
@@ -527,7 +532,19 @@ async function submitAllKlingJobs(
     })
   );
 
-  jobEntries.push(...await Promise.all(jobSubmissions));
+  const settled = await Promise.allSettled(jobSubmissions);
+  let successCount = 0;
+  for (const result of settled) {
+    if (result.status === "fulfilled") {
+      jobEntries.push(result.value);
+      successCount++;
+    } else {
+      console.error("[generate-video] job submission failed:", result.reason instanceof Error ? result.reason.message : result.reason);
+    }
+  }
+  if (successCount === 0) {
+    throw new Error("All video job submissions failed. The AI service may be temporarily overloaded — please try again in a moment.");
+  }
   return { jobIds: Object.fromEntries(jobEntries), modelUsed: jobModels[0] || klingModel };
 }
 
@@ -731,6 +748,7 @@ Deno.serve(async (req: Request) => {
           klingModel,
           provider,
           compositeImageBlob,
+          resolvedLanguage,
         );
 
         // ── Update generation with job IDs and provider ───────────

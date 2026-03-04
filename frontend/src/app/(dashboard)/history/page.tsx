@@ -15,31 +15,67 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatDate, formatCurrency } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useGenerationHistory } from "@/hooks/use-generations";
 import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
 import type { GenerationStatus } from "@/types/database";
-import { calculateGenerationCost } from "@/lib/generation-cost";
+/**
+ * Thumbnail for a history card.
+ * Prefers the composite scene image (POV shot), falls back to product image.
+ * Handles both full signed URLs (external) and Supabase storage paths.
+ */
+function HistoryThumbnail({
+  compositeUrl,
+  productPath,
+  alt,
+}: {
+  compositeUrl: string | null;
+  productPath?: string;
+  alt: string;
+}) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [useFallback, setUseFallback] = useState(false);
 
-/** Renders an image from either an external URL or a Supabase storage path. */
-function ResolvedImage({ path, alt, className }: { path: string; alt: string; className?: string }) {
-  const [src, setSrc] = useState<string | null>(isExternalUrl(path) ? path : null);
   useEffect(() => {
-    if (!isExternalUrl(path)) {
-      getSignedImageUrl("product-images", path).then(setSrc);
+    let cancelled = false;
+    async function resolve() {
+      // 1. Try composite scene image first
+      if (!useFallback && compositeUrl) {
+        const url = isExternalUrl(compositeUrl)
+          ? compositeUrl
+          : await getSignedImageUrl("composite-images", compositeUrl);
+        if (!cancelled && url && url !== "/placeholder-product.svg") {
+          setSrc(url);
+          return;
+        }
+      }
+      // 2. Fall back to product image
+      if (productPath) {
+        const url = isExternalUrl(productPath)
+          ? productPath
+          : await getSignedImageUrl("product-images", productPath);
+        if (!cancelled) setSrc(url);
+      }
     }
-  }, [path]);
+    resolve();
+    return () => { cancelled = true; };
+  }, [compositeUrl, productPath, useFallback]);
+
   if (!src) return null;
-  return <img src={src} alt={alt} className={className} loading="lazy" decoding="async" />;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="size-full rounded-lg object-cover"
+      loading="lazy"
+      decoding="async"
+      onError={() => { if (!useFallback) setUseFallback(true); }}
+    />
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -232,12 +268,6 @@ export default function HistoryPage() {
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredGenerations.map((gen) => {
-              const cost = calculateGenerationCost(
-                gen.videos,
-                gen.video_quality,
-                gen.kling_model,
-              );
-              const showCost = gen.status === "completed" && cost.totalBilledSeconds > 0;
               return (
               <Link
                 key={gen.id}
@@ -252,17 +282,16 @@ export default function HistoryPage() {
                   (gen.status === "pending" || gen.status === "generating_segments") && "border-amber-500",
                 )}>
                   <CardContent className="flex flex-col gap-3 py-5">
-                    {/* Product & persona names */}
+                    {/* Scene thumbnail + names */}
                     <div className="flex items-start gap-3">
-                      {/* Product image thumbnail */}
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                        {gen.products?.images?.[0] ? (
-                          <ResolvedImage
-                            path={gen.products.images[0]}
-                            alt={gen.products?.name ?? "Product"}
-                            className="size-full rounded-lg object-cover"
-                          />
-                        ) : (
+                      {/* Composite scene preview (POV shot), fallback to product image */}
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted overflow-hidden">
+                        <HistoryThumbnail
+                          compositeUrl={gen.composite_image_url ?? null}
+                          productPath={gen.products?.images?.[0]}
+                          alt={gen.products?.name ?? "Scene preview"}
+                        />
+                        {!gen.composite_image_url && !gen.products?.images?.[0] && (
                           <Video className="size-5 text-muted-foreground" />
                         )}
                       </div>
@@ -298,11 +327,6 @@ export default function HistoryPage() {
                       <Badge variant="outline" className="text-xs capitalize">
                         {gen.mode} mode
                       </Badge>
-                      {showCost && (
-                        <Badge variant="outline" className="text-xs">
-                          {cost.modelName}
-                        </Badge>
-                      )}
                       {gen.status === "completed" && gen.videos && (
                         <span className="text-xs text-muted-foreground">
                           {(gen.videos.hooks?.length ?? 0) +
@@ -312,16 +336,6 @@ export default function HistoryPage() {
                         </span>
                       )}
                     </div>
-
-                    {showCost && (
-                      <p className="text-xs text-muted-foreground">
-                        Cost:{" "}
-                        <span className="font-medium text-foreground">
-                          {formatCurrency(cost.totalCostUsd)}
-                        </span>{" "}
-                        ({cost.totalBilledSeconds}s billed)
-                      </p>
-                    )}
 
                     {/* Awaiting approval: prompt user to resume */}
                     {gen.status === "awaiting_approval" && (

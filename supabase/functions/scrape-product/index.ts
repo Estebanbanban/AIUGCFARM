@@ -543,7 +543,7 @@ Deno.serve(async (req: Request) => {
 
       if (error) {
         saveFailed = true;
-        saveError = `${error.code ?? "unknown"}: ${error.message}`;
+        saveError = "Failed to save product. Please try again.";
         console.error("DB insert failed (non-fatal):", {
           code: error.code,
           message: error.message,

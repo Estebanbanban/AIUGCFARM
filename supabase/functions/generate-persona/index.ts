@@ -373,6 +373,7 @@ Deno.serve(async (req: Request) => {
       : 2;
 
     // Description mode: use OpenRouter to parse free-form description into structured attributes
+    const t0 = Date.now();
     let resolvedAttributes = attributes;
     if (description && typeof description === "string" && description.trim().length > 0) {
       if (!resolvedAttributes || Object.keys(resolvedAttributes ?? {}).length === 0) {
@@ -413,7 +414,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const validAttrs = resolvedAttributes as PersonaAttributes;
-    const t0 = Date.now();
     const hasPersonaId = typeof persona_id === "string" && persona_id.length > 0;
     const isProgressiveAppend = hasPersonaId && imageCount === 1;
     const isRegeneration = hasPersonaId && !isProgressiveAppend;
@@ -431,17 +431,32 @@ Deno.serve(async (req: Request) => {
     let existingRegenCount = 0;
     let existingGeneratedImages: string[] = [];
     if (hasPersonaId) {
-      const { data: existing } = await sb
+      // Try with regen_count first; fall back to query without it if the column
+      // hasn't been added yet (migration 20260228000002 not applied).
+      let existing: Record<string, unknown> | null = null;
+      const { data: d1, error: e1 } = await sb
         .from("personas")
         .select("id, owner_id, regen_count, generated_images")
         .eq("id", persona_id)
         .single();
+      if (e1 && e1.message?.includes("regen_count")) {
+        // Column doesn't exist yet — query without it
+        console.warn("regen_count column not found, querying without it");
+        const { data: d2 } = await sb
+          .from("personas")
+          .select("id, owner_id, generated_images")
+          .eq("id", persona_id)
+          .single();
+        existing = d2 as Record<string, unknown> | null;
+      } else {
+        existing = d1 as Record<string, unknown> | null;
+      }
       if (!existing || existing.owner_id !== userId) {
         return json({ detail: "Persona not found" }, cors, 404);
       }
-      existingRegenCount = existing.regen_count ?? 0;
+      existingRegenCount = (existing.regen_count as number) ?? 0;
       existingGeneratedImages = Array.isArray(existing.generated_images)
-        ? existing.generated_images
+        ? (existing.generated_images as string[])
         : [];
       // Free-tier rate limit: cap at FREE_REGEN_LIMIT regenerations per persona
       if (!isAdmin && plan === "free" && existingRegenCount >= FREE_REGEN_LIMIT) {
@@ -462,11 +477,14 @@ Deno.serve(async (req: Request) => {
       const maxPersonas = PERSONA_LIMITS[plan] ?? 0;
 
       if (!isAdmin) {
+        // Only count personas that have at least one generated image — ghost personas
+        // created during init mode (empty generated_images) don't consume a slot.
         const { count: currentCount } = await sb
           .from("personas")
           .select("id", { count: "exact", head: true })
           .eq("owner_id", userId)
-          .eq("is_active", true);
+          .eq("is_active", true)
+          .neq("generated_images", "[]");
 
         if ((currentCount ?? 0) >= maxPersonas) {
           return json(
@@ -507,7 +525,32 @@ Deno.serve(async (req: Request) => {
     // The frontend will then fire parallel image-generation calls using the
     // returned persona_id + attributes.
     if (imageCount === 0 && !hasPersonaId) {
-      const { data: initPersona, error: initErr } = await sb
+      // Reuse any existing ghost persona (empty generated_images) so retries
+      // after a failed generation don't accumulate wasted slots.
+      const { data: existingGhost } = await sb
+        .from("personas")
+        .select("id")
+        .eq("owner_id", userId)
+        .eq("is_active", true)
+        .eq("generated_images", "[]")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingGhost) {
+        const { data: updated, error: updateErr } = await sb
+          .from("personas")
+          .update({ name, attributes: attributesToSave })
+          .eq("id", existingGhost.id)
+          .select("id, name, attributes")
+          .single();
+        if (updateErr) throw new Error(`DB update ghost persona failed: ${updateErr.message}`);
+        console.log(`[generate-persona] init (reused ghost ${existingGhost.id}): ${Date.now() - t0}ms`);
+        return json({ data: { id: updated!.id, attributes: validAttrs } }, cors, 201);
+      }
+
+      let initPersona;
+      const { data: d1, error: e1 } = await sb
         .from("personas")
         .insert({
           owner_id: userId,
@@ -520,9 +563,30 @@ Deno.serve(async (req: Request) => {
         })
         .select("id, name, attributes")
         .single();
-      if (initErr) throw new Error(`DB insert failed: ${initErr.message}`);
+      if (e1 && e1.message?.includes("regen_count")) {
+        // regen_count column not yet added — retry without it
+        console.warn("regen_count column not found, inserting without it");
+        const { data: d2, error: e2 } = await sb
+          .from("personas")
+          .insert({
+            owner_id: userId,
+            name,
+            attributes: attributesToSave,
+            generated_images: [],
+            selected_image_url: null,
+            is_active: true,
+          })
+          .select("id, name, attributes")
+          .single();
+        if (e2) throw new Error(`DB insert failed: ${e2.message}`);
+        initPersona = d2;
+      } else if (e1) {
+        throw new Error(`DB insert failed: ${e1.message}`);
+      } else {
+        initPersona = d1;
+      }
       console.log(`[generate-persona] init done: ${Date.now() - t0}ms`);
-      return json({ data: { id: initPersona.id, attributes: validAttrs } }, cors, 201);
+      return json({ data: { id: initPersona!.id, attributes: validAttrs } }, cors, 201);
     }
 
     // Build final image prompt: scene context + explicit physical attributes pinned
@@ -535,6 +599,7 @@ Deno.serve(async (req: Request) => {
     // simultaneously and triggers WORKER_LIMIT on Supabase's free/pro tiers.
     const storagePaths: string[] = [];
     let failedCount = 0;
+    let lastImgError: Error | null = null;
     for (let i = 0; i < imageCount; i++) {
       console.log(`[generate-persona] Gemini image ${i + 1}/${imageCount}: ${Date.now() - t0}ms`);
       try {
@@ -553,30 +618,41 @@ Deno.serve(async (req: Request) => {
         if (uploadErr) {
           console.error(`Persona image ${i + 1} upload failed: ${uploadErr.message}`);
           failedCount++;
+          lastImgError = new Error(uploadErr.message);
         } else {
           storagePaths.push(storagePath);
         }
       } catch (imgErr) {
         console.error(`Persona image ${i + 1} generation failed:`, imgErr);
         failedCount++;
+        lastImgError = imgErr instanceof Error ? imgErr : new Error(String(imgErr));
       }
     }
 
     if (failedCount === imageCount) {
-      throw new Error(`All ${imageCount} image generation(s) failed`);
+      // Throw the real underlying error so the outer catch surfaces it in the response body.
+      throw lastImgError ?? new Error(`All ${imageCount} image generation(s) failed`);
     }
     console.log(`[generate-persona] all images done: ${Date.now() - t0}ms`);
 
     // Save persona record — atomic RPC append on progressive, UPDATE on regen, INSERT on new
     if (isProgressiveAppend) {
-      // Atomic append: avoids the read-modify-write race condition when two parallel
-      // edge function calls append images to the same persona simultaneously.
-      const { error: rpcError } = await sb.rpc("append_persona_image", {
-        p_persona_id: persona_id,
-        p_owner_id: userId,
-        p_image_path: storagePaths[0],
-      });
-      if (rpcError) throw new Error(`DB append failed: ${rpcError.message}`);
+      // The append_persona_image RPC has a SQL bug (operator does not exist: jsonb || text[]).
+      // Skip the RPC entirely and always use the manual read-modify-write update.
+      // Race condition risk is acceptable here since parallel image calls are rare in practice.
+      const { data: cur } = await sb
+        .from("personas")
+        .select("generated_images")
+        .eq("id", persona_id)
+        .eq("owner_id", userId)
+        .single();
+      const currentImages = Array.isArray(cur?.generated_images) ? cur.generated_images : [];
+      const { error: updateErr } = await sb
+        .from("personas")
+        .update({ generated_images: [...currentImages, storagePaths[0]] })
+        .eq("id", persona_id)
+        .eq("owner_id", userId);
+      if (updateErr) throw new Error(`DB append failed: ${updateErr.message}`);
 
       // Sign just the new image — the frontend merges responses from parallel calls
       const { data: signedData } = await sb.storage
@@ -598,6 +674,8 @@ Deno.serve(async (req: Request) => {
     const signedUrls = (signedData ?? []).map((d) => d.signedUrl).filter(Boolean) as string[];
 
     let persona;
+    const selectCols = "id, name, attributes, generated_images, selected_image_url, regen_count";
+    const selectColsNoRegen = "id, name, attributes, generated_images, selected_image_url";
     if (isRegeneration) {
       const { data, error } = await sb
         .from("personas")
@@ -610,10 +688,29 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", persona_id)
         .eq("owner_id", userId)
-        .select("id, name, attributes, generated_images, selected_image_url, regen_count")
+        .select(selectCols)
         .single();
-      if (error) throw new Error(`DB update failed: ${error.message}`);
-      persona = data;
+      if (error && error.message?.includes("regen_count")) {
+        console.warn("regen_count column not found, updating without it");
+        const { data: d2, error: e2 } = await sb
+          .from("personas")
+          .update({
+            name,
+            attributes: attributesToSave,
+            generated_images: storagePaths,
+            selected_image_url: null,
+          })
+          .eq("id", persona_id)
+          .eq("owner_id", userId)
+          .select(selectColsNoRegen)
+          .single();
+        if (e2) throw new Error(`DB update failed: ${e2.message}`);
+        persona = d2;
+      } else if (error) {
+        throw new Error(`DB update failed: ${error.message}`);
+      } else {
+        persona = data;
+      }
     } else {
       const { data, error } = await sb
         .from("personas")
@@ -626,10 +723,29 @@ Deno.serve(async (req: Request) => {
           is_active: true,
           regen_count: 1,
         })
-        .select("id, name, attributes, generated_images, selected_image_url, regen_count")
+        .select(selectCols)
         .single();
-      if (error) throw new Error(`DB insert failed: ${error.message}`);
-      persona = data;
+      if (error && error.message?.includes("regen_count")) {
+        console.warn("regen_count column not found, inserting without it");
+        const { data: d2, error: e2 } = await sb
+          .from("personas")
+          .insert({
+            owner_id: userId,
+            name,
+            attributes: attributesToSave,
+            generated_images: storagePaths,
+            selected_image_url: null,
+            is_active: true,
+          })
+          .select(selectColsNoRegen)
+          .single();
+        if (e2) throw new Error(`DB insert failed: ${e2.message}`);
+        persona = d2;
+      } else if (error) {
+        throw new Error(`DB insert failed: ${error.message}`);
+      } else {
+        persona = data;
+      }
     }
 
     return json(

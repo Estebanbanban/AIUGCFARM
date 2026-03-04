@@ -1,5 +1,5 @@
 import nextDynamic from "next/dynamic";
-import { getGenerationTimeseries, getGenerationStats, getProductSourceBreakdown } from "@/lib/admin/queries";
+import { getGenerationTimeseries, getGenerationStats, getProductSourceBreakdown, getApiCostStats } from "@/lib/admin/queries";
 import { StatCard } from "@/components/admin/StatCard";
 
 const GenerationsLineChart = nextDynamic(
@@ -18,10 +18,11 @@ const SourcePieChart = nextDynamic(
 export const dynamic = "force-dynamic";
 
 export default async function UsagePage() {
-  const [timeseries, stats, sourceBreakdown] = await Promise.all([
+  const [timeseries, stats, sourceBreakdown, apiCost] = await Promise.all([
     getGenerationTimeseries(30),
     getGenerationStats(),
     getProductSourceBreakdown(),
+    getApiCostStats(),
   ]);
 
   const statusData = [
@@ -45,6 +46,27 @@ export default async function UsagePage() {
         <StatCard label="Taux de succès" value={`${stats.successRate}%`} accent={stats.successRate > 80} />
         <StatCard label="Taux d'échec" value={`${stats.total ? Math.round((stats.failed / stats.total) * 100) : 0}%`} />
         <StatCard label="Durée moyenne" value={`${avgMin}m ${avgSec}s`} sub="Par génération" />
+      </div>
+
+      <div>
+        <h2 className="text-sm font-semibold text-foreground mb-3">Coûts API Kling (vidéo générée)</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+          <StatCard
+            label="Coût total API"
+            value={`$${apiCost.totalCostUsd.toFixed(2)}`}
+            sub={`${apiCost.count} générations complètes`}
+          />
+          <StatCard
+            label="Coût moyen / vidéo"
+            value={`$${apiCost.avgCostUsd.toFixed(3)}`}
+            sub="Par génération complète"
+          />
+          <StatCard
+            label="Secondes facturées"
+            value={`${apiCost.totalBilledSeconds.toLocaleString()}s`}
+            sub="Total cumulé"
+          />
+        </div>
       </div>
 
       <div className="rounded-xl border border-border bg-card p-5">
