@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -50,6 +50,7 @@ import { useVideoStitcher, STITCH_STATUS_LABELS } from "@/hooks/use-video-stitch
 import { useZipDownload } from "@/hooks/use-zip-download";
 import { useBatchStitcher } from "@/hooks/use-batch-stitcher";
 import { useWatchedGenerationsStore } from "@/stores/watched-generations";
+import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { NanoBananaLoader } from "@/components/ui/nano-loader";
 
 /** Strip Supabase project URLs from messages shown to users. */
@@ -1077,6 +1078,8 @@ function statusToLoader(
 
 export default function GenerationDetailPage() {
   const params = useParams();
+  const router = useRouter();
+  const wizard = useGenerationWizardStore();
   const generationId = params.id as string;
   const watchedGen = useWatchedGenerationsStore(
     (s) => s.generations.find((g) => g.id === generationId),
@@ -2009,6 +2012,25 @@ export default function GenerationDetailPage() {
                 </CardContent>
               )}
             </Card>
+          )}
+
+          {/* ============================================================ */}
+          {/*  What's next? CTA                                             */}
+          {/* ============================================================ */}
+          {gen?.status === "completed" && (
+            <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-4 text-center">
+              <p className="text-sm font-medium">Your video is ready!</p>
+              <p className="text-xs text-muted-foreground">Generate more combos or start a fresh campaign.</p>
+              <Button
+                size="sm"
+                onClick={() => {
+                  wizard.reset();
+                  router.push("/generate");
+                }}
+              >
+                Generate Another Video
+              </Button>
+            </div>
           )}
         </>
       )}

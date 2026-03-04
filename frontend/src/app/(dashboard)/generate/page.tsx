@@ -509,6 +509,15 @@ export default function GeneratePage() {
   const showAddProductForm =
     addingProduct || (!productsLoading && confirmedProducts.length === 0);
 
+  // ── Auto-start first-purchase offer timer on page mount ──────────────
+  // Starting the 30-min countdown as soon as the user visits /generate (rather
+  // than waiting for them to hit the paywall) gives them the full window.
+  useEffect(() => {
+    if (!isFirstVideo || profile === undefined) return;
+    offer.startOffer();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFirstVideo, profile !== undefined]);
+
   // ── Section navigation ────────────────────────────────────────────────
 
   function handleOpenSection(section: 1 | 2) {
@@ -728,7 +737,7 @@ export default function GeneratePage() {
             stopVideoSim();
             setVideoLoaderStep(-1);
             setVideoLoaderProgress(0);
-            toast.error("Script generation failed. Click 'Generate Script' to retry.");
+            toast.error("Script generation failed. Please try again.");
           },
         },
       );
@@ -820,7 +829,7 @@ export default function GeneratePage() {
             );
             // Script now shows inline - no step change needed
           } else {
-            toast.error("Script was not returned. Please try again.");
+            toast.error("Script generation failed. Please try again.");
           }
         },
         onError: (err) => {
@@ -838,7 +847,7 @@ export default function GeneratePage() {
           } else if (err instanceof EdgeError && err.code === "RATE_LIMITED") {
             toast.error("You're generating too fast. Please wait a moment and try again.");
           } else {
-            toast.error(err.message || "Failed to generate script");
+            toast.error("Script generation failed. Please try again.");
           }
         },
       },
@@ -2271,7 +2280,7 @@ export default function GeneratePage() {
                 ) : (
                   <Button
                     onClick={handleGenerateScript}
-                    disabled={(requiresCommentKeyword && !commentKeyword) || generateComposites.isPending || !store.compositeImagePath}
+                    disabled={(requiresCommentKeyword && !commentKeyword) || generateComposites.isPending || generateComposites.isError || !store.compositeImagePath}
                     size="lg"
                     className="w-full"
                   >
@@ -2357,12 +2366,14 @@ export default function GeneratePage() {
                     ) : (
                       <Button
                         onClick={handleGenerateScript}
-                        disabled={generateComposites.isPending || !store.compositeImagePath}
+                        disabled={generateComposites.isPending || generateComposites.isError || !store.compositeImagePath}
                         size="lg"
                         className="w-full"
                       >
                         {generateComposites.isPending ? (
                           <><Loader2 className="size-4 animate-spin" />Waiting for scene preview...</>
+                        ) : generateComposites.isError ? (
+                          <>Scene preview failed — regenerate above</>
                         ) : (
                           <>Generate Script</>
                         )}
@@ -2409,15 +2420,36 @@ export default function GeneratePage() {
               <h2 className="text-xl sm:text-3xl md:text-4xl font-extrabold text-foreground mb-3 tracking-tight">
                 {paywallHeadline}
               </h2>
-              {paywallSublineStatic ? (
-                <p className="text-muted-foreground font-medium">{paywallSublineStatic}</p>
-              ) : (
-                <p className="text-muted-foreground font-medium">
-                  Traditional UGC costs{" "}
-                  <span className="line-through decoration-muted-foreground/50">$150–$500</span>.
-                  {" "}Get the same quality instantly for a fraction of the cost.
-                </p>
-              )}
+              <p className="text-muted-foreground font-medium">
+                {paywallSublineStatic ?? "Your next UGC ad is 3 minutes away."}
+              </p>
+              {/* P2 — ROI comparison */}
+              <p className="mt-1.5 text-sm text-muted-foreground/80">
+                Traditional UGC agencies charge{" "}
+                <span className="font-semibold line-through decoration-muted-foreground/40">$150–$500 per video</span>.
+                {" "}Get the same quality for{" "}
+                <span className="font-semibold text-foreground">as low as $5</span>.
+              </p>
+            </div>
+
+            {/* P1 — Social proof: key trust signals */}
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 px-4 pb-5 sm:pb-6">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <div className="flex">
+                  {[1,2,3,4,5].map(i => (
+                    <Star key={i} className="size-3 fill-amber-400 text-amber-400" />
+                  ))}
+                </div>
+                <span>Loved by e-commerce brands</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Zap className="size-3 text-primary" />
+                <span>Ready in under 5 minutes</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Check className="size-3 text-emerald-500" />
+                <span>No filming or editing required</span>
+              </div>
             </div>
 
             <div className="flex justify-center mb-6 sm:mb-8 px-4">

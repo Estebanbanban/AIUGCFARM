@@ -16,7 +16,7 @@ export class EdgeError extends Error {
   }
 }
 
-const DEFAULT_EDGE_TIMEOUT_MS = 120_000;
+const DEFAULT_EDGE_TIMEOUT_MS = 180_000;
 
 /** Remove Supabase project URLs from error messages shown to users. */
 function sanitizeErrorMessage(msg: string): string {
