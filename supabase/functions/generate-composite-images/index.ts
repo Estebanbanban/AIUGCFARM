@@ -5,7 +5,7 @@ import { getAdminClient } from "../_shared/supabase.ts";
 import { withRetry } from "../_shared/retry.ts";
 import { generateCompositeFromImages } from "../_shared/nanobanana.ts";
 
-const COMPOSITE_COUNT = 4;
+const COMPOSITE_COUNT = 2; // 2×~45s = ~90s, well within Supabase 150s free-tier timeout
 const MAX_PRODUCT_REFERENCE_IMAGES = 2; // 2 product refs keeps RAM below WORKER_LIMIT
 
 Deno.serve(async (req: Request) => {
