@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
@@ -25,6 +25,7 @@ import {
   X,
   AlertCircle,
   Pencil,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -561,6 +562,17 @@ function BrandImportView({
   const [showSuccess, setShowSuccess] = useState(false);
   const [forceShowForm, setForceShowForm] = useState(false);
 
+  const confirmAnchorRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to confirm button when scrape results appear
+  useEffect(() => {
+    if (showScrapeResults) {
+      setTimeout(() => {
+        confirmAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      }, 200);
+    }
+  }, [showScrapeResults]);
+
   async function handleScrape() {
     if (!importUrl.trim()) return;
     setScrapeError(null);
@@ -697,11 +709,22 @@ function BrandImportView({
 
       {showScrapeResults ? (
         <div className="flex flex-col gap-4">
+          {/* Quick-confirm CTA — scrolls to the Confirm All button below */}
+          <button
+            type="button"
+            onClick={() => confirmAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })}
+            className="flex w-full items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+          >
+            <span>Ready? Confirm your import</span>
+            <ChevronDown className="size-4 animate-bounce" />
+          </button>
           <ScrapeResults
             products={scrapedProducts}
             brandSummary={scrapedBrandSummary}
             onConfirmed={handleScrapeConfirmed}
           />
+          {/* Anchor for auto-scroll — sits right after the Confirm All button */}
+          <div ref={confirmAnchorRef} />
           <Button
             variant="ghost"
             size="sm"
