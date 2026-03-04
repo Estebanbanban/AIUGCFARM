@@ -34,6 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
+import { createClient } from "@/lib/supabase/client";
 import type { Product, BrandSummary, Persona } from "@/types/database";
 import type { ScrapeResponseData } from "@/types/api";
 
@@ -125,6 +126,22 @@ export function OnboardingOverlay() {
     }
     window.addEventListener("onboarding:resume", handleResume);
     return () => window.removeEventListener("onboarding:resume", handleResume);
+  }, []);
+
+  // On every fresh login (any auth method), reset skip so tutorial auto-opens.
+  // sessionStorage flag prevents re-triggering on each page navigation within
+  // the same tab — only fires once per login session.
+  useEffect(() => {
+    const supabase = createClient();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string) => {
+      if (event === "SIGNED_IN" && !sessionStorage.getItem("onboarding_session_reset")) {
+        sessionStorage.setItem("onboarding_session_reset", "1");
+        localStorage.removeItem(SKIP_KEY);
+        setSkipped(false);
+        setHasActiveWizardSession(false);
+      }
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   // Auto-dismiss banner when the generation step completes
