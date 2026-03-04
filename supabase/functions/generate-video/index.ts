@@ -505,7 +505,7 @@ Deno.serve(async (req: Request) => {
     const sb = getAdminClient();
 
     const body = await req.json();
-    const { phase, generation_id, override_script, video_provider } = body;
+    const { phase, generation_id, override_script, video_provider, video_quality: quality_override } = body;
     const provider = (video_provider === "sora" ? "sora" : "kling") as "kling" | "sora";
 
     // ══════════════════════════════════════════════════════════════════
@@ -550,12 +550,20 @@ Deno.serve(async (req: Request) => {
       }
 
       const resolvedMode = gen.mode as string;
-      const resolvedQuality = gen.video_quality as string;
+      // Allow the client to override quality (e.g. user switched standard → HD before approving)
+      const resolvedQuality = (quality_override === "hd" || quality_override === "standard")
+        ? quality_override
+        : gen.video_quality as string;
 
       // Validate Sora only supports HD
       if (provider === "sora" && resolvedQuality !== "hd") {
         await sb.from("generations").update({ status: "awaiting_approval" }).eq("id", generation_id);
         return errorResponse(ErrorCodes.INVALID_INPUT, "Sora only supports HD quality. Please select HD quality to use Sora.", 400, cors);
+      }
+
+      // If quality changed, persist the updated value before charging credits
+      if (resolvedQuality !== gen.video_quality) {
+        await sb.from("generations").update({ video_quality: resolvedQuality }).eq("id", generation_id);
       }
 
       const { variantCount, creditCost, klingModel } = computeCosts(resolvedMode, resolvedQuality, provider);
@@ -589,10 +597,6 @@ Deno.serve(async (req: Request) => {
         .single();
 
       const approveIsAdmin = profileData?.role === "admin";
-      if (resolvedQuality === "hd" && !approveIsAdmin && !new Set(["growth", "scale"]).has((profileData?.plan as string) ?? "free")) {
-        await sb.from("generations").update({ status: "awaiting_approval" }).eq("id", generation_id);
-        return errorResponse(ErrorCodes.UNAUTHORIZED, "HD quality requires Growth or Scale plan.", 403, cors);
-      }
 
       // ── Compute effective cost + check credits ──────────────────
       const isFirstVideo = profileData?.first_video_discount_used === false;
@@ -767,13 +771,7 @@ Deno.serve(async (req: Request) => {
 
     const userPlan = (planProfile?.plan as string) ?? "free";
     const isAdmin = planProfile?.role === "admin";
-    const HD_PLANS = new Set(["growth", "scale"]);
     const ADVANCED_PLANS = new Set(["growth", "scale"]);
-
-    // ── 1c. Enforce HD quality restriction ─────────────────────────
-    if (resolvedQuality === "hd" && !isAdmin && !HD_PLANS.has(userPlan)) {
-      return errorResponse(ErrorCodes.UNAUTHORIZED, "HD quality (Kling V3) requires Growth or Scale plan. Upgrade to unlock.", 403, cors);
-    }
 
     // ── 1d. Enforce advanced mode restriction ──────────────────────
     if (advanced_segments && !isAdmin && !ADVANCED_PLANS.has(userPlan)) {
