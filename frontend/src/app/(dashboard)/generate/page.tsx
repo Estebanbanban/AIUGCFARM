@@ -817,6 +817,7 @@ export default function GeneratePage() {
         override_script: store.pendingScript,
         advanced_segments: advancedSegments,
         video_provider: store.videoProvider,
+        video_quality: store.quality,
       },
       {
         onSuccess: () => {
