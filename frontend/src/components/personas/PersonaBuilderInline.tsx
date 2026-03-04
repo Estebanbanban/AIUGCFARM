@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { resolvePersonaImageUrl } from '@/hooks/use-personas';
 import Image from 'next/image';
 import {
-  Loader2, Check, User, ImageIcon,
+  Loader2, Check, User, ImageIcon, X,
   ChevronDown, ChevronUp, Eye, Palette, Clock,
   Shirt, Watch, Wand2, Cpu, FlaskConical,
 } from 'lucide-react';
@@ -519,8 +519,9 @@ function ImageCard({
             src={imageSrc}
             alt=""
             aria-hidden="true"
-            loading="eager"
+            loading="lazy"
             decoding="async"
+            fetchPriority="low"
             className="absolute inset-0 h-full w-full object-cover"
             onError={(e) => { e.currentTarget.style.display = "none"; }}
           />
@@ -580,9 +581,10 @@ const PERSONA_STEPS = [
 interface PersonaBuilderInlineProps {
   onSaved: (personaId: string) => void;
   onCancel?: () => void;
+  onGenerationStarted?: (personaId: string) => void;
 }
 
-export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInlineProps) {
+export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }: PersonaBuilderInlineProps) {
   const store = usePersonaBuilderStore();
   const queryClient = useQueryClient();
   const { data: profile } = useProfile();
@@ -641,8 +643,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
       .single()
       .then(({ data }: { data: { regen_count: number } | null }) => {
         if (!cancelled && data?.regen_count != null) setRegenCount(data.regen_count);
-      })
-      .catch(() => {});
+      });
     return () => { cancelled = true; };
   }, [store.personaId, profile?.plan]);
 
@@ -667,26 +668,6 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
   }, [isGeneratingQuick, store.isGenerating]);
 
 
-  // ── Preload all static persona option images on mount ──────────────────────
-  useEffect(() => {
-    const allSrcs = [
-      ...Object.values(ethnicityImageSrc),
-      ...Object.values(genderImageSrc),
-      ...Object.values(hairStyleImageSrc),
-      ...Object.values(bodyTypeImageSrc),
-      ...Object.values(clothingImageSrc),
-      ...Object.values(accessoriesImageSrc),
-    ].filter((src) => !src.startsWith('data:'));
-
-    const imgs = [...new Set(allSrcs)].map((src) => {
-      const img = new window.Image();
-      img.src = src;
-      return img;
-    });
-    // Keep reference to prevent GC while loading
-    return () => { imgs.length = 0; };
-  }, []);
-
   const isDark = mounted && resolvedTheme === 'dark';
 
   // ── Dark-mode aware placeholder style maps ─────────────────────────────────
@@ -705,9 +686,13 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
   const accessoriesPlaceholderStyleDynamic: Record<string, React.CSSProperties> =
     Object.fromEntries(accessoryOptions.map((value) => [value, neutralCardStyle(`accessory-${value}`, isDark)]));
 
+  function resolvePersonaName() {
+    return store.name.trim() || "AI Creator";
+  }
 
   async function handleQuickCreate() {
-    if (!store.name.trim() || !quickDescription.trim()) return;
+    if (!quickDescription.trim()) return;
+    const resolvedName = resolvePersonaName();
     setIsGeneratingQuick(true);
 
     // Step 0 → 1: OpenRouter calls (description→attrs + scene prompt)
@@ -725,58 +710,48 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
       const initResult = await callEdge<{
         data: { id: string; attributes: Record<string, unknown> };
       }>('generate-persona', {
-        body: { name: store.name.trim(), description: quickDescription.trim(), image_count: 0 },
+        body: { name: resolvedName, description: quickDescription.trim(), image_count: 0 },
         timeoutMs: 60_000,
       });
 
       const { id: personaId, attributes } = initResult.data;
       store.setPersonaId(personaId);
+      if (!store.name.trim()) {
+        store.setField("name", resolvedName);
+      }
+      onGenerationStarted?.(personaId);
 
       // ── Phase 2: parallel image generation ────────────────────────────────
-      // Both edge function calls run simultaneously, each generating 1 image.
-      // Images appear progressively as each call resolves - the user can
-      // click "Use This Persona" as soon as the first image arrives.
+      // Both edge function calls run simultaneously, each generating 1 image
+      // in its own worker (separate memory budget → no WORKER_LIMIT).
       stopSim();
       setLoaderStep(2);
-      startSim(30, 95, 55_000);
+      startSim(30, 95, 55_000); // no onDone - Gemini responses will interrupt
 
-      // Clear any prior images before starting fresh
-      store.setGeneratedImages([]);
-
-      const imageCallBody = { persona_id: personaId, name: store.name.trim(), attributes, image_count: 1 };
-
-      let anySucceeded = false;
-      const handleImageResult = (res: PromiseSettledResult<{ data: { generated_image_urls: string[] } }>) => {
-        if (res.status === 'fulfilled') {
-          const newUrls = res.value.data.generated_image_urls ?? [];
-          if (newUrls.length > 0) {
-            anySucceeded = true;
-            store.appendGeneratedImages(newUrls);
-          }
-        }
-      };
-
-      const call1 = callEdge<{ data: { generated_image_urls: string[] } }>('generate-persona', {
-        body: imageCallBody,
-        timeoutMs: 180_000,
-      });
-      const call2 = callEdge<{ data: { generated_image_urls: string[] } }>('generate-persona', {
-        body: imageCallBody,
-        timeoutMs: 180_000,
-      });
-
-      // Show each image as soon as its call resolves
-      const results = await Promise.allSettled([
-        call1.then(r => { handleImageResult({ status: 'fulfilled', value: r }); return r; }),
-        call2.then(r => { handleImageResult({ status: 'fulfilled', value: r }); return r; }),
+      const imageCallBody = { persona_id: personaId, name: resolvedName, attributes, image_count: 1 };
+      const [res1, res2] = await Promise.allSettled([
+        callEdge<{ data: { generated_image_urls: string[] } }>('generate-persona', {
+          body: imageCallBody,
+          timeoutMs: 180_000,
+        }),
+        callEdge<{ data: { generated_image_urls: string[] } }>('generate-persona', {
+          body: imageCallBody,
+          timeoutMs: 180_000,
+        }),
       ]);
 
-      if (!anySucceeded) {
-        const rej = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined;
-        const err = rej?.reason instanceof Error ? rej.reason : new Error('Both portrait generations failed');
-        throw err;
+      // Collect URLs from whichever calls succeeded
+      const urls: string[] = [];
+      if (res1.status === 'fulfilled') urls.push(...(res1.value.data.generated_image_urls ?? []));
+      if (res2.status === 'fulfilled') urls.push(...(res2.value.data.generated_image_urls ?? []));
+
+      if (urls.length === 0) {
+        const rej = res1.status === 'rejected' ? res1 : (res2.status === 'rejected' ? res2 : null);
+        const err = rej && 'reason' in rej ? rej.reason : new Error('Both portrait generations failed');
+        throw err instanceof Error ? err : new Error('Both portrait generations failed');
       }
 
+      store.setGeneratedImages(urls);
       queryClient.invalidateQueries({ queryKey: ['personas'] });
 
       stopSim();
@@ -796,21 +771,10 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
   }
 
   async function handleGenerate() {
-    if (!store.name.trim()) return;
+    const resolvedName = resolvePersonaName();
     store.setIsGenerating(true);
     setImageLoadErrors(new Set());
     toast.info('Generating persona images…');
-
-    // Start progress simulation for Custom mode
-    setLoaderProgress(0);
-    setLoaderStep(0);
-    startSim(0, 20, 15_000, () => {
-      setLoaderStep(1);
-      startSim(20, 40, 15_000, () => {
-        setLoaderStep(2);
-        startSim(40, 90, 50_000);
-      });
-    });
 
     try {
       const attributes = {
@@ -830,7 +794,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
         data: { id: string; generated_images: string[]; generated_image_urls: string[]; regen_count?: number };
       }>('generate-persona', {
         body: {
-          name: store.name,
+          name: resolvedName,
           attributes,
           ...(store.personaId ? { persona_id: store.personaId } : {}),
         },
@@ -839,19 +803,14 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
 
       const displayUrls = result.data.generated_image_urls ?? result.data.generated_images;
       store.setPersonaId(result.data.id);
+      if (!store.name.trim()) {
+        store.setField("name", resolvedName);
+      }
       store.setGeneratedImages(displayUrls);
       if (result.data.regen_count != null) setRegenCount(result.data.regen_count);
-
-      stopSim();
-      setLoaderProgress(100);
-      setTimeout(() => { setLoaderStep(-1); setLoaderProgress(0); }, 800);
-
       toast.success(`${displayUrls.length} persona images generated!`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to generate persona');
-      stopSim();
-      setLoaderStep(-1);
-      setLoaderProgress(0);
     } finally {
       store.setIsGenerating(false);
     }
@@ -879,19 +838,26 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
   }
 
   return (
-    <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
+    <div className="flex flex-col gap-4">
+      {onCancel && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">Configure your AI persona</p>
+          <Button variant="ghost" size="sm" onClick={onCancel}>
+            <X className="size-4" />
+            Back to library
+          </Button>
+        </div>
+      )}
 
       <div className={cn(
-        "grid min-h-0 items-start gap-6",
+        "grid gap-6",
         store.generatedImages.length > 0
           ? "lg:grid-cols-2"
-          : createMode === 'quick' && !isGeneratingQuick
-            ? ""
-            : "lg:grid-cols-[1fr_300px]",
+          : "lg:grid-cols-[1fr_300px]",
       )}>
 
         {/* ── Left: Sims-style criteria builder ─────────────────────── */}
-        <fieldset disabled={store.isGenerating || store.isSaving || isGeneratingQuick} className="min-h-0 min-w-0 overflow-y-auto">
+        <fieldset disabled={store.isGenerating || store.isSaving || isGeneratingQuick} className="min-w-0">
           <div className={cn(
             'flex flex-col gap-5 transition-opacity',
             (store.isGenerating || store.isSaving || isGeneratingQuick) && 'pointer-events-none opacity-50',
@@ -903,7 +869,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                 Persona Name
               </Label>
               <Input
-                placeholder="e.g. Sophie, Marcus"
+                placeholder="Optional (e.g. Sophie, Marcus)"
                 value={store.name}
                 onChange={(e) => store.setField('name', e.target.value)}
               />
@@ -938,7 +904,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                 </div>
                 <Button
                   onClick={handleQuickCreate}
-                  disabled={!store.name.trim() || !quickDescription.trim() || isGeneratingQuick}
+                  disabled={!quickDescription.trim() || isGeneratingQuick}
                   className="w-full gap-2"
                 >
                   {isGeneratingQuick ? (
@@ -1109,40 +1075,52 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
         </fieldset>
 
         {/* ── Right: preview + generate ──────────────────────────────── */}
-        <div className={cn(
-          "flex min-h-0 flex-col gap-4",
-          createMode === 'quick' && !isGeneratingQuick && store.generatedImages.length === 0 && 'hidden',
-        )}>
-          <div className="flex min-h-0 flex-col">
+        <div className="flex flex-col gap-4">
+          <div className="sticky top-6">
 
             {/* Generating loader (Quick Create) */}
             {isGeneratingQuick && store.generatedImages.length === 0 && (
-              <div className="flex min-h-[320px] items-center justify-center">
-                <NanoBananaLoader
-                  title="Creating Your Persona"
-                  subtitle="Generating unique portraits - usually 60-90 seconds"
-                  steps={PERSONA_STEPS}
-                  currentStep={loaderStep}
-                  progress={loaderProgress}
-                />
-              </div>
+              <NanoBananaLoader
+                title="Creating Your Persona"
+                subtitle="Generating unique portraits - usually 60-90 seconds"
+                steps={PERSONA_STEPS}
+                currentStep={loaderStep}
+                progress={loaderProgress}
+                className="min-h-[400px]"
+              />
             )}
 
-            {/* Generating loader (Visual Builder - custom mode) */}
+            {/* Generating skeleton (Visual Builder - custom mode) */}
             {store.isGenerating && !isGeneratingQuick && store.generatedImages.length === 0 && (
-              <div className="flex min-h-[320px] items-center justify-center">
-                <NanoBananaLoader
-                  title="Creating Your Persona"
-                  subtitle="Generating unique portraits - usually 60-90 seconds"
-                  steps={PERSONA_STEPS}
-                  currentStep={loaderStep}
-                  progress={loaderProgress}
-                />
+              <div className="rounded-xl border border-border bg-card p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-sm font-medium text-foreground">
+                    {GENERATING_MESSAGES[generatingMessage]}
+                  </p>
+                  <span className="text-xs text-muted-foreground">{generatingElapsed}s</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="relative flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl border-2 border-transparent bg-muted animate-pulse">
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
+                      <User className="size-8" />
+                      <span className="text-xs">Portrait 1</span>
+                    </div>
+                  </div>
+                  <div className="relative flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl border-2 border-transparent bg-muted animate-pulse">
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
+                      <User className="size-8" />
+                      <span className="text-xs">Portrait 2</span>
+                    </div>
+                  </div>
+                </div>
+                <p className="mt-3 text-center text-xs text-muted-foreground">
+                  Expected time: ~35-45 seconds per portrait
+                </p>
               </div>
             )}
 
-            {/* Attribute summary (before generating) - only shown in Custom mode */}
-            {store.generatedImages.length === 0 && !store.isGenerating && !isGeneratingQuick && createMode === 'custom' && (
+            {/* Attribute summary (before generating) */}
+            {store.generatedImages.length === 0 && !store.isGenerating && !isGeneratingQuick && (
               <div className="rounded-xl border border-border bg-card p-4">
                 <p className="mb-3 text-sm font-semibold text-foreground">Persona Preview</p>
                 <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-primary/10">
@@ -1151,7 +1129,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                 <Separator className="mb-3" />
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   {[
-                    { label: 'Name',      value: store.name || 'Enter a name...' },
+                    { label: 'Name',      value: store.name || 'Optional' },
                     { label: 'Gender',    value: genderLabels[store.gender] },
                     { label: 'Age',       value: ageRangeLabels[store.ageRange] },
                     { label: 'Ethnicity', value: store.ethnicity },
@@ -1221,20 +1199,12 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
               </div>
             )}
 
-            {/* Still loading more images indicator */}
-            {(isGeneratingQuick || store.isGenerating) && store.generatedImages.length > 0 && (
-              <div className="mt-2 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="size-3 animate-spin" />
-                Loading more portraits…
-              </div>
-            )}
-
             {/* Action buttons */}
             <div className="mt-4 flex flex-col gap-3">
-              {store.generatedImages.length === 0 && !isGeneratingQuick ? (
+              {store.generatedImages.length === 0 ? (
                 <Button
                   onClick={handleGenerate}
-                  disabled={!store.name.trim() || store.isGenerating}
+                  disabled={store.isGenerating}
                   className="w-full disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
                   size="lg"
                 >
@@ -1249,7 +1219,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     </>
                   )}
                 </Button>
-              ) : store.generatedImages.length > 0 ? (
+              ) : (
                 <>
                   <Button
                     onClick={handleSave}
@@ -1272,51 +1242,86 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                   {profile?.plan === 'free' && regenCount > 0 && (
                     <p className="text-center text-xs text-muted-foreground">{regenCount} of 4 regenerations used</p>
                   )}
-                  {!isGeneratingQuick && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="w-full">
-                            <Button
-                              onClick={handleGenerate}
-                              variant="outline"
-                              disabled={store.isGenerating || store.isSaving || (profile?.plan === 'free' && regenCount >= 4)}
-                              className="w-full"
-                            >
-                              {store.isGenerating ? (
-                                <>
-                                  <Loader2 className="size-4 animate-spin" />
-                                  Regenerating…
-                                </>
-                              ) : (
-                                <>
-                                  Regenerate
-                                </>
-                              )}
-                            </Button>
-                          </span>
-                        </TooltipTrigger>
-                        {profile?.plan === 'free' && regenCount >= 4 && (
-                          <TooltipContent>
-                            <p>Upgrade to regenerate more images</p>
-                          </TooltipContent>
-                        )}
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="w-full">
+                          <Button
+                            onClick={handleGenerate}
+                            variant="outline"
+                            disabled={store.isGenerating || store.isSaving || (profile?.plan === 'free' && regenCount >= 4)}
+                            className="w-full"
+                          >
+                            {store.isGenerating ? (
+                              <>
+                                <Loader2 className="size-4 animate-spin" />
+                                Regenerating…
+                              </>
+                            ) : (
+                              <>
+                                Regenerate
+                              </>
+                            )}
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {profile?.plan === 'free' && regenCount >= 4 && (
+                        <TooltipContent>
+                          <p>Upgrade to regenerate more images</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 </>
-              ) : null}
-
-              {onCancel && (
-                <Button variant="ghost" size="sm" onClick={onCancel} className="w-full text-muted-foreground">
-                  Back to library
-                </Button>
               )}
             </div>
 
           </div>
         </div>
 
+      </div>
+
+      <div className="sticky bottom-0 z-10 -mx-1 border-t border-border bg-card/95 px-1 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+        {store.generatedImages.length === 0 ? (
+          <Button
+            onClick={createMode === "quick" ? handleQuickCreate : handleGenerate}
+            disabled={
+              createMode === "quick"
+                ? (!quickDescription.trim() || isGeneratingQuick)
+                : store.isGenerating
+            }
+            className="w-full"
+            size="lg"
+          >
+            {isGeneratingQuick || store.isGenerating ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Generating…
+              </>
+            ) : (
+              <>Generate Persona</>
+            )}
+          </Button>
+        ) : (
+          <Button
+            onClick={handleSave}
+            disabled={store.selectedImageIndex === null || !store.personaId || store.isSaving}
+            className="w-full"
+            size="lg"
+          >
+            {store.isSaving ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              <>
+                <Check className="size-4" />
+                Use This Persona
+              </>
+            )}
+          </Button>
+        )}
       </div>
     </div>
   );

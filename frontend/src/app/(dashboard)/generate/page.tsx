@@ -7,13 +7,17 @@ import {
   Check,
   ImageIcon,
   Loader2,
+  Monitor,
   Package,
+  RefreshCw,
+  Smartphone,
   User,
   Zap,
   LinkIcon,
   Upload,
   Plus,
   Pencil,
+  TrendingUp,
   Star,
   Clock,
   Flame,
@@ -21,6 +25,8 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronRight,
+  Settings2,
+  FlaskConical,
 } from "lucide-react";
 import { useFirstPurchaseOffer, COUPON_30_OFF, COUPON_50_OFF_FIRST_VIDEO } from "@/hooks/use-first-purchase-offer";
 import { toast } from "sonner";
@@ -39,9 +45,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -54,22 +63,23 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { useWatchedGenerationsStore } from "@/stores/watched-generations";
+import { VideoGenerationAnimation } from "@/components/landing/VideoGenerationAnimation";
 import { useProducts, useScrapeProduct } from "@/hooks/use-products";
-import { isExternalUrl, getSignedImageUrls } from "@/lib/storage";
-import { usePersonas, resolvePersonaImageUrl } from "@/hooks/use-personas";
-import type { Persona, Product, BrandSummary } from "@/types/database";
+import { isExternalUrl, getSignedImageUrl, getSignedImageUrls } from "@/lib/storage";
+import { usePersonas, resolvePersonaImageUrl, useSelectPersonaImage } from "@/hooks/use-personas";
+import type { Persona, Product, BrandSummary, ScriptSegment } from "@/types/database";
 import { useCredits } from "@/hooks/use-credits";
 import {
+  useEditCompositeImage,
   useGenerateCompositeImages,
   useGenerateScript,
   useApproveAndGenerate,
   useGenerations,
 } from "@/hooks/use-generations";
 import { useCheckout, useBuyCredits } from "@/hooks/use-checkout";
-import { useProfile, ADVANCED_MODE_PLANS } from "@/hooks/use-profile";
+import { useProfile, HD_QUALITY_PLANS, ADVANCED_MODE_PLANS } from "@/hooks/use-profile";
 import { ManualUploadForm } from "@/components/products/ManualUploadForm";
 import { ScrapeResults } from "@/components/products/ScrapeResults";
-import { PersonaBuilderInline } from "@/components/personas/PersonaBuilderInline";
 import {
   trackProductImported,
   trackPreviewGenerated,
@@ -79,8 +89,11 @@ import {
   trackCheckoutStarted,
   trackCreditsPurchased,
 } from "@/lib/datafast";
+import { AdvancedModePanel } from "@/components/generate/AdvancedModePanel";
 import { NanoBananaLoader } from "@/components/ui/nano-loader";
 import { callEdge, EdgeError } from "@/lib/api";
+import type { GenerateSegmentScriptResponse, AdvancedSegmentsInput } from "@/types/api";
+import type { AdvancedSegmentConfig, AdvancedSegmentsConfig } from "@/types/database";
 
 const LANGUAGE_OPTIONS = [
   { code: "en", native: "English"   },
@@ -96,27 +109,74 @@ const LANGUAGE_OPTIONS = [
 ] as const;
 
 const CTA_STYLE_OPTIONS = [
-  { key: "auto",              label: "Auto",            description: "Mixes CTA styles for variety" },
-  { key: "product_name_drop", label: "Name Drop",       description: "Mentions the product name directly" },
-  { key: "link_in_bio",       label: "Link in Bio",     description: "Directs viewers to your bio link" },
-  { key: "comment_keyword",   label: "Comment Keyword", description: "Triggers automation (e.g. ManyChat)" },
-  { key: "direct_website",    label: "Direct Website",  description: "Shows your store URL on screen" },
-  { key: "discount_code",     label: "Discount Code",   description: "Highlights a promo code on screen" },
-  { key: "link_in_comments",  label: "Link in Comments",description: "Directs viewers to comments" },
-  { key: "check_description", label: "Check Description",description: "Points to the caption/description" },
+  {
+    key: "auto",
+    label: "Auto",
+    description: "Mixes CTA styles for variety",
+    example: "Varies each video",
+  },
+  {
+    key: "product_name_drop",
+    label: "Name Drop",
+    description: "Mentions the product name directly",
+    example: 'Video ends: "Get [Product Name] now"',
+  },
+  {
+    key: "link_in_bio",
+    label: "Link in Bio",
+    description: "Directs viewers to your bio link",
+    example: 'Video ends: "Link in bio!"',
+  },
+  {
+    key: "comment_keyword",
+    label: "Comment Keyword",
+    description: "Triggers automation (e.g. ManyChat)",
+    example: 'Video ends: "Comment FREE"',
+  },
+  {
+    key: "direct_website",
+    label: "Direct Website",
+    description: "Shows your store URL on screen",
+    example: "Video ends with your store URL",
+  },
+  {
+    key: "discount_code",
+    label: "Discount Code",
+    description: "Highlights a promo code on screen",
+    example: 'Video ends: "Use code SAVE20"',
+  },
+  {
+    key: "link_in_comments",
+    label: "Link in Comments",
+    description: "Directs viewers to comments",
+    example: 'Video ends: "Tap the comments for the link"',
+  },
+  {
+    key: "check_description",
+    label: "Check Description",
+    description: "Points to the caption/description",
+    example: 'Video ends: "Full details in caption"',
+  },
 ] as const;
 
-const VIDEO_GEN_STEPS = [
-  { label: "Creating scene previews",    icon: <ImageIcon className="w-3 h-3" /> },
-  { label: "Writing ad script",          icon: <Zap className="w-3 h-3" /> },
-  { label: "Launching video generation", icon: <Zap className="w-3 h-3" /> },
-];
-
-const PLAN_BENEFITS: Record<PlanTier, string[]> = {
-  starter: ["Standard rendering queue", "Watermark-free exports", "Commercial use license", "Standard support"],
-  growth: ["Fast rendering priority", "Watermark-free exports", "Commercial use license", "Priority support"],
-  scale: ["Highest rendering priority", "Watermark-free exports", "Commercial use license", "Dedicated manager", "Custom API limits"],
+const VARIANT_LABEL_MAP: Record<string, string> = {
+  direct_address: "Direct Appeal",
+  value_prop: "Value Prop",
+  urgency: "Urgency",
+  fomo: "FOMO",
+  problem_solution: "Problem → Solution",
+  storytelling: "Story",
+  social_proof: "Social Proof",
+  question: "Question Hook",
+  bold_claim: "Bold Claim",
+  hook: "Hook",
+  body: "Body",
+  cta: "CTA",
 };
+
+function formatVariantLabel(label: string): string {
+  return VARIANT_LABEL_MAP[label] ?? label.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 function useResolvedProductImages(
   products: { id: string; images: string[] }[] | undefined,
@@ -130,18 +190,30 @@ function useResolvedProductImages(
       const result: Record<string, string | null> = {};
       const pathsToSign: { productId: string; path: string }[] = [];
 
+      // Pass 1: resolve external URLs immediately
       for (const p of products!) {
         const raw = p.images?.[0];
-        if (!raw) { result[p.id] = null; }
-        else if (isExternalUrl(raw)) { result[p.id] = raw; }
-        else { result[p.id] = null; pathsToSign.push({ productId: p.id, path: raw }); }
+        if (!raw) {
+          result[p.id] = null;
+        } else if (isExternalUrl(raw)) {
+          result[p.id] = raw;
+        } else {
+          result[p.id] = null;
+          pathsToSign.push({ productId: p.id, path: raw });
+        }
       }
       if (!cancelled) setImageMap({ ...result });
 
+      // Pass 2: batch-sign all internal paths in a single request
       if (pathsToSign.length > 0) {
-        const signedUrls = await getSignedImageUrls("product-images", pathsToSign.map((p) => p.path));
+        const signedUrls = await getSignedImageUrls(
+          "product-images",
+          pathsToSign.map((p) => p.path),
+        );
         if (!cancelled) {
-          signedUrls.forEach((url, i) => { result[pathsToSign[i].productId] = url; });
+          signedUrls.forEach((url, i) => {
+            result[pathsToSign[i].productId] = url;
+          });
           setImageMap({ ...result });
         }
       }
@@ -153,23 +225,41 @@ function useResolvedProductImages(
   return imageMap;
 }
 
-function useResolvedAllProductImages(product: { images: string[] } | undefined) {
+/**
+ * Resolve ALL image URLs for a single product (for the image selector).
+ * Returns a map of raw path -> signed URL.
+ */
+function useResolvedAllProductImages(
+  product: { images: string[] } | undefined,
+) {
   const [urlMap, setUrlMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (!product?.images || product.images.length === 0) { setUrlMap({}); return; }
+    if (!product?.images || product.images.length === 0) {
+      setUrlMap({});
+      return;
+    }
     let cancelled = false;
     async function resolve() {
       const result: Record<string, string> = {};
       const toSign: string[] = [];
+
       for (const raw of product!.images) {
         if (!raw || typeof raw !== "string") continue;
-        if (isExternalUrl(raw)) result[raw] = raw; else toSign.push(raw);
+        if (isExternalUrl(raw)) {
+          result[raw] = raw;
+        } else {
+          toSign.push(raw);
+        }
       }
+
       if (toSign.length > 0) {
         const signedUrls = await getSignedImageUrls("product-images", toSign);
-        signedUrls.forEach((url, i) => { if (url) result[toSign[i]] = url; });
+        signedUrls.forEach((url, i) => {
+          if (url) result[toSign[i]] = url;
+        });
       }
+
       if (!cancelled) setUrlMap(result);
     }
     resolve();
@@ -189,14 +279,21 @@ function useResolvedPersonaImages(personas: Persona[] | undefined) {
       const result: Record<string, string | null> = {};
       const pathsToSign: { personaId: string; path: string }[] = [];
 
+      // Pass 1: resolve external URLs immediately (no API call needed)
       for (const p of personas!) {
         const raw = p.selected_image_url ?? p.generated_images?.[0] ?? null;
-        if (!raw) { result[p.id] = null; }
-        else if (raw.startsWith("http")) { result[p.id] = raw; }
-        else { result[p.id] = null; pathsToSign.push({ personaId: p.id, path: raw }); }
+        if (!raw) {
+          result[p.id] = null;
+        } else if (raw.startsWith("http")) {
+          result[p.id] = raw;
+        } else {
+          result[p.id] = null;
+          pathsToSign.push({ personaId: p.id, path: raw });
+        }
       }
       if (!cancelled) setImageMap({ ...result });
 
+      // Pass 2: batch-sign all internal paths in a single request
       if (pathsToSign.length > 0) {
         const supabase = createClient();
         const { data } = await supabase.storage
@@ -217,6 +314,18 @@ function useResolvedPersonaImages(personas: Persona[] | undefined) {
   return imageMap;
 }
 
+const PLAN_BENEFITS: Record<PlanTier, string[]> = {
+  starter: ["Standard rendering queue", "Watermark-free exports", "Commercial use license", "Standard support"],
+  growth: ["Fast rendering priority", "Watermark-free exports", "Commercial use license", "Priority support"],
+  scale: ["Highest rendering priority", "Watermark-free exports", "Commercial use license", "Dedicated manager", "Custom API limits"],
+};
+
+const VIDEO_GEN_STEPS = [
+  { label: "Creating scene previews",    icon: <ImageIcon className="w-3 h-3" /> },
+  { label: "Writing ad script",          icon: <FlaskConical className="w-3 h-3" /> },
+  { label: "Launching video generation", icon: <Zap className="w-3 h-3" /> },
+];
+
 export default function GeneratePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -224,7 +333,7 @@ export default function GeneratePage() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallTab, setPaywallTab] = useState<"single" | "subscription">("single");
 
-  // Validate persisted pendingGenerationId against DB on mount
+  // Validate persisted pendingGenerationId against DB on mount.
   useEffect(() => {
     if (!store.pendingGenerationId) return;
     const supabase = createClient();
@@ -236,7 +345,8 @@ export default function GeneratePage() {
       .then(({ data }: { data: { status: string } | null }) => {
         if (!data || data.status !== "awaiting_approval") {
           store.clearPendingScript();
-          if (store.step >= 4) store.setStep(3);
+          // Reset to section 3 (step 4) if we were on old step 5
+          if (store.step >= 5) store.setStep(4);
         }
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -245,7 +355,9 @@ export default function GeneratePage() {
   // Auto-close paywall when returning from Stripe checkout
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("checkout") === "success") setShowPaywall(false);
+    if (params.get("checkout") === "success") {
+      setShowPaywall(false);
+    }
   }, []);
 
   // Product import state
@@ -255,19 +367,45 @@ export default function GeneratePage() {
   const [scrapedProducts, setScrapedProducts] = useState<Product[]>([]);
   const [scrapedBrandSummary, setScrapedBrandSummary] = useState<BrandSummary | null>(null);
   const [showScrapeResults, setShowScrapeResults] = useState(false);
+  // Section 1 sub-steps: 1 = product selection, 2 = format selection
+  const [section1SubStep, setSection1SubStep] = useState<1 | 2>(1);
 
-  // Persona builder state
-  const [buildingPersona, setBuildingPersona] = useState(false);
+  // Persona limit paywall
   const [showPersonaLimitPaywall, setShowPersonaLimitPaywall] = useState(false);
+  const [pickerPersona, setPickerPersona] = useState<Persona | null>(null);
+  const [pickerOptions, setPickerOptions] = useState<Array<{ imageIndex: number; signedUrl: string }>>([]);
+  const [pickerSelectedImageIndex, setPickerSelectedImageIndex] = useState<number | null>(null);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerSaving, setPickerSaving] = useState(false);
 
-  // CTA open state
+  // Composite preview state
+  const [compositeImages, setCompositeImages] = useState<
+    Array<{ path: string; signed_url: string }>
+  >([]);
+  const [selectedCompositeIdx, setSelectedCompositeIdx] = useState<number | null>(null);
+  const [showPreviewEditor, setShowPreviewEditor] = useState(false);
+  const [previewEditPrompt, setPreviewEditPrompt] = useState("");
   const [ctaOpen, setCtaOpen] = useState(false);
+
   const [showMoreCta, setShowMoreCta] = useState(false);
 
-  // Video loader state
+  // Advanced mode state
+  const [isInitializingAdvanced, setIsInitializingAdvanced] = useState(false);
+
+  // Tracks config changed after auto-fired script
+  const [scriptConfigChanged, setScriptConfigChanged] = useState(false);
+
+  // NanoBananaLoader state for video generation flow
   const [videoLoaderProgress, setVideoLoaderProgress] = useState(0);
   const [videoLoaderStep, setVideoLoaderStep] = useState(-1);
   const videoSimRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Tracks which format was used to fire background composite generation
+  const generationFiredForFormat = useRef<string | null>(null);
+  // Cancellation token for auto-fired script generation
+  const scriptAutoFireToken = useRef(0);
+  // Debounce timer for auto-regen on settings change
+  const scriptRegenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: products, isLoading: productsLoading } = useProducts();
   const productImageMap = useResolvedProductImages(products);
@@ -277,6 +415,8 @@ export default function GeneratePage() {
   const { data: credits, isLoading: creditsLoading } = useCredits();
   const { data: profile, isLoading: profileLoading } = useProfile();
   const generateComposites = useGenerateCompositeImages();
+  const editComposite = useEditCompositeImage();
+  const selectPersonaImage = useSelectPersonaImage();
   const generateScript = useGenerateScript();
   const approveAndGenerate = useApproveAndGenerate();
   const watchedGenerationsStore = useWatchedGenerationsStore();
@@ -284,6 +424,64 @@ export default function GeneratePage() {
   const buyCredits = useBuyCredits();
   const offer = useFirstPurchaseOffer();
   const { data: generations } = useGenerations();
+
+  // Auto-fire composites when arriving at Section 3 (step >= 4) via cold restore
+  useEffect(() => {
+    if (store.compositeImagePath && compositeImages.length > 0) return;
+    if (
+      store.step >= 4 &&
+      compositeImages.length === 0 &&
+      !generateComposites.isPending &&
+      !generationFiredForFormat.current &&
+      store.productId &&
+      store.personaId &&
+      store.format
+    ) {
+      handleGenerateComposites();
+      generationFiredForFormat.current = store.format;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.step]);
+
+  // Auto-select first composite when composites arrive
+  useEffect(() => {
+    if (compositeImages.length > 0 && selectedCompositeIdx === null) {
+      handleSelectComposite(0);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compositeImages.length]);
+
+  // Cycling progress messages while composites generate
+  const COMPOSITE_MESSAGES = [
+    "Placing your persona in the scene...",
+    "Compositing product and persona...",
+    "Rendering lighting and style...",
+    "Finalising preview images...",
+    "Almost ready...",
+  ];
+  const [compositeMsgIdx, setCompositeMsgIdx] = useState(0);
+  useEffect(() => {
+    if (!generateComposites.isPending) { setCompositeMsgIdx(0); return; }
+    const id = setInterval(() => setCompositeMsgIdx((i) => (i + 1) % COMPOSITE_MESSAGES.length), 2800);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generateComposites.isPending]);
+
+  // Cycling progress messages while script generates
+  const SCRIPT_MESSAGES = [
+    "Analysing your product details...",
+    "Crafting the perfect hook...",
+    "Writing a compelling body...",
+    "Polishing the call-to-action...",
+    "Almost there...",
+  ];
+  const [scriptMsgIdx, setScriptMsgIdx] = useState(0);
+  useEffect(() => {
+    if (!generateScript.isPending) { setScriptMsgIdx(0); return; }
+    const id = setInterval(() => setScriptMsgIdx((i) => (i + 1) % SCRIPT_MESSAGES.length), 3200);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generateScript.isPending]);
 
   const confirmedProducts = products?.filter((p) => p.confirmed) ?? [];
   const activePersonas = personas ?? [];
@@ -295,13 +493,20 @@ export default function GeneratePage() {
   const creditsRemaining = credits?.remaining ?? 0;
   const isUnlimitedCredits = credits?.is_unlimited === true;
   const userPlan = profile?.plan ?? "free";
+  const canUseHD = true; // HD is available to all users with credits
+  const canUseAdvanced = ADVANCED_MODE_PLANS.has(userPlan) || profile?.role === "admin";
   const creditCost =
     store.quality === "hd"
-      ? store.mode === "single" ? CREDITS_PER_SINGLE_HD : CREDITS_PER_BATCH_HD
-      : store.mode === "single" ? CREDITS_PER_SINGLE : CREDITS_PER_BATCH;
+      ? store.mode === "single"
+        ? CREDITS_PER_SINGLE_HD
+        : CREDITS_PER_BATCH_HD
+      : store.mode === "single"
+        ? CREDITS_PER_SINGLE
+        : CREDITS_PER_BATCH;
 
   const isFirstVideo = profile?.first_video_discount_used === false;
   const effectiveCost = creditCost;
+
   const hasEnoughCredits = isUnlimitedCredits || creditsRemaining >= effectiveCost;
   const requiresCommentKeyword = store.ctaStyle === "comment_keyword";
   const commentKeyword = store.ctaCommentKeyword.trim().replace(/[^a-zA-Z0-9 _-]/g, "");
@@ -309,45 +514,86 @@ export default function GeneratePage() {
   const showAddProductForm =
     addingProduct || (!productsLoading && confirmedProducts.length === 0);
 
-  const showPersonaBuilder =
-    buildingPersona || (!personasLoading && activePersonas.length === 0);
-
-  // Auto-start first-purchase offer timer on mount
-  useEffect(() => {
-    if (!isFirstVideo || profile === undefined) return;
-    offer.startOffer();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFirstVideo, profile !== undefined]);
-
-  // Cleanup interval on unmount
-  useEffect(() => () => stopVideoSim(), []);
-
-  // Free plan: auto-select the single persona and skip the picker.
-  // Paid plans always show the full selector so the user can pick or create another.
-  useEffect(() => {
-    if (store.step !== 2 || personasLoading || profileLoading) return;
-    if (userPlan !== "free") return;
-    if (store.personaId) return; // already selected
-    const valid = activePersonas.filter(
-      (p) => !!(p.selected_image_url || p.generated_images?.[0]),
-    );
-    if (valid.length >= 1) {
-      store.setPersonaId(valid[0].id);
-      store.setStep(3);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.step, personasLoading, profileLoading, userPlan, activePersonas.length]);
-
   // ── Section navigation ────────────────────────────────────────────────
 
   function handleOpenSection(section: 1 | 2) {
-    store.clearPendingScript();
+    // Clear state for sections after the one being re-opened
+    setCompositeImages([]);
+    setSelectedCompositeIdx(null);
+    setShowPreviewEditor(false);
+    setPreviewEditPrompt("");
     store.setCompositeImagePath(null);
+    store.clearPendingScript();
+    generationFiredForFormat.current = null;
+    setScriptConfigChanged(false);
     if (section === 1) {
+      // Also clear format so user explicitly re-chooses
       store.setSelectedProductImages([]);
       store.setStep(1);
+      setSection1SubStep(1);
     } else {
       store.setStep(2);
+    }
+  }
+
+  async function handleOpenPersonaImagePicker(persona: Persona) {
+    const generatedPaths = (persona.generated_images ?? []).filter(
+      (img): img is string => typeof img === "string" && img.length > 0,
+    );
+    if (generatedPaths.length === 0) {
+      toast.info("Portraits are still generating for this persona.");
+      return;
+    }
+
+    setPickerPersona(persona);
+    setPickerOptions([]);
+    setPickerSelectedImageIndex(null);
+    setPickerLoading(true);
+
+    try {
+      const limited = generatedPaths.slice(0, 4);
+      const resolved = await Promise.all(
+        limited.map(async (path, imageIndex) => {
+          const signedUrl = await resolvePersonaImageUrl(path);
+          return signedUrl ? { imageIndex, signedUrl } : null;
+        }),
+      );
+      const options = resolved.filter(
+        (item): item is { imageIndex: number; signedUrl: string } => item !== null,
+      );
+      setPickerOptions(options);
+      if (options.length === 0) {
+        toast.error("Couldn't load generated portraits. Please try again.");
+      }
+    } catch {
+      toast.error("Couldn't load generated portraits. Please try again.");
+    } finally {
+      setPickerLoading(false);
+    }
+  }
+
+  async function handleConfirmPersonaImageSelection() {
+    if (!pickerPersona || pickerSelectedImageIndex === null) return;
+    setPickerSaving(true);
+    try {
+      await selectPersonaImage.mutateAsync({
+        persona_id: pickerPersona.id,
+        image_index: pickerSelectedImageIndex,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["personas"] });
+      store.setPersonaId(pickerPersona.id);
+      store.setStep(4);
+      handleGenerateComposites(undefined, pickerPersona.id);
+      generationFiredForFormat.current = store.format;
+      setPickerPersona(null);
+      setPickerOptions([]);
+      setPickerSelectedImageIndex(null);
+      toast.success("Persona selected. Generating scene previews...");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save persona image";
+      toast.error(message);
+    } finally {
+      setPickerSaving(false);
     }
   }
 
@@ -359,12 +605,20 @@ export default function GeneratePage() {
     try {
       const result = await scrapeProduct.mutateAsync({ url: importUrl.trim() });
       if (result.products.length === 0) {
-        if (result.blocked_by_robots) throw new Error("This store blocks automated scraping (robots.txt). Try manual upload.");
-        throw new Error("No products could be extracted from this URL. Try a direct product page.");
+        if (result.blocked_by_robots) {
+          throw new Error(
+            "This store blocks automated scraping (robots.txt). Try manual upload.",
+          );
+        }
+        throw new Error(
+          "No products could be extracted from this URL. Try a direct product page.",
+        );
       }
       if (result.save_failed) {
         const detail = result.save_error ? ` (${result.save_error})` : "";
-        throw new Error(`We scraped this page but could not save products to your account. Please try again.${detail}`);
+        throw new Error(
+          `We scraped this page but could not save products to your account. Please try again.${detail}`,
+        );
       }
       const scraped: Product[] = result.products
         .filter((p) => p.id != null)
@@ -384,7 +638,11 @@ export default function GeneratePage() {
           created_at: "",
           updated_at: "",
         }));
-      if (scraped.length === 0) throw new Error("Products were found but none were saved to your account. Please try again.");
+      if (scraped.length === 0) {
+        throw new Error(
+          "Products were found but none were saved to your account. Please try again.",
+        );
+      }
       setScrapedProducts(scraped);
       setScrapedBrandSummary(result.brand_summary ?? null);
       setShowScrapeResults(true);
@@ -407,7 +665,6 @@ export default function GeneratePage() {
     queryClient.invalidateQueries({ queryKey: ["products"] });
     if (firstId) {
       store.setProductId(firstId);
-      store.setStep(2);
     }
     toast.success("Products imported! Select one to continue.");
   }
@@ -448,102 +705,326 @@ export default function GeneratePage() {
     if (videoSimRef.current) { clearInterval(videoSimRef.current); videoSimRef.current = null; }
   }
 
-  // ── Main generate handler (chains composites → script → approve) ──────────
+  // Cleanup interval on unmount
+  useEffect(() => () => stopVideoSim(), []);
 
-  async function handleGenerate() {
-    if (!store.productId || !store.personaId) return;
-    if (!isUnlimitedCredits && creditsRemaining < effectiveCost) {
-      trackPaywallShown("insufficient_credits");
-      offer.startOffer();
-      setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
-      setShowPaywall(true);
-      return;
+  // ── Composite preview handlers ───────────────────────────────────────────
+
+  async function handleGenerateComposites(formatOverride?: "9:16" | "16:9", personaIdOverride?: string) {
+    const format = formatOverride ?? store.format;
+    const personaId = personaIdOverride ?? store.personaId;
+    if (!store.productId || !personaId || !format) return;
+    setCompositeImages([]);
+    setSelectedCompositeIdx(null);
+    setShowPreviewEditor(false);
+    store.setCompositeImagePath(null);
+    setPreviewEditPrompt("");
+
+    generateComposites.mutate(
+      {
+        product_id: store.productId,
+        persona_id: personaId,
+        format,
+        ...(store.selectedProductImages.length > 0 && {
+          selected_images: store.selectedProductImages,
+        }),
+      },
+      {
+        onSuccess: (result) => {
+          setCompositeImages(result.images);
+          trackPreviewGenerated();
+        },
+        onError: (err) => {
+          toast.error(err.message || "Failed to generate preview images");
+        },
+      },
+    );
+  }
+
+  function handleSelectComposite(idx: number) {
+    setSelectedCompositeIdx(idx);
+    setShowPreviewEditor(false);
+    const path = compositeImages[idx].path;
+    store.setCompositeImagePath(path);
+    // Auto-fire script generation in background
+    const token = ++scriptAutoFireToken.current;
+    if (store.productId && store.personaId) {
+      if (store.ctaStyle === "comment_keyword" && !store.ctaCommentKeyword.trim()) return;
+      store.clearPendingScript();
+      setScriptConfigChanged(false);
+      setVideoLoaderStep(1);
+      setVideoLoaderProgress(25);
+      startVideoSim(25, 49, 75_000);
+
+      generateScript.mutate(
+        {
+          product_id: store.productId,
+          persona_id: store.personaId,
+          mode: store.mode,
+          quality: store.quality,
+          composite_image_path: path,
+          cta_style: store.ctaStyle,
+          language: store.language,
+          phase: "script",
+        },
+        {
+          onSuccess: (result) => {
+            stopVideoSim();
+            setVideoLoaderStep(-1);
+            setVideoLoaderProgress(0);
+            if (scriptAutoFireToken.current !== token) return;
+            if (result.script) {
+              trackScriptGenerated(store.mode, store.quality);
+              store.setPendingScript(
+                result.generation_id,
+                result.script,
+                result.credits_to_charge ?? effectiveCost,
+              );
+            }
+          },
+          onError: () => {
+            stopVideoSim();
+            setVideoLoaderStep(-1);
+            setVideoLoaderProgress(0);
+            toast.error("Script generation failed. Click 'Generate Script' to retry.");
+          },
+        },
+      );
     }
+  }
+
+  function handleApplyPreviewEdit() {
+    const trimmedPrompt = previewEditPrompt.trim();
+    if (!store.compositeImagePath || !trimmedPrompt) return;
+
+    editComposite.mutate(
+      {
+        composite_image_path: store.compositeImagePath,
+        edit_prompt: trimmedPrompt,
+        format: store.format!,
+      },
+      {
+        onSuccess: (result) => {
+          setCompositeImages((prev) => [result.image, ...prev]);
+          setSelectedCompositeIdx(0);
+          setShowPreviewEditor(false);
+          store.setCompositeImagePath(result.image.path);
+          setPreviewEditPrompt("");
+          toast.success("Preview image updated");
+        },
+        onError: (err) => {
+          toast.error(err.message || "Failed to edit preview image");
+        },
+      },
+    );
+  }
+
+  // ── Script generation ─────────────────────────────────────────────────
+
+  async function handleGenerateScript() {
     if (requiresCommentKeyword && !commentKeyword) {
       toast.error("Add a comment keyword for the CTA style.");
       return;
     }
+    if (!store.productId || !store.personaId) return;
+    if (!store.compositeImagePath) {
+      toast.error("Scene preview is still loading, please wait a moment.");
+      return;
+    }
+    setScriptConfigChanged(false);
+    setVideoLoaderStep(1);
+    setVideoLoaderProgress(25);
+    startVideoSim(25, 49, 75_000);
 
-    // Default to portrait format
-    store.setFormat("9:16");
-
-    setVideoLoaderStep(0);
-    setVideoLoaderProgress(5);
-    startVideoSim(5, 25, 30_000);
-
-    try {
-      // 1. Generate composite images
-      const compositesResult = await generateComposites.mutateAsync({
-        product_id: store.productId,
-        persona_id: store.personaId,
-        format: "9:16",
-        ...(store.selectedProductImages.length > 0 && { selected_images: store.selectedProductImages }),
-      });
-
-      if (!compositesResult.images.length) throw new Error("No composite images generated");
-      const compositePath = compositesResult.images[0].path;
-      store.setCompositeImagePath(compositePath);
-      trackPreviewGenerated();
-
-      stopVideoSim();
-      setVideoLoaderStep(1);
-      setVideoLoaderProgress(30);
-      startVideoSim(30, 55, 75_000);
-
-      // 2. Generate script
-      const scriptResult = await generateScript.mutateAsync({
+    generateScript.mutate(
+      {
         product_id: store.productId,
         persona_id: store.personaId,
         mode: store.mode,
         quality: store.quality,
-        composite_image_path: compositePath,
+        composite_image_path: store.compositeImagePath,
         cta_style: store.ctaStyle,
         cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
         language: store.language,
         phase: "script",
-      });
+      },
+      {
+        onSuccess: (result) => {
+          stopVideoSim();
+          setVideoLoaderStep(-1);
+          setVideoLoaderProgress(0);
+          if (result.script) {
+            trackScriptGenerated(store.mode, store.quality);
+            store.setPendingScript(
+              result.generation_id,
+              result.script,
+              result.credits_to_charge ?? effectiveCost,
+            );
+            // Script now shows inline - no step change needed
+          } else {
+            toast.error("Script was not returned. Please try again.");
+          }
+        },
+        onError: (err) => {
+          stopVideoSim();
+          setVideoLoaderStep(-1);
+          setVideoLoaderProgress(0);
+          if (err instanceof EdgeError && err.code === "RATE_LIMITED") {
+            toast.error("You're generating too fast. Please wait a moment and try again.");
+          } else {
+            toast.error(err.message || "Failed to generate script");
+          }
+        },
+      },
+    );
+  }
 
-      if (!scriptResult.script || !scriptResult.generation_id) throw new Error("Script generation failed");
-      store.setPendingScript(scriptResult.generation_id, scriptResult.script, scriptResult.credits_to_charge ?? effectiveCost);
-      trackScriptGenerated(store.mode, store.quality);
+  /** Debounced auto-regen: call when settings change and a script already exists */
+  function debouncedRegenScript() {
+    if (scriptRegenTimer.current) clearTimeout(scriptRegenTimer.current);
+    scriptRegenTimer.current = setTimeout(() => {
+      if (store.pendingScript) handleGenerateScript();
+    }, 500);
+  }
 
-      stopVideoSim();
-      setVideoLoaderStep(2);
-      setVideoLoaderProgress(60);
-      startVideoSim(60, 70, 10_000);
+  // ── Approve & generate video ──────────────────────────────────────────
 
-      // 3. Approve and generate video
-      await approveAndGenerate.mutateAsync({
-        generation_id: scriptResult.generation_id,
-        override_script: scriptResult.script,
+  function buildAdvancedSegmentsInput(segments: AdvancedSegmentsConfig): AdvancedSegmentsInput {
+    const mapSeg = (seg: AdvancedSegmentConfig) => ({
+      script_text: seg.scriptText,
+      global_emotion: seg.globalEmotion,
+      global_intensity: seg.globalIntensity,
+      ...(seg.actionDescription && { action_description: seg.actionDescription }),
+      ...(seg.imagePath && { image_path: seg.imagePath }),
+    });
+    return {
+      hooks: segments.hooks.map(mapSeg),
+      bodies: segments.bodies.map(mapSeg),
+      ctas: segments.ctas.map(mapSeg),
+    };
+  }
+
+  async function handleApproveAndGenerate() {
+    if (!store.pendingGenerationId || !store.pendingScript) return;
+    if (!hasEnoughCredits) {
+      trackPaywallShown("insufficient_credits");
+      offer.startOffer();
+      // Set default tab based on generation context
+      setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
+      setShowPaywall(true);
+      return;
+    }
+
+    const advancedSegments =
+      store.advancedMode && store.advancedSegments
+        ? buildAdvancedSegmentsInput(store.advancedSegments)
+        : undefined;
+
+    setVideoLoaderStep(2);
+    setVideoLoaderProgress(50);
+    startVideoSim(50, 59, 10_000);
+
+    approveAndGenerate.mutate(
+      {
+        generation_id: store.pendingGenerationId,
+        override_script: store.pendingScript,
+        advanced_segments: advancedSegments,
         video_provider: store.videoProvider,
         video_quality: store.quality,
-      });
+      },
+      {
+        onSuccess: () => {
+          const genId = store.pendingGenerationId!;
+          trackVideoGenerationStarted(store.mode, store.quality);
+          watchedGenerationsStore.add(genId, selectedProduct?.name);
+          store.reset();
+          router.push(`/generate/${genId}`);
+          toast.success("Generation started!");
+        },
+        onError: (err: Error) => {
+          stopVideoSim();
+          setVideoLoaderStep(-1);
+          setVideoLoaderProgress(0);
+          // Structured error code or fallback to HTTP 402
+          if (
+            err instanceof EdgeError &&
+            (err.code === "INSUFFICIENT_CREDITS" || err.status === 402)
+          ) {
+            trackPaywallShown("insufficient_credits");
+            offer.startOffer();
+            setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
+            setShowPaywall(true);
+          } else if (err instanceof EdgeError && err.code === "RATE_LIMITED") {
+            toast.error("You're generating too fast. Please wait a moment and try again.");
+          } else {
+            toast.error(err.message || "Failed to start generation");
+          }
+        },
+      },
+    );
+  }
 
-      const genId = scriptResult.generation_id;
-      trackVideoGenerationStarted(store.mode, store.quality);
-      watchedGenerationsStore.add(genId, selectedProduct?.name);
-      store.reset();
-      router.push(`/generate/${genId}`);
-      toast.success("Generation started!");
-    } catch (err) {
-      stopVideoSim();
-      setVideoLoaderStep(-1);
-      setVideoLoaderProgress(0);
-      if (err instanceof EdgeError && (err.code === "INSUFFICIENT_CREDITS" || err.status === 402)) {
-        trackPaywallShown("insufficient_credits");
-        offer.startOffer();
-        setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
-        setShowPaywall(true);
-      } else if (err instanceof EdgeError && err.code === "RATE_LIMITED") {
-        toast.error("You're generating too fast. Please wait a moment and try again.");
-      } else {
-        toast.error(err instanceof Error ? err.message : "Failed to generate video");
-      }
+  // ── Advanced mode ──────────────────────────────────────────────────────
+
+  async function handleSwitchToAdvanced() {
+    store.setAdvancedMode(true);
+    // Auto-initialize if no segments yet
+    if (!store.advancedSegments && !isInitializingAdvanced) {
+      await handleInitializeAdvancedSegments();
     }
   }
 
-  // ── Checkout / buy ──────────────────────────────────────────────────────
+  async function handleInitializeAdvancedSegments() {
+    if (!store.productId || !store.personaId) return;
+
+    setIsInitializingAdvanced(true);
+    const variantCount = store.mode === "single" ? 1 : 3;
+    const segTypes = ["hook", "body", "cta"] as const;
+
+    const calls = Array.from({ length: variantCount }, (_, vi) =>
+      segTypes.map((segType) =>
+        callEdge<GenerateSegmentScriptResponse>("generate-segment-script", {
+          body: {
+            product_id: store.productId,
+            persona_id: store.personaId,
+            segment_type: segType,
+            variant_index: vi,
+            cta_style: store.ctaStyle !== "auto" ? store.ctaStyle : undefined,
+            cta_comment_keyword: store.ctaStyle === "comment_keyword" ? store.ctaCommentKeyword : undefined,
+          },
+        }).then((res) => ({ ok: true as const, text: res.data.text, variantIndex: vi, segType }))
+        .catch(() => ({ ok: false as const, text: "", variantIndex: vi, segType }))
+      )
+    ).flat();
+
+    const results = await Promise.allSettled(calls);
+
+    const defaultSeg = (): AdvancedSegmentConfig => ({
+      scriptText: "",
+      globalEmotion: "neutral",
+      globalIntensity: 2,
+      actionDescription: "",
+      imagePath: null,
+      imageSignedUrl: null,
+      isRegeneratingImage: false,
+    });
+
+    const hooks: AdvancedSegmentConfig[] = Array.from({ length: variantCount }, defaultSeg);
+    const bodies: AdvancedSegmentConfig[] = Array.from({ length: variantCount }, defaultSeg);
+    const ctas: AdvancedSegmentConfig[] = Array.from({ length: variantCount }, defaultSeg);
+
+    for (const settled of results) {
+      if (settled.status !== "fulfilled") continue;
+      const r = settled.value;
+      if (!r.ok) continue;
+      if (r.segType === "hook") hooks[r.variantIndex] = { ...defaultSeg(), scriptText: r.text };
+      if (r.segType === "body") bodies[r.variantIndex] = { ...defaultSeg(), scriptText: r.text };
+      if (r.segType === "cta") ctas[r.variantIndex] = { ...defaultSeg(), scriptText: r.text };
+    }
+
+    store.setAdvancedSegments({ hooks, bodies, ctas });
+    setIsInitializingAdvanced(false);
+  }
 
   async function handleCheckout(plan: PlanTier) {
     const couponId = COUPON_30_OFF;
@@ -560,11 +1041,13 @@ export default function GeneratePage() {
   async function handleBuyPack(pack: CreditPackKey | SingleVideoPackKey) {
     const isSingleVideo = pack === "single_standard" || pack === "single_hd";
     const couponId = isSingleVideo
-      ? (isFirstVideo ? COUPON_50_OFF_FIRST_VIDEO : COUPON_30_OFF)
+      ? (isFirstVideo ? COUPON_50_OFF_FIRST_VIDEO : undefined)
       : COUPON_30_OFF;
     buyCredits.mutate({ pack, couponId, generation_id: store.pendingGenerationId ?? undefined }, {
       onSuccess: (url) => {
-        if (pack in { pack_10: 1, pack_30: 1, pack_100: 1 }) trackCreditsPurchased(pack as CreditPackKey);
+        if (pack in { pack_10: 1, pack_30: 1, pack_100: 1 }) {
+          trackCreditsPurchased(pack as CreditPackKey);
+        }
         if (couponId) offer.markUsed();
         window.location.href = url;
       },
@@ -596,43 +1079,59 @@ export default function GeneratePage() {
         toast("Your 50% first-video discount is still available!", {
           duration: 8000,
           icon: "🎬",
-          action: { label: "Grab it", onClick: () => { offer.startOffer(); setShowPaywall(true); } },
+          action: {
+            label: "Grab it",
+            onClick: () => {
+              offer.startOffer();
+              setShowPaywall(true);
+            },
+          },
         });
       } else if (videosGenerated > 0) {
-        toast("Come back when you're ready to scale your production.", { duration: 5000 });
+        toast("Come back when you're ready to scale your production.", {
+          duration: 5000,
+        });
       }
     }
     setShowPaywall(open);
   }
 
+  // Section 1 is "complete" once the user has moved past it
   const section1Complete = store.step >= 2;
-  const section2Complete = store.step >= 3;
-  const section3Unlocked = store.step >= 3;
+  // Section 2 is "complete" once the user is in Section 3
+  const section2Complete = store.step >= 4;
+  // Section 3 is available once product + format are configured
+  const section3Unlocked = store.step >= 2;
 
-  // Detect orphaned awaiting_approval generation
+  // Detect orphaned awaiting_approval generation (e.g. after localStorage wipe)
   const orphanedDraft = useMemo(() => {
-    if (store.pendingGenerationId) return null;
+    if (store.pendingGenerationId) return null; // already tracked in store
     return (generations ?? []).find((g) => g.status === "awaiting_approval") ?? null;
   }, [generations, store.pendingGenerationId]);
 
-  const isGenerating = videoLoaderStep >= 0;
-
   return (
     <div className="flex flex-col gap-4">
-      {/* ── Orphaned draft banner ── */}
+      {/* ── Orphaned draft banner (localStorage cleared, pending script in DB) ── */}
       {orphanedDraft && (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
           <div className="flex items-center gap-3">
             <AlertCircle className="size-4 shrink-0 text-amber-400" />
-            <p className="text-sm text-amber-400">You have a script awaiting approval - no credits charged yet.</p>
+            <p className="text-sm text-amber-400">
+              You have a script awaiting approval - no credits charged yet.
+            </p>
           </div>
-          <Button size="sm" variant="outline" className="shrink-0 border-amber-500/40 text-amber-400 hover:bg-amber-500/10" onClick={() => router.push("/dashboard")}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="shrink-0 border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+            onClick={() => router.push("/dashboard")}
+          >
             Review &amp; Approve
           </Button>
         </div>
       )}
 
-      {/* ── Header ── */}
+      {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Generate UGC Video</h1>
@@ -647,62 +1146,91 @@ export default function GeneratePage() {
         </div>
       </div>
 
-      {/* ── Section 1: Product ──────────────────────────────────────────── */}
+      {/* ── Section 1: Product & Format ───────────────────────────────── */}
       <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
-        <div className={cn(
-          "flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-4 sm:px-5 py-3 sm:py-4",
-          section1Complete && "border-b-0",
-        )}>
+        {/* Section header - always visible */}
+        <div
+          className={cn(
+            "flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-4 sm:px-5 py-3 sm:py-4",
+            section1Complete && "border-b-0",
+          )}
+        >
           <div className="flex items-center gap-3 min-w-0">
             <div className={cn(
               "flex size-6 items-center justify-center rounded-full text-xs font-bold",
-              section1Complete ? "bg-primary/15 text-primary" : "bg-primary text-primary-foreground",
+              section1Complete
+                ? "bg-primary/15 text-primary"
+                : "bg-primary text-primary-foreground",
             )}>
               {section1Complete ? <Check className="size-3.5" /> : "1"}
             </div>
             <span className="text-sm font-semibold">
               {section1Complete && selectedProduct ? (
-                <span className="truncate max-w-[200px] sm:max-w-none text-foreground">{selectedProduct.name}</span>
-              ) : "Select Product"}
+                <span className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2 flex-wrap">
+                  <span className="text-foreground truncate max-w-[200px] sm:max-w-none">{selectedProduct.name}</span>
+                  <Badge variant="secondary" className="text-[10px] sm:text-xs font-medium">
+                    {store.format === "9:16" ? "Portrait 9:16" : "Landscape 16:9"}
+                  </Badge>
+                </span>
+              ) : (
+                section1SubStep === 2 ? "Select Format" : "Select Product"
+              )}
             </span>
           </div>
           {section1Complete && (
-            <button type="button" onClick={() => handleOpenSection(1)} className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">
+            <button
+              type="button"
+              onClick={() => handleOpenSection(1)}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+            >
               Change
             </button>
           )}
         </div>
 
-        {!section1Complete && (
+        {/* Section 1 sub-step 1: Product selection */}
+        {!section1Complete && section1SubStep === 1 && (
           <div className="px-5 pb-5 flex flex-col gap-5">
+            {/* Product selector */}
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">Select a product</p>
                 {!showAddProductForm && confirmedProducts.length > 0 && (
                   <Button variant="outline" size="sm" onClick={() => setAddingProduct(true)}>
-                    <Plus className="size-4" />Add Product
+                    <Plus className="size-4" />
+                    Add Product
                   </Button>
                 )}
                 {showAddProductForm && confirmedProducts.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={handleCancelAddProduct}>← Back to products</Button>
+                  <Button variant="ghost" size="sm" onClick={handleCancelAddProduct}>
+                    ← Back to products
+                  </Button>
                 )}
               </div>
 
               {productsLoading ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {[1, 2, 3].map((i) => <Card key={i} className="h-40 animate-pulse bg-muted" />)}
+                  {[1, 2, 3].map((i) => (
+                    <Card key={i} className="h-40 animate-pulse bg-muted" />
+                  ))}
                 </div>
               ) : showAddProductForm ? (
                 showScrapeResults && scrapedProducts.length > 0 ? (
-                  <ScrapeResults products={scrapedProducts} brandSummary={scrapedBrandSummary} onConfirmed={handleScrapeConfirmed} />
+                  <ScrapeResults
+                    products={scrapedProducts}
+                    brandSummary={scrapedBrandSummary}
+                    onConfirmed={handleScrapeConfirmed}
+                  />
                 ) : (
                   <Tabs defaultValue="import-url" className="w-full">
                     <TabsList className="w-full">
                       <TabsTrigger value="import-url" className="flex-1">
-                        <LinkIcon className="size-3.5" />Import from URL
+                        <LinkIcon className="size-3.5" />
+                        Import from URL
                       </TabsTrigger>
                       <TabsTrigger value="upload" className="flex-1">
-                        <Upload className="size-3.5" />Upload Manually
+                        <Upload className="size-3.5" />
+                        Upload Manually
                       </TabsTrigger>
                     </TabsList>
                     <TabsContent value="import-url">
@@ -717,19 +1245,29 @@ export default function GeneratePage() {
                               value={importUrl}
                               onChange={(e) => setImportUrl(e.target.value)}
                               className="pl-10"
-                              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleScrape(); } }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") { e.preventDefault(); handleScrape(); }
+                              }}
                             />
                           </div>
-                          <p className="text-xs text-muted-foreground">Supports Shopify stores and most e-commerce product pages.</p>
-                          {scrapeError && <p className="text-xs text-destructive">{scrapeError}</p>}
+                          <p className="text-xs text-muted-foreground">
+                            Supports Shopify stores and most e-commerce product pages.
+                          </p>
+                          {scrapeError && (
+                            <p className="text-xs text-destructive">{scrapeError}</p>
+                          )}
                         </div>
                         <Button onClick={handleScrape} disabled={!importUrl.trim() || scrapeProduct.isPending}>
-                          {scrapeProduct.isPending ? <><Loader2 className="size-4 animate-spin" />Importing...</> : "Import"}
+                          {scrapeProduct.isPending ? (
+                            <><Loader2 className="size-4 animate-spin" />Importing...</>
+                          ) : "Import"}
                         </Button>
                       </div>
                     </TabsContent>
                     <TabsContent value="upload">
-                      <div className="pt-2"><ManualUploadForm onSuccess={handleManualUploadSuccess} /></div>
+                      <div className="pt-2">
+                        <ManualUploadForm onSuccess={handleManualUploadSuccess} />
+                      </div>
                     </TabsContent>
                   </Tabs>
                 )
@@ -737,12 +1275,28 @@ export default function GeneratePage() {
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {confirmedProducts.map((product) => (
                     <div key={product.id} className="relative">
-                      <button onClick={() => store.setProductId(product.id)} className="w-full text-left">
-                        <Card className={cn("h-full transition-all", store.productId === product.id ? "border-primary ring-1 ring-primary/30" : "hover:border-muted-foreground/30")}>
+                      <button
+                        onClick={() => store.setProductId(product.id)}
+                        className="w-full text-left"
+                      >
+                        <Card
+                          className={cn(
+                            "h-full transition-all",
+                            store.productId === product.id
+                              ? "border-primary ring-1 ring-primary/30"
+                              : "hover:border-muted-foreground/30",
+                          )}
+                        >
                           <CardContent className="flex flex-col gap-3 p-5">
                             <div className="flex aspect-video items-center justify-center rounded-lg bg-muted">
                               {productImageMap[product.id] ? (
-                                <img src={productImageMap[product.id]!} alt={product.name} className="size-full rounded-lg object-cover" loading="lazy" decoding="async" />
+                                <img
+                                  src={productImageMap[product.id]!}
+                                  alt={product.name}
+                                  className="size-full rounded-lg object-cover"
+                                  loading="lazy"
+                                  decoding="async"
+                                />
                               ) : (
                                 <ImageIcon className="size-8 text-muted-foreground" />
                               )}
@@ -751,20 +1305,32 @@ export default function GeneratePage() {
                               <h3 className="font-medium">{product.name}</h3>
                               {product.price && (
                                 <p className="mt-1 font-mono text-sm font-semibold">
-                                  {product.currency === "USD" ? "$" : product.currency}{product.price}
+                                  {product.currency === "USD" ? "$" : product.currency}
+                                  {product.price}
                                 </p>
                               )}
                             </div>
                             {store.productId === product.id && (
                               <div className="flex items-center gap-1.5 text-xs text-primary">
-                                <Check className="size-3.5" />Selected
+                                <Check className="size-3.5" />
+                                Selected
                               </div>
                             )}
                           </CardContent>
                         </Card>
                       </button>
-                      <Button asChild size="icon" variant="secondary" className="absolute right-3 top-3 size-8 rounded-full">
-                        <Link href={`/products/${product.id}`} onClick={(e) => e.stopPropagation()} aria-label={`Edit ${product.name}`} title="Edit product details and images">
+                      <Button
+                        asChild
+                        size="icon"
+                        variant="secondary"
+                        className="absolute right-3 top-3 size-8 rounded-full"
+                      >
+                        <Link
+                          href={`/products/${product.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Edit ${product.name}`}
+                          title="Edit product details and images"
+                        >
                           <Pencil className="size-3.5" />
                         </Link>
                       </Button>
@@ -774,25 +1340,34 @@ export default function GeneratePage() {
               ) : null}
             </div>
 
-            {/* Product image selector */}
+            {/* Product image selector (when selected product has >1 image) */}
             {selectedProduct && selectedProduct.images.length > 1 && store.productId && (
               <div className="flex flex-col gap-2">
                 <p className="text-sm font-medium text-muted-foreground">
                   Reference images
                   <span className="text-xs font-normal ml-1.5">
-                    ({store.selectedProductImages.length > 0 ? store.selectedProductImages.length : Math.min(selectedProduct.images.length, 4)} of {Math.min(selectedProduct.images.length, 4)} selected)
+                    ({store.selectedProductImages.length > 0
+                      ? store.selectedProductImages.length
+                      : Math.min(selectedProduct.images.length, 4)} of {Math.min(selectedProduct.images.length, 4)} selected)
                   </span>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Select which product images the AI should reference when creating your preview. All images are used by default.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {selectedProduct.images.slice(0, 4).map((imgPath, idx) => {
                     const resolvedUrl = selectedProductAllImages[imgPath];
-                    const isSelected = store.selectedProductImages.length === 0 || store.selectedProductImages.includes(imgPath);
+                    const isSelected =
+                      store.selectedProductImages.length === 0 ||
+                      store.selectedProductImages.includes(imgPath);
                     return (
                       <button
                         key={imgPath}
                         type="button"
                         onClick={() => {
-                          const current = store.selectedProductImages.length === 0 ? selectedProduct.images.slice(0, 4) : [...store.selectedProductImages];
+                          const current = store.selectedProductImages.length === 0
+                            ? selectedProduct.images.slice(0, 4)
+                            : [...store.selectedProductImages];
                           if (current.includes(imgPath)) {
                             if (current.length <= 1) return;
                             store.setSelectedProductImages(current.filter((p) => p !== imgPath));
@@ -800,12 +1375,25 @@ export default function GeneratePage() {
                             store.setSelectedProductImages([...current, imgPath]);
                           }
                         }}
-                        className={cn("relative size-16 rounded-lg overflow-hidden border-2 transition-all shrink-0", isSelected ? "border-primary ring-1 ring-primary/30" : "border-border opacity-50 hover:opacity-75")}
+                        className={cn(
+                          "relative size-16 rounded-lg overflow-hidden border-2 transition-all shrink-0",
+                          isSelected
+                            ? "border-primary ring-1 ring-primary/30"
+                            : "border-border opacity-50 hover:opacity-75",
+                        )}
                       >
                         {resolvedUrl ? (
-                          <img src={resolvedUrl} alt={`Product image ${idx + 1}`} className="size-full object-cover" loading="lazy" decoding="async" />
+                          <img
+                            src={resolvedUrl}
+                            alt={`Product image ${idx + 1}`}
+                            className="size-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                          />
                         ) : (
-                          <div className="size-full bg-muted flex items-center justify-center"><ImageIcon className="size-4 text-muted-foreground" /></div>
+                          <div className="size-full bg-muted flex items-center justify-center">
+                            <ImageIcon className="size-4 text-muted-foreground" />
+                          </div>
                         )}
                         {isSelected && (
                           <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
@@ -820,27 +1408,94 @@ export default function GeneratePage() {
                 </div>
               </div>
             )}
+
+          </div>
+        )}
+
+        {/* Section 1 sub-step 2: Format selection */}
+        {!section1Complete && section1SubStep === 2 && (
+          <div className="border-t border-border px-5 pb-5 pt-4 flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSection1SubStep(1)}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+              >
+                ← Back
+              </button>
+              <p className="text-sm font-medium text-muted-foreground">Choose format</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => store.setFormat("9:16")}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-sm transition-all",
+                  store.format === "9:16"
+                    ? "border-primary bg-primary/5 font-medium text-primary"
+                    : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/30",
+                )}
+              >
+                <Smartphone className="size-4" />
+                <div className="text-left">
+                  <p className="font-medium leading-none">Portrait</p>
+                  <p className="text-xs opacity-60 mt-0.5">9:16 · TikTok, Reels</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => store.setFormat("16:9")}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl border-2 px-4 py-3 text-sm transition-all",
+                  store.format === "16:9"
+                    ? "border-primary bg-primary/5 font-medium text-primary"
+                    : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/30",
+                )}
+              >
+                <Monitor className="size-4" />
+                <div className="text-left">
+                  <p className="font-medium leading-none">Landscape</p>
+                  <p className="text-xs opacity-60 mt-0.5">16:9 · YouTube, Meta</p>
+                </div>
+              </button>
+            </div>
+            <Button
+              onClick={() => store.setStep(2)}
+              disabled={!store.format}
+              className="w-full sm:w-auto"
+            >
+              Continue
+              <ChevronRight className="size-4" />
+            </Button>
           </div>
         )}
       </div>
 
-      {/* ── Sticky Continue — Section 1 ── */}
-      {!section1Complete && confirmedProducts.length > 0 && !showAddProductForm && !productsLoading && (
+      {/* ── Sticky Continue - Section 1 product step ──────────────────── */}
+      {!section1Complete && section1SubStep === 1 && confirmedProducts.length > 0 && !showAddProductForm && !productsLoading && (
         <div className="sticky bottom-4 z-20 flex justify-end pointer-events-none">
-          <Button onClick={() => store.setStep(2)} disabled={!store.productId} className="pointer-events-auto shadow-lg">
-            Continue <ChevronRight className="size-4" />
+          <Button
+            onClick={() => setSection1SubStep(2)}
+            disabled={!store.productId}
+            className="pointer-events-auto shadow-lg"
+          >
+            Continue
+            <ChevronRight className="size-4" />
           </Button>
         </div>
       )}
 
-      {/* ── Section 2: Persona ──────────────────────────────────────────── */}
+      {/* ── Section 2: Persona ────────────────────────────────────────── */}
       {store.step >= 2 && (
         <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
+          {/* Section header */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-4 sm:px-5 py-3 sm:py-4">
             <div className="flex items-center gap-3 min-w-0">
               <div className={cn(
                 "flex size-6 items-center justify-center rounded-full text-xs font-bold shrink-0",
-                section2Complete ? "bg-primary/15 text-primary" : "bg-primary text-primary-foreground",
+                section2Complete
+                  ? "bg-primary/15 text-primary"
+                  : "bg-primary text-primary-foreground",
               )}>
                 {section2Complete ? <Check className="size-3.5" /> : "2"}
               </div>
@@ -848,37 +1503,42 @@ export default function GeneratePage() {
                 {section2Complete && selectedPersona ? (
                   <span className="flex items-center gap-2">
                     {personaImageMap[selectedPersona.id] && (
-                      <img src={personaImageMap[selectedPersona.id]!} alt={selectedPersona.name} className="size-5 rounded-full object-cover" loading="lazy" decoding="async" />
+                      <img
+                        src={personaImageMap[selectedPersona.id]!}
+                        alt={selectedPersona.name}
+                        className="size-5 rounded-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
                     )}
                     <span className="text-foreground truncate max-w-[200px] sm:max-w-none">{selectedPersona.name}</span>
                   </span>
-                ) : "AI Spokesperson"}
+                ) : (
+                  "AI Spokesperson"
+                )}
               </span>
             </div>
-            {section2Complete && userPlan !== "free" && (
-              <button type="button" onClick={() => handleOpenSection(2)} className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">
+            {section2Complete && (
+              <button
+                type="button"
+                onClick={() => handleOpenSection(2)}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+              >
                 Change
               </button>
             )}
           </div>
 
+          {/* Section 2 body - only shown when not complete */}
           {!section2Complete && (
             <div className="px-5 pb-5 flex flex-col gap-4">
-              {showPersonaBuilder ? (
-                <PersonaBuilderInline
-                  onSaved={(id) => {
-                    queryClient.invalidateQueries({ queryKey: ["personas"] });
-                    store.setPersonaId(id);
-                    setBuildingPersona(false);
-                    store.setStep(3);
-                  }}
-                  onCancel={activePersonas.length > 0 ? () => setBuildingPersona(false) : undefined}
-                />
-              ) : personasLoading ? (
+              {personasLoading ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {[1, 2].map((i) => <Card key={i} className="h-40 animate-pulse bg-muted" />)}
+                  {[1, 2].map((i) => (
+                    <Card key={i} className="h-40 animate-pulse bg-muted" />
+                  ))}
                 </div>
-              ) : (
+              ) : activePersonas.length > 0 ? (
                 (() => {
                   const plan = profile?.plan as PlanTier | undefined;
                   const personaLimit = plan && PLANS[plan] ? PLANS[plan].personas : 1;
@@ -886,23 +1546,52 @@ export default function GeneratePage() {
                   return (
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       {activePersonas.map((persona) => {
-                        const hasImage = !!(persona.selected_image_url || persona.generated_images?.[0]);
+                        const hasSelectedImage = !!persona.selected_image_url;
+                        const hasGeneratedChoices =
+                          !hasSelectedImage && (persona.generated_images?.length ?? 0) > 0;
+                        const canChoosePersona = hasSelectedImage || hasGeneratedChoices;
                         return (
                           <button
                             key={persona.id}
                             onClick={() => {
-                              if (!hasImage) return;
-                              store.setPersonaId(persona.id);
-                              store.setStep(3);
+                              if (hasSelectedImage) {
+                                store.setPersonaId(persona.id);
+                                // Fire composites in background and advance to Section 3
+                                handleGenerateComposites(undefined, persona.id);
+                                generationFiredForFormat.current = store.format;
+                                store.setStep(4);
+                                return;
+                              }
+                              if (hasGeneratedChoices) {
+                                handleOpenPersonaImagePicker(persona);
+                              }
                             }}
-                            disabled={!hasImage}
-                            className={cn("text-left", !hasImage && "cursor-not-allowed opacity-50")}
+                            disabled={!canChoosePersona}
+                            className={cn(
+                              "text-left",
+                              !canChoosePersona && "cursor-not-allowed opacity-50",
+                            )}
                           >
-                            <Card className={cn("h-full transition-all", store.personaId === persona.id ? "border-primary ring-1 ring-primary/30" : hasImage ? "hover:border-muted-foreground/30" : "")}>
+                            <Card
+                              className={cn(
+                                "h-full transition-all",
+                                store.personaId === persona.id
+                                  ? "border-primary ring-1 ring-primary/30"
+                                  : canChoosePersona
+                                  ? "hover:border-muted-foreground/30"
+                                  : "",
+                              )}
+                            >
                               <CardContent className="flex flex-col items-center gap-3 p-6">
                                 <div className="flex size-20 items-center justify-center rounded-full bg-muted">
                                   {personaImageMap[persona.id] ? (
-                                    <img src={personaImageMap[persona.id]!} alt={persona.name} className="size-full rounded-full object-cover" loading="lazy" decoding="async" />
+                                    <img
+                                      src={personaImageMap[persona.id]!}
+                                      alt={persona.name}
+                                      className="size-full rounded-full object-cover"
+                                      loading="lazy"
+                                      decoding="async"
+                                    />
                                   ) : (
                                     <User className="size-8 text-muted-foreground" />
                                   )}
@@ -913,13 +1602,20 @@ export default function GeneratePage() {
                                     {persona.attributes.gender} / {persona.attributes.age} / {persona.attributes.clothing_style}
                                   </p>
                                 </div>
-                                {!hasImage ? (
+                                {!hasSelectedImage && hasGeneratedChoices ? (
+                                  <div className="flex items-center gap-1.5 text-xs text-primary">
+                                    <ImageIcon className="size-3.5" />
+                                    Choose portrait
+                                  </div>
+                                ) : !canChoosePersona ? (
                                   <div className="flex items-center gap-1.5 text-xs text-amber-500">
-                                    <AlertCircle className="size-3.5" />Needs image - visit Personas
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                    Generating portraits...
                                   </div>
                                 ) : store.personaId === persona.id ? (
                                   <div className="flex items-center gap-1.5 text-xs text-primary">
-                                    <Check className="size-3.5" />Selected
+                                    <Check className="size-3.5" />
+                                    Selected
                                   </div>
                                 ) : null}
                               </CardContent>
@@ -936,7 +1632,7 @@ export default function GeneratePage() {
                             offer.startOffer();
                             setShowPersonaLimitPaywall(true);
                           } else {
-                            setBuildingPersona(true);
+                            router.push("/personas/new?returnTo=/generate");
                           }
                         }}
                       >
@@ -959,26 +1655,43 @@ export default function GeneratePage() {
                     </div>
                   );
                 })()
+              ) : (
+                <Card className="border-border bg-card">
+                  <CardContent className="flex flex-col items-center gap-3 py-10">
+                    <User className="size-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      No personas yet - create one first before generating a video.
+                    </p>
+                    <Button asChild variant="outline" size="sm">
+                      <Link href="/personas/new?returnTo=/generate">
+                        Create your first persona →
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
               )}
             </div>
           )}
         </div>
       )}
 
-      {/* ── Section 3: Review & Generate ───────────────────────────────── */}
+      {/* ── Section 3: Settings & Generate ───────────────────────────── */}
       {section3Unlocked && (
         <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
+          {/* Section header */}
           <div className="flex items-center gap-3 px-4 sm:px-5 py-3 sm:py-4 border-b border-border">
-            <div className="flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">3</div>
-            <span className="text-sm font-semibold">Review & Generate</span>
+            <div className="flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
+              3
+            </div>
+            <span className="text-sm font-semibold">Settings & Generate</span>
           </div>
 
           <div className="p-5 flex flex-col gap-5">
-            {/* NanoBananaLoader overlay */}
-            {isGenerating && (
+            {/* ── NanoBananaLoader overlay ─────────────────────────── */}
+            {videoLoaderStep >= 0 && (
               <NanoBananaLoader
                 title="Creating Your Video"
-                subtitle="This usually takes 1–3 minutes"
+                subtitle="This usually takes 1\u20133 minutes"
                 steps={VIDEO_GEN_STEPS}
                 currentStep={videoLoaderStep}
                 progress={videoLoaderProgress}
@@ -986,50 +1699,52 @@ export default function GeneratePage() {
               />
             )}
 
-            {!isGenerating && (
-              <>
-                {/* Summary: product + persona */}
-                <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
-                  {selectedProduct && (
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Package className="size-4 shrink-0 text-muted-foreground" />
-                      <span className="text-sm font-medium truncate">{selectedProduct.name}</span>
-                    </div>
-                  )}
-                  {selectedProduct && selectedPersona && <span className="text-muted-foreground">·</span>}
-                  {selectedPersona && (
-                    <div className="flex items-center gap-2 min-w-0">
-                      {personaImageMap[selectedPersona.id] ? (
-                        <img src={personaImageMap[selectedPersona.id]!} alt={selectedPersona.name} className="size-5 rounded-full object-cover shrink-0" />
-                      ) : (
-                        <User className="size-4 shrink-0 text-muted-foreground" />
-                      )}
-                      <span className="text-sm font-medium truncate">{selectedPersona.name}</span>
-                    </div>
-                  )}
-                </div>
+            {!store.personaId && videoLoaderStep < 0 && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+                You can set video options now. Select a persona in step 2 once portraits are ready to auto-generate scene previews.
+              </div>
+            )}
 
+            {/* ── Easy Mode ─────────────────────────────────────────── */}
+            {!store.advancedMode && videoLoaderStep < 0 && (
+              <div className="flex flex-col gap-5">
                 {/* CTA style - collapsible */}
                 <Collapsible open={ctaOpen} onOpenChange={setCtaOpen}>
                   <CollapsibleTrigger asChild>
-                    <button type="button" className="flex w-full items-center justify-between rounded-xl border-2 border-border px-4 py-3 text-left transition-all hover:border-muted-foreground/30">
-                      <p className="text-sm font-medium">Customize CTA</p>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between rounded-xl border-2 border-border px-4 py-3 text-left transition-all hover:border-muted-foreground/30"
+                    >
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">Customize CTA</p>
+                      </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="secondary" className="text-xs">
                           {CTA_STYLE_OPTIONS.find((o) => o.key === store.ctaStyle)?.label ?? "Auto"}
                         </Badge>
-                        {ctaOpen ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+                        {ctaOpen ? (
+                          <ChevronUp className="size-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="size-4 text-muted-foreground" />
+                        )}
                       </div>
                     </button>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-2">
                     <div className="grid grid-cols-2 gap-2">
-                      {CTA_STYLE_OPTIONS.filter((o) => o.key === "auto" || o.key === "link_in_bio" || o.key === "direct_website").map((option) => (
+                      {CTA_STYLE_OPTIONS.filter((o) =>
+                        o.key === "auto" || o.key === "link_in_bio" || o.key === "direct_website"
+                      ).map((option) => (
                         <button
                           key={option.key}
                           type="button"
-                          onClick={() => store.setCtaStyle(option.key)}
-                          className={cn("flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all", store.ctaStyle === option.key ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/30")}
+                          onClick={() => { store.setCtaStyle(option.key); setScriptConfigChanged(true); debouncedRegenScript(); }}
+                          className={cn(
+                            "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                            store.ctaStyle === option.key
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-muted-foreground/30",
+                          )}
                         >
                           <p className="text-sm font-semibold">{option.label}</p>
                           <p className="mt-0.5 text-xs text-muted-foreground">{option.description}</p>
@@ -1038,12 +1753,19 @@ export default function GeneratePage() {
                     </div>
                     {showMoreCta && (
                       <div className="grid grid-cols-2 gap-2 mt-2">
-                        {CTA_STYLE_OPTIONS.filter((o) => o.key !== "auto" && o.key !== "link_in_bio" && o.key !== "direct_website").map((option) => (
+                        {CTA_STYLE_OPTIONS.filter((o) =>
+                          o.key !== "auto" && o.key !== "link_in_bio" && o.key !== "direct_website"
+                        ).map((option) => (
                           <button
                             key={option.key}
                             type="button"
-                            onClick={() => store.setCtaStyle(option.key)}
-                            className={cn("flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all", store.ctaStyle === option.key ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/30")}
+                            onClick={() => { store.setCtaStyle(option.key); setScriptConfigChanged(true); debouncedRegenScript(); }}
+                            className={cn(
+                              "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                              store.ctaStyle === option.key
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-muted-foreground/30",
+                            )}
                           >
                             <p className="text-sm font-semibold">{option.label}</p>
                             <p className="mt-0.5 text-xs text-muted-foreground">{option.description}</p>
@@ -1051,12 +1773,18 @@ export default function GeneratePage() {
                         ))}
                       </div>
                     )}
-                    <button type="button" onClick={() => setShowMoreCta(v => !v)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2">
-                      {showMoreCta ? "Fewer CTA options ▲" : "More CTA options ▼"}
+                    <button
+                      type="button"
+                      onClick={() => setShowMoreCta(v => !v)}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2"
+                    >
+                      {showMoreCta ? "Fewer CTA options \u25B2" : "More CTA options \u25BC"}
                     </button>
                     {requiresCommentKeyword && (
                       <div className="mt-3">
-                        <Label htmlFor="cta-comment-keyword" className="text-xs text-muted-foreground">Keyword viewers should comment</Label>
+                        <Label htmlFor="cta-comment-keyword" className="text-xs text-muted-foreground">
+                          Keyword viewers should comment
+                        </Label>
                         <Input
                           id="cta-comment-keyword"
                           value={store.ctaCommentKeyword}
@@ -1070,92 +1798,198 @@ export default function GeneratePage() {
                   </CollapsibleContent>
                 </Collapsible>
 
-                {/* Mode selector */}
-                <div>
-                  <p className="mb-2 text-sm font-medium">Generation mode</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => store.setMode("single")}
-                      className={cn("flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all", store.mode === "single" ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/30")}
-                    >
-                      <div className="flex w-full items-center justify-between">
-                        <p className="text-sm font-semibold">Single Ad</p>
-                        <p className="text-sm font-bold text-primary">{store.quality === "hd" ? CREDITS_PER_SINGLE_HD : CREDITS_PER_SINGLE} cr</p>
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">1 complete video · fastest</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => store.setMode("triple")}
-                      className={cn("flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all", store.mode === "triple" ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/30")}
-                    >
-                      <div className="flex w-full items-center justify-between">
-                        <p className="text-sm font-semibold">Full Campaign</p>
-                        <p className="text-sm font-bold text-primary">{store.quality === "hd" ? CREDITS_PER_BATCH_HD : CREDITS_PER_BATCH} cr</p>
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">27 combos · pick your best</p>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Quality selector */}
-                <div>
-                  <p className="mb-2 text-sm font-medium">Video quality</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => { store.setQuality("standard"); store.setVideoProvider("kling"); }}
-                      className={cn("flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all", store.quality === "standard" ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/30")}
-                    >
-                      <p className="text-sm font-semibold">Standard</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">Kling 2.6 · Faster, great for testing</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => store.setQuality("hd")}
-                      className={cn("flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all", store.quality === "hd" ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/30")}
-                    >
-                      <p className="text-sm font-semibold">High Quality</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">Best quality · final ads</p>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Model sub-selector (HD only) */}
-                {store.quality === "hd" && (
-                  <div>
-                    <p className="mb-2 text-sm font-medium">Model</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button type="button" onClick={() => store.setVideoProvider("kling")} className={cn("flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all", store.videoProvider === "kling" ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/30")}>
-                        <p className="text-sm font-semibold">Kling 3.0</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">Fast · proven quality</p>
+                <div className="flex flex-col gap-5">
+                    {/* Easy / Advanced mode tab */}
+                    <div className="flex rounded-lg border border-border bg-muted/40 p-1 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => store.setAdvancedMode(false)}
+                        className={cn(
+                          "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all",
+                          !store.advancedMode
+                            ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        <Zap className="size-4" />
+                        Easy Mode
                       </button>
-                      <button type="button" onClick={() => store.setVideoProvider("sora")} className={cn("flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all", store.videoProvider === "sora" ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/30")}>
-                        <p className="text-sm font-semibold">Sora 2 ✨</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">Premium · OpenAI</p>
-                      </button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!store.advancedMode) {
+                                  handleSwitchToAdvanced();
+                                }
+                              }}
+                              className={cn(
+                                "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all",
+                                store.advancedMode
+                                  ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                                  : "text-muted-foreground hover:text-foreground",
+                              )}
+                            >
+                              <Settings2 className="size-4" />
+                              Advanced
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Customize each Hook, Body, and CTA script, voice, and timing individually before generating.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+
+                    {/* Mode selector */}
+                    <div>
+                      <p className="mb-2 text-sm font-medium">Generation mode</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            store.setMode("single");
+                            setScriptConfigChanged(true);
+                            debouncedRegenScript();
+                          }}
+                          className={cn(
+                            "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                            store.mode === "single"
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-muted-foreground/30",
+                          )}
+                        >
+                          <div className="flex w-full items-center justify-between">
+                            <p className="text-sm font-semibold">Single Ad</p>
+                            <p className="text-sm font-bold text-primary">
+                              {store.quality === "hd" ? CREDITS_PER_SINGLE_HD : CREDITS_PER_SINGLE} cr
+                            </p>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">1 complete video · fastest</p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            store.setMode("triple");
+                            setScriptConfigChanged(true);
+                            debouncedRegenScript();
+                          }}
+                          className={cn(
+                            "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                            store.mode === "triple"
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-muted-foreground/30",
+                          )}
+                        >
+                          <div className="flex w-full items-center justify-between">
+                            <p className="text-sm font-semibold">Full Campaign</p>
+                            <p className="text-sm font-bold text-primary">
+                              {store.quality === "hd" ? CREDITS_PER_BATCH_HD : CREDITS_PER_BATCH} cr
+                            </p>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">27 combos · pick your best</p>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quality selector */}
+                    <div>
+                      <p className="mb-2 text-sm font-medium">Video quality</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { store.setQuality("standard"); store.setVideoProvider("kling"); setScriptConfigChanged(true); debouncedRegenScript(); }}
+                          className={cn(
+                            "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                            store.quality === "standard"
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-muted-foreground/30",
+                          )}
+                        >
+                          <p className="text-sm font-semibold">Standard</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">Kling 2.6 · Faster, great for testing</p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            store.setQuality("hd");
+                            setScriptConfigChanged(true);
+                            debouncedRegenScript();
+                          }}
+                          className={cn(
+                            "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                            store.quality === "hd"
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-muted-foreground/30",
+                          )}
+                        >
+                          <p className="text-sm font-semibold">High Quality</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">Best quality · final ads</p>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Model sub-selector (HD only) */}
+                    {store.quality === "hd" && (
+                      <div>
+                        <p className="mb-2 text-sm font-medium">Model</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => store.setVideoProvider("kling")}
+                            className={cn(
+                              "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                              store.videoProvider === "kling"
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-muted-foreground/30",
+                            )}
+                          >
+                            <p className="text-sm font-semibold">Kling 3.0</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">Fast · proven quality</p>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => store.setVideoProvider("sora")}
+                            className={cn(
+                              "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
+                              store.videoProvider === "sora"
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-muted-foreground/30",
+                            )}
+                          >
+                            <p className="text-sm font-semibold">Sora 2 ✨</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">Premium · OpenAI</p>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Language */}
+                    <div>
+                      <p className="mb-2 text-sm font-medium">Script language</p>
+                      <div className="flex flex-wrap gap-2">
+                        {LANGUAGE_OPTIONS.map((lang) => (
+                          <button
+                            key={lang.code}
+                            type="button"
+                            onClick={() => { store.setLanguage(lang.code); setScriptConfigChanged(true); debouncedRegenScript(); }}
+                            className={cn(
+                              "rounded-lg border-2 px-3 py-1.5 text-sm transition-all",
+                              store.language === lang.code
+                                ? "border-primary bg-primary/5 font-medium text-primary"
+                                : "border-border text-muted-foreground hover:border-muted-foreground/40",
+                            )}
+                          >
+                            {lang.native}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Audio is rendered in English by the AI model. Script language affects the on-screen text only.
+                      </p>
                     </div>
                   </div>
-                )}
-
-                {/* Language */}
-                <div>
-                  <p className="mb-2 text-sm font-medium">Script language</p>
-                  <div className="flex flex-wrap gap-2">
-                    {LANGUAGE_OPTIONS.map((lang) => (
-                      <button
-                        key={lang.code}
-                        type="button"
-                        onClick={() => store.setLanguage(lang.code)}
-                        className={cn("rounded-lg border-2 px-3 py-1.5 text-sm transition-all", store.language === lang.code ? "border-primary bg-primary/5 font-medium text-primary" : "border-border text-muted-foreground hover:border-muted-foreground/40")}
-                      >
-                        {lang.native}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">Audio is rendered in English by the AI model. Script language affects the on-screen text only.</p>
-                </div>
 
                 {requiresCommentKeyword && !commentKeyword && (
                   <div className="rounded-xl bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
@@ -1163,34 +1997,534 @@ export default function GeneratePage() {
                   </div>
                 )}
 
+                {/* Composites generating indicator */}
+                {generateComposites.isPending && (
+                  <div className="flex flex-col gap-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      {[0, 1, 2, 3].map((i) => (
+                        <div
+                          key={i}
+                          className={cn(
+                            "relative overflow-hidden rounded-xl border border-border bg-muted",
+                            store.format === "9:16" ? "aspect-[9/16]" : "aspect-video",
+                          )}
+                        >
+                          <div
+                            className="absolute inset-0 animate-pulse bg-gradient-to-br from-muted to-muted-foreground/5"
+                            style={{ animationDelay: `${i * 200}ms` }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex flex-col items-center gap-1.5 py-2">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="size-4 animate-spin" />
+                        <span>{COMPOSITE_MESSAGES[compositeMsgIdx]}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground/60">
+                        Usually takes about 45 seconds
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Scene preview (compact) */}
+                {!generateComposites.isPending && compositeImages.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Scene preview</p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleGenerateComposites()}
+                        disabled={generateComposites.isPending}
+                        className="text-xs text-muted-foreground h-7"
+                      >
+                        <RefreshCw className="size-3 mr-1" />
+                        Regenerate
+                      </Button>
+                    </div>
+                    <div className={cn(
+                      "grid gap-2",
+                      store.format === "9:16" ? "grid-cols-4" : "grid-cols-2",
+                    )}>
+                      {compositeImages.map((img, i) => (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            if (i !== selectedCompositeIdx && store.pendingScript) setScriptConfigChanged(true);
+                            setSelectedCompositeIdx(i);
+                            setShowPreviewEditor(false);
+                            const path = compositeImages[i].path;
+                            store.setCompositeImagePath(path);
+                          }}
+                          className="group relative overflow-hidden rounded-lg focus:outline-none"
+                        >
+                          <div className={cn(
+                            "relative overflow-hidden rounded-lg border-2 transition-all",
+                            store.format === "9:16" ? "aspect-[9/16]" : "aspect-video",
+                            selectedCompositeIdx === i
+                              ? "border-primary ring-2 ring-primary/30"
+                              : "border-transparent group-hover:border-muted-foreground/40",
+                          )}>
+                            <img src={img.signed_url} alt={`Preview ${i + 1}`} className="size-full object-cover" loading="lazy" decoding="async" />
+                            {selectedCompositeIdx === i && (
+                              <div className="absolute inset-0 flex items-end justify-center bg-primary/10 pb-2">
+                                <div className="flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
+                                  <Check className="size-2.5" />
+                                  Selected
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Quick edit */}
+                    {selectedCompositeIdx !== null && compositeImages[selectedCompositeIdx] && (
+                      <div className="rounded-lg border border-border bg-muted/20 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">Quick edit (optional)</p>
+                            <p className="text-xs text-muted-foreground">Adjust outfit, background, or lighting.</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGenerateComposites()}
+                              disabled={generateComposites.isPending}
+                            >
+                              {generateComposites.isPending ? (
+                                <><Loader2 className="size-3.5 animate-spin" />Regenerating...</>
+                              ) : (
+                                <><RefreshCw className="size-3.5" />Regenerate image</>
+                              )}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowPreviewEditor((prev) => !prev)}
+                            >
+                              {showPreviewEditor ? "Hide" : "Edit"}
+                            </Button>
+                          </div>
+                        </div>
+                        {showPreviewEditor && (
+                          <div className="mt-3 flex flex-col gap-3">
+                            <Textarea
+                              value={previewEditPrompt}
+                              onChange={(e) => setPreviewEditPrompt(e.target.value)}
+                              placeholder="Example: Change the outfit to a black hoodie and make the background a cozy cafe."
+                              maxLength={500}
+                              rows={2}
+                            />
+                            <div className="flex items-center justify-end gap-2">
+                              <Button type="button" variant="ghost" size="sm" onClick={() => setShowPreviewEditor(false)} disabled={editComposite.isPending}>
+                                Cancel
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={handleApplyPreviewEdit}
+                                disabled={editComposite.isPending || !store.compositeImagePath || previewEditPrompt.trim().length === 0}
+                              >
+                                {editComposite.isPending ? (
+                                  <><Loader2 className="size-3.5 animate-spin" />Applying...</>
+                                ) : (
+                                  <>Apply Edit</>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* No composites + not pending - fallback generate button */}
+                {!generateComposites.isPending && compositeImages.length === 0 && (
+                  <Button
+                    variant="outline"
+                    onClick={() => handleGenerateComposites()}
+                    disabled={!store.productId || !store.personaId || !store.format}
+                  >
+                    <ImageIcon className="size-4" />
+                    Generate Scene Preview
+                  </Button>
+                )}
+
                 {/* Credit cost */}
                 <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
                   <p className="text-sm text-muted-foreground">
-                    This will use <span className="font-bold text-foreground">{effectiveCost} credits</span>
+                    This will use{" "}
+                    <span className="font-bold text-foreground">{effectiveCost} credits</span>
                     {!isUnlimitedCredits && <span> ({creditsRemaining} remaining)</span>}
                   </p>
                 </div>
 
-                {/* Generate button */}
-                <Button
-                  onClick={handleGenerate}
-                  disabled={!store.productId || !store.personaId || creditsLoading || (requiresCommentKeyword && !commentKeyword)}
-                  size="lg"
-                  className="w-full"
-                >
-                  {creditsLoading ? (
-                    <><Loader2 className="size-4 animate-spin" />Checking credits...</>
-                  ) : (
-                    <><Zap className="size-4" />Generate Video</>
-                  )}
-                </Button>
-              </>
+                {/* ── Script / Generate area ────────────────────────── */}
+                {generateScript.isPending ? (
+                  <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-8 text-center">
+                    <Loader2 className="size-7 animate-spin text-primary" />
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Writing your script…</p>
+                      <p className="text-xs text-muted-foreground mt-1">{SCRIPT_MESSAGES[scriptMsgIdx]}</p>
+                    </div>
+                  </div>
+                ) : store.pendingScript ? (
+                  <div className="flex flex-col gap-4">
+                    {/* Script auto-regenerates when settings change */}
+
+                    {/* Script review - side-by-side for single mode, stacked for triple */}
+                    <div className={cn(
+                      "flex gap-4",
+                      store.mode === "single" ? "flex-row items-start" : "flex-col",
+                    )}>
+                      {/* Selected composite preview (single mode only - left column) */}
+                      {store.mode === "single" && selectedCompositeIdx !== null && compositeImages[selectedCompositeIdx] && (
+                        <div className="shrink-0 w-[200px]">
+                          <div className={cn(
+                            "relative overflow-hidden rounded-lg border border-border",
+                            store.format === "9:16" ? "aspect-[9/16]" : "aspect-video",
+                          )}>
+                            <img
+                              src={compositeImages[selectedCompositeIdx].signed_url}
+                              alt="Selected scene preview"
+                              className="size-full object-cover"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Script content (right column in single mode) */}
+                      <div className={cn("flex flex-col gap-1", store.mode === "single" ? "flex-1 min-w-0" : "")}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Check className="size-4 text-emerald-500" />
+                        <p className="text-sm font-semibold">Script ready - review & edit</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Edit any segment before generating your video.
+                      </p>
+
+                      {(["hooks", "bodies", "ctas"] as const).map((sectionType, sectionIdx) => {
+                        const segments = store.pendingScript![sectionType];
+                        const singularLabel = sectionType === "hooks" ? "Hook" : sectionType === "bodies" ? "Body" : "CTA";
+                        const sectionLabel = sectionType === "hooks" ? "Hooks" : sectionType === "bodies" ? "Bodies" : "CTAs";
+
+                        return (
+                          <div key={sectionType} className="flex flex-col gap-2">
+                            {sectionIdx > 0 && <Separator className="my-1" />}
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{sectionLabel}</p>
+                              <Badge variant="outline" className="text-[10px]">
+                                {segments.length} {segments.length === 1 ? "variant" : "variants"}
+                              </Badge>
+                            </div>
+
+                            {segments.map((segment: ScriptSegment, idx: number) => (
+                              <Card key={`${sectionType}-${idx}`} className="border-border">
+                                <CardContent className="flex flex-col gap-2 p-3">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5">
+                                      <p className="text-xs font-semibold text-foreground">
+                                        {singularLabel} {segments.length > 1 ? idx + 1 : ""}
+                                      </p>
+                                      <Badge variant="secondary" className="text-[10px]">
+                                        {formatVariantLabel(segment.variant_label)}
+                                      </Badge>
+                                      <Badge variant="outline" className="text-[10px]">
+                                        {segment.duration_seconds}s
+                                      </Badge>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2 text-[10px] text-muted-foreground"
+                                      disabled={generateScript.isPending}
+                                      onClick={() => {
+                                        if (!store.productId || !store.personaId || !store.compositeImagePath) return;
+                                        generateScript.mutate(
+                                          {
+                                            product_id: store.productId,
+                                            persona_id: store.personaId,
+                                            mode: store.mode,
+                                            quality: store.quality,
+                                            composite_image_path: store.compositeImagePath,
+                                            cta_style: store.ctaStyle,
+                                            cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
+                                            language: store.language,
+                                            phase: "script",
+                                          },
+                                          {
+                                            onSuccess: (result) => {
+                                              const newSegText = result.script?.[sectionType]?.[idx]?.text;
+                                              if (newSegText !== undefined && result.generation_id) {
+                                                const freshScript = useGenerationWizardStore.getState().pendingScript;
+                                                const freshCredits = useGenerationWizardStore.getState().creditsToCharge ?? 0;
+                                                if (freshScript) {
+                                                  store.setPendingScript(
+                                                    result.generation_id,
+                                                    {
+                                                      ...freshScript,
+                                                      [sectionType]: freshScript[sectionType].map((seg, i) =>
+                                                        i === idx ? { ...seg, text: newSegText } : seg
+                                                      ),
+                                                    },
+                                                    freshCredits,
+                                                  );
+                                                }
+                                              }
+                                            },
+                                            onError: (err) => { toast.error(err.message || "Failed to regenerate"); },
+                                          },
+                                        );
+                                      }}
+                                    >
+                                      {generateScript.isPending ? (
+                                        <Loader2 className="size-3 animate-spin" />
+                                      ) : (
+                                        <RefreshCw className="size-3" />
+                                      )}
+                                      Regen
+                                    </Button>
+                                  </div>
+                                  <Textarea
+                                    value={segment.text}
+                                    onChange={(e) => store.updateScriptSection(sectionType, idx, e.target.value)}
+                                    rows={3}
+                                    className="resize-none text-sm"
+                                  />
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    </div>
+
+                    {/* Generate Video */}
+                    <Button
+                      onClick={handleApproveAndGenerate}
+                      disabled={approveAndGenerate.isPending || creditsLoading}
+                      size="lg"
+                      className="w-full"
+                    >
+                      {approveAndGenerate.isPending ? (
+                        <><Loader2 className="size-4 animate-spin" />Starting generation...</>
+                      ) : creditsLoading ? (
+                        <><Loader2 className="size-4 animate-spin" />Checking credits...</>
+                      ) : (
+                        <><Zap className="size-4" />Generate Video</>
+                      )}
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    onClick={handleGenerateScript}
+                    disabled={(requiresCommentKeyword && !commentKeyword) || generateComposites.isPending || !store.compositeImagePath}
+                    size="lg"
+                    className="w-full"
+                  >
+                    {generateComposites.isPending ? (
+                      <><Loader2 className="size-4 animate-spin" />Waiting for scene preview...</>
+                    ) : (
+                      <>Generate Script</>
+                    )}
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* ── Advanced Mode ─────────────────────────────────────── */}
+            {store.advancedMode && videoLoaderStep < 0 && (
+              <div className="flex flex-col gap-5">
+                {isInitializingAdvanced ? (
+                  <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-muted/40 py-12">
+                    <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                    <div className="text-center">
+                      <p className="text-sm font-medium">Generating scripts for all segments…</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {store.mode === "triple" ? "9 segments" : "3 segments"} · usually takes ~20 seconds
+                      </p>
+                    </div>
+                  </div>
+                ) : store.advancedSegments ? (
+                  <>
+                    <div className="rounded-xl bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+                      {store.mode === "triple"
+                        ? "Customize each of the 9 segments - 3 variants × 3 types. Mix any combo for 27 unique videos."
+                        : "Customize your Hook, Body, and CTA individually for full creative control."}
+                    </div>
+                    <AdvancedModePanel
+                      mode={store.mode}
+                      segments={store.advancedSegments}
+                      productId={store.productId!}
+                      personaId={store.personaId!}
+                      format={store.format ?? "9:16"}
+                      mainCompositeSignedUrl={
+                        selectedCompositeIdx !== null
+                          ? compositeImages[selectedCompositeIdx]?.signed_url ?? null
+                          : null
+                      }
+                      onSegmentUpdate={(type, index, patch) => store.updateAdvancedSegment(type, index, patch)}
+                    />
+
+                    <Separator />
+
+                    {/* Credit cost */}
+                    <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
+                      <p className="text-sm text-muted-foreground">
+                        This will use{" "}
+                        <span className="font-bold text-foreground">{effectiveCost} credits</span>
+                        {!isUnlimitedCredits && <span> ({creditsRemaining} remaining)</span>}
+                      </p>
+                    </div>
+
+                    {/* Generate buttons for advanced mode */}
+                    {generateScript.isPending ? (
+                      <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-8 text-center">
+                        <Loader2 className="size-7 animate-spin text-primary" />
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">Writing your script…</p>
+                          <p className="text-xs text-muted-foreground mt-1">{SCRIPT_MESSAGES[scriptMsgIdx]}</p>
+                        </div>
+                      </div>
+                    ) : store.pendingScript ? (
+                      <Button
+                        onClick={handleApproveAndGenerate}
+                        disabled={approveAndGenerate.isPending || creditsLoading}
+                        size="lg"
+                        className="w-full"
+                      >
+                        {approveAndGenerate.isPending ? (
+                          <><Loader2 className="size-4 animate-spin" />Starting generation...</>
+                        ) : creditsLoading ? (
+                          <><Loader2 className="size-4 animate-spin" />Checking credits...</>
+                        ) : (
+                          <><Zap className="size-4" />Generate Video</>
+                        )}
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={handleGenerateScript}
+                        disabled={generateComposites.isPending || !store.compositeImagePath}
+                        size="lg"
+                        className="w-full"
+                      >
+                        {generateComposites.isPending ? (
+                          <><Loader2 className="size-4 animate-spin" />Waiting for scene preview...</>
+                        ) : (
+                          <>Generate Script</>
+                        )}
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  /* No segments yet and not initializing - re-init option */
+                  <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-10">
+                    <Settings2 className="size-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Advanced segments failed to generate.</p>
+                    <Button variant="outline" size="sm" onClick={handleInitializeAdvancedSegments}>
+                      Retry
+                    </Button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
       )}
 
-      {/* ── Paywall dialog ─────────────────────────────────────────────── */}
+      <Dialog
+        open={pickerPersona !== null}
+        onOpenChange={(open) => {
+          if (!open && !pickerSaving) {
+            setPickerPersona(null);
+            setPickerOptions([]);
+            setPickerSelectedImageIndex(null);
+            setPickerLoading(false);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Choose your persona portrait</DialogTitle>
+            <DialogDescription>
+              Pick one portrait to continue. You can go back to persona editing if needed.
+            </DialogDescription>
+          </DialogHeader>
+
+          {pickerLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : pickerOptions.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3">
+              {pickerOptions.map((option) => (
+                <button
+                  key={option.imageIndex}
+                  type="button"
+                  onClick={() => setPickerSelectedImageIndex(option.imageIndex)}
+                  className={cn(
+                    "relative aspect-[3/4] overflow-hidden rounded-xl border-2 transition-all",
+                    pickerSelectedImageIndex === option.imageIndex
+                      ? "border-primary ring-2 ring-primary/30"
+                      : "border-border hover:border-primary/40",
+                  )}
+                >
+                  <img
+                    src={option.signedUrl}
+                    alt={`Persona portrait ${option.imageIndex + 1}`}
+                    className="size-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  {pickerSelectedImageIndex === option.imageIndex && (
+                    <div className="absolute right-2 top-2 rounded-full bg-primary p-1">
+                      <Check className="size-3 text-primary-foreground" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="py-6 text-sm text-muted-foreground">
+              Portraits are not ready yet. Try again in a few seconds.
+            </p>
+          )}
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+            <Button
+              variant="outline"
+              onClick={() => router.push("/personas/new?returnTo=/generate")}
+              disabled={pickerSaving}
+            >
+              Go Back To Editing Persona
+            </Button>
+            <Button
+              onClick={handleConfirmPersonaImageSelection}
+              disabled={pickerSelectedImageIndex === null || pickerSaving}
+            >
+              {pickerSaving ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Use this portrait"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Paywall dialog ────────────────────────────────────────────── */}
       <Dialog open={showPaywall} onOpenChange={handlePaywallClose}>
         <DialogContent className="sm:max-w-4xl p-0 overflow-hidden max-h-[92vh] flex flex-col">
           <DialogTitle className="sr-only">Upgrade to generate videos</DialogTitle>
@@ -1211,37 +2545,60 @@ export default function GeneratePage() {
 
           <div className="overflow-y-auto flex-1">
             <div className="text-center max-w-2xl mx-auto pt-6 sm:pt-10 pb-4 sm:pb-6 px-4 sm:px-6">
-              <h2 className="text-xl sm:text-3xl md:text-4xl font-extrabold text-foreground mb-3 tracking-tight">{paywallHeadline}</h2>
-              <p className="text-muted-foreground font-medium">{paywallSublineStatic ?? "Your next UGC ad is 3 minutes away."}</p>
-              <p className="mt-1.5 text-sm text-muted-foreground/80">
-                Traditional UGC agencies charge <span className="font-semibold line-through decoration-muted-foreground/40">$150–$500 per video</span>. Get the same quality for <span className="font-semibold text-foreground">as low as $5</span>.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 px-4 pb-5 sm:pb-6">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <div className="flex">{[1,2,3,4,5].map(i => <Star key={i} className="size-3 fill-amber-400 text-amber-400" />)}</div>
-                <span>Loved by e-commerce brands</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Zap className="size-3 text-primary" /><span>Ready in under 5 minutes</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Check className="size-3 text-emerald-500" /><span>No filming or editing required</span>
-              </div>
+              <h2 className="text-xl sm:text-3xl md:text-4xl font-extrabold text-foreground mb-3 tracking-tight">
+                {paywallHeadline}
+              </h2>
+              {paywallSublineStatic ? (
+                <p className="text-muted-foreground font-medium">{paywallSublineStatic}</p>
+              ) : (
+                <p className="text-muted-foreground font-medium">
+                  Traditional UGC costs{" "}
+                  <span className="line-through decoration-muted-foreground/50">$150–$500</span>.
+                  {" "}Get the same quality instantly for a fraction of the cost.
+                </p>
+              )}
             </div>
 
             <div className="flex justify-center mb-6 sm:mb-8 px-4">
               <div className="bg-muted/80 p-1 sm:p-1.5 rounded-full inline-flex border border-border shadow-sm">
-                <button type="button" onClick={() => setPaywallTab("single")} className={cn("px-4 sm:px-8 py-2 sm:py-2.5 text-xs sm:text-sm font-bold rounded-full transition-all duration-200", paywallTab === "single" ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:text-foreground")}>
+                <button
+                  type="button"
+                  onClick={() => setPaywallTab("single")}
+                  className={cn(
+                    "px-4 sm:px-8 py-2 sm:py-2.5 text-xs sm:text-sm font-bold rounded-full transition-all duration-200",
+                    paywallTab === "single"
+                      ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
                   <>
                     {store.quality === "hd" ? "1 HD Video" : "1 Standard Video"}
-                    {isFirstVideo && <span className="ml-1 sm:ml-2 text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">-50%</span>}
+                    {isFirstVideo && (
+                      <span className="ml-1 sm:ml-2 text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                        -50%
+                      </span>
+                    )}
                   </>
                 </button>
-                <button type="button" onClick={() => setPaywallTab("subscription")} className={cn("flex items-center gap-1 sm:gap-2 px-4 sm:px-8 py-2 sm:py-2.5 text-xs sm:text-sm font-bold rounded-full transition-all duration-200", paywallTab === "subscription" ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:text-foreground")}>
+                <button
+                  type="button"
+                  onClick={() => setPaywallTab("subscription")}
+                  className={cn(
+                    "flex items-center gap-1 sm:gap-2 px-4 sm:px-8 py-2 sm:py-2.5 text-xs sm:text-sm font-bold rounded-full transition-all duration-200",
+                    paywallTab === "subscription"
+                      ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
                   Subscribe & Save
-                  <span className={cn("text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold", paywallTab === "subscription" ? "bg-primary/10 text-primary" : "bg-muted-foreground/20 text-muted-foreground")}>-30%</span>
+                  <span className={cn(
+                    "text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold",
+                    paywallTab === "subscription"
+                      ? "bg-primary/10 text-primary"
+                      : "bg-muted-foreground/20 text-muted-foreground",
+                  )}>
+                    -30%
+                  </span>
                 </button>
               </div>
             </div>
@@ -1251,8 +2608,11 @@ export default function GeneratePage() {
                 <div className="max-w-md mx-auto bg-card p-8 rounded-2xl border border-border shadow-sm">
                   <div className="mb-6">
                     <h3 className="text-xl font-bold text-foreground mb-1">Single Video</h3>
-                    <p className="text-muted-foreground text-sm leading-relaxed">Experience the quality before committing.</p>
+                    <p className="text-muted-foreground text-sm leading-relaxed">
+                      Experience the quality before committing.
+                    </p>
                   </div>
+
                   <div className="mb-6">
                     <div className="w-full p-5 rounded-2xl border-2 border-primary bg-primary/5 text-left">
                       <div className="flex justify-between items-center">
@@ -1261,13 +2621,20 @@ export default function GeneratePage() {
                             <div className="w-2.5 h-2.5 bg-primary rounded-full" />
                           </div>
                           {store.quality === "hd" ? (
-                            <div><span className="font-semibold text-foreground">Kling 3.0 · HD</span><span className="ml-2 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Best Quality</span></div>
+                            <div>
+                              <span className="font-semibold text-foreground">Kling 3.0 · HD</span>
+                              <span className="ml-2 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Best Quality</span>
+                            </div>
                           ) : (
                             <span className="font-semibold text-foreground">Kling 2.6 · Standard</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          {isFirstVideo && <span className="text-sm text-muted-foreground line-through font-medium">${store.quality === "hd" ? `${CREDITS_PER_SINGLE_HD}.00` : `${CREDITS_PER_SINGLE}.00`}</span>}
+                          {isFirstVideo && (
+                            <span className="text-sm text-muted-foreground line-through font-medium">
+                              ${store.quality === "hd" ? `${CREDITS_PER_SINGLE_HD}.00` : `${CREDITS_PER_SINGLE}.00`}
+                            </span>
+                          )}
                           <span className="font-bold text-foreground text-lg">
                             ${store.quality === "hd"
                               ? (isFirstVideo ? (CREDITS_PER_SINGLE_HD / 2).toFixed(2) : `${CREDITS_PER_SINGLE_HD}.00`)
@@ -1276,74 +2643,235 @@ export default function GeneratePage() {
                         </div>
                       </div>
                     </div>
+                    {store.quality === "standard" && (
+                      <p className="text-xs text-muted-foreground mt-2 text-center">
+                        Want HD instead?{" "}
+                        <button
+                          type="button"
+                          className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
+                          onClick={() => setPaywallTab("subscription")}
+                        >
+                          Upgrade to a plan →
+                        </button>
+                      </p>
+                    )}
                   </div>
-                  <Button className="w-full py-6 text-base font-bold" onClick={() => handleBuyPack(store.quality === "hd" ? "single_hd" : "single_standard")} disabled={buyCredits.isPending}>
+
+                  <Button
+                    className="w-full py-6 text-base font-bold"
+                    onClick={() => handleBuyPack(store.quality === "hd" ? "single_hd" : "single_standard")}
+                    disabled={buyCredits.isPending}
+                  >
                     {buyCredits.isPending ? <Loader2 className="size-4 animate-spin" /> : "Generate Video →"}
                   </Button>
                   {videosGenerated === 0 && isFirstVideo && (
                     <div className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
-                      <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">First video: 50% OFF applied automatically</span>
+                      <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                        First video: 50% OFF applied automatically
+                      </span>
                     </div>
+                  )}
+                  {videosGenerated > 0 && (
+                    <p className="text-center text-xs text-primary/70 mt-2 font-medium">
+                      You know it works. Keep scaling.
+                    </p>
                   )}
                   <p className="text-center text-xs text-muted-foreground mt-3">
                     Buying {store.quality === "hd" ? "10" : "5"} credits · Unused credits carry over for future videos
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 lg:gap-6">
-                  {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
-                    const isGrowth = key === "growth";
-                    const discountedMonthly = offer.discountedPrice(plan.price);
-                    return (
-                      <div key={key} className={cn("bg-card rounded-2xl p-7 relative flex flex-col", isGrowth ? "border-2 border-primary shadow-lg" : "border border-border shadow-sm")}>
-                        {isGrowth && (
-                          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm whitespace-nowrap">
-                            Most Popular
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5 lg:gap-6">
+                    {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
+                      const isGrowth = key === "growth";
+                      const discountedMonthly = offer.discountedPrice(plan.price);
+                      return (
+                        <div
+                          key={key}
+                          className={cn(
+                            "bg-card rounded-2xl p-7 relative flex flex-col",
+                            isGrowth ? "border-2 border-primary shadow-lg" : "border border-border shadow-sm",
+                          )}
+                        >
+                          {isGrowth && (
+                            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm whitespace-nowrap">
+                              Most Popular
+                            </div>
+                          )}
+                          <div className="mb-6">
+                            <h3 className="text-xl font-bold text-foreground tracking-tight mb-1">{plan.name}</h3>
+                            <p className="text-muted-foreground text-sm font-medium">{plan.credits} credits / mo</p>
                           </div>
-                        )}
-                        <div className="mb-4">
-                          <h3 className="text-lg font-bold text-foreground capitalize">{key}</h3>
-                          <div className="mt-2 flex items-baseline gap-1">
-                            {offer.isActive && <span className="text-sm text-muted-foreground line-through">${plan.price}</span>}
-                            <span className="text-3xl font-extrabold text-foreground">${discountedMonthly}</span>
-                            <span className="text-sm text-muted-foreground">/mo</span>
+                          <div className="mb-6">
+                            <div className="flex items-end gap-2 mb-1">
+                              <span className="text-4xl font-extrabold text-foreground tracking-tighter">
+                                ${discountedMonthly}
+                              </span>
+                              <span className="text-muted-foreground font-medium mb-1">/mo</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm font-medium">
+                              <span className="line-through text-muted-foreground">${plan.price}/mo</span>
+                              <span className="text-primary bg-primary/10 px-2 py-0.5 rounded-md text-xs font-bold">-30%</span>
+                            </div>
+                            <div className="mt-3 inline-flex bg-muted border border-border text-muted-foreground text-xs font-bold px-3 py-1.5 rounded-lg">
+                              ≈ ${(plan.price / (plan.credits / CREDITS_PER_SINGLE)).toFixed(2)}/video
+                            </div>
                           </div>
+                          <ul className="space-y-3 mb-8 flex-grow">
+                            {PLAN_BENEFITS[key].map((benefit, i) => (
+                              <li key={i} className="flex items-start gap-2.5 text-sm text-muted-foreground font-medium leading-tight">
+                                <Check className="size-4 text-primary shrink-0 mt-0.5" />
+                                {benefit}
+                              </li>
+                            ))}
+                          </ul>
+                          <Button
+                            variant={isGrowth ? "default" : "outline"}
+                            className="w-full py-5 font-bold"
+                            onClick={() => handleCheckout(key)}
+                            disabled={checkout.isPending}
+                          >
+                            {checkout.isPending ? <Loader2 className="size-4 animate-spin" /> : `Choose ${plan.name}`}
+                          </Button>
                         </div>
-                        <ul className="mb-6 flex flex-col gap-2 flex-1">
-                          {PLAN_BENEFITS[key].map((benefit) => (
-                            <li key={benefit} className="flex items-start gap-2 text-sm text-muted-foreground">
-                              <Check className="size-4 shrink-0 text-emerald-500 mt-0.5" />
-                              {benefit}
-                            </li>
-                          ))}
-                        </ul>
-                        <Button onClick={() => handleCheckout(key)} disabled={checkout.isPending} className={cn("w-full", isGrowth ? "" : "variant-outline")}>
-                          {checkout.isPending ? <Loader2 className="size-4 animate-spin" /> : `Get ${key.charAt(0).toUpperCase() + key.slice(1)}`}
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-12 text-center max-w-2xl mx-auto">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-5">
+                      Or buy one-time credit packs
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-3">
+                      {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => {
+                        const discountedPackPrice = isFirstVideo ? offer.discountedVideoPrice(pack.price) : offer.discountedPrice(pack.price);
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => handleBuyPack(key)}
+                            disabled={buyCredits.isPending}
+                            className="px-6 py-3 rounded-xl border border-border bg-card hover:border-muted-foreground/40 transition-colors text-sm disabled:opacity-50"
+                          >
+                            <span className="font-bold text-foreground">{pack.credits} credits</span>
+                            {" "}
+                            <span className="text-muted-foreground">
+                              -{" "}
+                              <span className="line-through">${pack.price}</span>{" "}
+                              <span className="text-primary font-semibold">${discountedPackPrice}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* ── Persona limit paywall dialog ──────────────────────────────── */}
+      {/* ── Persona limit paywall dialog ─────────────────────────────── */}
       <Dialog open={showPersonaLimitPaywall} onOpenChange={setShowPersonaLimitPaywall}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Persona limit reached</DialogTitle>
-            <DialogDescription>
-              Upgrade your plan to create more personas and unlock additional features.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setShowPersonaLimitPaywall(false)}>Cancel</Button>
-            <Button onClick={() => { setShowPersonaLimitPaywall(false); setShowPaywall(true); setPaywallTab("subscription"); }}>
-              Upgrade Plan
-            </Button>
+        <DialogContent className="sm:max-w-4xl p-0 overflow-hidden max-h-[92vh] flex flex-col">
+          <DialogTitle className="sr-only">Upgrade to create more personas</DialogTitle>
+
+          {offer.isActive && (
+            <div className="bg-primary text-primary-foreground px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm font-medium shrink-0">
+              <div className="flex items-center gap-2">
+                <Flame className="size-4" />
+                <span>Limited-time offer - 30% off your first plan</span>
+              </div>
+              <div className="flex items-center gap-2 bg-black/15 px-2.5 py-0.5 rounded font-mono">
+                <Clock className="size-3 opacity-80" />
+                <span className="tabular-nums">{offer.timeDisplay}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="overflow-y-auto flex-1 px-6 py-8 sm:px-10">
+            <div className="text-center mb-8">
+              <div className="inline-flex size-14 items-center justify-center rounded-full bg-primary/10 mb-4">
+                <User className="size-7 text-primary" />
+              </div>
+              <h2 className="text-2xl font-bold tracking-tight">
+                {offer.isActive ? "Unlock More Personas - 30% Off" : "Unlock More Personas"}
+              </h2>
+              <p className="mt-2 text-muted-foreground max-w-md mx-auto">
+                {(() => {
+                  const plan = profile?.plan as PlanTier | undefined;
+                  const personaLimit = plan && PLANS[plan] ? PLANS[plan].personas : 1;
+                  return plan
+                    ? `Your ${PLANS[plan as PlanTier]?.name ?? "current"} plan is limited to ${personaLimit} persona${personaLimit !== 1 ? "s" : ""}. Upgrade to create more.`
+                    : "The free plan is limited to 1 persona. Upgrade to create more.";
+                })()}
+              </p>
+            </div>
+
+            {(() => {
+              const currentPlan = profile?.plan as PlanTier | undefined;
+              const currentLimit = currentPlan && PLANS[currentPlan] ? PLANS[currentPlan].personas : 1;
+              return (
+                <div className="grid gap-4 sm:grid-cols-3 max-w-3xl mx-auto">
+                  {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
+                    const isGrowth = key === "growth";
+                    const discountedMonthly = offer.discountedPrice(plan.price);
+                    const isCurrentPlan = currentPlan === key;
+                    const isDowngrade = plan.personas <= currentLimit && !isCurrentPlan;
+                    const isDisabled = checkout.isPending || isCurrentPlan || isDowngrade;
+                    return (
+                      <div
+                        key={key}
+                        className={cn(
+                          "relative rounded-2xl border p-5 flex flex-col gap-4",
+                          isGrowth ? "border-primary/40 bg-primary/5 shadow-md" : "border-border bg-card",
+                          isDowngrade && "opacity-40",
+                        )}
+                      >
+                        {isGrowth && (
+                          <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-0.5 text-xs">
+                            Most popular
+                          </Badge>
+                        )}
+                        <div>
+                          <p className="font-semibold text-base">{plan.name}</p>
+                          <div className="mt-1 flex items-baseline gap-1">
+                            <span className="text-2xl font-bold">${discountedMonthly}</span>
+                            <span className="text-sm text-muted-foreground line-through">${plan.price}</span>
+                            <span className="text-xs text-muted-foreground">/mo</span>
+                          </div>
+                          <p className="mt-1 text-xs text-orange-500 font-medium">
+                            Up to {plan.personas} persona{plan.personas !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant={isGrowth ? "default" : "outline"}
+                          className="w-full font-bold"
+                          onClick={() => {
+                            setShowPersonaLimitPaywall(false);
+                            handleCheckout(key);
+                          }}
+                          disabled={isDisabled}
+                        >
+                          {isCurrentPlan
+                            ? "Current plan"
+                            : checkout.isPending
+                            ? <Loader2 className="size-4 animate-spin" />
+                            : `Choose ${plan.name}`}
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            <p className="mt-6 text-center text-xs text-muted-foreground">
+              No commitment on packs · Cancel subscriptions anytime
+            </p>
           </div>
         </DialogContent>
       </Dialog>

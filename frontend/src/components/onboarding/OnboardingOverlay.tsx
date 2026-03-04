@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
@@ -25,7 +25,6 @@ import {
   X,
   AlertCircle,
   Pencil,
-  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,14 +34,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
-import { createClient } from "@/lib/supabase/client";
 import type { Product, BrandSummary, Persona } from "@/types/database";
 import type { ScrapeResponseData } from "@/types/api";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SKIP_KEY = "onboarding-skipped";
-const BANNER_KEY = "onboarding-banner";
 
 type WizardView =
   | "checklist"
@@ -85,21 +82,7 @@ const STEPS = [
 
 export function OnboardingOverlay() {
   const router = useRouter();
-  const [view, _setView] = useState<WizardView>(() => {
-    if (typeof window !== "undefined" && sessionStorage.getItem(BANNER_KEY) === "true") {
-      return "banner";
-    }
-    return "checklist";
-  });
-  // Wrap setView to persist/clear banner state in sessionStorage
-  const setView = (v: WizardView) => {
-    if (v === "banner") {
-      sessionStorage.setItem(BANNER_KEY, "true");
-    } else {
-      sessionStorage.removeItem(BANNER_KEY);
-    }
-    _setView(v);
-  };
+  const [view, setView] = useState<WizardView>("checklist");
   const [skipped, setSkipped] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
@@ -144,34 +127,16 @@ export function OnboardingOverlay() {
     return () => window.removeEventListener("onboarding:resume", handleResume);
   }, []);
 
-  // On every fresh login (any auth method), reset skip so tutorial auto-opens.
-  // sessionStorage flag prevents re-triggering on each page navigation within
-  // the same tab — only fires once per login session.
-  useEffect(() => {
-    const supabase = createClient();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string) => {
-      if (event === "SIGNED_IN" && !sessionStorage.getItem("onboarding_session_reset")) {
-        sessionStorage.setItem("onboarding_session_reset", "1");
-        localStorage.removeItem(SKIP_KEY);
-        setSkipped(false);
-        setHasActiveWizardSession(false);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
   // Auto-dismiss banner when the generation step completes
   useEffect(() => {
     if (view === "banner" && hasCompletedGeneration) {
       localStorage.setItem(SKIP_KEY, "true");
-      sessionStorage.removeItem(BANNER_KEY);
       setSkipped(true);
     }
   }, [hasCompletedGeneration, view]);
 
   const handleSkip = () => {
     localStorage.setItem(SKIP_KEY, "true");
-    sessionStorage.removeItem(BANNER_KEY);
     setSkipped(true);
   };
 
@@ -203,12 +168,10 @@ export function OnboardingOverlay() {
     const hasPriorSession = !!(wizardStore.compositeImagePath || wizardStore.pendingScript || wizardStore.pendingGenerationId);
     if (!hasPriorSession && products && products.length > 0) {
       wizardStore.setProductId(products[0].id);
-      // Pre-select first persona that has a selected image
-      const readyPersona = (personas ?? []).find((p) => p.selected_image_url != null);
-      if (readyPersona) {
-        wizardStore.setPersonaId(readyPersona.id);
+      if (!wizardStore.format) {
+        wizardStore.setFormat("9:16");
       }
-      wizardStore.setStep(1);
+      wizardStore.setStep(2);
     }
     setView("banner");
     router.push("/generate");
@@ -334,6 +297,7 @@ export function OnboardingOverlay() {
                 <PersonaView
                   onComplete={handlePersonaComplete}
                   onBack={() => hasProduct ? setView("checklist") : setView("step-brand")}
+                  onProceedToVideo={() => setView("step-video")}
                 />
               )}
               {view === "step-video" && (
@@ -584,17 +548,6 @@ function BrandImportView({
   const [showSuccess, setShowSuccess] = useState(false);
   const [forceShowForm, setForceShowForm] = useState(false);
 
-  const confirmAnchorRef = useRef<HTMLDivElement>(null);
-
-  // Auto-scroll to confirm button when scrape results appear
-  useEffect(() => {
-    if (showScrapeResults) {
-      setTimeout(() => {
-        confirmAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-      }, 200);
-    }
-  }, [showScrapeResults]);
-
   async function handleScrape() {
     if (!importUrl.trim()) return;
     setScrapeError(null);
@@ -731,22 +684,11 @@ function BrandImportView({
 
       {showScrapeResults ? (
         <div className="flex flex-col gap-4">
-          {/* Quick-confirm CTA — scrolls to the Confirm All button below */}
-          <button
-            type="button"
-            onClick={() => confirmAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })}
-            className="flex w-full items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
-          >
-            <span>Ready? Confirm your import</span>
-            <ChevronDown className="size-4 animate-bounce" />
-          </button>
           <ScrapeResults
             products={scrapedProducts}
             brandSummary={scrapedBrandSummary}
             onConfirmed={handleScrapeConfirmed}
           />
-          {/* Anchor for auto-scroll — sits right after the Confirm All button */}
-          <div ref={confirmAnchorRef} />
           <Button
             variant="ghost"
             size="sm"
@@ -847,9 +789,11 @@ function BrandImportView({
 function PersonaView({
   onComplete,
   onBack,
+  onProceedToVideo,
 }: {
   onComplete: () => void;
   onBack: () => void;
+  onProceedToVideo: () => void;
 }) {
   const queryClient = useQueryClient();
   const { data: personas } = usePersonas();
@@ -860,6 +804,7 @@ function PersonaView({
   const [addPhotoPersonaId, setAddPhotoPersonaId] = useState<string | null>(null);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [selectingIndex, setSelectingIndex] = useState<number | null>(null);
+  const [canProceedWhileGenerating, setCanProceedWhileGenerating] = useState(false);
 
   // If a persona with image already exists (race condition / cache refresh), complete immediately
   useEffect(() => {
@@ -873,6 +818,7 @@ function PersonaView({
 
 
   function handleSaved() {
+    setCanProceedWhileGenerating(false);
     setShowSuccess(true);
     setTimeout(onComplete, 1500);
   }
@@ -897,6 +843,7 @@ function PersonaView({
     try {
       await selectImage.mutateAsync({ persona_id: addPhotoPersonaId, image_index: imageIndex });
       await queryClient.invalidateQueries({ queryKey: ["personas"] });
+      setCanProceedWhileGenerating(false);
       setShowSuccess(true);
       setTimeout(onComplete, 1500);
     } catch {
@@ -975,6 +922,22 @@ function PersonaView({
         </p>
       </div>
 
+      {(generateImages.isPending || canProceedWhileGenerating) && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {generateImages.isPending && (
+              <Loader2 className="size-3.5 animate-spin text-primary" />
+            )}
+            {generateImages.isPending
+              ? "Portraits are generating in the background."
+              : "You can continue to step 3 while portraits finish."}
+          </div>
+          <Button size="sm" variant="outline" onClick={onProceedToVideo}>
+            Continue to step 3
+          </Button>
+        </div>
+      )}
+
       {/* Existing personas without images - offer to add photo inline */}
       {hasExistingPersonas && (
         <div className="flex flex-col gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
@@ -1013,7 +976,14 @@ function PersonaView({
         </div>
       )}
 
-      <PersonaBuilderInline onSaved={handleSaved} onCancel={onBack} />
+      <PersonaBuilderInline
+        onSaved={handleSaved}
+        onCancel={onBack}
+        onGenerationStarted={() => {
+          setCanProceedWhileGenerating(true);
+          toast.info("Portraits are generating. You can continue to step 3 now.");
+        }}
+      />
     </div>
   );
 }
