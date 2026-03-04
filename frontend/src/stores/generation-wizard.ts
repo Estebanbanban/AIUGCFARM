@@ -9,6 +9,8 @@ interface PendingScript {
   ctas: ScriptSegment[];
 }
 
+type CompositePreviewCache = Record<string, string[]>;
+
 interface GenerationWizardState {
   step: number;
   productId: string | null;
@@ -32,6 +34,7 @@ interface GenerationWizardState {
   pendingGenerationId: string | null;
   pendingScript: PendingScript | null;
   creditsToCharge: number | null;
+  compositePreviewCache: CompositePreviewCache;
   // Advanced Mode
   advancedMode: boolean;
   advancedSegments: AdvancedSegmentsConfig | null;
@@ -60,6 +63,9 @@ interface GenerationWizardState {
   setCompositeImagePath: (path: string | null) => void;
   setSelectedProductImages: (images: string[]) => void;
   setPendingScript: (id: string, script: PendingScript, credits: number) => void;
+  setCompositePreviewCache: (key: string, paths: string[]) => void;
+  appendCompositePreviewCache: (key: string, path: string) => void;
+  clearCompositePreviewCache: (key?: string) => void;
   updateScriptSection: (type: "hooks" | "bodies" | "ctas", index: number, text: string) => void;
   clearPendingScript: () => void;
   setAdvancedMode: (enabled: boolean) => void;
@@ -100,6 +106,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
       pendingGenerationId: null,
       pendingScript: null,
       creditsToCharge: null,
+      compositePreviewCache: {},
       advancedMode: false,
       advancedSegments: null,
       videoProvider: "kling",
@@ -158,6 +165,25 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
           state.pendingScript = script;
           state.creditsToCharge = credits;
         }),
+      setCompositePreviewCache: (key, paths) =>
+        set((state) => {
+          const unique = [...new Set(paths.filter((p) => typeof p === "string" && p.length > 0))];
+          state.compositePreviewCache[key] = unique;
+        }),
+      appendCompositePreviewCache: (key, path) =>
+        set((state) => {
+          if (!path) return;
+          const existing = state.compositePreviewCache[key] ?? [];
+          state.compositePreviewCache[key] = [path, ...existing.filter((p) => p !== path)].slice(0, 12);
+        }),
+      clearCompositePreviewCache: (key) =>
+        set((state) => {
+          if (!key) {
+            state.compositePreviewCache = {};
+            return;
+          }
+          delete state.compositePreviewCache[key];
+        }),
       updateScriptSection: (type, index, text) =>
         set((state) => {
           if (state.pendingScript && state.pendingScript[type][index]) {
@@ -204,7 +230,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
           state.step = 5;
         }),
       reset: () =>
-        set(() => ({
+        set((state) => ({
           step: 1,
           productId: null,
           personaId: null,
@@ -219,6 +245,8 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
           pendingGenerationId: null,
           pendingScript: null,
           creditsToCharge: null,
+          // Preserve preview cache across sessions/resets.
+          compositePreviewCache: state.compositePreviewCache,
           advancedMode: false,
           advancedSegments: null,
           videoProvider: "kling" as const,
@@ -255,6 +283,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
         pendingGenerationId: state.pendingGenerationId,
         pendingScript: state.pendingScript,
         creditsToCharge: state.creditsToCharge,
+        compositePreviewCache: state.compositePreviewCache,
         advancedMode: state.advancedMode,
         videoProvider: state.videoProvider,
         // advancedSegments intentionally excluded - complex, per-session

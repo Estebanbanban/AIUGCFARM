@@ -442,10 +442,15 @@ export default function GeneratePage() {
     let cancelled = false;
 
     async function restoreCompositePreviews() {
-      if (lastPreviewContextKeyRef.current !== previewContextKey) {
-        lastPreviewContextKeyRef.current = previewContextKey;
+      const previousContextKey = lastPreviewContextKeyRef.current;
+      const contextChanged =
+        previousContextKey !== null && previousContextKey !== previewContextKey;
+      lastPreviewContextKeyRef.current = previewContextKey;
+      if (contextChanged) {
         setCompositeImages([]);
         setSelectedCompositeIdx(null);
+        store.setCompositeImagePath(null);
+        store.clearPendingScript();
         generationFiredForFormat.current = null;
       }
 
@@ -454,16 +459,25 @@ export default function GeneratePage() {
         return;
       }
       const cachedPaths = store.compositePreviewCache[previewContextKey] ?? [];
-      if (cachedPaths.length === 0) {
+      const fallbackPath =
+        !contextChanged && typeof store.compositeImagePath === "string"
+          ? store.compositeImagePath
+          : null;
+      const pathsToRestore = cachedPaths.length > 0
+        ? cachedPaths
+        : fallbackPath
+          ? [fallbackPath]
+          : [];
+      if (pathsToRestore.length === 0) {
         if (!cancelled) setPreviewRestoreReady(true);
         return;
       }
 
       if (!cancelled) setIsRestoringPreviews(true);
       try {
-        const signed = await getSignedImageUrls("composite-images", cachedPaths, 3600);
+        const signed = await getSignedImageUrls("composite-images", pathsToRestore, 3600);
         if (cancelled) return;
-        const restored = cachedPaths
+        const restored = pathsToRestore
           .map((path, i) => ({ path, signed_url: signed[i] }))
           .filter((img) => typeof img.signed_url === "string" && img.signed_url.length > 0) as Array<{
             path: string;
@@ -471,14 +485,23 @@ export default function GeneratePage() {
           }>;
         if (restored.length > 0) {
           setCompositeImages(restored);
-          const selectedIdx = store.compositeImagePath
-            ? restored.findIndex((img) => img.path === store.compositeImagePath)
+          const selectedPath = typeof store.compositeImagePath === "string"
+            ? store.compositeImagePath
+            : null;
+          const selectedIdx = selectedPath
+            ? restored.findIndex((img) => img.path === selectedPath)
             : -1;
-          if (selectedIdx >= 0) {
-            setSelectedCompositeIdx(selectedIdx);
-          } else {
-            setSelectedCompositeIdx(0);
+          if (selectedIdx < 0) {
             store.setCompositeImagePath(restored[0].path);
+            setSelectedCompositeIdx(0);
+          } else {
+            setSelectedCompositeIdx(selectedIdx);
+          }
+          if (cachedPaths.length === 0) {
+            store.setCompositePreviewCache(
+              previewContextKey,
+              restored.map((img) => img.path),
+            );
           }
         }
       } catch {
@@ -499,7 +522,8 @@ export default function GeneratePage() {
   }, [
     previewContextKey,
     store.compositePreviewCache,
-    store.compositeImagePath,
+    store.clearPendingScript,
+    store.setCompositePreviewCache,
     store.setCompositeImagePath,
   ]);
 
@@ -597,11 +621,8 @@ export default function GeneratePage() {
 
   function handleOpenSection(section: 1 | 2) {
     // Clear state for sections after the one being re-opened
-    setCompositeImages([]);
-    setSelectedCompositeIdx(null);
     setShowPreviewEditor(false);
     setPreviewEditPrompt("");
-    store.setCompositeImagePath(null);
     store.clearPendingScript();
     generationFiredForFormat.current = null;
     setScriptConfigChanged(false);
@@ -793,6 +814,7 @@ export default function GeneratePage() {
     const format = formatOverride ?? store.format;
     const personaId = personaIdOverride ?? store.personaId;
     if (!store.productId || !personaId || !format) return;
+    generationFiredForFormat.current = format;
     setShowPreviewEditor(false);
     setPreviewEditPrompt("");
 
@@ -812,6 +834,9 @@ export default function GeneratePage() {
           if (first) {
             store.setCompositeImagePath(first);
             setSelectedCompositeIdx(0);
+          } else {
+            store.setCompositeImagePath(null);
+            setSelectedCompositeIdx(null);
           }
           if (previewContextKey) {
             store.setCompositePreviewCache(
