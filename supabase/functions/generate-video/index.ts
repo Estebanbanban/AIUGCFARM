@@ -458,7 +458,19 @@ async function submitAllKlingJobs(
     })
   );
 
-  jobEntries.push(...await Promise.all(jobSubmissions));
+  const settled = await Promise.allSettled(jobSubmissions);
+  let successCount = 0;
+  for (const result of settled) {
+    if (result.status === "fulfilled") {
+      jobEntries.push(result.value);
+      successCount++;
+    } else {
+      console.error("[generate-video] job submission failed:", result.reason instanceof Error ? result.reason.message : result.reason);
+    }
+  }
+  if (successCount === 0) {
+    throw new Error("All video job submissions failed. The AI service may be temporarily overloaded — please try again in a moment.");
+  }
   return { jobIds: Object.fromEntries(jobEntries), modelUsed: jobModels[0] || klingModel };
 }
 

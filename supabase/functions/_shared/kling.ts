@@ -73,21 +73,35 @@ export async function submitKlingJob(params: {
   const requestedMode = params.mode || "pro";
   const requestedSound = params.sound || (requestedMode === "pro" ? "on" : "off");
 
-  const res = await fetch(`${KLING_BASE}/videos/image2video`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      model_name: requestedModel,
-      image: params.image_url,
-      prompt: params.script,
-      duration: String(params.duration),
-      mode: requestedMode,
-      sound: requestedSound,
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15_000);
+
+  let res: Response;
+  try {
+    res = await fetch(`${KLING_BASE}/videos/image2video`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        model_name: requestedModel,
+        image: params.image_url,
+        prompt: params.script,
+        duration: String(params.duration),
+        mode: requestedMode,
+        sound: requestedSound,
+      }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("Kling API submission timed out after 15s. The service may be under load — please retry.");
+    }
+    throw err;
+  }
+  clearTimeout(timeoutId);
 
   if (!res.ok) {
     let errBody: string;
