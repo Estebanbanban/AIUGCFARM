@@ -25,6 +25,8 @@ const GEMINI_MODEL_V2 = "gemini-2.5-flash-image";
 const GEMINI_MODEL_V1 = "gemini-3.1-flash-image-preview";
 // Keep the existing export alias pointing to v2 (composite/edit functions use it directly)
 const GEMINI_MODEL = GEMINI_MODEL_V2;
+// Keep individual calls below worker timeout budget to avoid WORKER_LIMIT cascades.
+const GEMINI_REQUEST_TIMEOUT_MS = 75_000;
 
 export interface GeneratedImage {
   data: Uint8Array;
@@ -47,7 +49,7 @@ function endpoint(model: string): string {
 /** Call Gemini with a text prompt and a specific model, return a single generated image. */
 async function generateSingleImage(prompt: string, model: string): Promise<GeneratedImage> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120_000); // 120s per image max
+  const timeout = setTimeout(() => controller.abort(), GEMINI_REQUEST_TIMEOUT_MS);
 
   try {
     const res = await fetch(endpoint(model), {
@@ -177,6 +179,8 @@ export async function generateCompositeFromImages(
     ? `${framingRule} ${multiImageInstruction} ${productContextPrompt} ${scenePrompt} The person is filming themselves POV-style (arm extended, front-camera angle, slight wide-angle distortion), naturally holding and showcasing the product which is clearly visible in frame. iPhone selfie aesthetic, talking-to-camera energy. ${formatHint}`
     : `${framingRule} ${multiImageInstruction} ${productContextPrompt} UGC phone selfie: extreme close-up POV, front-camera angle, arm extended at selfie distance, slight wide-angle distortion. The person looks directly into the lens while naturally holding the product near their upper chest — the product is clearly visible in frame. Natural window lighting, authentic imperfections, talking-to-camera energy. ${formatHint}`;
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GEMINI_REQUEST_TIMEOUT_MS);
   const res = await fetch(endpoint(GEMINI_MODEL), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -193,7 +197,8 @@ export async function generateCompositeFromImages(
         imageConfig: { aspectRatio },
       },
     }),
-  });
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timeout));
 
   if (!res.ok) {
     const err = await res.text();
@@ -245,6 +250,8 @@ export async function editCompositeFromReference(
     formatHint,
   ].join(" ");
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GEMINI_REQUEST_TIMEOUT_MS);
   const res = await fetch(endpoint(GEMINI_MODEL), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -260,7 +267,8 @@ export async function editCompositeFromReference(
         imageConfig: { aspectRatio },
       },
     }),
-  });
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timeout));
 
   if (!res.ok) {
     const err = await res.text();

@@ -6,6 +6,8 @@ import { withRetry } from "../_shared/retry.ts";
 import { editCompositeFromReference } from "../_shared/nanobanana.ts";
 
 const MAX_EDIT_PROMPT_CHARS = 500;
+const DAILY_EDIT_LIMIT_FREE = 15;
+const DAILY_EDIT_LIMIT_PAID = 60;
 
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req);
@@ -42,6 +44,29 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "format must be '9:16' or '16:9'" }, cors, 400);
     }
 
+    // Fair-use limit for composite edits to control model costs.
+    const { data: profile } = await sb
+      .from("profiles")
+      .select("plan")
+      .eq("id", userId)
+      .single();
+    const dailyLimit = profile?.plan === "free" ? DAILY_EDIT_LIMIT_FREE : DAILY_EDIT_LIMIT_PAID;
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+    const { count: todayCount } = await sb
+      .from("credit_ledger")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_id", userId)
+      .eq("reason", "composite_generation")
+      .gte("created_at", todayStart.toISOString());
+    if ((todayCount ?? 0) >= dailyLimit) {
+      return json(
+        { detail: `Daily image edit limit reached (${dailyLimit}/day). Try again tomorrow.` },
+        cors,
+        429,
+      );
+    }
+
     // Only allow editing composite images owned by this user.
     if (!composite_image_path.startsWith(`${userId}/`)) {
       return json({ detail: "Access denied for this composite image" }, cors, 403);
@@ -49,7 +74,12 @@ Deno.serve(async (req: Request) => {
 
     const { data: referenceSigned, error: signErr } = await sb.storage
       .from("composite-images")
-      .createSignedUrl(composite_image_path, 600);
+      .createSignedUrl(composite_image_path, 600, {
+        transform: {
+          width: format === "9:16" ? 960 : 1280,
+          quality: 82,
+        },
+      });
 
     if (signErr || !referenceSigned?.signedUrl) {
       throw new Error(`Failed to sign composite image URL: ${signErr?.message}`);
@@ -61,7 +91,7 @@ Deno.serve(async (req: Request) => {
         edit_prompt.trim(),
         format as "9:16" | "16:9",
       ),
-      4,
+      2,
       1000,
     );
 
@@ -86,6 +116,12 @@ Deno.serve(async (req: Request) => {
     if (signedErr || !signedData?.signedUrl) {
       throw new Error(`Failed to sign edited image URL: ${signedErr?.message}`);
     }
+
+    await sb.from("credit_ledger").insert({
+      owner_id: userId,
+      amount: 0,
+      reason: "composite_generation",
+    });
 
     return json(
       {

@@ -934,6 +934,47 @@ export default function GeneratePage() {
     );
   }
 
+  function handleRegenerateSelectedComposite() {
+    if (selectedCompositeIdx === null || !compositeImages[selectedCompositeIdx] || !store.format) return;
+    const selectedIdx = selectedCompositeIdx;
+    const selectedPath = compositeImages[selectedIdx].path;
+    const variationPrompt =
+      "Create a different variation of this same ad scene while keeping the same persona identity and product. Change camera angle, background details, and pose subtly. Keep a natural photorealistic iPhone selfie style.";
+
+    editComposite.mutate(
+      {
+        composite_image_path: selectedPath,
+        edit_prompt: variationPrompt,
+        format: store.format,
+      },
+      {
+        onSuccess: (result) => {
+          setCompositeImages((prev) => {
+            if (!prev[selectedIdx]) return prev;
+            const next = [...prev];
+            next[selectedIdx] = result.image;
+            if (previewContextKey) {
+              store.setCompositePreviewCache(
+                previewContextKey,
+                next.map((img) => img.path),
+              );
+            }
+            return next;
+          });
+          store.setCompositeImagePath(result.image.path);
+          store.clearPendingScript();
+          setScriptConfigChanged(false);
+          setShowPreviewEditor(false);
+          setPreviewEditPrompt("");
+          toast.success("Selected preview regenerated");
+        },
+        onError: (err) => {
+          toast.error(err.message || "Failed to regenerate selected preview");
+        },
+      },
+    );
+  }
+
   // ── Script generation ─────────────────────────────────────────────────
 
   async function handleGenerateScript() {
@@ -1883,12 +1924,19 @@ export default function GeneratePage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleGenerateComposites()}
-                          disabled={generateComposites.isPending || !store.productId || !store.personaId || !store.format}
+                          onClick={handleRegenerateSelectedComposite}
+                          disabled={
+                            generateComposites.isPending ||
+                            editComposite.isPending ||
+                            selectedCompositeIdx === null ||
+                            !store.productId ||
+                            !store.personaId ||
+                            !store.format
+                          }
                           className="h-7 px-2 text-xs"
                         >
                           <RefreshCw className="mr-1 size-3" />
-                          Regenerate all
+                          Regenerate selected
                         </Button>
                       </div>
 
