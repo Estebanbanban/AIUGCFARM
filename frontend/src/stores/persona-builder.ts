@@ -22,6 +22,7 @@ interface PersonaBuilderState {
   setField: (field: string, value: string) => void;
   toggleAccessory: (accessory: string) => void;
   setGeneratedImages: (urls: string[]) => void;
+  appendGeneratedImages: (urls: string[]) => void;
   selectImage: (index: number) => void;
   setIsGenerating: (val: boolean) => void;
   setIsSaving: (val: boolean) => void;
@@ -81,7 +82,17 @@ export const usePersonaBuilderStore = create<PersonaBuilderState>()(
       setGeneratedImages: (urls) =>
         set((state) => {
           state.generatedImages = urls;
-          state.selectedImageIndex = null;
+          // Auto-select first image so user can immediately click "Use This Persona"
+          state.selectedImageIndex = urls.length > 0 ? 0 : null;
+        }),
+      appendGeneratedImages: (urls) =>
+        set((state) => {
+          const isFirst = state.generatedImages.length === 0;
+          state.generatedImages.push(...urls);
+          // Auto-select first image when it arrives
+          if (isFirst && state.generatedImages.length > 0) {
+            state.selectedImageIndex = 0;
+          }
         }),
       selectImage: (index) =>
         set((state) => {
