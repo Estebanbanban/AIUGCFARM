@@ -5,8 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
-  User,
-  ShoppingBag,
   Film,
   Clock,
   Settings,
@@ -36,8 +34,6 @@ import { useGenerationNotifications } from "@/hooks/use-generation-notifications
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Personas", href: "/personas", icon: User },
-  { label: "Brand", href: "/products", icon: ShoppingBag },
   { label: "Generate", href: "/generate", icon: Film },
   { label: "History", href: "/history", icon: Clock },
   { label: "Settings", href: "/settings", icon: Settings },

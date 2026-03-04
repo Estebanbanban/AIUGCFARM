@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { resolvePersonaImageUrl } from '@/hooks/use-personas';
 import Image from 'next/image';
 import {
-  Loader2, Check, User, ImageIcon, X,
+  Loader2, Check, User, ImageIcon,
   ChevronDown, ChevronUp, Eye, Palette, Clock,
   Shirt, Watch, Wand2, Cpu, FlaskConical,
 } from 'lucide-react';
@@ -641,7 +641,8 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
       .single()
       .then(({ data }: { data: { regen_count: number } | null }) => {
         if (!cancelled && data?.regen_count != null) setRegenCount(data.regen_count);
-      });
+      })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [store.personaId, profile?.plan]);
 
@@ -732,36 +733,50 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
       store.setPersonaId(personaId);
 
       // ── Phase 2: parallel image generation ────────────────────────────────
-      // Both edge function calls run simultaneously, each generating 1 image
-      // in its own worker (separate memory budget → no WORKER_LIMIT).
+      // Both edge function calls run simultaneously, each generating 1 image.
+      // Images appear progressively as each call resolves - the user can
+      // click "Use This Persona" as soon as the first image arrives.
       stopSim();
       setLoaderStep(2);
-      startSim(30, 95, 55_000); // no onDone - Gemini responses will interrupt
+      startSim(30, 95, 55_000);
+
+      // Clear any prior images before starting fresh
+      store.setGeneratedImages([]);
 
       const imageCallBody = { persona_id: personaId, name: store.name.trim(), attributes, image_count: 1 };
-      const [res1, res2] = await Promise.allSettled([
-        callEdge<{ data: { generated_image_urls: string[] } }>('generate-persona', {
-          body: imageCallBody,
-          timeoutMs: 180_000,
-        }),
-        callEdge<{ data: { generated_image_urls: string[] } }>('generate-persona', {
-          body: imageCallBody,
-          timeoutMs: 180_000,
-        }),
+
+      let anySucceeded = false;
+      const handleImageResult = (res: PromiseSettledResult<{ data: { generated_image_urls: string[] } }>) => {
+        if (res.status === 'fulfilled') {
+          const newUrls = res.value.data.generated_image_urls ?? [];
+          if (newUrls.length > 0) {
+            anySucceeded = true;
+            store.appendGeneratedImages(newUrls);
+          }
+        }
+      };
+
+      const call1 = callEdge<{ data: { generated_image_urls: string[] } }>('generate-persona', {
+        body: imageCallBody,
+        timeoutMs: 180_000,
+      });
+      const call2 = callEdge<{ data: { generated_image_urls: string[] } }>('generate-persona', {
+        body: imageCallBody,
+        timeoutMs: 180_000,
+      });
+
+      // Show each image as soon as its call resolves
+      const results = await Promise.allSettled([
+        call1.then(r => { handleImageResult({ status: 'fulfilled', value: r }); return r; }),
+        call2.then(r => { handleImageResult({ status: 'fulfilled', value: r }); return r; }),
       ]);
 
-      // Collect URLs from whichever calls succeeded
-      const urls: string[] = [];
-      if (res1.status === 'fulfilled') urls.push(...(res1.value.data.generated_image_urls ?? []));
-      if (res2.status === 'fulfilled') urls.push(...(res2.value.data.generated_image_urls ?? []));
-
-      if (urls.length === 0) {
-        const rej = res1.status === 'rejected' ? res1 : (res2.status === 'rejected' ? res2 : null);
-        const err = rej && 'reason' in rej ? rej.reason : new Error('Both portrait generations failed');
-        throw err instanceof Error ? err : new Error('Both portrait generations failed');
+      if (!anySucceeded) {
+        const rej = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined;
+        const err = rej?.reason instanceof Error ? rej.reason : new Error('Both portrait generations failed');
+        throw err;
       }
 
-      store.setGeneratedImages(urls);
       queryClient.invalidateQueries({ queryKey: ['personas'] });
 
       stopSim();
@@ -864,19 +879,10 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      {onCancel && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">Configure your AI persona</p>
-          <Button variant="ghost" size="sm" onClick={onCancel}>
-            <X className="size-4" />
-            Back to library
-          </Button>
-        </div>
-      )}
+    <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
 
       <div className={cn(
-        "grid gap-6",
+        "grid min-h-0 items-start gap-6",
         store.generatedImages.length > 0
           ? "lg:grid-cols-2"
           : createMode === 'quick' && !isGeneratingQuick
@@ -885,7 +891,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
       )}>
 
         {/* ── Left: Sims-style criteria builder ─────────────────────── */}
-        <fieldset disabled={store.isGenerating || store.isSaving || isGeneratingQuick} className="min-w-0">
+        <fieldset disabled={store.isGenerating || store.isSaving || isGeneratingQuick} className="min-h-0 min-w-0 overflow-y-auto">
           <div className={cn(
             'flex flex-col gap-5 transition-opacity',
             (store.isGenerating || store.isSaving || isGeneratingQuick) && 'pointer-events-none opacity-50',
@@ -1104,33 +1110,35 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
 
         {/* ── Right: preview + generate ──────────────────────────────── */}
         <div className={cn(
-          "flex flex-col gap-4",
+          "flex min-h-0 flex-col gap-4",
           createMode === 'quick' && !isGeneratingQuick && store.generatedImages.length === 0 && 'hidden',
         )}>
-          <div className="sticky top-6">
+          <div className="flex min-h-0 flex-col">
 
             {/* Generating loader (Quick Create) */}
             {isGeneratingQuick && store.generatedImages.length === 0 && (
-              <NanoBananaLoader
-                title="Creating Your Persona"
-                subtitle="Generating unique portraits - usually 60-90 seconds"
-                steps={PERSONA_STEPS}
-                currentStep={loaderStep}
-                progress={loaderProgress}
-                className="min-h-[400px]"
-              />
+              <div className="flex min-h-[320px] items-center justify-center">
+                <NanoBananaLoader
+                  title="Creating Your Persona"
+                  subtitle="Generating unique portraits - usually 60-90 seconds"
+                  steps={PERSONA_STEPS}
+                  currentStep={loaderStep}
+                  progress={loaderProgress}
+                />
+              </div>
             )}
 
             {/* Generating loader (Visual Builder - custom mode) */}
             {store.isGenerating && !isGeneratingQuick && store.generatedImages.length === 0 && (
-              <NanoBananaLoader
-                title="Creating Your Persona"
-                subtitle="Generating unique portraits - usually 60-90 seconds"
-                steps={PERSONA_STEPS}
-                currentStep={loaderStep}
-                progress={loaderProgress}
-                className="min-h-[400px]"
-              />
+              <div className="flex min-h-[320px] items-center justify-center">
+                <NanoBananaLoader
+                  title="Creating Your Persona"
+                  subtitle="Generating unique portraits - usually 60-90 seconds"
+                  steps={PERSONA_STEPS}
+                  currentStep={loaderStep}
+                  progress={loaderProgress}
+                />
+              </div>
             )}
 
             {/* Attribute summary (before generating) - only shown in Custom mode */}
@@ -1213,9 +1221,17 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
               </div>
             )}
 
+            {/* Still loading more images indicator */}
+            {(isGeneratingQuick || store.isGenerating) && store.generatedImages.length > 0 && (
+              <div className="mt-2 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="size-3 animate-spin" />
+                Loading more portraits…
+              </div>
+            )}
+
             {/* Action buttons */}
             <div className="mt-4 flex flex-col gap-3">
-              {store.generatedImages.length === 0 ? (
+              {store.generatedImages.length === 0 && !isGeneratingQuick ? (
                 <Button
                   onClick={handleGenerate}
                   disabled={!store.name.trim() || store.isGenerating}
@@ -1233,7 +1249,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     </>
                   )}
                 </Button>
-              ) : (
+              ) : store.generatedImages.length > 0 ? (
                 <>
                   <Button
                     onClick={handleSave}
@@ -1256,37 +1272,45 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                   {profile?.plan === 'free' && regenCount > 0 && (
                     <p className="text-center text-xs text-muted-foreground">{regenCount} of 4 regenerations used</p>
                   )}
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="w-full">
-                          <Button
-                            onClick={handleGenerate}
-                            variant="outline"
-                            disabled={store.isGenerating || store.isSaving || (profile?.plan === 'free' && regenCount >= 4)}
-                            className="w-full"
-                          >
-                            {store.isGenerating ? (
-                              <>
-                                <Loader2 className="size-4 animate-spin" />
-                                Regenerating…
-                              </>
-                            ) : (
-                              <>
-                                Regenerate
-                              </>
-                            )}
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      {profile?.plan === 'free' && regenCount >= 4 && (
-                        <TooltipContent>
-                          <p>Upgrade to regenerate more images</p>
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-                  </TooltipProvider>
+                  {!isGeneratingQuick && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="w-full">
+                            <Button
+                              onClick={handleGenerate}
+                              variant="outline"
+                              disabled={store.isGenerating || store.isSaving || (profile?.plan === 'free' && regenCount >= 4)}
+                              className="w-full"
+                            >
+                              {store.isGenerating ? (
+                                <>
+                                  <Loader2 className="size-4 animate-spin" />
+                                  Regenerating…
+                                </>
+                              ) : (
+                                <>
+                                  Regenerate
+                                </>
+                              )}
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {profile?.plan === 'free' && regenCount >= 4 && (
+                          <TooltipContent>
+                            <p>Upgrade to regenerate more images</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </>
+              ) : null}
+
+              {onCancel && (
+                <Button variant="ghost" size="sm" onClick={onCancel} className="w-full text-muted-foreground">
+                  Back to library
+                </Button>
               )}
             </div>
 
