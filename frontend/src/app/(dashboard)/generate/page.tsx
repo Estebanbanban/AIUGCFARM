@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -984,8 +984,34 @@ export default function GeneratePage() {
   // Section 3 is unlocked
   const section3Unlocked = store.step >= 4;
 
+  // Detect orphaned awaiting_approval generation (e.g. after localStorage wipe)
+  const orphanedDraft = useMemo(() => {
+    if (store.pendingGenerationId) return null; // already tracked in store
+    return (generations ?? []).find((g) => g.status === "awaiting_approval") ?? null;
+  }, [generations, store.pendingGenerationId]);
+
   return (
     <div className="flex flex-col gap-4">
+      {/* ── Orphaned draft banner (localStorage cleared, pending script in DB) ── */}
+      {orphanedDraft && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="size-4 shrink-0 text-amber-400" />
+            <p className="text-sm text-amber-400">
+              You have a script awaiting approval — no credits charged yet.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="shrink-0 border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+            onClick={() => router.push("/dashboard")}
+          >
+            Review &amp; Approve
+          </Button>
+        </div>
+      )}
+
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>

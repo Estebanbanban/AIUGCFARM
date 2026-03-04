@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 const reels = [
   {
@@ -54,13 +54,34 @@ const reels = [
 ];
 
 function ReelCard({ reel }: { reel: (typeof reels)[number] }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      },
+      { threshold: 0.5 },
+    );
+
+    observer.observe(video);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="flex-shrink-0 px-2.5 md:px-3">
       <div className="relative w-[180px] sm:w-[210px] md:w-[240px] aspect-[9/16] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_14px_26px_rgba(0,0,0,0.16)] dark:shadow-[0_14px_26px_rgba(0,0,0,0.35)]">
         <video
+          ref={videoRef}
           className="h-full w-full object-cover"
           poster={reel.poster}
-          autoPlay
           loop
           muted
           playsInline

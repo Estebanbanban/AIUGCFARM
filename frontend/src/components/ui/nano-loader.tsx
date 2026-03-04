@@ -67,9 +67,9 @@ export function NanoBananaLoader({
       )}
 
       {/* HUD container */}
-      <div className="w-full max-w-md rounded-xl border border-zinc-800/50 bg-[#161616] p-6 space-y-6">
+      <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 space-y-6">
         {/* Live preview label */}
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-700">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
           Live Preview
         </span>
 
@@ -88,7 +88,7 @@ export function NanoBananaLoader({
           </div>
 
           {/* Progress bar */}
-          <div className="w-full h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+          <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
             <div
               className="h-full rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)] transition-all duration-700"
               style={{ width: `${clampedProgress}%` }}
@@ -117,13 +117,13 @@ export function NanoBananaLoader({
                 ) : isActive ? (
                   <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
                     {step.icon ?? (
-                      <Zap className="w-3 h-3 text-[#0d0d0d]" />
+                      <Zap className="w-3 h-3 text-amber-950" />
                     )}
                   </div>
                 ) : (
-                  <div className="w-5 h-5 rounded-full border border-zinc-700 flex items-center justify-center flex-shrink-0">
+                  <div className="w-5 h-5 rounded-full border border-border flex items-center justify-center flex-shrink-0">
                     {step.icon ?? (
-                      <Zap className="w-3 h-3 text-zinc-700" />
+                      <Zap className="w-3 h-3 text-muted-foreground" />
                     )}
                   </div>
                 )}
@@ -132,9 +132,9 @@ export function NanoBananaLoader({
                 <span
                   className={cn(
                     "text-sm transition-all duration-500",
-                    isDone && "text-zinc-200",
-                    isActive && "text-zinc-200 font-bold",
-                    isPending && "text-zinc-700"
+                    isDone && "text-foreground",
+                    isActive && "text-foreground font-bold",
+                    isPending && "text-muted-foreground"
                   )}
                 >
                   {step.label}
@@ -146,7 +146,7 @@ export function NanoBananaLoader({
       </div>
 
       {/* Stats footer */}
-      <div className="w-full max-w-md flex items-center justify-between px-2 text-[10px] font-mono uppercase tracking-widest text-zinc-700">
+      <div className="w-full max-w-md flex items-center justify-between px-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
         <span>CineRads</span>
         <span className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />

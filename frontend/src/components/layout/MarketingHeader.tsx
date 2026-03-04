@@ -90,7 +90,7 @@ function UserMenu({ user }: { user: AuthUser }) {
               className="flex w-full items-center gap-2.5 px-4 py-3 text-sm text-destructive hover:bg-destructive/5 transition-colors"
             >
               <LogOut className="size-4" />
-              Se déconnecter
+              Sign Out
             </button>
           </motion.div>
         )}
@@ -296,7 +296,7 @@ export function MarketingHeader() {
                       className="flex items-center gap-2.5 rounded-full border border-destructive/30 py-3 px-4 text-sm text-destructive"
                     >
                       <LogOut className="size-4" />
-                      Se déconnecter
+                      Sign Out
                     </button>
                   </>
                 ) : (

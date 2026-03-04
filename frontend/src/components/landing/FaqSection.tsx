@@ -34,7 +34,7 @@ const faqs = [
   {
     question: "Is there a free trial?",
     answer:
-      "New accounts get 50% off their first video — no credit card required to sign up. Generate a full UGC ad and see the quality before you commit to a plan.",
+      "Brand import and AI persona creation are completely free — no credit card required. Import your brand, build your AI persona, and explore the platform before generating your first video.",
   },
   {
     question: "Can I cancel anytime?",

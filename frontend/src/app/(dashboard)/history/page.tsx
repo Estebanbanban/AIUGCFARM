@@ -11,6 +11,8 @@ import {
   Sparkles,
   AlertCircle,
   RefreshCw,
+  FileText,
+  LayoutDashboard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDate, formatCurrency } from "@/lib/utils";
@@ -61,16 +63,19 @@ function statusLabel(status: string): string {
       return "Completed";
     case "failed":
       return "Failed";
+    case "awaiting_approval":
+      return "Review Script";
     default:
       return "In Progress";
   }
 }
 
-type HistoryStatusFilter = "all" | "in_progress" | "completed" | "failed";
+type HistoryStatusFilter = "all" | "in_progress" | "review_script" | "completed" | "failed";
 
 function toStatusFilter(status: GenerationStatus): Exclude<HistoryStatusFilter, "all"> {
   if (status === "completed") return "completed";
   if (status === "failed") return "failed";
+  if (status === "awaiting_approval") return "review_script";
   return "in_progress";
 }
 
@@ -89,6 +94,7 @@ export default function HistoryPage() {
     const counts = {
       all: generations.length,
       in_progress: 0,
+      review_script: 0,
       completed: 0,
       failed: 0,
     };
@@ -189,6 +195,16 @@ export default function HistoryPage() {
             >
               In Progress ({statusCounts.in_progress})
             </Button>
+            {statusCounts.review_script > 0 && (
+              <Button
+                variant={statusFilter === "review_script" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setStatusFilter("review_script")}
+                className="border-amber-500/40 text-amber-400 hover:text-amber-300"
+              >
+                Review Script ({statusCounts.review_script})
+              </Button>
+            )}
             <Button
               variant={statusFilter === "completed" ? "default" : "outline"}
               size="sm"
@@ -233,6 +249,7 @@ export default function HistoryPage() {
                   "h-full transition-colors hover:border-primary/30 border-l-4",
                   gen.status === "completed" && "border-emerald-500",
                   gen.status === "failed" && "border-red-500",
+                  gen.status === "awaiting_approval" && "border-amber-400",
                   (gen.status === "pending" || gen.status === "generating_segments") && "border-amber-500",
                 )}>
                   <CardContent className="flex flex-col gap-3 py-5">
@@ -305,6 +322,29 @@ export default function HistoryPage() {
                         </span>{" "}
                         ({cost.totalBilledSeconds}s billed)
                       </p>
+                    )}
+
+                    {/* Awaiting approval: prompt user to resume */}
+                    {gen.status === "awaiting_approval" && (
+                      <div
+                        className="flex items-start gap-2 rounded-md bg-amber-500/10 px-3 py-2"
+                        onClick={(e) => e.preventDefault()}
+                      >
+                        <FileText className="mt-0.5 size-3.5 shrink-0 text-amber-400" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs text-amber-400">
+                            Script ready — no credits charged yet
+                          </p>
+                          <Link
+                            href="/dashboard"
+                            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-1 rounded transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <LayoutDashboard className="size-3" />
+                            Approve &amp; Generate
+                          </Link>
+                        </div>
+                      </div>
                     )}
 
                     {/* Failed: show error + retry */}
