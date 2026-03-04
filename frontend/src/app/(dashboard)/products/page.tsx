@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -9,6 +9,9 @@ import {
   LinkIcon,
   Upload,
   AlertCircle,
+  ChevronRight,
+  ArrowLeft,
+  Store,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -35,6 +38,60 @@ import { ManualUploadForm } from '@/components/products/ManualUploadForm';
 import { isExternalUrl, getSignedImageUrls } from '@/lib/storage';
 import { Badge } from '@/components/ui/badge';
 import type { Product, BrandSummary } from '@/types/database';
+
+/* -------------------------------------------------------------------------- */
+/*  Brand grouping helpers                                                     */
+/* -------------------------------------------------------------------------- */
+
+function getBrandKey(storeUrl: string | null): string {
+  if (!storeUrl) return '_manual';
+  try {
+    return new URL(storeUrl).hostname.toLowerCase();
+  } catch {
+    return storeUrl.slice(0, 80).toLowerCase();
+  }
+}
+
+function getBrandName(storeUrl: string | null): string {
+  if (!storeUrl) return 'My Products';
+  try {
+    return new URL(storeUrl).hostname
+      .replace(/^www\./, '')
+      .replace(/\.myshopify\.com$/, '');
+  } catch {
+    return storeUrl;
+  }
+}
+
+interface BrandGroup {
+  key: string;
+  name: string;
+  storeUrl: string | null;
+  products: Product[];
+  source: Product['source'] | null;
+}
+
+function groupByBrand(products: Product[]): BrandGroup[] {
+  const map = new Map<string, BrandGroup>();
+  for (const p of products) {
+    const key = getBrandKey(p.store_url);
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        name: getBrandName(p.store_url),
+        storeUrl: p.store_url,
+        products: [],
+        source: p.source,
+      });
+    }
+    map.get(key)!.products.push(p);
+  }
+  return Array.from(map.values());
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Image resolution hook                                                      */
+/* -------------------------------------------------------------------------- */
 
 /** Batch resolve first image for all products (1 API call instead of N) */
 function useResolvedProductImages(products: Product[] | undefined) {
@@ -69,6 +126,79 @@ function useResolvedProductImages(products: Product[] | undefined) {
   return imageMap;
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Brand card                                                                 */
+/* -------------------------------------------------------------------------- */
+
+function BrandCard({
+  brand,
+  imageMap,
+  onClick,
+}: {
+  brand: BrandGroup;
+  imageMap: Record<string, string>;
+  onClick: () => void;
+}) {
+  const previews = brand.products.slice(0, 3);
+  const tone = brand.products[0]?.brand_summary?.tone ?? null;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group w-full text-left"
+    >
+      <Card className="h-full transition-colors hover:border-primary/30 group-hover:border-primary/30">
+        <CardContent className="flex flex-col gap-3 p-4">
+          {/* Product image preview strip */}
+          <div className="grid grid-cols-3 gap-1 overflow-hidden rounded-lg">
+            {previews.map((p) => (
+              <div key={p.id} className="aspect-square bg-muted">
+                {imageMap[p.id] && (
+                  <img
+                    src={imageMap[p.id]}
+                    alt={p.name}
+                    className="size-full object-cover"
+                    loading="lazy"
+                  />
+                )}
+              </div>
+            ))}
+            {Array.from({ length: Math.max(0, 3 - previews.length) }).map((_, i) => (
+              <div key={`empty-${i}`} className="aspect-square bg-muted rounded" />
+            ))}
+          </div>
+
+          {/* Brand info */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate font-medium text-foreground capitalize">{brand.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {brand.products.length} product{brand.products.length !== 1 ? 's' : ''}
+              </p>
+              {tone && (
+                <p className="mt-1 truncate text-xs text-muted-foreground italic">{tone}</p>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              {brand.source && brand.source !== '_manual' as string && (
+                <Badge variant="outline" className="text-xs capitalize">
+                  {brand.source}
+                </Badge>
+              )}
+              <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </button>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Skeleton                                                                   */
+/* -------------------------------------------------------------------------- */
+
 function ProductCardSkeleton() {
   return (
     <Card className="h-full">
@@ -87,11 +217,18 @@ function ProductCardSkeleton() {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Main page                                                                  */
+/* -------------------------------------------------------------------------- */
+
 export default function ProductsPage() {
   const { data: products, isLoading, error } = useProducts();
   const { data: profile } = useProfile();
   const scrapeProduct = useScrapeProduct();
   const queryClient = useQueryClient();
+
+  // Brand navigation state (null = brand list, string = selected brand key)
+  const [selectedBrandKey, setSelectedBrandKey] = useState<string | null>(null);
 
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importUrl, setImportUrl] = useState('');
@@ -101,13 +238,29 @@ export default function ProductsPage() {
   const [showScrapeResults, setShowScrapeResults] = useState(false);
 
   const productImageMap = useResolvedProductImages(products);
-  const hasProducts = (products?.length ?? 0) > 0;
+
   const plan = profile?.plan ?? 'free';
   const isAdmin = profile?.role === 'admin';
   const productLimit = PRODUCT_SLOT_LIMITS[plan];
   const productCount = products?.length ?? 0;
   const atProductLimit = !isAdmin && productCount >= productLimit;
   const approachingLimit = !isAdmin && productCount >= productLimit * 0.8;
+
+  // Group all products by brand/store
+  const brands = useMemo(() => groupByBrand(products ?? []), [products]);
+
+  // Currently viewed brand
+  const selectedBrand = useMemo(
+    () => brands.find((b) => b.key === selectedBrandKey) ?? null,
+    [brands, selectedBrandKey],
+  );
+
+  // If the selected brand no longer exists (e.g. all products deleted), go back
+  useEffect(() => {
+    if (selectedBrandKey && !selectedBrand && !isLoading) {
+      setSelectedBrandKey(null);
+    }
+  }, [selectedBrandKey, selectedBrand, isLoading]);
 
   async function handleScrape() {
     if (!importUrl.trim()) return;
@@ -190,31 +343,58 @@ export default function ProductsPage() {
     }
   }
 
+  /* ---------------------------------------------------------------------- */
+  /*  Render: brand list view                                                 */
+  /* ---------------------------------------------------------------------- */
+
+  const showBrandList = selectedBrandKey === null;
+
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
+      {/* ------------------------------------------------------------------ */}
+      {/*  Header                                                             */}
+      {/* ------------------------------------------------------------------ */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Products</h1>
-          <span className="mt-1 block text-sm text-muted-foreground" suppressHydrationWarning>
-            {isLoading ? (
-              <Skeleton className="inline-block h-4 w-32" />
-            ) : (
-              `${products?.length ?? 0} product${(products?.length ?? 0) !== 1 ? 's' : ''}`
-            )}
-          </span>
+        <div className="flex items-center gap-3">
+          {/* Back button when inside a brand */}
+          {!showBrandList && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSelectedBrandKey(null)}
+            >
+              <ArrowLeft className="size-4" />
+            </Button>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {showBrandList ? 'Brands' : selectedBrand?.name ?? 'Products'}
+            </h1>
+            <span className="mt-1 block text-sm text-muted-foreground" suppressHydrationWarning>
+              {isLoading ? (
+                <Skeleton className="inline-block h-4 w-32" />
+              ) : showBrandList ? (
+                `${brands.length} brand${brands.length !== 1 ? 's' : ''}`
+              ) : (
+                `${selectedBrand?.products.length ?? 0} product${(selectedBrand?.products.length ?? 0) !== 1 ? 's' : ''}`
+              )}
+            </span>
+          </div>
         </div>
-        {hasProducts && (
+
+        {/* Action buttons */}
+        {(showBrandList ? brands.length > 0 : selectedBrand !== null) && (
           <div className="flex items-center gap-3">
             {atProductLimit && (
-              <Badge variant="outline" className={`text-xs ${approachingLimit ? 'bg-amber-500/10 text-amber-600 border-amber-500/30' : 'text-muted-foreground'}`}>
+              <Badge
+                variant="outline"
+                className={`text-xs ${approachingLimit ? 'bg-amber-500/10 text-amber-600 border-amber-500/30' : 'text-muted-foreground'}`}
+              >
                 {atProductLimit && <AlertCircle className="size-3" />}
                 {productCount}/{productLimit} products
               </Badge>
             )}
             <Button
-              variant="secondary"
-              disabled={atProductLimit}
               onClick={() => {
                 if (atProductLimit) {
                   toast.error(`You've reached the ${productLimit} product limit for your ${plan} plan. Upgrade to add more.`);
@@ -222,45 +402,34 @@ export default function ProductsPage() {
                 }
                 setShowImportDialog(true);
               }}
-            >
-              <LinkIcon className="size-4" />
-              Import Product
-            </Button>
-            <Button
               disabled={atProductLimit}
-              onClick={() => {
-                if (atProductLimit) {
-                  toast.error(`You've reached the ${productLimit} product limit for your ${plan} plan. Upgrade to add more.`);
-                  return;
-                }
-                setShowImportDialog(true);
-              }}
             >
               <Plus className="size-4" />
-              Add Manually
+              {showBrandList ? 'Add Brand' : 'Add Product'}
             </Button>
           </div>
         )}
       </div>
 
-      {/* Error state */}
+      {/* ------------------------------------------------------------------ */}
+      {/*  Error state                                                        */}
+      {/* ------------------------------------------------------------------ */}
       {error && !isLoading && (
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-12">
             <p className="text-sm text-destructive">
               Failed to load products: {error.message}
             </p>
-            <Button
-              variant="outline"
-              onClick={() => window.location.reload()}
-            >
+            <Button variant="outline" onClick={() => window.location.reload()}>
               Retry
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Loading skeletons */}
+      {/* ------------------------------------------------------------------ */}
+      {/*  Loading skeletons                                                  */}
+      {/* ------------------------------------------------------------------ */}
       {isLoading && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -269,10 +438,28 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* Product Grid */}
-      {!isLoading && !error && hasProducts && (
+      {/* ------------------------------------------------------------------ */}
+      {/*  Brand list view                                                    */}
+      {/* ------------------------------------------------------------------ */}
+      {!isLoading && !error && showBrandList && brands.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {products!.map((product) => (
+          {brands.map((brand) => (
+            <BrandCard
+              key={brand.key}
+              brand={brand}
+              imageMap={productImageMap}
+              onClick={() => setSelectedBrandKey(brand.key)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/*  Product list view (inside a brand)                                */}
+      {/* ------------------------------------------------------------------ */}
+      {!isLoading && !error && !showBrandList && selectedBrand && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {selectedBrand.products.map((product) => (
             <DeleteProductWrapper
               key={product.id}
               product={product}
@@ -282,18 +469,20 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* Empty state */}
-      {!isLoading && !error && !hasProducts && (
+      {/* ------------------------------------------------------------------ */}
+      {/*  Empty state (no products at all)                                  */}
+      {/* ------------------------------------------------------------------ */}
+      {!isLoading && !error && brands.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-12">
             <div className="flex size-14 items-center justify-center rounded-full bg-primary/10">
-              <Package className="size-7 text-primary" />
+              <Store className="size-7 text-primary" />
             </div>
             <div className="text-center">
-              <h3 className="font-semibold">No products yet</h3>
+              <h3 className="font-semibold">No brands yet</h3>
               <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                Import products from your store or upload them manually to get
-                started with video generation.
+                Import your store to get started. We&apos;ll automatically group
+                your products by brand.
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -301,10 +490,7 @@ export default function ProductsPage() {
                 <LinkIcon className="size-4" />
                 Import from Store
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowImportDialog(true)}
-              >
+              <Button variant="outline" onClick={() => setShowImportDialog(true)}>
                 <Upload className="size-4" />
                 Upload Manually
               </Button>
@@ -313,11 +499,15 @@ export default function ProductsPage() {
         </Card>
       )}
 
-      {/* Import Dialog with Tabs */}
+      {/* ------------------------------------------------------------------ */}
+      {/*  Import Dialog                                                      */}
+      {/* ------------------------------------------------------------------ */}
       <Dialog open={showImportDialog} onOpenChange={handleDialogClose}>
         <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-lg">
           <DialogHeader className="shrink-0">
-            <DialogTitle>Add Product</DialogTitle>
+            <DialogTitle>
+              {showBrandList ? 'Add Brand' : 'Add Product'}
+            </DialogTitle>
             <DialogDescription>
               Import a product from a URL or upload one manually.
             </DialogDescription>
@@ -344,16 +534,15 @@ export default function ProductsPage() {
                 </TabsTrigger>
               </TabsList>
 
-              {/* Import from URL Tab */}
               <TabsContent value="import-url">
                 <div className="flex flex-col gap-4 pt-2">
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="product-url">Product URL</Label>
+                    <Label htmlFor="product-url">Store or Product URL</Label>
                     <div className="relative">
                       <LinkIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         id="product-url"
-                        placeholder="https://store.com/products/..."
+                        placeholder="https://yourstore.com/products/..."
                         value={importUrl}
                         onChange={(e) => setImportUrl(e.target.value)}
                         className="pl-10"
@@ -373,10 +562,7 @@ export default function ProductsPage() {
                     )}
                   </div>
                   <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => handleDialogClose(false)}
-                    >
+                    <Button variant="outline" onClick={() => handleDialogClose(false)}>
                       Cancel
                     </Button>
                     <Button
@@ -396,7 +582,6 @@ export default function ProductsPage() {
                 </div>
               </TabsContent>
 
-              {/* Upload Manually Tab */}
               <TabsContent value="upload">
                 <div className="pt-2">
                   <ManualUploadForm onSuccess={handleUploadSuccess} />
@@ -410,10 +595,14 @@ export default function ProductsPage() {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Delete wrapper (unchanged)                                                */
+/* -------------------------------------------------------------------------- */
+
 function DeleteProductWrapper({ product, resolvedImageUrl }: { product: Product; resolvedImageUrl?: string }) {
   const deleteProduct = useDeleteProduct(product.id);
 
-  async function handleDelete(id: string) {
+  async function handleDelete() {
     try {
       await deleteProduct.mutateAsync();
       toast.success(`"${product.name}" deleted`);
