@@ -1,6 +1,7 @@
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
 import { sendEmail } from "../_shared/email.ts";
+import { captureException } from "../_shared/sentry.ts";
 import Stripe from "https://esm.sh/stripe@14?target=deno";
 
 const FRONTEND_URL = Deno.env.get("FRONTEND_URL") || "http://localhost:3000";
@@ -260,6 +261,51 @@ Deno.serve(async (req: Request) => {
             console.error("checkout: credit ledger insert failed:", ledgerErr);
             processingError = ledgerErr.message;
           }
+        }
+
+        // Send post-purchase confirmation email for subscriptions
+        try {
+          const planCredits = PLAN_CREDITS[plan] ?? 0;
+          const { data: authUser } = await sb.auth.admin.getUserById(userId);
+          const userEmail = authUser?.user?.email;
+          if (userEmail) {
+            const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
+            await sendEmail({
+              to: userEmail,
+              subject: `Welcome to ${planLabel} \u2014 your credits are loaded!`,
+              html: `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:system-ui,-apple-system,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 0">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden">
+        <tr><td style="padding:32px 40px 24px;border-bottom:1px solid #f3f4f6">
+          <p style="margin:0;font-size:22px;font-weight:700;color:#111827;letter-spacing:-0.5px">CineRads</p>
+        </td></tr>
+        <tr><td style="padding:32px 40px">
+          <h1 style="margin:0 0 12px;font-size:20px;font-weight:600;color:#111827">Your ${planLabel} plan is active!</h1>
+          <p style="margin:0 0 24px;font-size:15px;color:#6b7280;line-height:1.6">
+            We just loaded <strong>${planCredits} credits</strong> into your account. You\u2019re ready to start creating UGC video ads at scale.
+          </p>
+          <a href="${FRONTEND_URL}/generate" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 28px;border-radius:8px">
+            Create your first video
+          </a>
+        </td></tr>
+        <tr><td style="padding:20px 40px;background:#f9fafb;border-top:1px solid #f3f4f6">
+          <p style="margin:0;font-size:12px;color:#9ca3af">&copy; 2026 CineRads &middot; AI UGC Video Generator</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+            });
+            console.log(`Subscription email sent to ${userEmail} (${planLabel} plan, ${planCredits} credits)`);
+          }
+        } catch (emailErr) {
+          // Email failure should not block the webhook — log and continue
+          console.error("checkout: subscription purchase email failed:", emailErr);
         }
 
         break;
@@ -603,6 +649,7 @@ Deno.serve(async (req: Request) => {
 
     return json({ data: { received: true } }, headers);
   } catch (e: unknown) {
+    captureException(e);
     console.error("stripe-webhook error:", e);
     return json({ detail: "Webhook processing failed" }, headers, 500);
   }

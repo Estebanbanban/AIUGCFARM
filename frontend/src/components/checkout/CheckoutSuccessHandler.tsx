@@ -83,9 +83,13 @@ export function CheckoutSuccessHandler() {
       timers.push(setTimeout(smartRefresh, 30_000));
       timers.push(setTimeout(smartRefresh, 60_000));
     } else {
+      // Poll credits every 2s for 15s so the balance updates as soon as the
+      // webhook grants credits (avoids the "0 credits" flash if user clicks
+      // Generate immediately after redirect).
       invalidateCreditsOnly();
-      timers.push(setTimeout(invalidateCreditsOnly, 4_000));
-      timers.push(setTimeout(invalidateCreditsOnly, 10_000));
+      for (let t = 2_000; t <= 15_000; t += 2_000) {
+        timers.push(setTimeout(invalidateCreditsOnly, t));
+      }
     }
 
     // Track purchase regardless of page
@@ -97,10 +101,14 @@ export function CheckoutSuccessHandler() {
       trackPurchaseConfirmed("credits", packParam);
     }
 
-    // On /generate: just toast + clean URL, don't navigate away or show modal
+    // On /generate: just toast + clean URL, don't navigate away or show modal.
+    // Still poll credits so they appear even if webhook hasn't landed yet.
     if (isOnGeneratePage) {
       queryClient.invalidateQueries({ queryKey: ["credits"] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
+      for (let t = 2_000; t <= 15_000; t += 2_000) {
+        timers.push(setTimeout(invalidateCreditsOnly, t));
+      }
       toast.success("Payment confirmed! Your credits are ready — generate your video now");
       router.replace(pathname!);
       return () => { timers.forEach(clearTimeout); };
