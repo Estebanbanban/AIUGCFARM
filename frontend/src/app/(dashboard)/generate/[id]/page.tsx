@@ -596,12 +596,14 @@ function CombinationPreview({
   ctaVideo,
   generationId,
   allSegmentEntries,
+  autoStitch = false,
 }: {
   hookVideo: SegmentVideo | undefined;
   bodyVideo: SegmentVideo | undefined;
   ctaVideo: SegmentVideo | undefined;
   generationId: string;
   allSegmentEntries: Array<{ name: string; url: string }>;
+  autoStitch?: boolean;
 }) {
   const hookRef = useRef<HTMLVideoElement>(null);
   const bodyRef = useRef<HTMLVideoElement>(null);
@@ -616,7 +618,7 @@ function CombinationPreview({
     "sequential",
   );
 
-  const { stitch, reset, status: stitchStatus, stitchedUrl, error: stitchError } =
+  const { stitch, reset, status: stitchStatus, progress: stitchProgress, stitchedUrl, error: stitchError } =
     useVideoStitcher();
 
   const {
@@ -627,6 +629,9 @@ function CombinationPreview({
     isActive: isPackZipping,
   } = useZipDownload();
 
+  // Track whether auto-stitch has been triggered for this combination
+  const autoStitchTriggered = useRef(false);
+
   // Toast on Download Pack failure
   useEffect(() => {
     if (packZipStatus === "error") {
@@ -634,6 +639,30 @@ function CombinationPreview({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [packZipStatus]);
+
+  // Toast on stitch failure
+  useEffect(() => {
+    if (stitchStatus === "error" && stitchError) {
+      toast.error(stitchError);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stitchStatus]);
+
+  // Auto-stitch when all segments are available and autoStitch is enabled
+  useEffect(() => {
+    if (
+      autoStitch &&
+      hookVideo &&
+      bodyVideo &&
+      ctaVideo &&
+      stitchStatus === "idle" &&
+      !autoStitchTriggered.current
+    ) {
+      autoStitchTriggered.current = true;
+      stitch(hookVideo.url, bodyVideo.url, ctaVideo.url);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStitch, hookVideo?.url, bodyVideo?.url, ctaVideo?.url, stitchStatus]);
 
   const isStitching =
     stitchStatus !== "idle" &&
@@ -701,6 +730,7 @@ function CombinationPreview({
     stopAll();
     reset();
     setViewMode("sequential");
+    autoStitchTriggered.current = false;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hookVideo?.url, bodyVideo?.url, ctaVideo?.url]);
 
@@ -971,6 +1001,16 @@ function CombinationPreview({
             </Button>
           </div>
         </div>
+
+        {isStitching && (
+          <div className="mt-2">
+            <Progress
+              value={stitchProgress}
+              className="h-1.5 bg-muted [&>[data-slot=progress-indicator]]:bg-primary"
+            />
+            <p className="mt-1 text-xs text-muted-foreground text-right">{stitchProgress}%</p>
+          </div>
+        )}
 
         {stitchError && (
           <p className="mt-2 text-xs text-red-400">{stitchError}</p>
@@ -1855,6 +1895,7 @@ export default function GenerationDetailPage() {
                     ...(segments.bodies ?? []).map((v, i) => ({ name: `bodies/body_${i + 1}.mp4`, url: v.url })),
                     ...(segments.ctas ?? []).map((v, i) => ({ name: `ctas/cta_${i + 1}.mp4`, url: v.url })),
                   ]}
+                  autoStitch
                 />
 
                 {/* Selection summary */}

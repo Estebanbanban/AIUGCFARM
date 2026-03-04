@@ -212,6 +212,7 @@ export const STITCH_STATUS_LABELS: Record<StitchStatus, string> = {
 
 export function useVideoStitcher() {
   const [status, setStatus] = useState<StitchStatus>("idle");
+  const [progress, setProgress] = useState(0);
   const [stitchedUrl, setStitchedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const prevBlobUrl = useRef<string | null>(null);
@@ -240,15 +241,18 @@ export function useVideoStitcher() {
 
       setStitchedUrl(null);
       setError(null);
+      setProgress(0);
 
       try {
         setStatus("loading_ffmpeg");
+        setProgress(5);
         const [ffmpeg, { fetchFile }] = await Promise.all([
           getFFmpeg(),
           import("@ffmpeg/util"),
         ]);
 
         setStatus("fetching");
+        setProgress(15);
         await Promise.all([
           ffmpeg
             .writeFile("hook.mp4", await fetchFile(hookUrl))
@@ -262,6 +266,7 @@ export function useVideoStitcher() {
         ]);
 
         setStatus("detecting");
+        setProgress(30);
         const [hookB, bodyB, ctaB] = await Promise.all([
           detectSpeechBounds(ffmpeg, "hook.mp4"),
           detectSpeechBounds(ffmpeg, "body.mp4"),
@@ -269,6 +274,7 @@ export function useVideoStitcher() {
         ]);
 
         setStatus("trimming");
+        setProgress(45);
         // Trim each clip to its speech boundaries (re-encode for frame-accurate cuts)
         await ffmpeg.exec([
           "-i", "hook.mp4",
@@ -277,6 +283,7 @@ export function useVideoStitcher() {
           "-c:v", "libx264", "-c:a", "aac",
           "hook_t.mp4",
         ]);
+        setProgress(55);
         await ffmpeg.exec([
           "-i", "body.mp4",
           "-ss", bodyB.start.toFixed(3),
@@ -284,6 +291,7 @@ export function useVideoStitcher() {
           "-c:v", "libx264", "-c:a", "aac",
           "body_t.mp4",
         ]);
+        setProgress(65);
         await ffmpeg.exec([
           "-i", "cta.mp4",
           "-ss", ctaB.start.toFixed(3),
@@ -293,6 +301,7 @@ export function useVideoStitcher() {
         ]);
 
         setStatus("concat");
+        setProgress(80);
         // Write concat manifest
         const manifest = "file 'hook_t.mp4'\nfile 'body_t.mp4'\nfile 'cta_t.mp4'\n";
         await ffmpeg.writeFile(
@@ -309,11 +318,13 @@ export function useVideoStitcher() {
           "output.mp4",
         ]);
 
+        setProgress(90);
         const data = (await ffmpeg.readFile("output.mp4")) as Uint8Array;
         const blob = new Blob([data.buffer as ArrayBuffer], { type: "video/mp4" });
         const url = URL.createObjectURL(blob);
         prevBlobUrl.current = url;
         setStitchedUrl(url);
+        setProgress(100);
         setStatus("done");
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Stitching failed";
@@ -334,8 +345,9 @@ export function useVideoStitcher() {
     }
     setStitchedUrl(null);
     setError(null);
+    setProgress(0);
     setStatus("idle");
   }, []);
 
-  return { stitch, reset, status, stitchedUrl, error };
+  return { stitch, reset, status, progress, stitchedUrl, error };
 }
