@@ -18,6 +18,11 @@ export class EdgeError extends Error {
 
 const DEFAULT_EDGE_TIMEOUT_MS = 120_000;
 
+/** Remove Supabase project URLs from error messages shown to users. */
+function sanitizeErrorMessage(msg: string): string {
+  return msg.replace(/https?:\/\/[a-z0-9]+\.supabase\.(co|in)\/[^\s]*/g, "[internal]");
+}
+
 async function parseEdgeError(res: Response): Promise<{ message: string; code?: string }> {
   const text = await res.text().catch(() => "");
   if (text) {
@@ -122,7 +127,7 @@ export async function callEdge<T>(
 
   if (!res.ok) {
     const { message, code } = await parseEdgeError(res);
-    throw new EdgeError(res.status, message, code);
+    throw new EdgeError(res.status, sanitizeErrorMessage(message), code);
   }
   return res.json();
 }
@@ -152,7 +157,7 @@ export async function callEdgePublic<T>(
 
   if (!res.ok) {
     const { message, code } = await parseEdgeError(res);
-    throw new EdgeError(res.status, message, code);
+    throw new EdgeError(res.status, sanitizeErrorMessage(message), code);
   }
   return res.json();
 }
@@ -197,7 +202,7 @@ export async function callEdgeMultipart<T>(
 
   if (!res.ok) {
     const { message, code } = await parseEdgeError(res);
-    throw new EdgeError(res.status, message, code);
+    throw new EdgeError(res.status, sanitizeErrorMessage(message), code);
   }
   return res.json();
 }

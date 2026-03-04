@@ -119,7 +119,8 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      const packSuccessUrl = generation_id
+      const isSingleVideo = pack === "single_standard" || pack === "single_hd";
+      const packSuccessUrl = (generation_id || isSingleVideo)
         ? `${FRONTEND_URL}/generate?checkout=success&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`
         : `${FRONTEND_URL}/dashboard?checkout=success&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`;
 

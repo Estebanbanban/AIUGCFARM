@@ -373,6 +373,7 @@ Deno.serve(async (req: Request) => {
       : 2;
 
     // Description mode: use OpenRouter to parse free-form description into structured attributes
+    const t0 = Date.now();
     let resolvedAttributes = attributes;
     if (description && typeof description === "string" && description.trim().length > 0) {
       if (!resolvedAttributes || Object.keys(resolvedAttributes ?? {}).length === 0) {
@@ -413,7 +414,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const validAttrs = resolvedAttributes as PersonaAttributes;
-    const t0 = Date.now();
     const hasPersonaId = typeof persona_id === "string" && persona_id.length > 0;
     const isProgressiveAppend = hasPersonaId && imageCount === 1;
     const isRegeneration = hasPersonaId && !isProgressiveAppend;

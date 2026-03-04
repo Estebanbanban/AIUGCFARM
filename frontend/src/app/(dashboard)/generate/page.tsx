@@ -421,7 +421,8 @@ export default function GeneratePage() {
 
   // Auto-fire composites when arriving at Section 3 (step >= 4) via cold restore
   useEffect(() => {
-    if (store.compositeImagePath && compositeImages.length > 0) return;
+    // Skip if composites already exist (persisted path or loaded images)
+    if (store.compositeImagePath) return;
     if (
       store.step >= 4 &&
       compositeImages.length === 0 &&
@@ -1006,7 +1007,7 @@ export default function GeneratePage() {
   async function handleBuyPack(pack: CreditPackKey | SingleVideoPackKey) {
     const isSingleVideo = pack === "single_standard" || pack === "single_hd";
     const couponId = isSingleVideo
-      ? (isFirstVideo ? COUPON_50_OFF_FIRST_VIDEO : undefined)
+      ? (isFirstVideo ? COUPON_50_OFF_FIRST_VIDEO : COUPON_30_OFF)
       : COUPON_30_OFF;
     buyCredits.mutate({ pack, couponId, generation_id: store.pendingGenerationId ?? undefined }, {
       onSuccess: (url) => {

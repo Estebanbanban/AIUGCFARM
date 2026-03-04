@@ -786,6 +786,17 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
     setImageLoadErrors(new Set());
     toast.info('Generating persona images…');
 
+    // Start progress simulation for Custom mode
+    setLoaderProgress(0);
+    setLoaderStep(0);
+    startSim(0, 20, 15_000, () => {
+      setLoaderStep(1);
+      startSim(20, 40, 15_000, () => {
+        setLoaderStep(2);
+        startSim(40, 90, 50_000);
+      });
+    });
+
     try {
       const attributes = {
         gender: store.gender,
@@ -815,9 +826,17 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
       store.setPersonaId(result.data.id);
       store.setGeneratedImages(displayUrls);
       if (result.data.regen_count != null) setRegenCount(result.data.regen_count);
+
+      stopSim();
+      setLoaderProgress(100);
+      setTimeout(() => { setLoaderStep(-1); setLoaderProgress(0); }, 800);
+
       toast.success(`${displayUrls.length} persona images generated!`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to generate persona');
+      stopSim();
+      setLoaderStep(-1);
+      setLoaderProgress(0);
     } finally {
       store.setIsGenerating(false);
     }
@@ -860,7 +879,9 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
         "grid gap-6",
         store.generatedImages.length > 0
           ? "lg:grid-cols-2"
-          : "lg:grid-cols-[1fr_300px]",
+          : createMode === 'quick' && !isGeneratingQuick
+            ? ""
+            : "lg:grid-cols-[1fr_300px]",
       )}>
 
         {/* ── Left: Sims-style criteria builder ─────────────────────── */}
@@ -1082,7 +1103,10 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
         </fieldset>
 
         {/* ── Right: preview + generate ──────────────────────────────── */}
-        <div className="flex flex-col gap-4">
+        <div className={cn(
+          "flex flex-col gap-4",
+          createMode === 'quick' && !isGeneratingQuick && store.generatedImages.length === 0 && 'hidden',
+        )}>
           <div className="sticky top-6">
 
             {/* Generating loader (Quick Create) */}
@@ -1097,37 +1121,20 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
               />
             )}
 
-            {/* Generating skeleton (Visual Builder - custom mode) */}
+            {/* Generating loader (Visual Builder - custom mode) */}
             {store.isGenerating && !isGeneratingQuick && store.generatedImages.length === 0 && (
-              <div className="rounded-xl border border-border bg-card p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-sm font-medium text-foreground">
-                    {GENERATING_MESSAGES[generatingMessage]}
-                  </p>
-                  <span className="text-xs text-muted-foreground">{generatingElapsed}s</span>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="relative flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl border-2 border-transparent bg-muted animate-pulse">
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
-                      <User className="size-8" />
-                      <span className="text-xs">Portrait 1</span>
-                    </div>
-                  </div>
-                  <div className="relative flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl border-2 border-transparent bg-muted animate-pulse">
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
-                      <User className="size-8" />
-                      <span className="text-xs">Portrait 2</span>
-                    </div>
-                  </div>
-                </div>
-                <p className="mt-3 text-center text-xs text-muted-foreground">
-                  Expected time: ~35-45 seconds per portrait
-                </p>
-              </div>
+              <NanoBananaLoader
+                title="Creating Your Persona"
+                subtitle="Generating unique portraits - usually 60-90 seconds"
+                steps={PERSONA_STEPS}
+                currentStep={loaderStep}
+                progress={loaderProgress}
+                className="min-h-[400px]"
+              />
             )}
 
-            {/* Attribute summary (before generating) */}
-            {store.generatedImages.length === 0 && !store.isGenerating && !isGeneratingQuick && (
+            {/* Attribute summary (before generating) - only shown in Custom mode */}
+            {store.generatedImages.length === 0 && !store.isGenerating && !isGeneratingQuick && createMode === 'custom' && (
               <div className="rounded-xl border border-border bg-card p-4">
                 <p className="mb-3 text-sm font-semibold text-foreground">Persona Preview</p>
                 <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-primary/10">

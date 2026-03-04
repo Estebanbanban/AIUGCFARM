@@ -9,6 +9,7 @@ import {
   X,
   Loader2,
   AlertCircle,
+  AlertTriangle,
   Clock,
   Cpu,
   FileText,
@@ -50,6 +51,11 @@ import { useZipDownload } from "@/hooks/use-zip-download";
 import { useBatchStitcher } from "@/hooks/use-batch-stitcher";
 import { useWatchedGenerationsStore } from "@/stores/watched-generations";
 import { NanoBananaLoader } from "@/components/ui/nano-loader";
+
+/** Strip Supabase project URLs from messages shown to users. */
+function sanitizeMsg(msg: string): string {
+  return msg.replace(/https?:\/\/[a-z0-9]+\.supabase\.(co|in)\/[^\s]*/g, "[internal]");
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Status configuration                                                      */
@@ -945,9 +951,9 @@ function CombinationPreview({
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            {stitchStatus === "done" && stitchedUrl && (
+            {stitchStatus === "done" && stitchedUrl ? (
               <>
-                <Button size="sm" variant="outline" onClick={handleDownloadStitched}>
+                <Button size="sm" onClick={handleDownloadStitched}>
                   <Download className="size-3.5" />
                   Download
                 </Button>
@@ -956,7 +962,7 @@ function CombinationPreview({
                   variant="outline"
                   onClick={handleDownloadPack}
                   disabled={isPackZipping}
-                  title="Download stitched video + all 9 raw segments as a ZIP"
+                  title="Download stitched video + all raw segments as a ZIP"
                 >
                   {isPackZipping ? (
                     <>
@@ -968,37 +974,40 @@ function CombinationPreview({
                   ) : (
                     <>
                       <Download className="size-3.5" />
-                      Download Pack
+                      Download All (ZIP)
                     </>
                   )}
                 </Button>
-              </>
-            )}
-
-            <Button
-              size="sm"
-              onClick={
-                stitchStatus === "done" ? handleDownloadStitched : handleStitch
-              }
-              disabled={isStitching}
-            >
-              {isStitching ? (
-                <>
-                  <Loader2 className="size-3.5 animate-spin" />
-                  {STITCH_STATUS_LABELS[stitchStatus]}
-                </>
-              ) : stitchStatus === "done" ? (
-                <>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleStitch}
+                  disabled={isStitching}
+                  title="Re-stitch the segments"
+                >
                   <Scissors className="size-3.5" />
                   Re-stitch
-                </>
-              ) : (
-                <>
-                  <Scissors className="size-3.5" />
-                  {STITCH_STATUS_LABELS[stitchStatus]}
-                </>
-              )}
-            </Button>
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                onClick={handleStitch}
+                disabled={isStitching}
+              >
+                {isStitching ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" />
+                    {STITCH_STATUS_LABELS[stitchStatus]}
+                  </>
+                ) : (
+                  <>
+                    <Scissors className="size-3.5" />
+                    {STITCH_STATUS_LABELS[stitchStatus]}
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -1239,6 +1248,15 @@ export default function GenerationDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isProcessing]);
 
+  // Warn user before closing tab during generation
+  const isGenerating = !!gen && !["completed", "failed"].includes(status);
+  useEffect(() => {
+    if (!isGenerating) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isGenerating]);
+
   // Toast on ZIP download failure (Story A)
   useEffect(() => {
     if (zipStatus === "error") {
@@ -1278,7 +1296,7 @@ export default function GenerationDetailPage() {
       refetch();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to regenerate segment.",
+        sanitizeMsg(err instanceof Error ? err.message : "Failed to regenerate segment."),
       );
     } finally {
       setRegeneratingKey(null);
@@ -1338,7 +1356,7 @@ export default function GenerationDetailPage() {
             Something went wrong
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            {error.message || "Failed to load generation status."}
+            {sanitizeMsg(error.message || "Failed to load generation status.")}
           </p>
         </div>
         <Button
@@ -1412,6 +1430,18 @@ export default function GenerationDetailPage() {
           </Badge>
         )}
       </div>
+
+      {/* ---------------------------------------------------------------- */}
+      {/*  Don't close warning banner during generation                    */}
+      {/* ---------------------------------------------------------------- */}
+      {isGenerating && !isStale && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+          <AlertTriangle className="size-4 shrink-0 text-amber-400" />
+          <p className="text-sm text-amber-400">
+            Video is generating — please don&apos;t close this page.
+          </p>
+        </div>
+      )}
 
       {/* ---------------------------------------------------------------- */}
       {/*  Awaiting approval - script ready, nothing is generating        */}
@@ -1502,7 +1532,7 @@ export default function GenerationDetailPage() {
         <Card className="border-amber-500/30">
           <CardContent className="flex items-center gap-3 py-4">
             <AlertCircle className="size-5 shrink-0 text-amber-400" />
-            <p className="text-sm text-amber-400">{gen.error_message}</p>
+            <p className="text-sm text-amber-400">{sanitizeMsg(gen.error_message)}</p>
           </CardContent>
         </Card>
       )}
@@ -1996,8 +2026,9 @@ export default function GenerationDetailPage() {
                   Generation Failed
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {gen?.error_message ||
-                    "An error occurred during generation. Please try again."}
+                  {gen?.error_message
+                    ? sanitizeMsg(gen.error_message)
+                    : "An error occurred during generation. Please try again."}
                 </p>
               </div>
             </div>

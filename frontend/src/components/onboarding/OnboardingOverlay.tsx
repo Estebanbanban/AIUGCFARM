@@ -42,6 +42,7 @@ import type { ScrapeResponseData } from "@/types/api";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SKIP_KEY = "onboarding-skipped";
+const BANNER_KEY = "onboarding-banner";
 
 type WizardView =
   | "checklist"
@@ -84,7 +85,21 @@ const STEPS = [
 
 export function OnboardingOverlay() {
   const router = useRouter();
-  const [view, setView] = useState<WizardView>("checklist");
+  const [view, _setView] = useState<WizardView>(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem(BANNER_KEY) === "true") {
+      return "banner";
+    }
+    return "checklist";
+  });
+  // Wrap setView to persist/clear banner state in sessionStorage
+  const setView = (v: WizardView) => {
+    if (v === "banner") {
+      sessionStorage.setItem(BANNER_KEY, "true");
+    } else {
+      sessionStorage.removeItem(BANNER_KEY);
+    }
+    _setView(v);
+  };
   const [skipped, setSkipped] = useState(false);
   const [hydrated, setHydrated] = useState(false);
 
@@ -149,12 +164,14 @@ export function OnboardingOverlay() {
   useEffect(() => {
     if (view === "banner" && hasCompletedGeneration) {
       localStorage.setItem(SKIP_KEY, "true");
+      sessionStorage.removeItem(BANNER_KEY);
       setSkipped(true);
     }
   }, [hasCompletedGeneration, view]);
 
   const handleSkip = () => {
     localStorage.setItem(SKIP_KEY, "true");
+    sessionStorage.removeItem(BANNER_KEY);
     setSkipped(true);
   };
 
@@ -186,6 +203,11 @@ export function OnboardingOverlay() {
     const hasPriorSession = !!(wizardStore.compositeImagePath || wizardStore.pendingScript || wizardStore.pendingGenerationId);
     if (!hasPriorSession && products && products.length > 0) {
       wizardStore.setProductId(products[0].id);
+      // Pre-select first persona that has a selected image
+      const readyPersona = (personas ?? []).find((p) => p.selected_image_url != null);
+      if (readyPersona) {
+        wizardStore.setPersonaId(readyPersona.id);
+      }
       wizardStore.setStep(1);
     }
     setView("banner");
