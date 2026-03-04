@@ -322,6 +322,22 @@ export default function GeneratePage() {
   // Cleanup interval on unmount
   useEffect(() => () => stopVideoSim(), []);
 
+  // Free plan: auto-select the single persona and skip the picker.
+  // Paid plans always show the full selector so the user can pick or create another.
+  useEffect(() => {
+    if (store.step !== 2 || personasLoading || profileLoading) return;
+    if (userPlan !== "free") return;
+    if (store.personaId) return; // already selected
+    const valid = activePersonas.filter(
+      (p) => !!(p.selected_image_url || p.generated_images?.[0]),
+    );
+    if (valid.length >= 1) {
+      store.setPersonaId(valid[0].id);
+      store.setStep(3);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.step, personasLoading, profileLoading, userPlan, activePersonas.length]);
+
   // ── Section navigation ────────────────────────────────────────────────
 
   function handleOpenSection(section: 1 | 2) {
@@ -839,7 +855,7 @@ export default function GeneratePage() {
                 ) : "AI Spokesperson"}
               </span>
             </div>
-            {section2Complete && (
+            {section2Complete && userPlan !== "free" && (
               <button type="button" onClick={() => handleOpenSection(2)} className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">
                 Change
               </button>
