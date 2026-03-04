@@ -6,6 +6,7 @@ import { checkKlingJob } from "../_shared/kling.ts";
 import { checkSoraJob } from "../_shared/sora.ts";
 import { refundCredits } from "../_shared/credits.ts";
 import { sendEmail } from "../_shared/email.ts";
+import { captureException } from "../_shared/sentry.ts";
 
 const COSTS = {
   standard: { single: 5, batch: 15 },
@@ -540,6 +541,7 @@ Deno.serve(async (req: Request) => {
     if (msg === "Unauthorized") {
       return json({ detail: "Authentication required" }, cors, 401);
     }
+    captureException(e);
     console.error("video-status error:", e);
     return json({ detail: "Internal error" }, cors, 500);
   }
