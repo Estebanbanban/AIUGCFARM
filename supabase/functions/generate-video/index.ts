@@ -627,7 +627,38 @@ Deno.serve(async (req: Request) => {
         .select("id");
 
       if (lockErr || !lockRows || lockRows.length === 0) {
-        // Another request already transitioned the status — return 409
+        // Another request may have already transitioned the status.
+        // If it's already in progress/completed, treat as idempotent success.
+        const { data: currentGen } = await sb
+          .from("generations")
+          .select("status")
+          .eq("id", generation_id)
+          .eq("owner_id", userId)
+          .maybeSingle();
+
+        const currentStatus = currentGen?.status as string | undefined;
+        const inFlightStatuses = new Set([
+          "locking",
+          "submitting_jobs",
+          "generating_segments",
+          "stitching",
+          "completed",
+        ]);
+
+        if (currentStatus && inFlightStatuses.has(currentStatus)) {
+          return json(
+            {
+              data: {
+                generation_id,
+                status: currentStatus,
+                deduplicated: true,
+              },
+            },
+            cors,
+            200,
+          );
+        }
+
         return errorResponse(
           ErrorCodes.INVALID_INPUT,
           "Generation is no longer awaiting approval (already processing or completed).",

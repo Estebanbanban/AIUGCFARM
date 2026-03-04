@@ -954,6 +954,14 @@ export default function GeneratePage() {
             offer.startOffer();
             setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
             setShowPaywall(true);
+          } else if (
+            err instanceof EdgeError &&
+            (err.status === 409 || (err.code === "INVALID_INPUT" && err.message.includes("no longer awaiting approval")))
+          ) {
+            // Pending script became stale (already approved/failed/expired).
+            // Clear it so user can regenerate script from current preview.
+            store.clearPendingScript();
+            toast.error("This script approval session expired. Please generate script again.");
           } else if (err instanceof EdgeError && err.code === "RATE_LIMITED") {
             toast.error("You're generating too fast. Please wait a moment and try again.");
           } else {
