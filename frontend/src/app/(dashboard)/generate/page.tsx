@@ -443,7 +443,7 @@ export default function GeneratePage() {
   const creditsRemaining = credits?.remaining ?? 0;
   const isUnlimitedCredits = credits?.is_unlimited === true;
   const userPlan = profile?.plan ?? "free";
-  const canUseHD = HD_QUALITY_PLANS.has(userPlan) || profile?.role === "admin";
+  const canUseHD = true; // HD is available to all users with credits
   const canUseAdvanced = ADVANCED_MODE_PLANS.has(userPlan) || profile?.role === "admin";
   const creditCost =
     store.quality === "hd"
