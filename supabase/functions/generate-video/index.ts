@@ -593,6 +593,7 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const { phase, generation_id, override_script, video_provider, video_quality: quality_override } = body;
     const provider = (video_provider === "sora" ? "sora" : "kling") as "kling" | "sora";
+    const VALID_LANGUAGES = new Set(["en","es","fr","de","it","pt","ja","zh","ar","ru"]);
 
     // ══════════════════════════════════════════════════════════════════
     // PHASE "full" — Approve an existing awaiting_approval generation
@@ -636,6 +637,10 @@ Deno.serve(async (req: Request) => {
       }
 
       const resolvedMode = gen.mode as string;
+      const generationLanguageRaw = typeof gen.language === "string" ? gen.language : "en";
+      const resolvedLanguage = VALID_LANGUAGES.has(generationLanguageRaw)
+        ? generationLanguageRaw
+        : "en";
       // Allow the client to override quality (e.g. user switched standard → HD before approving)
       const resolvedQuality = (quality_override === "hd" || quality_override === "standard")
         ? quality_override
@@ -819,7 +824,6 @@ Deno.serve(async (req: Request) => {
       language?: string;
     };
 
-    const VALID_LANGUAGES = new Set(["en","es","fr","de","it","pt","ja","zh","ar","ru"]);
     const resolvedLanguage = VALID_LANGUAGES.has(language) ? language : "en";
 
     if (!product_id) return errorResponse(ErrorCodes.INVALID_INPUT, "product_id is required", 400, cors);
