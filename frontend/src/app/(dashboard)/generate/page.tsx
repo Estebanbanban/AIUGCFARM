@@ -713,6 +713,14 @@ export default function GeneratePage() {
   // ── Script generation ─────────────────────────────────────────────────
 
   async function handleGenerateScript() {
+    // Paywall pre-check: block script generation if user has no credits
+    if (!isUnlimitedCredits && creditsRemaining < effectiveCost) {
+      trackPaywallShown("insufficient_credits");
+      offer.startOffer();
+      setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
+      setShowPaywall(true);
+      return;
+    }
     if (requiresCommentKeyword && !commentKeyword) {
       toast.error("Add a comment keyword for the CTA style.");
       return;
@@ -720,6 +728,14 @@ export default function GeneratePage() {
     if (!store.productId || !store.personaId) return;
     if (!store.compositeImagePath) {
       toast.error("Scene preview is still loading, please wait a moment.");
+      return;
+    }
+    // Pre-check credits before generating script to avoid wasted API calls
+    if (!hasEnoughCredits) {
+      trackPaywallShown("insufficient_credits");
+      offer.startOffer();
+      setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
+      setShowPaywall(true);
       return;
     }
     setScriptConfigChanged(false);
@@ -760,7 +776,19 @@ export default function GeneratePage() {
           stopVideoSim();
           setVideoLoaderStep(-1);
           setVideoLoaderProgress(0);
-          toast.error(err.message || "Failed to generate script");
+          if (
+            err instanceof EdgeError &&
+            (err.code === "INSUFFICIENT_CREDITS" || err.status === 402)
+          ) {
+            trackPaywallShown("insufficient_credits");
+            offer.startOffer();
+            setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
+            setShowPaywall(true);
+          } else if (err instanceof EdgeError && err.code === "RATE_LIMITED") {
+            toast.error("You're generating too fast. Please wait a moment and try again.");
+          } else {
+            toast.error(err.message || "Failed to generate script");
+          }
         },
       },
     );
@@ -831,12 +859,17 @@ export default function GeneratePage() {
           stopVideoSim();
           setVideoLoaderStep(-1);
           setVideoLoaderProgress(0);
-          // Backend 402 = insufficient credits → show paywall instead of toast
-          if (err instanceof EdgeError && err.status === 402) {
+          // Structured error code or fallback to HTTP 402
+          if (
+            err instanceof EdgeError &&
+            (err.code === "INSUFFICIENT_CREDITS" || err.status === 402)
+          ) {
             trackPaywallShown("insufficient_credits");
             offer.startOffer();
             setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
             setShowPaywall(true);
+          } else if (err instanceof EdgeError && err.code === "RATE_LIMITED") {
+            toast.error("You're generating too fast. Please wait a moment and try again.");
           } else {
             toast.error(err.message || "Failed to start generation");
           }
@@ -1032,11 +1065,11 @@ export default function GeneratePage() {
         {/* Section header - always visible */}
         <div
           className={cn(
-            "flex items-center justify-between px-5 py-4",
+            "flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-4 sm:px-5 py-3 sm:py-4",
             section1Complete && "border-b-0",
           )}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className={cn(
               "flex size-6 items-center justify-center rounded-full text-xs font-bold",
               section1Complete
@@ -1047,9 +1080,9 @@ export default function GeneratePage() {
             </div>
             <span className="text-sm font-semibold">
               {section1Complete && selectedProduct ? (
-                <span className="flex items-center gap-2 flex-wrap">
-                  <span className="text-foreground">{selectedProduct.name}</span>
-                  <Badge variant="secondary" className="text-xs font-medium">
+                <span className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2 flex-wrap">
+                  <span className="text-foreground truncate max-w-[200px] sm:max-w-none">{selectedProduct.name}</span>
+                  <Badge variant="secondary" className="text-[10px] sm:text-xs font-medium">
                     {store.format === "9:16" ? "Portrait 9:16" : "Landscape 16:9"}
                   </Badge>
                 </span>
@@ -1301,10 +1334,10 @@ export default function GeneratePage() {
       {store.step >= 2 && (
         <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
           {/* Section header */}
-          <div className="flex items-center justify-between px-5 py-4">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-4 sm:px-5 py-3 sm:py-4">
+            <div className="flex items-center gap-3 min-w-0">
               <div className={cn(
-                "flex size-6 items-center justify-center rounded-full text-xs font-bold",
+                "flex size-6 items-center justify-center rounded-full text-xs font-bold shrink-0",
                 section2Complete
                   ? "bg-primary/15 text-primary"
                   : "bg-primary text-primary-foreground",
@@ -1323,7 +1356,7 @@ export default function GeneratePage() {
                         decoding="async"
                       />
                     )}
-                    <span className="text-foreground">{selectedPersona.name}</span>
+                    <span className="text-foreground truncate max-w-[200px] sm:max-w-none">{selectedPersona.name}</span>
                   </span>
                 ) : (
                   "AI Spokesperson"
@@ -1475,7 +1508,7 @@ export default function GeneratePage() {
       {section3Unlocked && (
         <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
           {/* Section header */}
-          <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-3 px-4 sm:px-5 py-3 sm:py-4 border-b border-border">
             <div className="flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
               3
             </div>
@@ -2261,8 +2294,8 @@ export default function GeneratePage() {
           )}
 
           <div className="overflow-y-auto flex-1">
-            <div className="text-center max-w-2xl mx-auto pt-10 pb-6 px-6">
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground mb-3 tracking-tight">
+            <div className="text-center max-w-2xl mx-auto pt-6 sm:pt-10 pb-4 sm:pb-6 px-4 sm:px-6">
+              <h2 className="text-xl sm:text-3xl md:text-4xl font-extrabold text-foreground mb-3 tracking-tight">
                 {paywallHeadline}
               </h2>
               {paywallSublineStatic ? (
@@ -2276,13 +2309,13 @@ export default function GeneratePage() {
               )}
             </div>
 
-            <div className="flex justify-center mb-8 px-4">
-              <div className="bg-muted/80 p-1.5 rounded-full inline-flex border border-border shadow-sm">
+            <div className="flex justify-center mb-6 sm:mb-8 px-4">
+              <div className="bg-muted/80 p-1 sm:p-1.5 rounded-full inline-flex border border-border shadow-sm">
                 <button
                   type="button"
                   onClick={() => setPaywallTab("single")}
                   className={cn(
-                    "px-8 py-2.5 text-sm font-bold rounded-full transition-all duration-200",
+                    "px-4 sm:px-8 py-2 sm:py-2.5 text-xs sm:text-sm font-bold rounded-full transition-all duration-200",
                     paywallTab === "single"
                       ? "bg-background text-foreground shadow-sm ring-1 ring-border"
                       : "text-muted-foreground hover:text-foreground",
@@ -2291,7 +2324,7 @@ export default function GeneratePage() {
                   <>
                     {store.quality === "hd" ? "1 HD Video" : "1 Standard Video"}
                     {isFirstVideo && (
-                      <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                      <span className="ml-1 sm:ml-2 text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
                         -50%
                       </span>
                     )}
@@ -2301,7 +2334,7 @@ export default function GeneratePage() {
                   type="button"
                   onClick={() => setPaywallTab("subscription")}
                   className={cn(
-                    "flex items-center gap-2 px-8 py-2.5 text-sm font-bold rounded-full transition-all duration-200",
+                    "flex items-center gap-1 sm:gap-2 px-4 sm:px-8 py-2 sm:py-2.5 text-xs sm:text-sm font-bold rounded-full transition-all duration-200",
                     paywallTab === "subscription"
                       ? "bg-background text-foreground shadow-sm ring-1 ring-border"
                       : "text-muted-foreground hover:text-foreground",
@@ -2320,7 +2353,7 @@ export default function GeneratePage() {
               </div>
             </div>
 
-            <div className="px-6 pb-10">
+            <div className="px-4 sm:px-6 pb-6 sm:pb-10">
               {paywallTab === "single" ? (
                 <div className="max-w-md mx-auto bg-card p-8 rounded-2xl border border-border shadow-sm">
                   <div className="mb-6">
@@ -2399,7 +2432,7 @@ export default function GeneratePage() {
                 </div>
               ) : (
                 <>
-                  <div className="grid md:grid-cols-3 gap-5 lg:gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5 lg:gap-6">
                     {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
                       const isGrowth = key === "growth";
                       const discountedMonthly = offer.discountedPrice(plan.price);

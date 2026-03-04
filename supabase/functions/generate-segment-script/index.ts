@@ -4,6 +4,7 @@ import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
 import { callOpenRouter } from "../_shared/openrouter.ts";
 import { withRetry } from "../_shared/retry.ts";
+import { ErrorCodes, errorResponse } from "../_shared/errors.ts";
 
 const LANGUAGE_NAMES: Record<string, string> = {
   es: "Spanish", fr: "French", de: "German", it: "Italian",
@@ -88,7 +89,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     if (req.method !== "POST") {
-      return json({ detail: "Method not allowed" }, cors, 405);
+      return errorResponse(ErrorCodes.INVALID_INPUT, "Method not allowed", 405, cors);
     }
 
     const userId = await requireUserId(req);
@@ -107,10 +108,10 @@ Deno.serve(async (req: Request) => {
     const VALID_LANGUAGES = new Set(["en","es","fr","de","it","pt","ja","zh","ar","ru"]);
     const resolvedLanguage = VALID_LANGUAGES.has(language) ? language : "en";
 
-    if (!product_id) return json({ detail: "product_id is required" }, cors, 400);
-    if (!persona_id) return json({ detail: "persona_id is required" }, cors, 400);
+    if (!product_id) return errorResponse(ErrorCodes.INVALID_INPUT, "product_id is required", 400, cors);
+    if (!persona_id) return errorResponse(ErrorCodes.INVALID_INPUT, "persona_id is required", 400, cors);
     if (!segment_type || !["hook", "body", "cta"].includes(segment_type)) {
-      return json({ detail: "segment_type must be 'hook', 'body', or 'cta'" }, cors, 400);
+      return errorResponse(ErrorCodes.INVALID_INPUT, "segment_type must be 'hook', 'body', or 'cta'", 400, cors);
     }
 
     // Verify product ownership
@@ -122,7 +123,7 @@ Deno.serve(async (req: Request) => {
       .eq("confirmed", true)
       .single();
     if (prodErr || !product) {
-      return json({ detail: "Product not found or not confirmed" }, cors, 404);
+      return errorResponse(ErrorCodes.INVALID_INPUT, "Product not found or not confirmed", 404, cors);
     }
 
     // Verify persona ownership
@@ -134,7 +135,7 @@ Deno.serve(async (req: Request) => {
       .eq("is_active", true)
       .single();
     if (persErr || !persona) {
-      return json({ detail: "Persona not found or inactive" }, cors, 404);
+      return errorResponse(ErrorCodes.INVALID_INPUT, "Persona not found or inactive", 404, cors);
     }
 
     const seg = segment_type as SegmentType;
@@ -178,13 +179,14 @@ Deno.serve(async (req: Request) => {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg === "Unauthorized") {
-      return json({ detail: "Authentication required" }, cors, 401);
+      return errorResponse(ErrorCodes.UNAUTHORIZED, "Authentication required", 401, cors);
     }
     console.error("generate-segment-script error:", e);
-    return json(
-      { detail: "Failed to generate segment script. Please try again." },
-      cors,
+    return errorResponse(
+      ErrorCodes.INTERNAL_ERROR,
+      "Failed to generate segment script. Please try again.",
       500,
+      cors,
     );
   }
 });
