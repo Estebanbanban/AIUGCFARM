@@ -66,7 +66,7 @@ import { useWatchedGenerationsStore } from "@/stores/watched-generations";
 import { VideoGenerationAnimation } from "@/components/landing/VideoGenerationAnimation";
 import { useProducts, useScrapeProduct } from "@/hooks/use-products";
 import { isExternalUrl, getSignedImageUrl, getSignedImageUrls } from "@/lib/storage";
-import { usePersonas, resolvePersonaImageUrl } from "@/hooks/use-personas";
+import { usePersonas, resolvePersonaImageUrl, useSelectPersonaImage } from "@/hooks/use-personas";
 import type { Persona, Product, BrandSummary, ScriptSegment } from "@/types/database";
 import { useCredits } from "@/hooks/use-credits";
 import {
@@ -372,6 +372,11 @@ export default function GeneratePage() {
 
   // Persona limit paywall
   const [showPersonaLimitPaywall, setShowPersonaLimitPaywall] = useState(false);
+  const [pickerPersona, setPickerPersona] = useState<Persona | null>(null);
+  const [pickerOptions, setPickerOptions] = useState<Array<{ imageIndex: number; signedUrl: string }>>([]);
+  const [pickerSelectedImageIndex, setPickerSelectedImageIndex] = useState<number | null>(null);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerSaving, setPickerSaving] = useState(false);
 
   // Composite preview state
   const [compositeImages, setCompositeImages] = useState<
@@ -411,6 +416,7 @@ export default function GeneratePage() {
   const { data: profile, isLoading: profileLoading } = useProfile();
   const generateComposites = useGenerateCompositeImages();
   const editComposite = useEditCompositeImage();
+  const selectPersonaImage = useSelectPersonaImage();
   const generateScript = useGenerateScript();
   const approveAndGenerate = useApproveAndGenerate();
   const watchedGenerationsStore = useWatchedGenerationsStore();
@@ -527,6 +533,67 @@ export default function GeneratePage() {
       setSection1SubStep(1);
     } else {
       store.setStep(2);
+    }
+  }
+
+  async function handleOpenPersonaImagePicker(persona: Persona) {
+    const generatedPaths = (persona.generated_images ?? []).filter(
+      (img): img is string => typeof img === "string" && img.length > 0,
+    );
+    if (generatedPaths.length === 0) {
+      toast.info("Portraits are still generating for this persona.");
+      return;
+    }
+
+    setPickerPersona(persona);
+    setPickerOptions([]);
+    setPickerSelectedImageIndex(null);
+    setPickerLoading(true);
+
+    try {
+      const limited = generatedPaths.slice(0, 4);
+      const resolved = await Promise.all(
+        limited.map(async (path, imageIndex) => {
+          const signedUrl = await resolvePersonaImageUrl(path);
+          return signedUrl ? { imageIndex, signedUrl } : null;
+        }),
+      );
+      const options = resolved.filter(
+        (item): item is { imageIndex: number; signedUrl: string } => item !== null,
+      );
+      setPickerOptions(options);
+      if (options.length === 0) {
+        toast.error("Couldn't load generated portraits. Please try again.");
+      }
+    } catch {
+      toast.error("Couldn't load generated portraits. Please try again.");
+    } finally {
+      setPickerLoading(false);
+    }
+  }
+
+  async function handleConfirmPersonaImageSelection() {
+    if (!pickerPersona || pickerSelectedImageIndex === null) return;
+    setPickerSaving(true);
+    try {
+      await selectPersonaImage.mutateAsync({
+        persona_id: pickerPersona.id,
+        image_index: pickerSelectedImageIndex,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["personas"] });
+      store.setPersonaId(pickerPersona.id);
+      store.setStep(4);
+      handleGenerateComposites(undefined, pickerPersona.id);
+      generationFiredForFormat.current = store.format;
+      setPickerPersona(null);
+      setPickerOptions([]);
+      setPickerSelectedImageIndex(null);
+      toast.success("Persona selected. Generating scene previews...");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save persona image";
+      toast.error(message);
+    } finally {
+      setPickerSaving(false);
     }
   }
 
@@ -679,14 +746,6 @@ export default function GeneratePage() {
     setShowPreviewEditor(false);
     const path = compositeImages[idx].path;
     store.setCompositeImagePath(path);
-    // Paywall pre-check: skip auto-fire script gen if no credits
-    if (!isUnlimitedCredits && creditsRemaining < effectiveCost) {
-      trackPaywallShown("insufficient_credits");
-      offer.startOffer();
-      setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
-      setShowPaywall(true);
-      return;
-    }
     // Auto-fire script generation in background
     const token = ++scriptAutoFireToken.current;
     if (store.productId && store.personaId) {
@@ -763,14 +822,6 @@ export default function GeneratePage() {
   // ── Script generation ─────────────────────────────────────────────────
 
   async function handleGenerateScript() {
-    // Paywall pre-check: block script generation if user has no credits
-    if (!isUnlimitedCredits && creditsRemaining < effectiveCost) {
-      trackPaywallShown("insufficient_credits");
-      offer.startOffer();
-      setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
-      setShowPaywall(true);
-      return;
-    }
     if (requiresCommentKeyword && !commentKeyword) {
       toast.error("Add a comment keyword for the CTA style.");
       return;
@@ -778,14 +829,6 @@ export default function GeneratePage() {
     if (!store.productId || !store.personaId) return;
     if (!store.compositeImagePath) {
       toast.error("Scene preview is still loading, please wait a moment.");
-      return;
-    }
-    // Pre-check credits before generating script to avoid wasted API calls
-    if (!hasEnoughCredits) {
-      trackPaywallShown("insufficient_credits");
-      offer.startOffer();
-      setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
-      setShowPaywall(true);
       return;
     }
     setScriptConfigChanged(false);
@@ -826,15 +869,7 @@ export default function GeneratePage() {
           stopVideoSim();
           setVideoLoaderStep(-1);
           setVideoLoaderProgress(0);
-          if (
-            err instanceof EdgeError &&
-            (err.code === "INSUFFICIENT_CREDITS" || err.status === 402)
-          ) {
-            trackPaywallShown("insufficient_credits");
-            offer.startOffer();
-            setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
-            setShowPaywall(true);
-          } else if (err instanceof EdgeError && err.code === "RATE_LIMITED") {
+          if (err instanceof EdgeError && err.code === "RATE_LIMITED") {
             toast.error("You're generating too fast. Please wait a moment and try again.");
           } else {
             toast.error(err.message || "Failed to generate script");
@@ -1065,8 +1100,8 @@ export default function GeneratePage() {
   const section1Complete = store.step >= 2;
   // Section 2 is "complete" once the user is in Section 3
   const section2Complete = store.step >= 4;
-  // Section 3 is unlocked
-  const section3Unlocked = store.step >= 4;
+  // Section 3 is available once product + format are configured
+  const section3Unlocked = store.step >= 2;
 
   // Detect orphaned awaiting_approval generation (e.g. after localStorage wipe)
   const orphanedDraft = useMemo(() => {
@@ -1511,27 +1546,38 @@ export default function GeneratePage() {
                   return (
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       {activePersonas.map((persona) => {
-                        const hasImage = !!(persona.selected_image_url || persona.generated_images?.[0]);
+                        const hasSelectedImage = !!persona.selected_image_url;
+                        const hasGeneratedChoices =
+                          !hasSelectedImage && (persona.generated_images?.length ?? 0) > 0;
+                        const canChoosePersona = hasSelectedImage || hasGeneratedChoices;
                         return (
                           <button
                             key={persona.id}
                             onClick={() => {
-                              if (!hasImage) return;
-                              store.setPersonaId(persona.id);
-                              // Fire composites in background and advance to Section 3
-                              handleGenerateComposites(undefined, persona.id);
-                              generationFiredForFormat.current = store.format;
-                              store.setStep(4);
+                              if (hasSelectedImage) {
+                                store.setPersonaId(persona.id);
+                                // Fire composites in background and advance to Section 3
+                                handleGenerateComposites(undefined, persona.id);
+                                generationFiredForFormat.current = store.format;
+                                store.setStep(4);
+                                return;
+                              }
+                              if (hasGeneratedChoices) {
+                                handleOpenPersonaImagePicker(persona);
+                              }
                             }}
-                            disabled={!hasImage}
-                            className={cn("text-left", !hasImage && "cursor-not-allowed opacity-50")}
+                            disabled={!canChoosePersona}
+                            className={cn(
+                              "text-left",
+                              !canChoosePersona && "cursor-not-allowed opacity-50",
+                            )}
                           >
                             <Card
                               className={cn(
                                 "h-full transition-all",
                                 store.personaId === persona.id
                                   ? "border-primary ring-1 ring-primary/30"
-                                  : hasImage
+                                  : canChoosePersona
                                   ? "hover:border-muted-foreground/30"
                                   : "",
                               )}
@@ -1556,10 +1602,15 @@ export default function GeneratePage() {
                                     {persona.attributes.gender} / {persona.attributes.age} / {persona.attributes.clothing_style}
                                   </p>
                                 </div>
-                                {!hasImage ? (
+                                {!hasSelectedImage && hasGeneratedChoices ? (
+                                  <div className="flex items-center gap-1.5 text-xs text-primary">
+                                    <ImageIcon className="size-3.5" />
+                                    Choose portrait
+                                  </div>
+                                ) : !canChoosePersona ? (
                                   <div className="flex items-center gap-1.5 text-xs text-amber-500">
-                                    <AlertCircle className="size-3.5" />
-                                    Needs image - visit Personas
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                    Generating portraits...
                                   </div>
                                 ) : store.personaId === persona.id ? (
                                   <div className="flex items-center gap-1.5 text-xs text-primary">
@@ -1646,6 +1697,12 @@ export default function GeneratePage() {
                 progress={videoLoaderProgress}
                 className="min-h-[350px]"
               />
+            )}
+
+            {!store.personaId && videoLoaderStep < 0 && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+                You can set video options now. Select a persona in step 2 once portraits are ready to auto-generate scene previews.
+              </div>
             )}
 
             {/* ── Easy Mode ─────────────────────────────────────────── */}
@@ -2383,6 +2440,89 @@ export default function GeneratePage() {
           </div>
         </div>
       )}
+
+      <Dialog
+        open={pickerPersona !== null}
+        onOpenChange={(open) => {
+          if (!open && !pickerSaving) {
+            setPickerPersona(null);
+            setPickerOptions([]);
+            setPickerSelectedImageIndex(null);
+            setPickerLoading(false);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Choose your persona portrait</DialogTitle>
+            <DialogDescription>
+              Pick one portrait to continue. You can go back to persona editing if needed.
+            </DialogDescription>
+          </DialogHeader>
+
+          {pickerLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : pickerOptions.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3">
+              {pickerOptions.map((option) => (
+                <button
+                  key={option.imageIndex}
+                  type="button"
+                  onClick={() => setPickerSelectedImageIndex(option.imageIndex)}
+                  className={cn(
+                    "relative aspect-[3/4] overflow-hidden rounded-xl border-2 transition-all",
+                    pickerSelectedImageIndex === option.imageIndex
+                      ? "border-primary ring-2 ring-primary/30"
+                      : "border-border hover:border-primary/40",
+                  )}
+                >
+                  <img
+                    src={option.signedUrl}
+                    alt={`Persona portrait ${option.imageIndex + 1}`}
+                    className="size-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  {pickerSelectedImageIndex === option.imageIndex && (
+                    <div className="absolute right-2 top-2 rounded-full bg-primary p-1">
+                      <Check className="size-3 text-primary-foreground" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="py-6 text-sm text-muted-foreground">
+              Portraits are not ready yet. Try again in a few seconds.
+            </p>
+          )}
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+            <Button
+              variant="outline"
+              onClick={() => router.push("/personas/new?returnTo=/generate")}
+              disabled={pickerSaving}
+            >
+              Go Back To Editing Persona
+            </Button>
+            <Button
+              onClick={handleConfirmPersonaImageSelection}
+              disabled={pickerSelectedImageIndex === null || pickerSaving}
+            >
+              {pickerSaving ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Use this portrait"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Paywall dialog ────────────────────────────────────────────── */}
       <Dialog open={showPaywall} onOpenChange={handlePaywallClose}>

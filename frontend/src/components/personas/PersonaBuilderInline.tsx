@@ -519,8 +519,9 @@ function ImageCard({
             src={imageSrc}
             alt=""
             aria-hidden="true"
-            loading="eager"
+            loading="lazy"
             decoding="async"
+            fetchPriority="low"
             className="absolute inset-0 h-full w-full object-cover"
             onError={(e) => { e.currentTarget.style.display = "none"; }}
           />
@@ -580,9 +581,10 @@ const PERSONA_STEPS = [
 interface PersonaBuilderInlineProps {
   onSaved: (personaId: string) => void;
   onCancel?: () => void;
+  onGenerationStarted?: (personaId: string) => void;
 }
 
-export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInlineProps) {
+export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }: PersonaBuilderInlineProps) {
   const store = usePersonaBuilderStore();
   const queryClient = useQueryClient();
   const { data: profile } = useProfile();
@@ -666,26 +668,6 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
   }, [isGeneratingQuick, store.isGenerating]);
 
 
-  // ── Preload all static persona option images on mount ──────────────────────
-  useEffect(() => {
-    const allSrcs = [
-      ...Object.values(ethnicityImageSrc),
-      ...Object.values(genderImageSrc),
-      ...Object.values(hairStyleImageSrc),
-      ...Object.values(bodyTypeImageSrc),
-      ...Object.values(clothingImageSrc),
-      ...Object.values(accessoriesImageSrc),
-    ].filter((src) => !src.startsWith('data:'));
-
-    const imgs = [...new Set(allSrcs)].map((src) => {
-      const img = new window.Image();
-      img.src = src;
-      return img;
-    });
-    // Keep reference to prevent GC while loading
-    return () => { imgs.length = 0; };
-  }, []);
-
   const isDark = mounted && resolvedTheme === 'dark';
 
   // ── Dark-mode aware placeholder style maps ─────────────────────────────────
@@ -704,9 +686,13 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
   const accessoriesPlaceholderStyleDynamic: Record<string, React.CSSProperties> =
     Object.fromEntries(accessoryOptions.map((value) => [value, neutralCardStyle(`accessory-${value}`, isDark)]));
 
+  function resolvePersonaName() {
+    return store.name.trim() || "AI Creator";
+  }
 
   async function handleQuickCreate() {
-    if (!store.name.trim() || !quickDescription.trim()) return;
+    if (!quickDescription.trim()) return;
+    const resolvedName = resolvePersonaName();
     setIsGeneratingQuick(true);
 
     // Step 0 → 1: OpenRouter calls (description→attrs + scene prompt)
@@ -724,12 +710,16 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
       const initResult = await callEdge<{
         data: { id: string; attributes: Record<string, unknown> };
       }>('generate-persona', {
-        body: { name: store.name.trim(), description: quickDescription.trim(), image_count: 0 },
+        body: { name: resolvedName, description: quickDescription.trim(), image_count: 0 },
         timeoutMs: 60_000,
       });
 
       const { id: personaId, attributes } = initResult.data;
       store.setPersonaId(personaId);
+      if (!store.name.trim()) {
+        store.setField("name", resolvedName);
+      }
+      onGenerationStarted?.(personaId);
 
       // ── Phase 2: parallel image generation ────────────────────────────────
       // Both edge function calls run simultaneously, each generating 1 image
@@ -738,7 +728,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
       setLoaderStep(2);
       startSim(30, 95, 55_000); // no onDone - Gemini responses will interrupt
 
-      const imageCallBody = { persona_id: personaId, name: store.name.trim(), attributes, image_count: 1 };
+      const imageCallBody = { persona_id: personaId, name: resolvedName, attributes, image_count: 1 };
       const [res1, res2] = await Promise.allSettled([
         callEdge<{ data: { generated_image_urls: string[] } }>('generate-persona', {
           body: imageCallBody,
@@ -781,7 +771,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
   }
 
   async function handleGenerate() {
-    if (!store.name.trim()) return;
+    const resolvedName = resolvePersonaName();
     store.setIsGenerating(true);
     setImageLoadErrors(new Set());
     toast.info('Generating persona images…');
@@ -804,7 +794,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
         data: { id: string; generated_images: string[]; generated_image_urls: string[]; regen_count?: number };
       }>('generate-persona', {
         body: {
-          name: store.name,
+          name: resolvedName,
           attributes,
           ...(store.personaId ? { persona_id: store.personaId } : {}),
         },
@@ -813,6 +803,9 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
 
       const displayUrls = result.data.generated_image_urls ?? result.data.generated_images;
       store.setPersonaId(result.data.id);
+      if (!store.name.trim()) {
+        store.setField("name", resolvedName);
+      }
       store.setGeneratedImages(displayUrls);
       if (result.data.regen_count != null) setRegenCount(result.data.regen_count);
       toast.success(`${displayUrls.length} persona images generated!`);
@@ -876,7 +869,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                 Persona Name
               </Label>
               <Input
-                placeholder="e.g. Sophie, Marcus"
+                placeholder="Optional (e.g. Sophie, Marcus)"
                 value={store.name}
                 onChange={(e) => store.setField('name', e.target.value)}
               />
@@ -911,7 +904,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                 </div>
                 <Button
                   onClick={handleQuickCreate}
-                  disabled={!store.name.trim() || !quickDescription.trim() || isGeneratingQuick}
+                  disabled={!quickDescription.trim() || isGeneratingQuick}
                   className="w-full gap-2"
                 >
                   {isGeneratingQuick ? (
@@ -1136,7 +1129,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                 <Separator className="mb-3" />
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   {[
-                    { label: 'Name',      value: store.name || 'Enter a name...' },
+                    { label: 'Name',      value: store.name || 'Optional' },
                     { label: 'Gender',    value: genderLabels[store.gender] },
                     { label: 'Age',       value: ageRangeLabels[store.ageRange] },
                     { label: 'Ethnicity', value: store.ethnicity },
@@ -1211,7 +1204,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
               {store.generatedImages.length === 0 ? (
                 <Button
                   onClick={handleGenerate}
-                  disabled={!store.name.trim() || store.isGenerating}
+                  disabled={store.isGenerating}
                   className="w-full disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
                   size="lg"
                 >
@@ -1286,6 +1279,49 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
           </div>
         </div>
 
+      </div>
+
+      <div className="sticky bottom-0 z-10 -mx-1 border-t border-border bg-card/95 px-1 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+        {store.generatedImages.length === 0 ? (
+          <Button
+            onClick={createMode === "quick" ? handleQuickCreate : handleGenerate}
+            disabled={
+              createMode === "quick"
+                ? (!quickDescription.trim() || isGeneratingQuick)
+                : store.isGenerating
+            }
+            className="w-full"
+            size="lg"
+          >
+            {isGeneratingQuick || store.isGenerating ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Generating…
+              </>
+            ) : (
+              <>Generate Persona</>
+            )}
+          </Button>
+        ) : (
+          <Button
+            onClick={handleSave}
+            disabled={store.selectedImageIndex === null || !store.personaId || store.isSaving}
+            className="w-full"
+            size="lg"
+          >
+            {store.isSaving ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              <>
+                <Check className="size-4" />
+                Use This Persona
+              </>
+            )}
+          </Button>
+        )}
       </div>
     </div>
   );

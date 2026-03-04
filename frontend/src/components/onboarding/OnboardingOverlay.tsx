@@ -168,7 +168,10 @@ export function OnboardingOverlay() {
     const hasPriorSession = !!(wizardStore.compositeImagePath || wizardStore.pendingScript || wizardStore.pendingGenerationId);
     if (!hasPriorSession && products && products.length > 0) {
       wizardStore.setProductId(products[0].id);
-      wizardStore.setStep(1);
+      if (!wizardStore.format) {
+        wizardStore.setFormat("9:16");
+      }
+      wizardStore.setStep(2);
     }
     setView("banner");
     router.push("/generate");
@@ -294,6 +297,7 @@ export function OnboardingOverlay() {
                 <PersonaView
                   onComplete={handlePersonaComplete}
                   onBack={() => hasProduct ? setView("checklist") : setView("step-brand")}
+                  onProceedToVideo={() => setView("step-video")}
                 />
               )}
               {view === "step-video" && (
@@ -785,9 +789,11 @@ function BrandImportView({
 function PersonaView({
   onComplete,
   onBack,
+  onProceedToVideo,
 }: {
   onComplete: () => void;
   onBack: () => void;
+  onProceedToVideo: () => void;
 }) {
   const queryClient = useQueryClient();
   const { data: personas } = usePersonas();
@@ -798,6 +804,7 @@ function PersonaView({
   const [addPhotoPersonaId, setAddPhotoPersonaId] = useState<string | null>(null);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [selectingIndex, setSelectingIndex] = useState<number | null>(null);
+  const [canProceedWhileGenerating, setCanProceedWhileGenerating] = useState(false);
 
   // If a persona with image already exists (race condition / cache refresh), complete immediately
   useEffect(() => {
@@ -811,6 +818,7 @@ function PersonaView({
 
 
   function handleSaved() {
+    setCanProceedWhileGenerating(false);
     setShowSuccess(true);
     setTimeout(onComplete, 1500);
   }
@@ -835,6 +843,7 @@ function PersonaView({
     try {
       await selectImage.mutateAsync({ persona_id: addPhotoPersonaId, image_index: imageIndex });
       await queryClient.invalidateQueries({ queryKey: ["personas"] });
+      setCanProceedWhileGenerating(false);
       setShowSuccess(true);
       setTimeout(onComplete, 1500);
     } catch {
@@ -913,6 +922,22 @@ function PersonaView({
         </p>
       </div>
 
+      {(generateImages.isPending || canProceedWhileGenerating) && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {generateImages.isPending && (
+              <Loader2 className="size-3.5 animate-spin text-primary" />
+            )}
+            {generateImages.isPending
+              ? "Portraits are generating in the background."
+              : "You can continue to step 3 while portraits finish."}
+          </div>
+          <Button size="sm" variant="outline" onClick={onProceedToVideo}>
+            Continue to step 3
+          </Button>
+        </div>
+      )}
+
       {/* Existing personas without images - offer to add photo inline */}
       {hasExistingPersonas && (
         <div className="flex flex-col gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
@@ -951,7 +976,14 @@ function PersonaView({
         </div>
       )}
 
-      <PersonaBuilderInline onSaved={handleSaved} onCancel={onBack} />
+      <PersonaBuilderInline
+        onSaved={handleSaved}
+        onCancel={onBack}
+        onGenerationStarted={() => {
+          setCanProceedWhileGenerating(true);
+          toast.info("Portraits are generating. You can continue to step 3 now.");
+        }}
+      />
     </div>
   );
 }

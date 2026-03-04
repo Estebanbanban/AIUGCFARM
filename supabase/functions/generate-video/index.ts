@@ -392,6 +392,75 @@ async function generateScript(
   }
 }
 
+function trimToWords(input: string, maxWords: number): string {
+  const words = input.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return words.join(" ");
+  return `${words.slice(0, maxWords).join(" ")}...`;
+}
+
+function buildFallbackScript(
+  product: Record<string, unknown>,
+  variantCount: number,
+  _language: string,
+): GeneratedScript {
+  const productNameRaw =
+    typeof product.name === "string" && product.name.trim().length > 0
+      ? product.name.trim()
+      : "this product";
+  const productName = trimToWords(productNameRaw, 4);
+  const description =
+    typeof product.description === "string" ? product.description : "";
+  const primaryBenefit =
+    description
+      .split(/[.!?]/)
+      .map((part) => part.trim())
+      .find((part) => part.length > 0) ?? "It solves a real day-to-day problem";
+  const benefitShort = trimToWords(primaryBenefit, 12);
+
+  const hookTemplates = [
+    `If you've struggled with this, try ${productName}.`,
+    `I didn't expect ${productName} to work this well.`,
+    `Quick review: ${productName} is actually worth it.`,
+  ];
+  const bodyTemplates = [
+    `${productName} is straightforward to use, and ${benefitShort.toLowerCase()}.`,
+    `I've been using ${productName}, and the difference was clear within days.`,
+    `What I like most about ${productName} is how simple and reliable it feels.`,
+  ];
+  const ctaTemplates = [
+    `Link in bio if you want the same one.`,
+    `Check the description for the exact product.`,
+    `If this fits you, grab ${productName} today.`,
+  ];
+
+  const pick = (templates: string[], i: number, maxWords: number) =>
+    trimToWords(templates[i % templates.length], maxWords);
+
+  const hooks: ScriptSegment[] = [];
+  const bodies: ScriptSegment[] = [];
+  const ctas: ScriptSegment[] = [];
+
+  for (let i = 0; i < variantCount; i++) {
+    hooks.push({
+      text: pick(hookTemplates, i, 10),
+      duration_seconds: 3,
+      variant_label: i === 0 ? "direct_address" : i === 1 ? "social_proof" : "question",
+    });
+    bodies.push({
+      text: pick(bodyTemplates, i, 22),
+      duration_seconds: 7,
+      variant_label: i === 0 ? "value_prop" : i === 1 ? "storytelling" : "problem_solution",
+    });
+    ctas.push({
+      text: pick(ctaTemplates, i, 10),
+      duration_seconds: 3,
+      variant_label: i === 0 ? "link_drop" : i === 1 ? "check_description" : "recommendation",
+    });
+  }
+
+  return { hooks, bodies, ctas };
+}
+
 // ── Shared helpers ────────────────────────────────────────────────────
 
 /** Compute credit cost and variant count from mode/quality/provider. */
@@ -857,45 +926,48 @@ Deno.serve(async (req: Request) => {
 
       const generationId = generation.id;
 
+      let script: GeneratedScript;
+      let scriptRaw: GeneratedScript;
+      let usedFallback = false;
+
       try {
         // ── Generate script (with coherence review) ─────────────────
-        const { script, scriptRaw } = await generateScript(product, variantCount, resolvedLanguage);
-
-        // ── Save script to generation record ────────────────────────
-        const { error: updateErr } = await sb
-          .from("generations")
-          .update({ script, script_raw: scriptRaw })
-          .eq("id", generationId);
-
-        if (updateErr) {
-          throw new Error(`Failed to update generation: ${updateErr.message}`);
-        }
-
-        return json(
-          {
-            data: {
-              generation_id: generationId,
-              status: "awaiting_approval",
-              script,
-              credits_to_charge: effectiveCost,
-            },
-          },
-          cors,
-          201,
-        );
+        const generated = await generateScript(product, variantCount, resolvedLanguage);
+        script = generated.script;
+        scriptRaw = generated.scriptRaw;
       } catch (scriptErr) {
+        // Fallback instead of failing with 500 so users can still review/edit.
         captureException(scriptErr);
-        const errMsg =
-          scriptErr instanceof Error ? scriptErr.message : String(scriptErr);
-        console.error("generate-video script-only error:", errMsg);
-
-        await sb
-          .from("generations")
-          .update({ status: "failed", error_message: errMsg })
-          .eq("id", generationId);
-
-        throw scriptErr;
+        const errMsg = scriptErr instanceof Error ? scriptErr.message : String(scriptErr);
+        console.error("generate-video script-only error, using fallback:", errMsg);
+        usedFallback = true;
+        script = buildFallbackScript(product, variantCount, resolvedLanguage);
+        scriptRaw = script;
       }
+
+      // ── Save script to generation record ────────────────────────
+      const { error: updateErr } = await sb
+        .from("generations")
+        .update({ script, script_raw: scriptRaw })
+        .eq("id", generationId);
+
+      if (updateErr) {
+        throw new Error(`Failed to update generation: ${updateErr.message}`);
+      }
+
+      return json(
+        {
+          data: {
+            generation_id: generationId,
+            status: "awaiting_approval",
+            script,
+            credits_to_charge: effectiveCost,
+            fallback_used: usedFallback,
+          },
+        },
+        cors,
+        201,
+      );
     }
 
     // ══════════════════════════════════════════════════════════════════
