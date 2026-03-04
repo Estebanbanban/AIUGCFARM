@@ -599,6 +599,7 @@ Deno.serve(async (req: Request) => {
     // simultaneously and triggers WORKER_LIMIT on Supabase's free/pro tiers.
     const storagePaths: string[] = [];
     let failedCount = 0;
+    let lastImgError: Error | null = null;
     for (let i = 0; i < imageCount; i++) {
       console.log(`[generate-persona] Gemini image ${i + 1}/${imageCount}: ${Date.now() - t0}ms`);
       try {
@@ -617,17 +618,20 @@ Deno.serve(async (req: Request) => {
         if (uploadErr) {
           console.error(`Persona image ${i + 1} upload failed: ${uploadErr.message}`);
           failedCount++;
+          lastImgError = new Error(uploadErr.message);
         } else {
           storagePaths.push(storagePath);
         }
       } catch (imgErr) {
         console.error(`Persona image ${i + 1} generation failed:`, imgErr);
         failedCount++;
+        lastImgError = imgErr instanceof Error ? imgErr : new Error(String(imgErr));
       }
     }
 
     if (failedCount === imageCount) {
-      throw new Error(`All ${imageCount} image generation(s) failed`);
+      // Throw the real underlying error so the outer catch surfaces it in the response body.
+      throw lastImgError ?? new Error(`All ${imageCount} image generation(s) failed`);
     }
     console.log(`[generate-persona] all images done: ${Date.now() - t0}ms`);
 
