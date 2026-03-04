@@ -383,6 +383,8 @@ export default function GeneratePage() {
     Array<{ path: string; signed_url: string }>
   >([]);
   const [selectedCompositeIdx, setSelectedCompositeIdx] = useState<number | null>(null);
+  const [isRestoringPreviews, setIsRestoringPreviews] = useState(false);
+  const [previewRestoreReady, setPreviewRestoreReady] = useState(false);
   const [showPreviewEditor, setShowPreviewEditor] = useState(false);
   const [previewEditPrompt, setPreviewEditPrompt] = useState("");
   const [ctaOpen, setCtaOpen] = useState(false);
@@ -402,6 +404,7 @@ export default function GeneratePage() {
 
   // Tracks which format was used to fire background composite generation
   const generationFiredForFormat = useRef<string | null>(null);
+  const lastPreviewContextKeyRef = useRef<string | null>(null);
   // Cancellation token for auto-fired script generation
   const scriptAutoFireToken = useRef(0);
   // Debounce timer for auto-regen on settings change
@@ -424,9 +427,85 @@ export default function GeneratePage() {
   const buyCredits = useBuyCredits();
   const offer = useFirstPurchaseOffer();
   const { data: generations } = useGenerations();
+  const previewContextKey = useMemo(() => {
+    if (!store.productId || !store.personaId || !store.format) return null;
+    const refs =
+      store.selectedProductImages.length > 0
+        ? [...store.selectedProductImages].sort().join(",")
+        : "auto";
+    return `${store.productId}::${store.personaId}::${store.format}::${refs}`;
+  }, [store.productId, store.personaId, store.format, store.selectedProductImages]);
 
-  // Auto-fire composites when arriving at Section 3 (step >= 4) via cold restore
+  // Restore previously generated preview images for this exact context.
+  // This prevents expensive re-generation when user revisits /generate.
   useEffect(() => {
+    let cancelled = false;
+
+    async function restoreCompositePreviews() {
+      if (lastPreviewContextKeyRef.current !== previewContextKey) {
+        lastPreviewContextKeyRef.current = previewContextKey;
+        setCompositeImages([]);
+        setSelectedCompositeIdx(null);
+        generationFiredForFormat.current = null;
+      }
+
+      if (!previewContextKey) {
+        if (!cancelled) setPreviewRestoreReady(true);
+        return;
+      }
+      const cachedPaths = store.compositePreviewCache[previewContextKey] ?? [];
+      if (cachedPaths.length === 0) {
+        if (!cancelled) setPreviewRestoreReady(true);
+        return;
+      }
+
+      if (!cancelled) setIsRestoringPreviews(true);
+      try {
+        const signed = await getSignedImageUrls("composite-images", cachedPaths, 3600);
+        if (cancelled) return;
+        const restored = cachedPaths
+          .map((path, i) => ({ path, signed_url: signed[i] }))
+          .filter((img) => typeof img.signed_url === "string" && img.signed_url.length > 0) as Array<{
+            path: string;
+            signed_url: string;
+          }>;
+        if (restored.length > 0) {
+          setCompositeImages(restored);
+          const selectedIdx = store.compositeImagePath
+            ? restored.findIndex((img) => img.path === store.compositeImagePath)
+            : -1;
+          if (selectedIdx >= 0) {
+            setSelectedCompositeIdx(selectedIdx);
+          } else {
+            setSelectedCompositeIdx(0);
+            store.setCompositeImagePath(restored[0].path);
+          }
+        }
+      } catch {
+        // Silent fallback: if restore fails, normal generation flow will run.
+      } finally {
+        if (!cancelled) {
+          setIsRestoringPreviews(false);
+          setPreviewRestoreReady(true);
+        }
+      }
+    }
+
+    setPreviewRestoreReady(false);
+    void restoreCompositePreviews();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    previewContextKey,
+    store.compositePreviewCache,
+    store.compositeImagePath,
+    store.setCompositeImagePath,
+  ]);
+
+  // Auto-fire composites when arriving at Section 3 (step >= 4) after restore check.
+  useEffect(() => {
+    if (!previewRestoreReady || isRestoringPreviews) return;
     if (store.compositeImagePath && compositeImages.length > 0) return;
     if (
       store.step >= 4 &&
@@ -441,7 +520,7 @@ export default function GeneratePage() {
       generationFiredForFormat.current = store.format;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.step]);
+  }, [store.step, previewRestoreReady, isRestoringPreviews]);
 
   // Auto-select first composite when composites arrive
   useEffect(() => {
@@ -714,10 +793,7 @@ export default function GeneratePage() {
     const format = formatOverride ?? store.format;
     const personaId = personaIdOverride ?? store.personaId;
     if (!store.productId || !personaId || !format) return;
-    setCompositeImages([]);
-    setSelectedCompositeIdx(null);
     setShowPreviewEditor(false);
-    store.setCompositeImagePath(null);
     setPreviewEditPrompt("");
 
     generateComposites.mutate(
@@ -732,6 +808,17 @@ export default function GeneratePage() {
       {
         onSuccess: (result) => {
           setCompositeImages(result.images);
+          const first = result.images[0]?.path ?? null;
+          if (first) {
+            store.setCompositeImagePath(first);
+            setSelectedCompositeIdx(0);
+          }
+          if (previewContextKey) {
+            store.setCompositePreviewCache(
+              previewContextKey,
+              result.images.map((img) => img.path),
+            );
+          }
           trackPreviewGenerated();
         },
         onError: (err) => {
@@ -809,6 +896,9 @@ export default function GeneratePage() {
           setSelectedCompositeIdx(0);
           setShowPreviewEditor(false);
           store.setCompositeImagePath(result.image.path);
+          if (previewContextKey) {
+            store.appendCompositePreviewCache(previewContextKey, result.image.path);
+          }
           setPreviewEditPrompt("");
           toast.success("Preview image updated");
         },
@@ -1686,20 +1776,62 @@ export default function GeneratePage() {
       {/* ── Section 3: Settings & Generate ───────────────────────────── */}
       {section3Unlocked && (
         <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
-          {/* Section header */}
-          <div className="flex items-center gap-3 px-4 sm:px-5 py-3 sm:py-4 border-b border-border">
-            <div className="flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
+          <div className="flex items-center gap-3 border-b border-border px-4 py-3 sm:px-5 sm:py-4">
+            <div className="flex size-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
               3
             </div>
-            <span className="text-sm font-semibold">Settings & Generate</span>
+            <span className="text-sm font-semibold">Video Builder</span>
           </div>
 
-          <div className="p-5 flex flex-col gap-5">
-            {/* ── NanoBananaLoader overlay ─────────────────────────── */}
+          <div className="border-b border-border bg-muted/20 px-4 py-3 sm:px-5">
+            <div className="flex flex-wrap gap-2 text-xs">
+              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-2.5 py-1">
+                <span className="text-muted-foreground">Product</span>
+                <span className="max-w-[180px] truncate font-medium text-foreground">
+                  {selectedProduct?.name ?? "Not selected"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleOpenSection(1)}
+                  className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                >
+                  Edit
+                </button>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-2.5 py-1">
+                <span className="text-muted-foreground">Persona</span>
+                <span className="max-w-[150px] truncate font-medium text-foreground">
+                  {selectedPersona?.name ?? "Not selected"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleOpenSection(2)}
+                  className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                >
+                  Edit
+                </button>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-2.5 py-1">
+                <span className="text-muted-foreground">Format</span>
+                <span className="font-medium text-foreground">
+                  {store.format === "9:16" ? "Portrait 9:16" : store.format === "16:9" ? "Landscape 16:9" : "Not selected"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleOpenSection(1)}
+                  className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                >
+                  Edit
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-5 p-5">
             {videoLoaderStep >= 0 && (
               <NanoBananaLoader
                 title="Creating Your Video"
-                subtitle="This usually takes 1\u20133 minutes"
+                subtitle="This usually takes 1-3 minutes"
                 steps={VIDEO_GEN_STEPS}
                 currentStep={videoLoaderStep}
                 progress={videoLoaderProgress}
@@ -1713,425 +1845,142 @@ export default function GeneratePage() {
               </div>
             )}
 
-            {/* ── Easy Mode ─────────────────────────────────────────── */}
-            {!store.advancedMode && videoLoaderStep < 0 && (
-              <div className="flex flex-col gap-5">
-                {/* CTA style - collapsible */}
-                <Collapsible open={ctaOpen} onOpenChange={setCtaOpen}>
-                  <CollapsibleTrigger asChild>
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between rounded-xl border-2 border-border px-4 py-3 text-left transition-all hover:border-muted-foreground/30"
-                    >
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium">Customize CTA</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {CTA_STYLE_OPTIONS.find((o) => o.key === store.ctaStyle)?.label ?? "Auto"}
-                        </Badge>
-                        {ctaOpen ? (
-                          <ChevronUp className="size-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronDown className="size-4 text-muted-foreground" />
-                        )}
-                      </div>
-                    </button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      {CTA_STYLE_OPTIONS.filter((o) =>
-                        o.key === "auto" || o.key === "link_in_bio" || o.key === "direct_website"
-                      ).map((option) => (
-                        <button
-                          key={option.key}
-                          type="button"
-                          onClick={() => { store.setCtaStyle(option.key); setScriptConfigChanged(true); debouncedRegenScript(); }}
-                          className={cn(
-                            "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
-                            store.ctaStyle === option.key
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:border-muted-foreground/30",
-                          )}
-                        >
-                          <p className="text-sm font-semibold">{option.label}</p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">{option.description}</p>
-                        </button>
-                      ))}
-                    </div>
-                    {showMoreCta && (
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        {CTA_STYLE_OPTIONS.filter((o) =>
-                          o.key !== "auto" && o.key !== "link_in_bio" && o.key !== "direct_website"
-                        ).map((option) => (
-                          <button
-                            key={option.key}
-                            type="button"
-                            onClick={() => { store.setCtaStyle(option.key); setScriptConfigChanged(true); debouncedRegenScript(); }}
-                            className={cn(
-                              "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
-                              store.ctaStyle === option.key
-                                ? "border-primary bg-primary/5"
-                                : "border-border hover:border-muted-foreground/30",
-                            )}
-                          >
-                            <p className="text-sm font-semibold">{option.label}</p>
-                            <p className="mt-0.5 text-xs text-muted-foreground">{option.description}</p>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setShowMoreCta(v => !v)}
-                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2"
-                    >
-                      {showMoreCta ? "Fewer CTA options \u25B2" : "More CTA options \u25BC"}
-                    </button>
-                    {requiresCommentKeyword && (
-                      <div className="mt-3">
-                        <Label htmlFor="cta-comment-keyword" className="text-xs text-muted-foreground">
-                          Keyword viewers should comment
-                        </Label>
-                        <Input
-                          id="cta-comment-keyword"
-                          value={store.ctaCommentKeyword}
-                          onChange={(e) => store.setCtaCommentKeyword(e.target.value.replace(/[^a-zA-Z0-9 _-]/g, ""))}
-                          placeholder='e.g. "link" or "deal"'
-                          className="mt-1"
-                          maxLength={30}
-                        />
-                      </div>
-                    )}
-                  </CollapsibleContent>
-                </Collapsible>
-
-                <div className="flex flex-col gap-5">
-                    {/* Easy / Advanced mode tab */}
-                    <div className="flex rounded-lg border border-border bg-muted/40 p-1 gap-1">
-                      <button
-                        type="button"
-                        onClick={() => store.setAdvancedMode(false)}
-                        className={cn(
-                          "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all",
-                          !store.advancedMode
-                            ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        <Zap className="size-4" />
-                        Easy Mode
-                      </button>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!store.advancedMode) {
-                                  handleSwitchToAdvanced();
-                                }
-                              }}
-                              className={cn(
-                                "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all",
-                                store.advancedMode
-                                  ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                                  : "text-muted-foreground hover:text-foreground",
-                              )}
-                            >
-                              <Settings2 className="size-4" />
-                              Advanced
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Customize each Hook, Body, and CTA script, voice, and timing individually before generating.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-
-                    {/* Mode selector */}
-                    <div>
-                      <p className="mb-2 text-sm font-medium">Generation mode</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            store.setMode("single");
-                            setScriptConfigChanged(true);
-                            debouncedRegenScript();
-                          }}
-                          className={cn(
-                            "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
-                            store.mode === "single"
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:border-muted-foreground/30",
-                          )}
-                        >
-                          <div className="flex w-full items-center justify-between">
-                            <p className="text-sm font-semibold">Single Ad</p>
-                            <p className="text-sm font-bold text-primary">
-                              {store.quality === "hd" ? CREDITS_PER_SINGLE_HD : CREDITS_PER_SINGLE} cr
-                            </p>
-                          </div>
-                          <p className="mt-1 text-xs text-muted-foreground">1 complete video · fastest</p>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            store.setMode("triple");
-                            setScriptConfigChanged(true);
-                            debouncedRegenScript();
-                          }}
-                          className={cn(
-                            "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
-                            store.mode === "triple"
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:border-muted-foreground/30",
-                          )}
-                        >
-                          <div className="flex w-full items-center justify-between">
-                            <p className="text-sm font-semibold">Full Campaign</p>
-                            <p className="text-sm font-bold text-primary">
-                              {store.quality === "hd" ? CREDITS_PER_BATCH_HD : CREDITS_PER_BATCH} cr
-                            </p>
-                          </div>
-                          <p className="mt-1 text-xs text-muted-foreground">27 combos · pick your best</p>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Quality selector */}
-                    <div>
-                      <p className="mb-2 text-sm font-medium">Video quality</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => { store.setQuality("standard"); store.setVideoProvider("kling"); setScriptConfigChanged(true); debouncedRegenScript(); }}
-                          className={cn(
-                            "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
-                            store.quality === "standard"
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:border-muted-foreground/30",
-                          )}
-                        >
-                          <p className="text-sm font-semibold">Standard</p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">Kling 2.6 · Faster, great for testing</p>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            store.setQuality("hd");
-                            setScriptConfigChanged(true);
-                            debouncedRegenScript();
-                          }}
-                          className={cn(
-                            "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
-                            store.quality === "hd"
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:border-muted-foreground/30",
-                          )}
-                        >
-                          <p className="text-sm font-semibold">High Quality</p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">Best quality · final ads</p>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Model sub-selector (HD only) */}
-                    {store.quality === "hd" && (
-                      <div>
-                        <p className="mb-2 text-sm font-medium">Model</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => store.setVideoProvider("kling")}
-                            className={cn(
-                              "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
-                              store.videoProvider === "kling"
-                                ? "border-primary bg-primary/5"
-                                : "border-border hover:border-muted-foreground/30",
-                            )}
-                          >
-                            <p className="text-sm font-semibold">Kling 3.0</p>
-                            <p className="mt-0.5 text-xs text-muted-foreground">Fast · proven quality</p>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => store.setVideoProvider("sora")}
-                            className={cn(
-                              "flex flex-col items-start rounded-xl border-2 px-4 py-3 text-left transition-all",
-                              store.videoProvider === "sora"
-                                ? "border-primary bg-primary/5"
-                                : "border-border hover:border-muted-foreground/30",
-                            )}
-                          >
-                            <p className="text-sm font-semibold">Sora 2 ✨</p>
-                            <p className="mt-0.5 text-xs text-muted-foreground">Premium · OpenAI</p>
-                          </button>
+            {videoLoaderStep < 0 && (
+              <>
+                <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+                  <div className="space-y-4 self-start lg:sticky lg:top-24">
+                    <div className="rounded-xl border border-border bg-background p-4">
+                      <div className="mb-3 flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">B. Scene</p>
+                          <p className="mt-1 text-sm text-muted-foreground">Pick a preview image for this video.</p>
                         </div>
-                      </div>
-                    )}
-
-                    {/* Language */}
-                    <div>
-                      <p className="mb-2 text-sm font-medium">Script language</p>
-                      <div className="flex flex-wrap gap-2">
-                        {LANGUAGE_OPTIONS.map((lang) => (
-                          <button
-                            key={lang.code}
-                            type="button"
-                            onClick={() => { store.setLanguage(lang.code); setScriptConfigChanged(true); debouncedRegenScript(); }}
-                            className={cn(
-                              "rounded-lg border-2 px-3 py-1.5 text-sm transition-all",
-                              store.language === lang.code
-                                ? "border-primary bg-primary/5 font-medium text-primary"
-                                : "border-border text-muted-foreground hover:border-muted-foreground/40",
-                            )}
-                          >
-                            {lang.native}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Audio is rendered in English by the AI model. Script language affects the on-screen text only.
-                      </p>
-                    </div>
-                  </div>
-
-                {requiresCommentKeyword && !commentKeyword && (
-                  <div className="rounded-xl bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
-                    Add a comment keyword above to generate the CTA correctly.
-                  </div>
-                )}
-
-                {/* Composites generating indicator */}
-                {generateComposites.isPending && (
-                  <div className="flex flex-col gap-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      {[0, 1, 2, 3].map((i) => (
-                        <div
-                          key={i}
-                          className={cn(
-                            "relative overflow-hidden rounded-xl border border-border bg-muted",
-                            store.format === "9:16" ? "aspect-[9/16]" : "aspect-video",
-                          )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleGenerateComposites()}
+                          disabled={generateComposites.isPending || !store.productId || !store.personaId || !store.format}
+                          className="h-7 px-2 text-xs"
                         >
-                          <div
-                            className="absolute inset-0 animate-pulse bg-gradient-to-br from-muted to-muted-foreground/5"
-                            style={{ animationDelay: `${i * 200}ms` }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex flex-col items-center gap-1.5 py-2">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 className="size-4 animate-spin" />
-                        <span>{COMPOSITE_MESSAGES[compositeMsgIdx]}</span>
+                          <RefreshCw className="mr-1 size-3" />
+                          Regenerate all
+                        </Button>
                       </div>
-                      <p className="text-xs text-muted-foreground/60">
-                        Usually takes about 45 seconds
-                      </p>
-                    </div>
-                  </div>
-                )}
 
-                {/* Scene preview (compact) */}
-                {!generateComposites.isPending && compositeImages.length > 0 && (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium">Scene preview</p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleGenerateComposites()}
-                        disabled={generateComposites.isPending}
-                        className="text-xs text-muted-foreground h-7"
-                      >
-                        <RefreshCw className="size-3 mr-1" />
-                        Regenerate
-                      </Button>
-                    </div>
-                    <div className={cn(
-                      "grid gap-2",
-                      store.format === "9:16" ? "grid-cols-4" : "grid-cols-2",
-                    )}>
-                      {compositeImages.map((img, i) => (
-                        <button
-                          key={i}
-                          onClick={() => {
-                            if (i !== selectedCompositeIdx && store.pendingScript) setScriptConfigChanged(true);
-                            setSelectedCompositeIdx(i);
-                            setShowPreviewEditor(false);
-                            const path = compositeImages[i].path;
-                            store.setCompositeImagePath(path);
-                          }}
-                          className="group relative overflow-hidden rounded-lg focus:outline-none"
-                        >
-                          <div className={cn(
-                            "relative overflow-hidden rounded-lg border-2 transition-all",
-                            store.format === "9:16" ? "aspect-[9/16]" : "aspect-video",
-                            selectedCompositeIdx === i
-                              ? "border-primary ring-2 ring-primary/30"
-                              : "border-transparent group-hover:border-muted-foreground/40",
-                          )}>
-                            <img src={img.signed_url} alt={`Preview ${i + 1}`} className="size-full object-cover" loading="lazy" decoding="async" />
-                            {selectedCompositeIdx === i && (
-                              <div className="absolute inset-0 flex items-end justify-center bg-primary/10 pb-2">
-                                <div className="flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
-                                  <Check className="size-2.5" />
-                                  Selected
-                                </div>
+                      {generateComposites.isPending && (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-2">
+                            {[0, 1, 2, 3].map((i) => (
+                              <div
+                                key={i}
+                                className={cn(
+                                  "relative overflow-hidden rounded-lg border border-border bg-muted",
+                                  store.format === "9:16" ? "aspect-[9/16]" : "aspect-video",
+                                )}
+                              >
+                                <div
+                                  className="absolute inset-0 animate-pulse bg-gradient-to-br from-muted to-muted-foreground/5"
+                                  style={{ animationDelay: `${i * 200}ms` }}
+                                />
                               </div>
-                            )}
+                            ))}
                           </div>
-                        </button>
-                      ))}
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Loader2 className="size-3.5 animate-spin" />
+                            <span>{COMPOSITE_MESSAGES[compositeMsgIdx]}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {!generateComposites.isPending && compositeImages.length > 0 && (
+                        <div className={cn("grid gap-2", store.format === "9:16" ? "grid-cols-2" : "grid-cols-1")}>
+                          {compositeImages.map((img, i) => (
+                            <button
+                              key={i}
+                              onClick={() => {
+                                if (i !== selectedCompositeIdx && store.pendingScript) setScriptConfigChanged(true);
+                                handleSelectComposite(i);
+                              }}
+                              className="group relative overflow-hidden rounded-lg focus:outline-none"
+                            >
+                              <div
+                                className={cn(
+                                  "relative overflow-hidden rounded-lg border-2 transition-all",
+                                  store.format === "9:16" ? "aspect-[9/16]" : "aspect-video",
+                                  selectedCompositeIdx === i
+                                    ? "border-primary ring-2 ring-primary/30"
+                                    : "border-transparent group-hover:border-muted-foreground/40",
+                                )}
+                              >
+                                <img
+                                  src={img.signed_url}
+                                  alt={`Preview ${i + 1}`}
+                                  className="size-full object-cover"
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                                {selectedCompositeIdx === i && (
+                                  <div className="absolute inset-0 flex items-end justify-center bg-primary/10 pb-2">
+                                    <div className="flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
+                                      <Check className="size-2.5" />
+                                      Selected
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {!generateComposites.isPending && compositeImages.length === 0 && (
+                        <Button
+                          variant="outline"
+                          onClick={() => handleGenerateComposites()}
+                          disabled={!store.productId || !store.personaId || !store.format}
+                          className="w-full"
+                        >
+                          <ImageIcon className="size-4" />
+                          Generate Scene Preview
+                        </Button>
+                      )}
                     </div>
 
-                    {/* Quick edit */}
                     {selectedCompositeIdx !== null && compositeImages[selectedCompositeIdx] && (
-                      <div className="rounded-lg border border-border bg-muted/20 p-3">
-                        <div className="flex items-center justify-between gap-3">
+                      <div className="rounded-xl border border-border bg-background p-4">
+                        <div className="mb-2 flex items-center justify-between gap-3">
                           <div>
-                            <p className="text-sm font-medium">Quick edit (optional)</p>
+                            <p className="text-sm font-medium">Quick Edit</p>
                             <p className="text-xs text-muted-foreground">Adjust outfit, background, or lighting.</p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleGenerateComposites()}
-                              disabled={generateComposites.isPending}
-                            >
-                              {generateComposites.isPending ? (
-                                <><Loader2 className="size-3.5 animate-spin" />Regenerating...</>
-                              ) : (
-                                <><RefreshCw className="size-3.5" />Regenerate image</>
-                              )}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setShowPreviewEditor((prev) => !prev)}
-                            >
-                              {showPreviewEditor ? "Hide" : "Edit"}
-                            </Button>
-                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowPreviewEditor((prev) => !prev)}
+                            className="h-7 px-2 text-xs"
+                          >
+                            {showPreviewEditor ? "Hide" : "Edit"}
+                          </Button>
                         </div>
+
                         {showPreviewEditor && (
-                          <div className="mt-3 flex flex-col gap-3">
+                          <div className="flex flex-col gap-3">
                             <Textarea
                               value={previewEditPrompt}
                               onChange={(e) => setPreviewEditPrompt(e.target.value)}
-                              placeholder="Example: Change the outfit to a black hoodie and make the background a cozy cafe."
+                              placeholder="Example: change the outfit to a black hoodie with a cozy cafe background."
                               maxLength={500}
                               rows={2}
                             />
                             <div className="flex items-center justify-end gap-2">
-                              <Button type="button" variant="ghost" size="sm" onClick={() => setShowPreviewEditor(false)} disabled={editComposite.isPending}>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowPreviewEditor(false)}
+                                disabled={editComposite.isPending}
+                              >
                                 Cancel
                               </Button>
                               <Button
@@ -2152,303 +2001,556 @@ export default function GeneratePage() {
                       </div>
                     )}
                   </div>
-                )}
 
-                {/* No composites + not pending - fallback generate button */}
-                {!generateComposites.isPending && compositeImages.length === 0 && (
-                  <Button
-                    variant="outline"
-                    onClick={() => handleGenerateComposites()}
-                    disabled={!store.productId || !store.personaId || !store.format}
-                  >
-                    <ImageIcon className="size-4" />
-                    Generate Scene Preview
-                  </Button>
-                )}
+                  <div className="min-w-0 space-y-5">
+                    <div className="rounded-xl border border-border bg-background p-4 sm:p-5">
+                      <div className="mb-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">A. Video Setup</p>
+                        <p className="mt-1 text-sm text-muted-foreground">Configure mode, quality, and script controls.</p>
+                      </div>
 
-                {/* Credit cost */}
-                <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
-                  <p className="text-sm text-muted-foreground">
-                    This will use{" "}
-                    <span className="font-bold text-foreground">{effectiveCost} credits</span>
-                    {!isUnlimitedCredits && <span> ({creditsRemaining} remaining)</span>}
-                  </p>
-                </div>
+                      <div className="flex rounded-lg border border-border bg-muted/40 p-1">
+                        <button
+                          type="button"
+                          onClick={() => store.setAdvancedMode(false)}
+                          className={cn(
+                            "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all",
+                            !store.advancedMode
+                              ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                              : "text-muted-foreground hover:text-foreground",
+                          )}
+                        >
+                          <Zap className="size-4" />
+                          Easy Mode
+                        </button>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!store.advancedMode) {
+                                    handleSwitchToAdvanced();
+                                  }
+                                }}
+                                className={cn(
+                                  "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all",
+                                  store.advancedMode
+                                    ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                                    : "text-muted-foreground hover:text-foreground",
+                                )}
+                              >
+                                <Settings2 className="size-4" />
+                                Advanced
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Customize each Hook, Body, and CTA script, voice, and timing individually before generating.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
 
-                {/* ── Script / Generate area ────────────────────────── */}
-                {generateScript.isPending ? (
-                  <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-8 text-center">
-                    <Loader2 className="size-7 animate-spin text-primary" />
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Writing your script…</p>
-                      <p className="text-xs text-muted-foreground mt-1">{SCRIPT_MESSAGES[scriptMsgIdx]}</p>
-                    </div>
-                  </div>
-                ) : store.pendingScript ? (
-                  <div className="flex flex-col gap-4">
-                    {/* Script auto-regenerates when settings change */}
+                      {!store.advancedMode ? (
+                        <div className="mt-5 space-y-5">
+                          <Collapsible open={ctaOpen} onOpenChange={setCtaOpen}>
+                            <CollapsibleTrigger asChild>
+                              <button
+                                type="button"
+                                className="flex w-full items-center justify-between rounded-xl border border-border px-4 py-3 text-left transition-all hover:border-muted-foreground/30"
+                              >
+                                <p className="text-sm font-medium">Customize CTA</p>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary" className="text-xs">
+                                    {CTA_STYLE_OPTIONS.find((o) => o.key === store.ctaStyle)?.label ?? "Auto"}
+                                  </Badge>
+                                  {ctaOpen ? (
+                                    <ChevronUp className="size-4 text-muted-foreground" />
+                                  ) : (
+                                    <ChevronDown className="size-4 text-muted-foreground" />
+                                  )}
+                                </div>
+                              </button>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="mt-2">
+                              <div className="grid grid-cols-2 gap-2">
+                                {CTA_STYLE_OPTIONS.filter((o) =>
+                                  o.key === "auto" || o.key === "link_in_bio" || o.key === "direct_website"
+                                ).map((option) => (
+                                  <button
+                                    key={option.key}
+                                    type="button"
+                                    onClick={() => {
+                                      store.setCtaStyle(option.key);
+                                      setScriptConfigChanged(true);
+                                      debouncedRegenScript();
+                                    }}
+                                    className={cn(
+                                      "flex flex-col items-start rounded-xl border px-4 py-3 text-left transition-all",
+                                      store.ctaStyle === option.key
+                                        ? "border-primary bg-primary/5"
+                                        : "border-border hover:border-muted-foreground/30",
+                                    )}
+                                  >
+                                    <p className="text-sm font-semibold">{option.label}</p>
+                                    <p className="mt-0.5 text-xs text-muted-foreground">{option.description}</p>
+                                  </button>
+                                ))}
+                              </div>
+                              {showMoreCta && (
+                                <div className="mt-2 grid grid-cols-2 gap-2">
+                                  {CTA_STYLE_OPTIONS.filter((o) =>
+                                    o.key !== "auto" && o.key !== "link_in_bio" && o.key !== "direct_website"
+                                  ).map((option) => (
+                                    <button
+                                      key={option.key}
+                                      type="button"
+                                      onClick={() => {
+                                        store.setCtaStyle(option.key);
+                                        setScriptConfigChanged(true);
+                                        debouncedRegenScript();
+                                      }}
+                                      className={cn(
+                                        "flex flex-col items-start rounded-xl border px-4 py-3 text-left transition-all",
+                                        store.ctaStyle === option.key
+                                          ? "border-primary bg-primary/5"
+                                          : "border-border hover:border-muted-foreground/30",
+                                      )}
+                                    >
+                                      <p className="text-sm font-semibold">{option.label}</p>
+                                      <p className="mt-0.5 text-xs text-muted-foreground">{option.description}</p>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowMoreCta((v) => !v)}
+                                className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                              >
+                                {showMoreCta ? "Fewer CTA options ▲" : "More CTA options ▼"}
+                              </button>
+                              {requiresCommentKeyword && (
+                                <div className="mt-3">
+                                  <Label htmlFor="cta-comment-keyword" className="text-xs text-muted-foreground">
+                                    Keyword viewers should comment
+                                  </Label>
+                                  <Input
+                                    id="cta-comment-keyword"
+                                    value={store.ctaCommentKeyword}
+                                    onChange={(e) => store.setCtaCommentKeyword(e.target.value.replace(/[^a-zA-Z0-9 _-]/g, ""))}
+                                    placeholder='e.g. "link" or "deal"'
+                                    className="mt-1"
+                                    maxLength={30}
+                                  />
+                                </div>
+                              )}
+                            </CollapsibleContent>
+                          </Collapsible>
 
-                    {/* Script review - side-by-side for single mode, stacked for triple */}
-                    <div className={cn(
-                      "flex gap-4",
-                      store.mode === "single" ? "flex-row items-start" : "flex-col",
-                    )}>
-                      {/* Selected composite preview (single mode only - left column) */}
-                      {store.mode === "single" && selectedCompositeIdx !== null && compositeImages[selectedCompositeIdx] && (
-                        <div className="shrink-0 w-[200px]">
-                          <div className={cn(
-                            "relative overflow-hidden rounded-lg border border-border",
-                            store.format === "9:16" ? "aspect-[9/16]" : "aspect-video",
-                          )}>
-                            <img
-                              src={compositeImages[selectedCompositeIdx].signed_url}
-                              alt="Selected scene preview"
-                              className="size-full object-cover"
-                            />
+                          <div>
+                            <p className="mb-2 text-sm font-medium">Generation mode</p>
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  store.setMode("single");
+                                  setScriptConfigChanged(true);
+                                  debouncedRegenScript();
+                                }}
+                                className={cn(
+                                  "flex flex-col items-start rounded-xl border px-4 py-3 text-left transition-all",
+                                  store.mode === "single"
+                                    ? "border-primary bg-primary/5"
+                                    : "border-border hover:border-muted-foreground/30",
+                                )}
+                              >
+                                <div className="flex w-full items-center justify-between">
+                                  <p className="text-sm font-semibold">Single Ad</p>
+                                  <p className="text-sm font-bold text-primary">
+                                    {store.quality === "hd" ? CREDITS_PER_SINGLE_HD : CREDITS_PER_SINGLE} cr
+                                  </p>
+                                </div>
+                                <p className="mt-1 text-xs text-muted-foreground">1 complete video · fastest</p>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  store.setMode("triple");
+                                  setScriptConfigChanged(true);
+                                  debouncedRegenScript();
+                                }}
+                                className={cn(
+                                  "flex flex-col items-start rounded-xl border px-4 py-3 text-left transition-all",
+                                  store.mode === "triple"
+                                    ? "border-primary bg-primary/5"
+                                    : "border-border hover:border-muted-foreground/30",
+                                )}
+                              >
+                                <div className="flex w-full items-center justify-between">
+                                  <p className="text-sm font-semibold">Full Campaign</p>
+                                  <p className="text-sm font-bold text-primary">
+                                    {store.quality === "hd" ? CREDITS_PER_BATCH_HD : CREDITS_PER_BATCH} cr
+                                  </p>
+                                </div>
+                                <p className="mt-1 text-xs text-muted-foreground">27 combos · pick your best</p>
+                              </button>
+                            </div>
                           </div>
+
+                          <div>
+                            <p className="mb-2 text-sm font-medium">Video quality</p>
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  store.setQuality("standard");
+                                  store.setVideoProvider("kling");
+                                  setScriptConfigChanged(true);
+                                  debouncedRegenScript();
+                                }}
+                                className={cn(
+                                  "flex flex-col items-start rounded-xl border px-4 py-3 text-left transition-all",
+                                  store.quality === "standard"
+                                    ? "border-primary bg-primary/5"
+                                    : "border-border hover:border-muted-foreground/30",
+                                )}
+                              >
+                                <p className="text-sm font-semibold">Standard</p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">Kling 2.6 · Faster, great for testing</p>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  store.setQuality("hd");
+                                  setScriptConfigChanged(true);
+                                  debouncedRegenScript();
+                                }}
+                                className={cn(
+                                  "flex flex-col items-start rounded-xl border px-4 py-3 text-left transition-all",
+                                  store.quality === "hd"
+                                    ? "border-primary bg-primary/5"
+                                    : "border-border hover:border-muted-foreground/30",
+                                )}
+                              >
+                                <p className="text-sm font-semibold">High Quality</p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">Best quality · final ads</p>
+                              </button>
+                            </div>
+                          </div>
+
+                          {store.quality === "hd" && (
+                            <div>
+                              <p className="mb-2 text-sm font-medium">Model</p>
+                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                <button
+                                  type="button"
+                                  onClick={() => store.setVideoProvider("kling")}
+                                  className={cn(
+                                    "flex flex-col items-start rounded-xl border px-4 py-3 text-left transition-all",
+                                    store.videoProvider === "kling"
+                                      ? "border-primary bg-primary/5"
+                                      : "border-border hover:border-muted-foreground/30",
+                                  )}
+                                >
+                                  <p className="text-sm font-semibold">Kling 3.0</p>
+                                  <p className="mt-0.5 text-xs text-muted-foreground">Fast · proven quality</p>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => store.setVideoProvider("sora")}
+                                  className={cn(
+                                    "flex flex-col items-start rounded-xl border px-4 py-3 text-left transition-all",
+                                    store.videoProvider === "sora"
+                                      ? "border-primary bg-primary/5"
+                                      : "border-border hover:border-muted-foreground/30",
+                                  )}
+                                >
+                                  <p className="text-sm font-semibold">Sora 2 ✨</p>
+                                  <p className="mt-0.5 text-xs text-muted-foreground">Premium · OpenAI</p>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          <div>
+                            <p className="mb-2 text-sm font-medium">Script language</p>
+                            <div className="flex flex-wrap gap-2">
+                              {LANGUAGE_OPTIONS.map((lang) => (
+                                <button
+                                  key={lang.code}
+                                  type="button"
+                                  onClick={() => {
+                                    store.setLanguage(lang.code);
+                                    setScriptConfigChanged(true);
+                                    debouncedRegenScript();
+                                  }}
+                                  className={cn(
+                                    "rounded-lg border px-3 py-1.5 text-sm transition-all",
+                                    store.language === lang.code
+                                      ? "border-primary bg-primary/5 font-medium text-primary"
+                                      : "border-border text-muted-foreground hover:border-muted-foreground/40",
+                                  )}
+                                >
+                                  {lang.native}
+                                </button>
+                              ))}
+                            </div>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Audio is rendered in English by the AI model. Script language affects the on-screen text only.
+                            </p>
+                          </div>
+
+                          {requiresCommentKeyword && !commentKeyword && (
+                            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-500">
+                              Add a comment keyword above to generate the CTA correctly.
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="mt-5 space-y-4">
+                          {isInitializingAdvanced ? (
+                            <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-muted/40 py-12">
+                              <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                              <div className="text-center">
+                                <p className="text-sm font-medium">Generating scripts for all segments...</p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {store.mode === "triple" ? "9 segments" : "3 segments"} · usually takes ~20 seconds
+                                </p>
+                              </div>
+                            </div>
+                          ) : store.advancedSegments ? (
+                            <>
+                              <div className="rounded-xl bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+                                {store.mode === "triple"
+                                  ? "Customize each of the 9 segments - 3 variants × 3 types. Mix any combo for 27 unique videos."
+                                  : "Customize your Hook, Body, and CTA individually for full creative control."}
+                              </div>
+                              <AdvancedModePanel
+                                mode={store.mode}
+                                segments={store.advancedSegments}
+                                productId={store.productId!}
+                                personaId={store.personaId!}
+                                format={store.format ?? "9:16"}
+                                mainCompositeSignedUrl={
+                                  selectedCompositeIdx !== null
+                                    ? compositeImages[selectedCompositeIdx]?.signed_url ?? null
+                                    : null
+                                }
+                                onSegmentUpdate={(type, index, patch) => store.updateAdvancedSegment(type, index, patch)}
+                              />
+                            </>
+                          ) : (
+                            <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-10">
+                              <Settings2 className="size-8 text-muted-foreground" />
+                              <p className="text-sm text-muted-foreground">Advanced segments failed to generate.</p>
+                              <Button variant="outline" size="sm" onClick={handleInitializeAdvancedSegments}>
+                                Retry
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       )}
+                    </div>
 
-                      {/* Script content (right column in single mode) */}
-                      <div className={cn("flex flex-col gap-1", store.mode === "single" ? "flex-1 min-w-0" : "")}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <Check className="size-4 text-emerald-500" />
-                        <p className="text-sm font-semibold">Script ready - review & edit</p>
+                    <div className="rounded-xl border border-border bg-background p-4 sm:p-5">
+                      <div className="mb-4 flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">C. Script</p>
+                          <p className="mt-1 text-sm text-muted-foreground">Review and edit before final generation.</p>
+                        </div>
+                        {store.pendingScript && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleGenerateScript}
+                            disabled={generateScript.isPending || generateComposites.isPending || !store.compositeImagePath}
+                            className="h-7 px-2 text-xs text-muted-foreground"
+                          >
+                            <RefreshCw className="mr-1 size-3" />
+                            Regenerate script
+                          </Button>
+                        )}
                       </div>
-                      <p className="text-xs text-muted-foreground mb-3">
-                        Edit any segment before generating your video.
-                      </p>
 
-                      {(["hooks", "bodies", "ctas"] as const).map((sectionType, sectionIdx) => {
-                        const segments = store.pendingScript![sectionType];
-                        const singularLabel = sectionType === "hooks" ? "Hook" : sectionType === "bodies" ? "Body" : "CTA";
-                        const sectionLabel = sectionType === "hooks" ? "Hooks" : sectionType === "bodies" ? "Bodies" : "CTAs";
-
-                        return (
-                          <div key={sectionType} className="flex flex-col gap-2">
-                            {sectionIdx > 0 && <Separator className="my-1" />}
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{sectionLabel}</p>
-                              <Badge variant="outline" className="text-[10px]">
-                                {segments.length} {segments.length === 1 ? "variant" : "variants"}
-                              </Badge>
+                      {generateScript.isPending ? (
+                        <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-8 text-center">
+                          <Loader2 className="size-7 animate-spin text-primary" />
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">Writing your script...</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{SCRIPT_MESSAGES[scriptMsgIdx]}</p>
+                          </div>
+                        </div>
+                      ) : store.pendingScript ? (
+                        !store.advancedMode ? (
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-2">
+                              <Check className="size-4 text-emerald-500" />
+                              <p className="text-sm font-semibold">Script ready - review & edit</p>
+                              {scriptConfigChanged && (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  Settings changed
+                                </Badge>
+                              )}
                             </div>
 
-                            {segments.map((segment: ScriptSegment, idx: number) => (
-                              <Card key={`${sectionType}-${idx}`} className="border-border">
-                                <CardContent className="flex flex-col gap-2 p-3">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-1.5">
-                                      <p className="text-xs font-semibold text-foreground">
-                                        {singularLabel} {segments.length > 1 ? idx + 1 : ""}
-                                      </p>
-                                      <Badge variant="secondary" className="text-[10px]">
-                                        {formatVariantLabel(segment.variant_label)}
-                                      </Badge>
-                                      <Badge variant="outline" className="text-[10px]">
-                                        {segment.duration_seconds}s
-                                      </Badge>
-                                    </div>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-6 px-2 text-[10px] text-muted-foreground"
-                                      disabled={generateScript.isPending}
-                                      onClick={() => {
-                                        if (!store.productId || !store.personaId || !store.compositeImagePath) return;
-                                        generateScript.mutate(
-                                          {
-                                            product_id: store.productId,
-                                            persona_id: store.personaId,
-                                            mode: store.mode,
-                                            quality: store.quality,
-                                            composite_image_path: store.compositeImagePath,
-                                            cta_style: store.ctaStyle,
-                                            cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
-                                            language: store.language,
-                                            phase: "script",
-                                          },
-                                          {
-                                            onSuccess: (result) => {
-                                              const newSegText = result.script?.[sectionType]?.[idx]?.text;
-                                              if (newSegText !== undefined && result.generation_id) {
-                                                const freshScript = useGenerationWizardStore.getState().pendingScript;
-                                                const freshCredits = useGenerationWizardStore.getState().creditsToCharge ?? 0;
-                                                if (freshScript) {
-                                                  store.setPendingScript(
-                                                    result.generation_id,
-                                                    {
-                                                      ...freshScript,
-                                                      [sectionType]: freshScript[sectionType].map((seg, i) =>
-                                                        i === idx ? { ...seg, text: newSegText } : seg
-                                                      ),
-                                                    },
-                                                    freshCredits,
-                                                  );
-                                                }
-                                              }
-                                            },
-                                            onError: (err) => { toast.error(err.message || "Failed to regenerate"); },
-                                          },
-                                        );
-                                      }}
-                                    >
-                                      {generateScript.isPending ? (
-                                        <Loader2 className="size-3 animate-spin" />
-                                      ) : (
-                                        <RefreshCw className="size-3" />
-                                      )}
-                                      Regen
-                                    </Button>
+                            {(["hooks", "bodies", "ctas"] as const).map((sectionType) => {
+                              const segments = store.pendingScript![sectionType];
+                              const singularLabel = sectionType === "hooks" ? "Hook" : sectionType === "bodies" ? "Body" : "CTA";
+                              const sectionLabel = sectionType === "hooks" ? "Hooks" : sectionType === "bodies" ? "Bodies" : "CTAs";
+
+                              return (
+                                <div key={sectionType} className="space-y-2">
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{sectionLabel}</p>
+                                    <Badge variant="outline" className="text-[10px]">
+                                      {segments.length} {segments.length === 1 ? "variant" : "variants"}
+                                    </Badge>
                                   </div>
-                                  <Textarea
-                                    value={segment.text}
-                                    onChange={(e) => store.updateScriptSection(sectionType, idx, e.target.value)}
-                                    rows={3}
-                                    className="resize-none text-sm"
-                                  />
-                                </CardContent>
-                              </Card>
-                            ))}
+
+                                  <div className="space-y-2">
+                                    {segments.map((segment: ScriptSegment, idx: number) => (
+                                      <div key={`${sectionType}-${idx}`} className="rounded-lg border border-border bg-background p-3">
+                                        <div className="mb-2 flex items-center justify-between gap-2">
+                                          <div className="flex items-center gap-1.5">
+                                            <p className="text-xs font-semibold text-foreground">
+                                              {singularLabel} {segments.length > 1 ? idx + 1 : ""}
+                                            </p>
+                                            <Badge variant="secondary" className="text-[10px]">
+                                              {formatVariantLabel(segment.variant_label)}
+                                            </Badge>
+                                            <Badge variant="outline" className="text-[10px]">
+                                              {segment.duration_seconds}s
+                                            </Badge>
+                                          </div>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="size-7 text-muted-foreground"
+                                            aria-label={`Regenerate ${singularLabel.toLowerCase()} ${idx + 1}`}
+                                            title={`Regenerate ${singularLabel.toLowerCase()} ${idx + 1}`}
+                                            disabled={generateScript.isPending}
+                                            onClick={() => {
+                                              if (!store.productId || !store.personaId || !store.compositeImagePath) return;
+                                              generateScript.mutate(
+                                                {
+                                                  product_id: store.productId,
+                                                  persona_id: store.personaId,
+                                                  mode: store.mode,
+                                                  quality: store.quality,
+                                                  composite_image_path: store.compositeImagePath,
+                                                  cta_style: store.ctaStyle,
+                                                  cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
+                                                  language: store.language,
+                                                  phase: "script",
+                                                },
+                                                {
+                                                  onSuccess: (result) => {
+                                                    const newSegText = result.script?.[sectionType]?.[idx]?.text;
+                                                    if (newSegText !== undefined && result.generation_id) {
+                                                      const freshScript = useGenerationWizardStore.getState().pendingScript;
+                                                      const freshCredits = useGenerationWizardStore.getState().creditsToCharge ?? 0;
+                                                      if (freshScript) {
+                                                        store.setPendingScript(
+                                                          result.generation_id,
+                                                          {
+                                                            ...freshScript,
+                                                            [sectionType]: freshScript[sectionType].map((seg, i) =>
+                                                              i === idx ? { ...seg, text: newSegText } : seg,
+                                                            ),
+                                                          },
+                                                          freshCredits,
+                                                        );
+                                                      }
+                                                    }
+                                                  },
+                                                  onError: (err) => { toast.error(err.message || "Failed to regenerate"); },
+                                                },
+                                              );
+                                            }}
+                                          >
+                                            <RefreshCw className="size-3.5" />
+                                          </Button>
+                                        </div>
+                                        <Textarea
+                                          value={segment.text}
+                                          onChange={(e) => store.updateScriptSection(sectionType, idx, e.target.value)}
+                                          rows={3}
+                                          className="resize-none text-sm"
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
-                        );
-                      })}
-                    </div>
-                    </div>
-
-                    {/* Generate Video */}
-                    <Button
-                      onClick={handleApproveAndGenerate}
-                      disabled={approveAndGenerate.isPending || creditsLoading}
-                      size="lg"
-                      className="w-full"
-                    >
-                      {approveAndGenerate.isPending ? (
-                        <><Loader2 className="size-4 animate-spin" />Starting generation...</>
-                      ) : creditsLoading ? (
-                        <><Loader2 className="size-4 animate-spin" />Checking credits...</>
+                        ) : (
+                          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3">
+                            <p className="text-sm font-medium text-foreground">Script ready for advanced generation</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Your advanced segment settings are ready. Generate when you are satisfied with the setup.
+                            </p>
+                          </div>
+                        )
                       ) : (
-                        <><Zap className="size-4" />Generate Video</>
+                        <div className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
+                          Generate a script to review Hook, Body, and CTA text before launching the final video render.
+                        </div>
                       )}
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    onClick={handleGenerateScript}
-                    disabled={(requiresCommentKeyword && !commentKeyword) || generateComposites.isPending || !store.compositeImagePath}
-                    size="lg"
-                    className="w-full"
-                  >
-                    {generateComposites.isPending ? (
-                      <><Loader2 className="size-4 animate-spin" />Waiting for scene preview...</>
-                    ) : (
-                      <>Generate Script</>
-                    )}
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {/* ── Advanced Mode ─────────────────────────────────────── */}
-            {store.advancedMode && videoLoaderStep < 0 && (
-              <div className="flex flex-col gap-5">
-                {isInitializingAdvanced ? (
-                  <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-muted/40 py-12">
-                    <Loader2 className="size-6 animate-spin text-muted-foreground" />
-                    <div className="text-center">
-                      <p className="text-sm font-medium">Generating scripts for all segments…</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {store.mode === "triple" ? "9 segments" : "3 segments"} · usually takes ~20 seconds
-                      </p>
                     </div>
                   </div>
-                ) : store.advancedSegments ? (
-                  <>
-                    <div className="rounded-xl bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-                      {store.mode === "triple"
-                        ? "Customize each of the 9 segments - 3 variants × 3 types. Mix any combo for 27 unique videos."
-                        : "Customize your Hook, Body, and CTA individually for full creative control."}
-                    </div>
-                    <AdvancedModePanel
-                      mode={store.mode}
-                      segments={store.advancedSegments}
-                      productId={store.productId!}
-                      personaId={store.personaId!}
-                      format={store.format ?? "9:16"}
-                      mainCompositeSignedUrl={
-                        selectedCompositeIdx !== null
-                          ? compositeImages[selectedCompositeIdx]?.signed_url ?? null
-                          : null
-                      }
-                      onSegmentUpdate={(type, index, patch) => store.updateAdvancedSegment(type, index, patch)}
-                    />
+                </div>
 
-                    <Separator />
-
-                    {/* Credit cost */}
-                    <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
+                <div className="sticky bottom-4 z-20 rounded-xl border border-border bg-background/95 px-4 py-3 shadow-lg backdrop-blur">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
                       <p className="text-sm text-muted-foreground">
-                        This will use{" "}
-                        <span className="font-bold text-foreground">{effectiveCost} credits</span>
+                        This run uses <span className="font-semibold text-foreground">{effectiveCost} credits</span>
                         {!isUnlimitedCredits && <span> ({creditsRemaining} remaining)</span>}
                       </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Estimated generation time: {store.quality === "hd" ? "2-4 minutes" : "1-3 minutes"}
+                      </p>
                     </div>
-
-                    {/* Generate buttons for advanced mode */}
-                    {generateScript.isPending ? (
-                      <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-8 text-center">
-                        <Loader2 className="size-7 animate-spin text-primary" />
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">Writing your script…</p>
-                          <p className="text-xs text-muted-foreground mt-1">{SCRIPT_MESSAGES[scriptMsgIdx]}</p>
-                        </div>
-                      </div>
-                    ) : store.pendingScript ? (
-                      <Button
-                        onClick={handleApproveAndGenerate}
-                        disabled={approveAndGenerate.isPending || creditsLoading}
-                        size="lg"
-                        className="w-full"
-                      >
-                        {approveAndGenerate.isPending ? (
-                          <><Loader2 className="size-4 animate-spin" />Starting generation...</>
-                        ) : creditsLoading ? (
-                          <><Loader2 className="size-4 animate-spin" />Checking credits...</>
-                        ) : (
-                          <><Zap className="size-4" />Generate Video</>
-                        )}
-                      </Button>
-                    ) : (
-                      <Button
-                        onClick={handleGenerateScript}
-                        disabled={generateComposites.isPending || !store.compositeImagePath}
-                        size="lg"
-                        className="w-full"
-                      >
-                        {generateComposites.isPending ? (
-                          <><Loader2 className="size-4 animate-spin" />Waiting for scene preview...</>
-                        ) : (
-                          <>Generate Script</>
-                        )}
-                      </Button>
-                    )}
-                  </>
-                ) : (
-                  /* No segments yet and not initializing - re-init option */
-                  <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-10">
-                    <Settings2 className="size-8 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">Advanced segments failed to generate.</p>
-                    <Button variant="outline" size="sm" onClick={handleInitializeAdvancedSegments}>
-                      Retry
-                    </Button>
+                    <div className="w-full sm:w-auto">
+                      {store.pendingScript ? (
+                        <Button
+                          onClick={handleApproveAndGenerate}
+                          disabled={approveAndGenerate.isPending || creditsLoading}
+                          size="lg"
+                          className="w-full sm:min-w-[220px]"
+                        >
+                          {approveAndGenerate.isPending ? (
+                            <><Loader2 className="size-4 animate-spin" />Starting generation...</>
+                          ) : creditsLoading ? (
+                            <><Loader2 className="size-4 animate-spin" />Checking credits...</>
+                          ) : (
+                            <><Zap className="size-4" />Generate Video</>
+                          )}
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={handleGenerateScript}
+                          disabled={(requiresCommentKeyword && !commentKeyword) || generateComposites.isPending || !store.compositeImagePath}
+                          size="lg"
+                          className="w-full sm:min-w-[220px]"
+                        >
+                          {generateComposites.isPending ? (
+                            <><Loader2 className="size-4 animate-spin" />Waiting for scene preview...</>
+                          ) : (
+                            <>Generate Script</>
+                          )}
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
+                </div>
+              </>
             )}
           </div>
         </div>
       )}
-
       <Dialog
         open={pickerPersona !== null}
         onOpenChange={(open) => {
