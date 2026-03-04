@@ -124,7 +124,7 @@ export default function PersonasPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">AI Personas</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <span className="mt-1 block text-sm text-muted-foreground" suppressHydrationWarning>
             {isLoading ? (
               <Skeleton className="inline-block h-4 w-32" />
             ) : (
@@ -132,7 +132,7 @@ export default function PersonasPage() {
                 ? `${slotsUsed} personas created · unlimited slots (admin)`
                 : `${slotsUsed}/${slotLimit} persona slots used`
             )}
-          </p>
+          </span>
         </div>
         {atLimit ? (
           <Button disabled>

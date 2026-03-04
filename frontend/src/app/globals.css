@@ -151,9 +151,7 @@
   body {
     @apply bg-background text-foreground;
   }
-  *,
-  *::before,
-  *::after {
-    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, fill 0.3s ease, stroke 0.3s ease;
-  }
+  /* Theme color transitions are handled by next-themes disableTransitionOnChange.
+     Avoid a blanket * transition — it causes compositor instability during HMR
+     rebuilds and React re-renders, which breaks Playwright screenshots. */
 }

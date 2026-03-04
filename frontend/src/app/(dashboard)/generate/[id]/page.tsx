@@ -27,6 +27,7 @@ import {
   Square,
   Sparkles,
   Zap,
+  LayoutDashboard,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -248,7 +249,7 @@ function VideoGeneratingScreen({
           >
             {/* Shimmer effect */}
             <div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-foreground/5 to-transparent"
               style={{
                 animation: `shimmer 2s ease-in-out infinite`,
                 animationDelay: `${i * 200}ms`,
@@ -257,13 +258,13 @@ function VideoGeneratingScreen({
             />
             {/* Play button icon in center */}
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="size-10 rounded-full bg-white/10 flex items-center justify-center animate-pulse">
-                <Play className="size-4 text-white/40 ml-0.5" />
+              <div className="size-10 rounded-full bg-foreground/10 flex items-center justify-center animate-pulse">
+                <Play className="size-4 text-muted-foreground/40 ml-0.5" />
               </div>
             </div>
             {/* Segment label */}
             <div className="absolute bottom-2 inset-x-0 text-center">
-              <span className="text-[10px] font-medium text-white/30">
+              <span className="text-[10px] font-medium text-muted-foreground/50">
                 {["Hook", "Body", "CTA"][i]}
               </span>
             </div>
@@ -488,7 +489,7 @@ function VideoSegmentCard({
       {multiSelect ? (
         <div className={cn(
           "absolute right-2 top-2 z-10 flex size-6 items-center justify-center rounded",
-          isSelected ? "bg-primary text-white" : "bg-black/40 text-white/60"
+          isSelected ? "bg-primary text-primary-foreground" : "bg-black/40 text-white/60"
         )}>
           {isSelected
             ? <CheckSquare className="size-4" />
@@ -496,12 +497,12 @@ function VideoSegmentCard({
         </div>
       ) : isSelected && (
         <div className="absolute right-2 top-2 z-10 flex size-6 items-center justify-center rounded-full bg-primary">
-          <Check className="size-3.5 text-white" />
+          <Check className="size-3.5 text-primary-foreground" />
         </div>
       )}
 
       {/* Video player */}
-      <div className="relative aspect-[9/16] w-full bg-black">
+      <div className="relative aspect-[9/16] w-full bg-black dark:bg-black">
         <video
           ref={videoRef}
           src={video.url}
@@ -768,7 +769,7 @@ function CombinationPreview({
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <div className="relative aspect-[9/16] w-full max-w-xs overflow-hidden rounded-xl bg-black">
+      <div className="relative aspect-[9/16] w-full max-w-xs overflow-hidden rounded-xl bg-black dark:bg-black">
 
         {/* ── Stitched single video (shown after stitching) ── */}
         {viewMode === "stitched" && stitchedUrl && (
@@ -1111,7 +1112,8 @@ export default function GenerationDetailPage() {
   const config = statusConfig[status] ?? statusConfig.scripting;
   const isComplete = status === "completed";
   const isFailed = status === "failed";
-  const isProcessing = !isComplete && !isFailed;
+  const isAwaitingApproval = status === "awaiting_approval";
+  const isProcessing = !isComplete && !isFailed && !isAwaitingApproval;
 
   const skeletonCount = gen?.mode === "triple" ? 9 : 3;
 
@@ -1336,6 +1338,12 @@ export default function GenerationDetailPage() {
             ID: {generationId.slice(0, 8)}...
           </p>
         </div>
+        {isAwaitingApproval && (
+          <Badge variant="secondary" className="bg-amber-500/10 text-amber-400">
+            <FileText className="size-3" />
+            Review Script
+          </Badge>
+        )}
         {isProcessing && !isStale && (
           <Badge variant="secondary" className={config.badgeClass}>
             <Loader2 className="size-3 animate-spin" />
@@ -1364,6 +1372,35 @@ export default function GenerationDetailPage() {
           </Badge>
         )}
       </div>
+
+      {/* ---------------------------------------------------------------- */}
+      {/*  Awaiting approval — script ready, nothing is generating        */}
+      {/* ---------------------------------------------------------------- */}
+      {isAwaitingApproval && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="flex flex-col gap-4 py-6">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-full bg-amber-500/10">
+                <FileText className="size-5 text-amber-400" />
+              </div>
+              <div>
+                <p className="font-semibold text-foreground">
+                  Your script is ready — action required
+                </p>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  Review and approve your script to start generating videos. No credits have been charged yet.
+                </p>
+              </div>
+            </div>
+            <Button asChild className="w-full sm:w-auto">
+              <Link href="/dashboard">
+                <LayoutDashboard className="size-4" />
+                Go to Dashboard to Approve Script
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ---------------------------------------------------------------- */}
       {/*  Stale timeout card (replaces progress + productive wait)        */}

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { VideoCarousel } from "@/components/landing/VideoCarousel";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
@@ -7,6 +8,16 @@ import { TestimonialSection } from "@/components/landing/TestimonialSection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FaqSection } from "@/components/landing/FaqSection";
 import { FinalCtaSection } from "@/components/landing/FinalCtaSection";
+
+export const metadata: Metadata = {
+  title: "CineRads — AI UGC Video Ads for E-Commerce",
+  description:
+    "Create AI-powered UGC video ads in minutes. Import your products, build AI personas, and generate short-form video ads for TikTok, Reels, and Shorts.",
+  openGraph: {
+    title: "CineRads — AI UGC Video Ads for E-Commerce",
+    description: "Create AI-powered UGC video ads in minutes.",
+  },
+};
 
 const jsonLd = {
   "@context": "https://schema.org",

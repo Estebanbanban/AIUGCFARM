@@ -100,7 +100,7 @@ export function PricingSection() {
       <div className="max-w-5xl mx-auto">
         <FadeInUp className="text-center mb-14">
           <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground mb-3">Pricing</p>
-          <p className="text-sm text-[#888] mb-4">
+          <p className="text-sm text-muted-foreground mb-4">
             Traditional UGC creators charge $150-$500 per video.
           </p>
           <h2 className="text-[clamp(2rem,4vw,3rem)] font-semibold tracking-tight text-foreground">
@@ -118,14 +118,14 @@ export function PricingSection() {
             <button
               onClick={() => setAnnual(false)}
               className={`text-sm font-medium transition-colors ${
-                !annual ? "text-white" : "text-[#666]"
+                !annual ? "text-foreground" : "text-muted-foreground"
               }`}
             >
               Monthly
             </button>
             <button
               onClick={() => setAnnual(!annual)}
-              className="relative w-11 h-6 rounded-full bg-[#222] border border-[#333] transition-all flex items-center"
+              className="relative w-11 h-6 rounded-full bg-muted border border-border transition-all flex items-center"
               aria-label="Toggle billing period"
             >
               <span
@@ -137,7 +137,7 @@ export function PricingSection() {
             <button
               onClick={() => setAnnual(true)}
               className={`text-sm font-medium transition-colors flex items-center gap-2 ${
-                annual ? "text-white" : "text-[#666]"
+                annual ? "text-foreground" : "text-muted-foreground"
               }`}
             >
               Annual
@@ -157,13 +157,13 @@ export function PricingSection() {
                     plan.highlighted
                       ? "bg-card border border-primary/40 shadow-[0_0_40px_rgba(249,115,22,0.07)]"
                       : plan.isAgency
-                      ? "bg-card border border-[#333] hover:border-[#555]"
+                      ? "bg-card border border-border hover:border-muted-foreground/40"
                       : "bg-card border border-border hover:border-primary/30"
                   }`}
                 >
                   {plan.highlighted && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <span className="bg-primary text-white text-xs font-medium rounded-full px-3 py-1">
+                      <span className="bg-primary text-primary-foreground text-xs font-medium rounded-full px-3 py-1">
                         Most Popular
                       </span>
                     </div>
@@ -180,7 +180,7 @@ export function PricingSection() {
                       <span className="text-muted-foreground text-lg">/mo</span>
                     </div>
                     {annual && (
-                      <p className="text-xs text-[#888] mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         billed annually · save ${plan.annualSavings}/yr
                       </p>
                     )}
@@ -203,9 +203,9 @@ export function PricingSection() {
                     disabled={!!loadingPlan}
                     className={`w-full py-3 rounded-full text-sm font-medium text-center transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
                       plan.highlighted
-                        ? "bg-primary text-white hover:bg-orange-600"
+                        ? "bg-primary text-primary-foreground hover:bg-orange-600"
                         : plan.isAgency
-                        ? "bg-white text-black hover:bg-[#f0f0f0]"
+                        ? "bg-foreground text-background hover:opacity-90"
                         : "border border-border text-foreground hover:border-primary/40"
                     }`}
                   >

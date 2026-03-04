@@ -196,13 +196,13 @@ export default function ProductsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Products</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <span className="mt-1 block text-sm text-muted-foreground" suppressHydrationWarning>
             {isLoading ? (
               <Skeleton className="inline-block h-4 w-32" />
             ) : (
               `${products?.length ?? 0} product${(products?.length ?? 0) !== 1 ? 's' : ''}`
             )}
-          </p>
+          </span>
         </div>
         {hasProducts && (
           <div className="flex items-center gap-3">
