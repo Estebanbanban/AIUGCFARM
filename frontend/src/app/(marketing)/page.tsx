@@ -10,11 +10,11 @@ import { FaqSection } from "@/components/landing/FaqSection";
 import { FinalCtaSection } from "@/components/landing/FinalCtaSection";
 
 export const metadata: Metadata = {
-  title: "CineRads — AI UGC Video Ads for E-Commerce",
+  title: "CineRads - AI UGC Video Ads for E-Commerce",
   description:
     "Create AI-powered UGC video ads in minutes. Import your products, build AI personas, and generate short-form video ads for TikTok, Reels, and Shorts.",
   openGraph: {
-    title: "CineRads — AI UGC Video Ads for E-Commerce",
+    title: "CineRads - AI UGC Video Ads for E-Commerce",
     description: "Create AI-powered UGC video ads in minutes.",
   },
 };
@@ -112,7 +112,7 @@ const jsonLd = {
           name: "Is there a free trial?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Brand import and AI persona creation are completely free — no credit card required. Import your brand, build your AI persona, and explore the platform before generating your first video.",
+            text: "Brand import and AI persona creation are completely free - no credit card required. Import your brand, build your AI persona, and explore the platform before generating your first video.",
           },
         },
         {

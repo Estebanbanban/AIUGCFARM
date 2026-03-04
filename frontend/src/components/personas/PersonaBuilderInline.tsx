@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { resolvePersonaImageUrl } from '@/hooks/use-personas';
 import Image from 'next/image';
 import {
-  Loader2, Sparkles, Check, User, ImageIcon, X,
+  Loader2, Check, User, ImageIcon, X,
   ChevronDown, ChevronUp, Eye, Palette, Clock,
   Shirt, Watch, Wand2, Cpu, FlaskConical,
 } from 'lucide-react';
@@ -714,7 +714,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
     setLoaderStep(0);
     startSim(0, 15, 20_000, () => {
       setLoaderStep(1);
-      startSim(15, 30, 15_000); // no onDone — phase 2 will snap to step 2
+      startSim(15, 30, 15_000); // no onDone - phase 2 will snap to step 2
     });
 
     try {
@@ -736,7 +736,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
       // in its own worker (separate memory budget → no WORKER_LIMIT).
       stopSim();
       setLoaderStep(2);
-      startSim(30, 95, 55_000); // no onDone — Gemini responses will interrupt
+      startSim(30, 95, 55_000); // no onDone - Gemini responses will interrupt
 
       const imageCallBody = { persona_id: personaId, name: store.name.trim(), attributes, image_count: 1 };
       const [res1, res2] = await Promise.allSettled([
@@ -917,7 +917,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                   {isGeneratingQuick ? (
                     <><Loader2 className="size-4 animate-spin" />Generating...</>
                   ) : (
-                    <><Sparkles className="size-4" />Generate from description</>
+                    <>Generate from description</>
                   )}
                 </Button>
               </div>
@@ -1089,7 +1089,7 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
             {isGeneratingQuick && store.generatedImages.length === 0 && (
               <NanoBananaLoader
                 title="Creating Your Persona"
-                subtitle="Generating unique portraits — usually 60–90 seconds"
+                subtitle="Generating unique portraits - usually 60-90 seconds"
                 steps={PERSONA_STEPS}
                 currentStep={loaderStep}
                 progress={loaderProgress}
@@ -1222,7 +1222,6 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                     </>
                   ) : (
                     <>
-                      <Sparkles className="size-4" />
                       Generate Persona
                     </>
                   )}
@@ -1267,7 +1266,6 @@ export function PersonaBuilderInline({ onSaved, onCancel }: PersonaBuilderInline
                               </>
                             ) : (
                               <>
-                                <Sparkles className="size-4" />
                                 Regenerate
                               </>
                             )}

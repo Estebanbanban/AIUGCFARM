@@ -68,10 +68,6 @@ export function NanoBananaLoader({
 
       {/* HUD container */}
       <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 space-y-6">
-        {/* Live preview label */}
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-          Live Preview
-        </span>
 
         {/* Spinner + progress section */}
         <div className="flex flex-col items-center gap-4">
@@ -145,12 +141,11 @@ export function NanoBananaLoader({
         </div>
       </div>
 
-      {/* Stats footer */}
-      <div className="w-full max-w-md flex items-center justify-between px-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-        <span>CineRads</span>
+      {/* Status footer */}
+      <div className="w-full max-w-md flex items-center justify-end px-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          Online
+          Rendering
         </span>
       </div>
     </div>

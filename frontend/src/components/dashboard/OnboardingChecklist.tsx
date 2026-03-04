@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Circle, Package, User, Film, Sparkles } from "lucide-react";
+import { CheckCircle2, Circle, Package, User, Film } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -86,7 +86,6 @@ export function OnboardingChecklist({
             onClick={handleResumeTutorial}
             className="flex w-fit items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
           >
-            <Sparkles className="size-3.5" />
             Resume guided tutorial
           </button>
         )}

@@ -14,7 +14,6 @@ import {
   Menu,
   LogOut,
   Plus,
-  Sparkles,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -145,7 +144,6 @@ function SidebarContent({
             }}
             className="flex w-full items-center gap-2.5 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15"
           >
-            <Sparkles className="size-4 shrink-0" />
             <span className="flex-1 text-left">Get Started</span>
             <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums">
               {onboardingStepsDone}/3
@@ -203,7 +201,7 @@ function getPageTitle(pathname: string): string {
   return "Dashboard";
 }
 
-export function DashboardShell({ children }: { children: React.ReactNode }) {
+export function DashboardShell({ children, className }: { children: React.ReactNode; className?: string }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const pageTitle = getPageTitle(pathname);
@@ -211,7 +209,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+    <div className={cn("flex flex-1 min-h-0 overflow-hidden bg-background text-foreground", className)}>
       <aside className="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar lg:flex lg:flex-col">
         <SidebarContent pathname={pathname} />
       </aside>

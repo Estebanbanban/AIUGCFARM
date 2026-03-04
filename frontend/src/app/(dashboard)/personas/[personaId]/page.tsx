@@ -447,7 +447,6 @@ export default function PersonaDetailPage() {
                     </p>
                     <Button asChild size="sm">
                       <Link href="/generate">
-                        <Sparkles className="size-4" />
                         Generate Video
                       </Link>
                     </Button>

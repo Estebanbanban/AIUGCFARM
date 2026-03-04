@@ -7,6 +7,8 @@ import { callOpenRouter } from "../_shared/openrouter.ts";
 import { withRetry } from "../_shared/retry.ts";
 import { submitKlingJob } from "../_shared/kling.ts";
 import { submitSoraJob } from "../_shared/sora.ts";
+import { captureException } from "../_shared/sentry.ts";
+import { ErrorCodes, errorResponse } from "../_shared/errors.ts";
 
 // 1 credit = $1. Kling v2.6 = ~$0.88/single gen → 5cr. Kling v3 = ~$1.76/single → 10cr.
 // Credit costs are fixed. first_video_discount_used tracks the one-time purchase price discount (paywall only).
@@ -496,7 +498,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     if (req.method !== "POST") {
-      return json({ detail: "Method not allowed" }, cors, 405);
+      return errorResponse(ErrorCodes.INVALID_INPUT, "Method not allowed", 405, cors);
     }
 
     const userId = await requireUserId(req);
@@ -518,12 +520,12 @@ Deno.serve(async (req: Request) => {
         .single();
 
       if (genLookupErr || !gen) {
-        return json({ detail: "Generation not found" }, cors, 404);
+        return errorResponse(ErrorCodes.INVALID_INPUT, "Generation not found", 404, cors);
       }
 
       // Auth check: owner must match authenticated user
       if (gen.owner_id !== userId) {
-        return json({ detail: "Access denied" }, cors, 403);
+        return errorResponse(ErrorCodes.UNAUTHORIZED, "Access denied", 403, cors);
       }
 
       // Atomic status lock: transition awaiting_approval → locking in a single UPDATE.
@@ -539,10 +541,11 @@ Deno.serve(async (req: Request) => {
 
       if (lockErr || !lockRows || lockRows.length === 0) {
         // Another request already transitioned the status — return 409
-        return json(
-          { detail: `Generation is no longer awaiting approval (already processing or completed).` },
-          cors,
+        return errorResponse(
+          ErrorCodes.INVALID_INPUT,
+          "Generation is no longer awaiting approval (already processing or completed).",
           409,
+          cors,
         );
       }
 
@@ -555,7 +558,7 @@ Deno.serve(async (req: Request) => {
       // Validate Sora only supports HD
       if (provider === "sora" && resolvedQuality !== "hd") {
         await sb.from("generations").update({ status: "awaiting_approval" }).eq("id", generation_id);
-        return json({ detail: "Sora only supports HD quality. Please select HD quality to use Sora." }, cors, 400);
+        return errorResponse(ErrorCodes.INVALID_INPUT, "Sora only supports HD quality. Please select HD quality to use Sora.", 400, cors);
       }
 
       // If quality changed, persist the updated value before charging credits
@@ -583,7 +586,7 @@ Deno.serve(async (req: Request) => {
           .from("generations")
           .update({ status: "awaiting_approval" })
           .eq("id", generation_id);
-        return json({ detail: "Generation has no script to approve" }, cors, 400);
+        return errorResponse(ErrorCodes.INVALID_INPUT, "Generation has no script to approve", 400, cors);
       }
 
       // ── Plan-based validation for approve flow ──────────────────
@@ -606,14 +609,11 @@ Deno.serve(async (req: Request) => {
           .from("generations")
           .update({ status: "awaiting_approval" })
           .eq("id", generation_id);
-        return json(
-          {
-            detail: `Insufficient credits. You need ${effectiveCost} credits but have ${remaining}. Purchase more or upgrade your plan.`,
-            first_video_discount: isFirstVideo,
-            effective_cost: effectiveCost,
-          },
-          cors,
+        return errorResponse(
+          ErrorCodes.INSUFFICIENT_CREDITS,
+          `Insufficient credits. You need ${effectiveCost} credits but have ${remaining}. Purchase more or upgrade your plan.`,
           402,
+          cors,
         );
       }
 
@@ -692,6 +692,7 @@ Deno.serve(async (req: Request) => {
           200,
         );
       } catch (pipelineErr) {
+        captureException(pipelineErr);
         const errMsg =
           pipelineErr instanceof Error ? pipelineErr.message : String(pipelineErr);
         console.error("generate-video approval pipeline error:", errMsg);
@@ -734,29 +735,29 @@ Deno.serve(async (req: Request) => {
     const VALID_LANGUAGES = new Set(["en","es","fr","de","it","pt","ja","zh","ar","ru"]);
     const resolvedLanguage = VALID_LANGUAGES.has(language) ? language : "en";
 
-    if (!product_id) return json({ detail: "product_id is required" }, cors, 400);
-    if (!persona_id) return json({ detail: "persona_id is required" }, cors, 400);
-    if (!composite_image_path) return json({ detail: "composite_image_path is required" }, cors, 400);
+    if (!product_id) return errorResponse(ErrorCodes.INVALID_INPUT, "product_id is required", 400, cors);
+    if (!persona_id) return errorResponse(ErrorCodes.INVALID_INPUT, "persona_id is required", 400, cors);
+    if (!composite_image_path) return errorResponse(ErrorCodes.INVALID_INPUT, "composite_image_path is required", 400, cors);
     if (
       typeof composite_image_path !== "string" ||
       !composite_image_path.startsWith(`${userId}/`)
     ) {
-      return json({ detail: "Access denied for this composite image" }, cors, 403);
+      return errorResponse(ErrorCodes.UNAUTHORIZED, "Access denied for this composite image", 403, cors);
     }
 
     const resolvedMode = mode || "single";
     if (resolvedMode !== "single" && resolvedMode !== "triple") {
-      return json({ detail: "mode must be 'single' or 'triple'" }, cors, 400);
+      return errorResponse(ErrorCodes.INVALID_INPUT, "mode must be 'single' or 'triple'", 400, cors);
     }
 
     const resolvedQuality = quality || "standard";
     if (resolvedQuality !== "standard" && resolvedQuality !== "hd") {
-      return json({ detail: "quality must be 'standard' or 'hd'" }, cors, 400);
+      return errorResponse(ErrorCodes.INVALID_INPUT, "quality must be 'standard' or 'hd'", 400, cors);
     }
 
     // Validate Sora only supports HD quality
     if (provider === "sora" && resolvedQuality !== "hd") {
-      return json({ detail: "Sora only supports HD quality. Please select HD quality to use Sora." }, cors, 400);
+      return errorResponse(ErrorCodes.INVALID_INPUT, "Sora only supports HD quality. Please select HD quality to use Sora.", 400, cors);
     }
 
     const { variantCount, creditCost, klingModel } = computeCosts(resolvedMode, resolvedQuality, provider);
@@ -774,11 +775,7 @@ Deno.serve(async (req: Request) => {
 
     // ── 1d. Enforce advanced mode restriction ──────────────────────
     if (advanced_segments && !isAdmin && !ADVANCED_PLANS.has(userPlan)) {
-      return json(
-        { detail: "Advanced script editor requires Growth or Scale plan. Upgrade to unlock." },
-        cors,
-        403,
-      );
+      return errorResponse(ErrorCodes.UNAUTHORIZED, "Advanced script editor requires Growth or Scale plan. Upgrade to unlock.", 403, cors);
     }
 
     // ── 2. Verify product ownership (confirmed = true) ────────────
@@ -791,7 +788,7 @@ Deno.serve(async (req: Request) => {
       .eq("confirmed", true)
       .single();
     if (prodErr || !product) {
-      return json({ detail: "Product not found or not confirmed" }, cors, 404);
+      return errorResponse(ErrorCodes.INVALID_INPUT, "Product not found or not confirmed", 404, cors);
     }
 
     // ── 3. Verify persona ownership (is_active, has selected_image_url)
@@ -804,15 +801,11 @@ Deno.serve(async (req: Request) => {
       .eq("is_active", true)
       .single();
     if (persErr || !persona) {
-      return json({ detail: "Persona not found or inactive" }, cors, 404);
+      return errorResponse(ErrorCodes.INVALID_INPUT, "Persona not found or inactive", 404, cors);
     }
 
     if (!persona.selected_image_url) {
-      return json(
-        { detail: "Persona has no selected image. Select one first." },
-        cors,
-        400,
-      );
+      return errorResponse(ErrorCodes.INVALID_INPUT, "Persona has no selected image. Select one first.", 400, cors);
     }
 
     // ── 4. Security: validate per-segment image paths ─────────────
@@ -821,7 +814,7 @@ Deno.serve(async (req: Request) => {
       for (const segType of ["hooks", "bodies", "ctas"] as const) {
         for (const seg of advanced_segments[segType]) {
           if (seg.image_path && !seg.image_path.startsWith(`${userId}/`)) {
-            return json({ detail: "Access denied for segment image path" }, cors, 403);
+            return errorResponse(ErrorCodes.UNAUTHORIZED, "Access denied for segment image path", 403, cors);
           }
         }
       }
@@ -891,6 +884,7 @@ Deno.serve(async (req: Request) => {
           201,
         );
       } catch (scriptErr) {
+        captureException(scriptErr);
         const errMsg =
           scriptErr instanceof Error ? scriptErr.message : String(scriptErr);
         console.error("generate-video script-only error:", errMsg);
@@ -910,25 +904,25 @@ Deno.serve(async (req: Request) => {
     // The legacy single-call path has been removed to enforce user
     // approval before any credits are debited or video jobs are sent.
     // ══════════════════════════════════════════════════════════════════
-    return json(
-      {
-        detail:
-          "Direct generation is not supported. Generate a script first (phase: 'script'), review it, then approve with generation_id.",
-      },
-      cors,
+    return errorResponse(
+      ErrorCodes.INVALID_INPUT,
+      "Direct generation is not supported. Generate a script first (phase: 'script'), review it, then approve with generation_id.",
       400,
+      cors,
     );
 
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg === "Unauthorized") {
-      return json({ detail: "Authentication required" }, cors, 401);
+      return errorResponse(ErrorCodes.UNAUTHORIZED, "Authentication required", 401, cors);
     }
+    captureException(e);
     console.error("generate-video error:", e);
-    return json(
-      { detail: "Something went wrong generating your content. Please try again." },
-      cors,
+    return errorResponse(
+      ErrorCodes.INTERNAL_ERROR,
+      "Something went wrong generating your content. Please try again.",
       500,
+      cors,
     );
   }
 });

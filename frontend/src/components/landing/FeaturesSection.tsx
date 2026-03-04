@@ -5,7 +5,7 @@ import { slideInLeft, slideInRight } from "@/lib/animations";
 import { Check } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
-/*  Shared grid pattern — rendered inside each SVG's own <defs>               */
+/*  Shared grid pattern - rendered inside each SVG's own <defs>               */
 /* -------------------------------------------------------------------------- */
 
 function GridPattern({ id }: { id: string }) {
@@ -22,7 +22,7 @@ function GridPattern({ id }: { id: string }) {
 
 function AnimationProductImport() {
   return (
-    <div className="w-full rounded-2xl overflow-hidden border border-zinc-800 bg-[#0c0c0e] shadow-2xl">
+    <div className="w-full rounded-2xl overflow-hidden border border-border shadow-2xl bg-zinc-950">
       <svg viewBox="0 0 600 420" className="w-full h-auto block">
         <defs>
           <GridPattern id="pi-grid" />
@@ -41,7 +41,7 @@ function AnimationProductImport() {
             <stop offset="50%" stopColor="#f97316" stopOpacity="0.8" />
             <stop offset="100%" stopColor="#f97316" stopOpacity="0" />
           </linearGradient>
-          {/* SVG clipPath for URL text reveal — replaces unreliable CSS clip-path:inset() on <g> */}
+          {/* SVG clipPath for URL text reveal - replaces unreliable CSS clip-path:inset() on <g> */}
           <clipPath id="pi-url-clip">
             <rect x="146" y="70" height="44">
               <animate
@@ -69,7 +69,7 @@ function AnimationProductImport() {
           @keyframes pi-press    { 0%,18%{transform:scale(1);filter:none} 19%{transform:scale(0.92);filter:brightness(1.2)} 22%,100%{transform:scale(1);filter:url(#pi-glow)} }
           @keyframes pi-scanline { 0%,23%{opacity:0;transform:translateY(0)} 24%{opacity:1;transform:translateY(0)} 40%,100%{opacity:0;transform:translateY(180px)} }
           @keyframes pi-skelFade { 0%,23%{opacity:0} 25%,38%{opacity:1} 40%,100%{opacity:0} }
-          /* CRITICAL: animation-only class — no SVG transform attr on this element */
+          /* CRITICAL: animation-only class - no SVG transform attr on this element */
           @keyframes pi-rowUp    { 0%,42%{opacity:0;transform:translateY(20px)} 48%,95%{opacity:1;transform:translateY(0)} 100%{opacity:0} }
           @keyframes pi-summary  { 0%,58%{opacity:0;transform:translateY(10px)} 65%,95%{opacity:1;transform:translateY(0)} 100%{opacity:0} }
           @keyframes pi-bPulse   { 0%,55%{stroke:#2a2a2a} 60%,85%{stroke:rgba(249,115,22,0.5)} 90%,100%{stroke:#2a2a2a} }
@@ -82,11 +82,11 @@ function AnimationProductImport() {
           {/* URL input */}
           <rect x="70" y="70" width="350" height="44" rx="8" fill="#09090b" stroke="#2a2a2b" strokeWidth="1" />
           <text x="86" y="97" fill="#71717a" fontSize="14" fontFamily="monospace">https://</text>
-          {/* Text reveal via SVG clipPath — reliable cross-browser */}
+          {/* Text reveal via SVG clipPath - reliable cross-browser */}
           <g clipPath="url(#pi-url-clip)">
             <text x="146" y="97" fill="#e4e4e7" fontSize="14" fontFamily="monospace">hydrabeauty.com/products</text>
           </g>
-          {/* Cursor: SVG <animate> on x attribute — no CSS transform conflict */}
+          {/* Cursor: SVG <animate> on x attribute - no CSS transform conflict */}
           <rect y="82" width="2" height="20" fill="#f97316">
             <animate attributeName="x" values="146;146;346;346;146" keyTimes="0;0.05;0.18;0.97;1" dur="10s" repeatCount="indefinite" />
             <animate attributeName="opacity" values="1;1;1;0;1" keyTimes="0;0.05;0.19;0.97;1" dur="10s" repeatCount="indefinite" />
@@ -152,7 +152,7 @@ function AnimationProductImport() {
 
 function AnimationPersonaBuilder() {
   return (
-    <div className="w-full rounded-2xl overflow-hidden border border-zinc-800 bg-[#0c0c0e] shadow-2xl">
+    <div className="w-full rounded-2xl overflow-hidden border border-border shadow-2xl bg-zinc-950">
       <svg viewBox="0 0 600 420" className="w-full h-auto block">
         <defs>
           <GridPattern id="pb-grid" />
@@ -169,7 +169,7 @@ function AnimationPersonaBuilder() {
           <clipPath id="pb-avatar-clip">
             <rect x="330" y="50" width="230" height="320" rx="16" />
           </clipPath>
-          {/* Photo reveal: height animates 0→320 — replaces CSS clip-path:inset() on <g> */}
+          {/* Photo reveal: height animates 0->320 - replaces CSS clip-path:inset() on <g> */}
           <clipPath id="pb-reveal-clip">
             <rect x="330" y="50" width="230" height="0">
               <animate
@@ -238,7 +238,7 @@ function AnimationPersonaBuilder() {
           <g clipPath="url(#pb-avatar-clip)">
             <rect x="330" y="50" width="230" height="320" fill="#141417" />
 
-            {/* Wireframe placeholder — fades out when avatar generates */}
+            {/* Wireframe placeholder - fades out when avatar generates */}
             <g className="pb-wire" stroke="#2a2a2b" strokeWidth="1.5" fill="none">
               <circle cx="445" cy="160" r="45" strokeDasharray="4 4" />
               <path d="M 365 320 C 365 240, 525 240, 525 320" strokeDasharray="4 4" />
@@ -246,7 +246,7 @@ function AnimationPersonaBuilder() {
               <line x1="330" y1="160" x2="560" y2="160" strokeDasharray="2 6" strokeOpacity="0.5" />
             </g>
 
-            {/* Real persona photo — revealed top-down via SVG clipPath (not CSS clip-path:inset) */}
+            {/* Real persona photo - revealed top-down via SVG clipPath (not CSS clip-path:inset) */}
             <image
               href="/img/Gemini_Generated_Image_h670yrh670yrh670-7.png"
               x="330" y="50"
@@ -286,7 +286,7 @@ function AnimationVideoGeneration() {
   const P = 1116; // perimeter of 480×88 rect with rx=12
 
   return (
-    <div className="w-full rounded-2xl overflow-hidden border border-zinc-800 bg-[#0c0c0e] shadow-2xl">
+    <div className="w-full rounded-2xl overflow-hidden border border-border shadow-2xl bg-zinc-950">
       <svg viewBox="0 0 600 420" className="w-full h-auto block">
         <defs>
           <GridPattern id="vg-grid" />
@@ -302,7 +302,7 @@ function AnimationVideoGeneration() {
             <feGaussianBlur stdDeviation="6" result="blur" />
             <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
-          {/* SVG clipPaths for text reveal — replaces unreliable CSS clip-path:inset() on <g>
+          {/* SVG clipPaths for text reveal - replaces unreliable CSS clip-path:inset() on <g>
               Coords are in the coordinate system of each row's translate() group */}
           <clipPath id="vg-clip1">
             <rect x="0" y="0" height="88">
@@ -384,7 +384,7 @@ function AnimationSegmentMixer() {
   const W = 140, H = 70;
 
   return (
-    <div className="w-full rounded-2xl overflow-hidden border border-zinc-800 bg-[#0c0c0e] shadow-2xl">
+    <div className="w-full rounded-2xl overflow-hidden border border-border shadow-2xl bg-zinc-950">
       <svg viewBox="0 0 600 420" className="w-full h-auto block">
         <defs>
           <GridPattern id="sm-grid" />

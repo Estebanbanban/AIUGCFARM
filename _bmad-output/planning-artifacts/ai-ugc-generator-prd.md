@@ -13,19 +13,23 @@ stepsCompleted:
   - 'step-e-02-review'
   - 'step-e-03-edit'
   - 'step-e-04-implementation-sync'
-lastEdited: '2026-02-28'
+lastEdited: '2026-03-04'
 editHistory:
   - date: '2026-02-26'
     changes: 'Full restructure from legacy format to BMAD standard. Extracted 38 FRs from narrative. Created SMART success criteria. Converted UI flow to user journeys. Added domain requirements, innovation analysis, project-type requirements. Removed tech stack and epic breakdown sections (relocated to Architecture and Epics docs). Tightened all NFRs with measurement methods.'
   - date: '2026-02-28'
     changes: 'Synchronized PRD with implemented codebase (Feb 2026 audit). Updated credit model from segment-based to dollar-value (1 credit = $1). Updated all plan prices and credit allocations to match implementation. Moved Expert Mode, Scale tier, account deletion, email notifications from Phase 2/deferred to Phase 1. Added new FRs (FR39-FR50) for: script review/approval, Advanced Mode, per-segment regeneration, composite image editing, credit packs, admin panel, CTA style, format selection, video quality tiers, coupon system. Updated Phase 2 scope to reflect only genuinely unbuilt features. Updated pricing appendix with actual tiers, credit packs, and generation costs.'
+  - date: '2026-03-03'
+    changes: 'March 2026 docs-sync audit (pass 1). Added Key Frontend Libraries section (React Query, Zustand, Sentry, Vitest+Playwright, DataFast, canvas-confetti). Added FR51-FR55: annual billing, single-video paywall purchase, post-purchase email, first-video discount tracking, offer banner. Added observability NFRs (NFR-OBS1, NFR-OBS2). Updated Phase 2 with deferred-item notes (FFmpeg worker, Redis rate limiting, failure recovery). Confirmed persona image count (2), free tier persona slot (1), admin panel and Advanced Mode in Phase 1.'
+  - date: '2026-03-04'
+    changes: 'March 2026 docs-sync audit (pass 2). Added ffmpeg.wasm + fflate to tech stack. Updated FR23 from Deferred to client-side implemented. Updated FR41 per-segment regen to dynamic credit cost (1cr standard / 2cr HD). Added FR56-FR63: client-side video stitching, auto-stitch, batch stitch+zip, paywall pre-check, EdgeError typed API errors, credit polling after purchase, NanoBananaLoader progress HUD, quality labels. Updated Phase 1 scope with stitching, paywall pre-check, EdgeError, credit polling, NanoBananaLoader, quality labels, mobile responsive. Updated Phase 2 FFmpeg note. Updated credit cost matrix and added single-video pricing appendix.'
 ---
 
 # Product Requirements Document  -  AI UGC Generator
 
 **Author:** Axel Ronsin
 **Date:** February 2026
-**Version:** 3.0  -  Implementation-Synchronized
+**Version:** 3.1  -  Implementation-Synchronized
 **Product Name:** CineRads
 
 ---
@@ -47,6 +51,23 @@ editHistory:
 **Business Model:** Dollar-value credit-based SaaS with subscriptions and one-time credit packs. 1 credit = $1 value. Users generate video ads through a two-phase flow: AI script generation (free) followed by user-approved video generation (credits debited on approval). Credit costs vary by generation mode and quality tier: Standard single = 5 credits, Standard triple = 15 credits, HD single = 10 credits, HD triple = 30 credits. Three subscription tiers: Starter ($25/mo, 30 credits), Growth ($80/mo, 100 credits), Scale ($180/mo, 250 credits). One-time credit packs available: 10 credits ($12), 30 credits ($33), 100 credits ($95). First-video 50% discount replaces free trial credits.
 
 **Problem:** UGC creators cost $150-$500+ per video, take days-to-weeks, and deliver inconsistent quality. Brands needing 10-50+ variations per product face a production bottleneck that directly limits ad spend scaling.
+
+---
+
+## Key Frontend Libraries
+
+> Full tech stack documented in `architecture.md`. The following are notable frontend additions implemented beyond the original architecture spec:
+
+| Library | Purpose |
+|---|---|
+| React Query (TanStack Query) | Data fetching & caching (all data hooks: useProducts, usePersonas, useCredits, useGenerations) |
+| Zustand | Generation wizard state management with localStorage persistence (`stores/generation-wizard.ts`) |
+| Sentry | Production error tracking + performance monitoring (frontend SDK + Edge Function `_shared/sentry.ts`) |
+| Vitest + Playwright | Unit testing (Vitest) and end-to-end testing (Playwright) framework |
+| DataFast | Analytics event tracking (`lib/datafast.ts`: product imported, preview generated, script generated, video generation started, paywall shown, checkout started, credits purchased) |
+| canvas-confetti | Post-purchase celebration animation in `PurchaseSuccessModal.tsx` |
+| @ffmpeg/ffmpeg + @ffmpeg/util | Client-side video stitching via WebAssembly — trims silence, concatenates Hook+Body+CTA segments into a single MP4 (`hooks/use-video-stitcher.ts`) |
+| fflate | Client-side zip compression for batch stitch export (`hooks/use-batch-stitcher.ts`, `hooks/use-zip-download.ts`) |
 
 ---
 
@@ -89,7 +110,7 @@ Core value loop: Scrape -> Persona -> Script Review -> Generate -> Download.
 - Format selection: portrait (9:16) or landscape (16:9)
 - Segmented video pipeline: generates Hook, Body, CTA segments independently via Kling
 - Script review step with coherence review pass (OpenRouter two-pass: generation + quality scoring/revision)
-- Per-segment regeneration (1 credit per re-generation, refunded on failure)
+- Per-segment regeneration (dynamic credit cost: 1cr standard / 2cr HD, refunded on failure)
 - Composite image editing via natural language prompts
 - Segment review by type + preview player on `/generate/[id]`
 - Download individual MP4 segments via signed URLs
@@ -108,6 +129,13 @@ Core value loop: Scrape -> Persona -> Script Review -> Generate -> Download.
 - Admin panel: user listing, ban/unban, credit adjustments, analytics dashboards (overview, revenue, funnel, usage). Admin users bypass credit checks entirely
 - Persona slots by tier: Free=1, Starter=1, Growth=3, Scale=10
 - Analytics tracking via DataFast
+- Client-side video stitching via ffmpeg.wasm: silence trimming + concatenation of Hook+Body+CTA into single MP4. Auto-stitch on completion. Batch stitch+zip export via fflate
+- Paywall pre-check: client-side credit check before script generation to avoid wasted API calls
+- Structured API error handling via EdgeError class + ErrorCodes enum across all Edge Functions
+- Credit polling after purchase: staggered smart-refresh with optimistic profile updates to prevent balance flash
+- NanoBananaLoader: branded progress HUD with step-by-step visualization for async operations
+- Quality labels (Standard/HD) displayed throughout generation wizard, paywall, and review pages
+- Mobile responsive: dashboard, video library, and landing page functional on mobile viewports (generation wizard desktop-optimized)
 
 ### Phase 2: Growth (v1.1-v1.3)
 
@@ -118,14 +146,15 @@ Features not yet implemented:
 - Multi-language script generation (10+ languages)
 - Marketplace: community-created persona templates
 - White-label offering for agencies
-- FFmpeg stitching of segment combinations (deferred from Phase 1  -  not available in Deno Edge Functions)
+- Server-side FFmpeg stitching (client-side stitching via ffmpeg.wasm implemented in Phase 1; server-side stitching for higher reliability and mobile support requires an external worker service, not possible in Deno Edge Functions; evaluate Lambda/Cloud Function worker)
 - Bulk zip download of segments
 - Shopify native app integration (OAuth + embedded admin)
 - Team/agency features: multi-seat accounts, shared personas, brand profiles
 - Video analytics: view counts, click-through tracking per video
 - Watermark on free-tier outputs
 - NPS survey integration
-- Redis-based rate limiting (currently in-memory)
+- Redis-backed rate limiting hardening (in-memory rate limiting implemented in Phase 1; Redis version deferred to Phase 2)
+- Generation failure recovery workflow (retry logic exists for individual API calls; user-facing retry-after-failure workflow with exponential backoff and one-click manual retry deferred to Phase 2)
 - Explicit pacing/duration slider per segment (currently auto-estimated from word count)
 - Background/environment selector UI (currently per-segment composite image selection only)
 
@@ -171,9 +200,9 @@ Features not yet implemented:
 | 9 | Hits "Generate Script" | AI writes Hook/Body/CTA script variants. Script review step shows editable segments | User approves before any charges |
 | 10 | Reviews/edits script, hits "Approve & Generate" | Credits debited, video pipeline generates segments independently | One-click from approval to video |
 | 11 | Views generation progress | Redirect to `/generate/[id]` with polling progress | Real-time feedback |
-| 12 | Downloads segments as MP4 | Direct download via signed URLs | Ready for ad platform upload |
+| 12 | Views stitched video or downloads segments | Auto-stitch combines Hook+Body+CTA into single MP4 (client-side ffmpeg.wasm). Also available: individual segment downloads via signed URLs, batch stitch+zip for all combos | Ready for ad platform upload |
 
-**Success:** User goes from persona creation to downloadable video ad with full script review control. Gets up to 27 possible video combinations from a triple-mode generation.
+**Success:** User goes from persona creation to downloadable stitched video ad with full script review control. Gets up to 27 possible video combinations from a triple-mode generation.
 
 ### UJ3: Free User  -  Paywall Conversion
 
@@ -207,7 +236,7 @@ Features not yet implemented:
 | 2 | Resumes a draft generation | "Resume" from dashboard hydrates wizard to step 5 with existing script | No lost work on interrupted sessions |
 | 3 | Selects product, selects existing persona | Pre-configured  -  no rebuild needed | Persona persistence saves time |
 | 4 | Generates video (Triple mode) | Script review -> approval -> 9 segments delivered | Consistent quality across clients |
-| 5 | Uses per-segment regeneration for weak segments | Re-generates individual segments (1 credit each) | Surgical improvement without full re-generation |
+| 5 | Uses per-segment regeneration for weak segments | Re-generates individual segments (1cr standard / 2cr HD) | Surgical improvement without full re-generation |
 
 **Success:** Marcus generates segments for multiple products efficiently, using draft resume and per-segment regeneration to optimize output quality.
 
@@ -346,7 +375,7 @@ Features not yet implemented:
 | FR20 | System generates composite POV-style images of the persona holding/using the selected product. 4 previews generated per request; user selects preferred. Editing via natural language prompts supported | Implemented | UJ2.7 |
 | FR21 | System generates video segments independently (Hook, Body, CTA) via Kling v2.6 (Standard) or Kling v3 (HD) to maintain lip-sync quality (each segment < 10 seconds) | Implemented | UJ2.7 |
 | FR22 | Body segments are bounded at 10 seconds maximum. The script generation LLM enforces 5-9s body duration. Kling duration clamped to 5 or 10 | Implemented | UJ2.7 |
-| FR23 | FFmpeg stitching of segment combinations | **Deferred** (not available in Deno Edge Functions). Individual segments delivered; client-side sequential preview only | UJ2.7 |
+| FR23 | FFmpeg stitching of segment combinations | **Client-side implemented** via ffmpeg.wasm (`use-video-stitcher.ts`). Trims leading/trailing silence via silencedetect, re-encodes to frame-accurate cuts, concatenates Hook+Body+CTA into single MP4 blob URL. Auto-stitch triggers automatically when all segments complete. Batch stitch+zip export via `use-batch-stitcher.ts` + fflate. Server-side stitching remains deferred (requires external worker, not possible in Deno Edge Functions) | UJ2.7 |
 | FR24 | Each Triple mode generation produces 3 variants per segment type (3 hooks + 3 bodies + 3 CTAs = 9 segments). Single mode produces 1 variant per type (3 segments) | Implemented | UJ2.8 |
 | FR25 | Users can review generated segments by type (hooks, bodies, CTAs). Preview player exists on `/generate/[id]`. Combination builder UI deferred | Implemented (partial) | UJ2.8 |
 | FR26 | Users can download individual generated video segments as MP4 files via signed URL. Bulk zip download deferred | Implemented | UJ2.9 |
@@ -384,7 +413,7 @@ Features not yet implemented:
 |---|---|---|---|
 | FR39 | Two-phase script review/approval flow: phase "script" creates generation with `awaiting_approval` status and returns script + cost preview. Approval with `generation_id` debits credits and submits Kling jobs. Atomic `locking` status prevents double-approval | Implemented | UJ2.9, UJ2.10 |
 | FR40 | Advanced Mode panel: per-segment emotion selector (happy, excited, surprised, serious, neutral), intensity control (1-3), action descriptions, inline emotion tags `[e:emotion:intensity]`, per-segment custom composite images | Implemented | UJ2.8 |
-| FR41 | Per-segment regeneration: re-generate a single segment of a completed generation (1 credit). Resubmits to Kling with same composite and script. Failed regeneration refunds 1 credit | Implemented | UJ4.5 |
+| FR41 | Per-segment regeneration: re-generate a single segment of a completed generation. Dynamic credit cost: 1 credit for Standard quality, 2 credits for HD quality (resolved from `generations.video_quality`). Resubmits to Kling with same composite and script. Failed regeneration refunds the debited credits. Insufficient credits returns HTTP 402 with `INSUFFICIENT_CREDITS` error code | Implemented | UJ4.5 |
 | FR42 | Composite image editing: edit existing composite via natural language prompt (`edit-composite-image/` Edge Function using NanoBanana `editCompositeFromReference`) | Implemented | UJ2.7 |
 | FR43 | One-time credit packs: Starter Pack (10cr, $12), Creator Pack (30cr, $33), Pro Pack (100cr, $95). Priced higher per credit than subscriptions to incentivize recurring revenue | Implemented | UJ3.2, PT2 |
 | FR44 | Admin panel: full user listing, ban/unban, credit adjustments, analytics dashboards (overview, revenue, funnel, usage). Admin users (`profiles.role = 'admin'`) bypass credit checks with unlimited credits. Admin operations use service role key exclusively | Implemented | Operations |
@@ -394,6 +423,19 @@ Features not yet implemented:
 | FR48 | Account deletion: full cleanup via `delete-account/` Edge Function. Cancels Stripe subscription, deletes storage objects across 4 buckets, deletes all DB records, deletes auth user | Implemented | DR2 |
 | FR49 | Transactional email via Resend: `send-email/` Supabase Auth Hook intercepts signup (6-digit OTP), recovery, magic link, email change. HMAC-SHA256 signature verification. Branded as CineRads | Implemented | NFR8, PT4 |
 | FR50 | Coupon system: allowlisted Stripe coupon IDs (30% off once for new users, 50% off once for Starter). Applied via `stripe-checkout/` Edge Function | Implemented | UJ3 |
+| FR51 | Annual Billing Option: users may choose annual vs monthly billing at checkout. Annual pricing configured via Stripe price IDs with discount vs monthly. Billing frequency parameter (`monthly` \| `annual`) passed to `stripe-checkout/` Edge Function | Implemented | UJ3, PT2 |
+| FR52 | Single-Video Paywall Purchase: when credits are insufficient mid-generation, user may purchase exactly one video (5 credits standard at $5, or 10 credits HD at $10) without committing to a plan or pack. Purchase routed via `single_standard` / `single_hd` Stripe price IDs. "Buy just one video" option shown in paywall modal | Implemented | UJ3.1, FR31 |
+| FR53 | Post-Purchase Email Notification: after a credit pack or single-video purchase, system sends a transactional email (via Resend) confirming credits added and linking to the generation wizard | Implemented | PT4, FR49 |
+| FR54 | First-Video Discount: first-time buyers are eligible for a 50% discount on their first purchase. Tracked via `profiles.first_video_discount_used` column. Coupon applied via Stripe coupon code. Discount restored on generation failure | Implemented | UJ3, FR34 |
+| FR55 | Offer Banner: after account creation or first login, a 30-minute countdown banner shows a 30% subscription discount (Stripe coupon `t9QmsQTe`). Timer persisted in localStorage (`cr_offer_started_at`). Dismissed permanently once user purchases or closes (`cr_offer_used`). Also offers 50% off first single-video via coupon `STARTER50`. Managed by `useFirstPurchaseOffer` hook | Implemented | UJ3, SC3 |
+| FR56 | Client-Side Video Stitching: completed segments are stitched client-side via ffmpeg.wasm (non-multithreaded build, no COOP/COEP headers required). Pipeline: fetch segments, detect speech boundaries via silencedetect, trim leading/trailing silence, concatenate Hook+Body+CTA into single MP4. Singleton FFmpeg instance with mutex lock prevents concurrent stitches. Progress bar with 7 status phases (idle, loading_ffmpeg, fetching, detecting, trimming, concat, done, error) | Implemented | FR23, UJ2.12 |
+| FR57 | Auto-Stitch on Completion: when all three segments of a combination (hook, body, CTA) finish generating, the system automatically triggers client-side stitching without user action. Debounced via `autoStitchTriggered` ref. User can switch between sequential preview and stitched video view | Implemented | FR56, UJ2.12 |
+| FR58 | Batch Stitch & Zip Export: users can stitch multiple segment combinations sequentially and download all stitched videos as a single zip file. Uses `useBatchStitcher` hook with `stitchToBlob()` for each combo, compressed via fflate (level 0). Progress shows current/total combo count. Filename format: `cinerades-{id}-batch-{date}.zip` | Implemented | FR56, UJ4.4 |
+| FR59 | Paywall Pre-Check: before script generation (both auto-fire on composite selection and manual "Generate Script"), system checks credit balance client-side. If insufficient, paywall opens immediately without wasting an API call. Paywall tab auto-selects "single" for low-cost generations or "subscription" for higher-cost ones | Implemented | FR31, UJ3.1 |
+| FR60 | EdgeError Typed API Errors: all Edge Function calls return structured errors via `EdgeError` class (carries HTTP status code). Backend uses `ErrorCodes` enum (`INSUFFICIENT_CREDITS`, `RATE_LIMITED`, `VIDEO_GENERATION_FAILED`, `CONTENT_POLICY_VIOLATION`, `UNAUTHORIZED`, `INVALID_INPUT`, `INTERNAL_ERROR`) with `errorResponse()` helper. Frontend catches `EdgeError` for status-specific handling (e.g., 401 triggers sign-out + redirect, 402 triggers paywall) | Implemented | NFR-OBS1, NFR7 |
+| FR61 | Credit Polling After Purchase: after Stripe checkout redirect, `CheckoutSuccessHandler` polls credit balance every 2s for 15s (pack/single-video) or uses staggered smart-refresh at 3s/8s/15s/30s/60s (subscription) to catch webhook processing delay. Optimistic profile update for plan changes prevents "free" flash. On `/generate` page, shows toast instead of modal to keep user in flow | Implemented | FR35, UJ3.4 |
+| FR62 | NanoBananaLoader Progress HUD: branded full-screen progress indicator used during persona generation and composite image generation. Features: dual concentric ring spinner (amber-500), CineRads logo center, step-by-step checklist with checkmarks, progress bar with glow effect, "CineRads / Online" branded footer. Reusable component at `components/ui/nano-loader.tsx` | Implemented | NFR7, UJ2.4 |
+| FR63 | Quality Labels in UI: generation wizard displays "Standard" and "HD" quality labels throughout. Standard maps to Kling v2.6, HD maps to Kling v3. Labels shown in quality selector, credit cost display, paywall, and generation review page. Per-segment regeneration error messages include quality-specific cost ("Regenerating an HD segment costs 2 credits") | Implemented | FR47, UJ2.8 |
 
 ---
 
@@ -437,6 +479,13 @@ Features not yet implemented:
 | NFR17 | Video generation pipeline scales via external APIs (Kling, NanoBanana/Gemini) with staggered requests to avoid rate limits | Composite generation uses staggered requests |
 | NFR18 | Generated video assets served from Supabase Storage with signed URLs | Signed URL generation on demand |
 | NFR19 | Database handles 10,000 registered users with < 100ms query response time for dashboard operations | Database query monitoring at p95, measured weekly |
+
+### Observability
+
+| ID | Requirement | Measurement |
+|---|---|---|
+| NFR-OBS1 | Error Tracking: all generation failures, webhook errors, and API errors captured via Sentry with full stack traces and user context. Covers frontend SDK + Edge Function `_shared/sentry.ts` `captureException()` | Sentry error dashboard: error count, resolution rate, mean-time-to-detect |
+| NFR-OBS2 | Analytics Events: key user actions tracked via DataFast — product imported, preview generated, script generated, video generation started, paywall shown, checkout started, credits purchased. Event functions exported from `frontend/src/lib/datafast.ts` | DataFast event dashboard: event counts, funnel drop-off rates |
 
 ---
 
@@ -498,7 +547,8 @@ Features not yet implemented:
 | Single | HD | Kling v3 | 3 (1H+1B+1C) | 10 credits | 5 credits |
 | Triple | Standard | Kling v2.6 | 9 (3H+3B+3C) | 15 credits | 8 credits |
 | Triple | HD | Kling v3 | 9 (3H+3B+3C) | 30 credits | 15 credits |
-| Per-segment regeneration | Any | Same as original | 1 | 1 credit | N/A |
+| Per-segment regeneration | Standard | Same as original | 1 | 1 credit | N/A |
+| Per-segment regeneration | HD | Same as original | 1 | 2 credits | N/A |
 
 ## Appendix C: Credit Pack Pricing
 
@@ -508,7 +558,14 @@ Features not yet implemented:
 | Creator Pack | 30 | $33 | $1.10 | 6 standard or 3 HD |
 | Pro Pack | 100 | $95 | $0.95 | 20 standard or 10 HD |
 
-Note: Subscription credit rate is $0.72-$0.83/credit. Pack rates ($0.95-$1.20/credit) are intentionally higher to incentivize subscriptions.
+**Single-Video Purchases (paywall "Try 1 Video" tab):**
+
+| Pack | Credits | Price | Quality |
+|---|---|---|---|
+| Single Video - Standard | 5 | $5 | Kling v2.6 |
+| Single Video - HD | 10 | $10 | Kling v3 |
+
+Note: Subscription credit rate is $0.72-$0.83/credit. Pack rates ($0.95-$1.20/credit) are intentionally higher to incentivize subscriptions. Single-video purchases are at $1.00/credit (no markup, no subscription required).
 
 ## Appendix D: Edge Functions Inventory
 

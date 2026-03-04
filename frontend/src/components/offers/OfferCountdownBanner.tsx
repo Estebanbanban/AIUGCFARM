@@ -36,11 +36,11 @@ export function OfferCountdownBanner() {
         >
           <div className="flex h-full items-center justify-center gap-3 px-4 text-sm font-medium">
             <span className="hidden sm:inline">
-              Limited offer: 50% off your first video + 30% off all plans — expires in{" "}
+              Limited offer: 50% off your first video + 30% off all plans - expires in{" "}
               <span className="font-bold tabular-nums">{offer.timeDisplay}</span>
             </span>
             <span className="sm:hidden">
-              50% off first video — <span className="font-bold tabular-nums">{offer.timeDisplay}</span>
+              50% off first video -<span className="font-bold tabular-nums">{offer.timeDisplay}</span>
             </span>
             <button
               onClick={() => router.push("/generate")}

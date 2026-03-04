@@ -596,12 +596,14 @@ function CombinationPreview({
   ctaVideo,
   generationId,
   allSegmentEntries,
+  autoStitch = false,
 }: {
   hookVideo: SegmentVideo | undefined;
   bodyVideo: SegmentVideo | undefined;
   ctaVideo: SegmentVideo | undefined;
   generationId: string;
   allSegmentEntries: Array<{ name: string; url: string }>;
+  autoStitch?: boolean;
 }) {
   const hookRef = useRef<HTMLVideoElement>(null);
   const bodyRef = useRef<HTMLVideoElement>(null);
@@ -616,7 +618,7 @@ function CombinationPreview({
     "sequential",
   );
 
-  const { stitch, reset, status: stitchStatus, stitchedUrl, error: stitchError } =
+  const { stitch, reset, status: stitchStatus, progress: stitchProgress, stitchedUrl, error: stitchError } =
     useVideoStitcher();
 
   const {
@@ -627,6 +629,9 @@ function CombinationPreview({
     isActive: isPackZipping,
   } = useZipDownload();
 
+  // Track whether auto-stitch has been triggered for this combination
+  const autoStitchTriggered = useRef(false);
+
   // Toast on Download Pack failure
   useEffect(() => {
     if (packZipStatus === "error") {
@@ -634,6 +639,30 @@ function CombinationPreview({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [packZipStatus]);
+
+  // Toast on stitch failure
+  useEffect(() => {
+    if (stitchStatus === "error" && stitchError) {
+      toast.error(stitchError);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stitchStatus]);
+
+  // Auto-stitch when all segments are available and autoStitch is enabled
+  useEffect(() => {
+    if (
+      autoStitch &&
+      hookVideo &&
+      bodyVideo &&
+      ctaVideo &&
+      stitchStatus === "idle" &&
+      !autoStitchTriggered.current
+    ) {
+      autoStitchTriggered.current = true;
+      stitch(hookVideo.url, bodyVideo.url, ctaVideo.url);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStitch, hookVideo?.url, bodyVideo?.url, ctaVideo?.url, stitchStatus]);
 
   const isStitching =
     stitchStatus !== "idle" &&
@@ -701,6 +730,7 @@ function CombinationPreview({
     stopAll();
     reset();
     setViewMode("sequential");
+    autoStitchTriggered.current = false;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hookVideo?.url, bodyVideo?.url, ctaVideo?.url]);
 
@@ -972,6 +1002,16 @@ function CombinationPreview({
           </div>
         </div>
 
+        {isStitching && (
+          <div className="mt-2">
+            <Progress
+              value={stitchProgress}
+              className="h-1.5 bg-muted [&>[data-slot=progress-indicator]]:bg-primary"
+            />
+            <p className="mt-1 text-xs text-muted-foreground text-right">{stitchProgress}%</p>
+          </div>
+        )}
+
         {stitchError && (
           <p className="mt-2 text-xs text-red-400">{stitchError}</p>
         )}
@@ -1006,7 +1046,7 @@ function statusToLoader(
     case "submitting_jobs":
       return { step: 1, progress: Math.min(25 + elapsedMs / 20_000 * 10, 34) };
     case "generating_segments": {
-      // Use real segment progress when available (accurate) — fall back to elapsed time
+      // Use real segment progress when available (accurate) - fall back to elapsed time
       if (segmentProgress && segmentProgress.total > 0) {
         const realPct = (segmentProgress.completed / segmentProgress.total) * 55 + 35;
         return { step: 2, progress: Math.min(realPct, 90) };
@@ -1033,7 +1073,7 @@ export default function GenerationDetailPage() {
     (s) => s.generations.find((g) => g.id === generationId),
   );
 
-  // Stale timeout state — must be declared before useGenerationStatus so it can be passed in
+  // Stale timeout state - must be declared before useGenerationStatus so it can be passed in
   const pageOpenedAt = useRef(Date.now());
   const [isStale, setIsStale] = useState(false);
 
@@ -1183,7 +1223,7 @@ export default function GenerationDetailPage() {
     return () => clearInterval(interval);
   }, [isProcessing, lastChecked]);
 
-  // Client-side stale timeout — after 12 minutes of non-terminal status, stop
+  // Client-side stale timeout - after 12 minutes of non-terminal status, stop
   // polling and show a "taking longer than expected" card.
   useEffect(() => {
     if (!isProcessing || isStale) return;
@@ -1374,7 +1414,7 @@ export default function GenerationDetailPage() {
       </div>
 
       {/* ---------------------------------------------------------------- */}
-      {/*  Awaiting approval — script ready, nothing is generating        */}
+      {/*  Awaiting approval - script ready, nothing is generating        */}
       {/* ---------------------------------------------------------------- */}
       {isAwaitingApproval && (
         <Card className="border-amber-500/30 bg-amber-500/5">
@@ -1385,7 +1425,7 @@ export default function GenerationDetailPage() {
               </div>
               <div>
                 <p className="font-semibold text-foreground">
-                  Your script is ready — action required
+                  Your script is ready - action required
                 </p>
                 <p className="mt-0.5 text-sm text-muted-foreground">
                   Review and approve your script to start generating videos. No credits have been charged yet.
@@ -1417,7 +1457,7 @@ export default function GenerationDetailPage() {
                   Taking longer than expected
                 </p>
                 <p className="mt-0.5 text-sm text-muted-foreground">
-                  The video provider may be under high load. Your credits are safe — check back in a few minutes.
+                  The video provider may be under high load. Your credits are safe - check back in a few minutes.
                 </p>
               </div>
             </div>
@@ -1447,7 +1487,7 @@ export default function GenerationDetailPage() {
       {isProcessing && !isStale && (
         <NanoBananaLoader
           title="Generating Your Video"
-          subtitle="Your video is rendering — usually 3–10 minutes"
+          subtitle="Your video is rendering - usually 3-10 minutes"
           steps={RENDER_STEPS}
           currentStep={loaderInfo.step}
           progress={loaderInfo.progress}
@@ -1468,9 +1508,9 @@ export default function GenerationDetailPage() {
       )}
 
       {/* ---------------------------------------------------------------- */}
-      {/*  POV Composite Image                                              */}
+      {/*  POV Composite Image (shown during processing only)               */}
       {/* ---------------------------------------------------------------- */}
-      {gen?.composite_image_url && (
+      {!isComplete && gen?.composite_image_url && (
         <Card>
           <CardHeader>
             <CardTitle className="text-foreground">
@@ -1492,9 +1532,9 @@ export default function GenerationDetailPage() {
       )}
 
       {/* ---------------------------------------------------------------- */}
-      {/*  Script preview (collapsible)                                     */}
+      {/*  Script preview (collapsible, shown during processing only)       */}
       {/* ---------------------------------------------------------------- */}
-      {script && (
+      {!isComplete && script && (
         <Card>
           <CardHeader>
             <button
@@ -1827,101 +1867,119 @@ export default function GenerationDetailPage() {
             </div>
           )}
 
-          {/* -------------------------------------------------------------- */}
-          {/*  Combination builder                                            */}
-          {/* -------------------------------------------------------------- */}
+          {/* ============================================================ */}
+          {/*  2. Combination Preview - simplified                            */}
+          {/* ============================================================ */}
           <Separator />
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-foreground">
-                Combination Preview
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Select one hook, one body, and one CTA above, then preview the
-                full combination here.
-              </p>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-foreground">
+                  Combination Preview
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Hook {selectedHook + 1} + Body {selectedBody + 1} + CTA {selectedCta + 1}
+                </p>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col items-center gap-6 lg:flex-row lg:items-start lg:gap-8">
-                {/* Preview player */}
-                <CombinationPreview
-                  hookVideo={segments.hooks?.[selectedHook]}
-                  bodyVideo={segments.bodies?.[selectedBody]}
-                  ctaVideo={segments.ctas?.[selectedCta]}
-                  generationId={generationId}
-                  allSegmentEntries={[
-                    ...(segments.hooks ?? []).map((v, i) => ({ name: `hooks/hook_${i + 1}.mp4`, url: v.url })),
-                    ...(segments.bodies ?? []).map((v, i) => ({ name: `bodies/body_${i + 1}.mp4`, url: v.url })),
-                    ...(segments.ctas ?? []).map((v, i) => ({ name: `ctas/cta_${i + 1}.mp4`, url: v.url })),
-                  ]}
-                />
-
-                {/* Selection summary */}
-                <div className="flex flex-1 flex-col gap-4">
-                  <h4 className="text-sm font-semibold text-foreground">
-                    Selected Combination
-                  </h4>
-
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-3 rounded-lg border border-border px-4 py-3">
-                      <div className="flex size-8 items-center justify-center rounded-full bg-primary/10">
-                        <span className="text-xs font-bold text-primary">
-                          H
-                        </span>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-foreground">
-                          Hook {selectedHook + 1}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {(segments.hooks?.[selectedHook]?.variant_label ?? 'N/A').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 rounded-lg border border-border px-4 py-3">
-                      <div className="flex size-8 items-center justify-center rounded-full bg-primary/10">
-                        <span className="text-xs font-bold text-primary">
-                          B
-                        </span>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-foreground">
-                          Body {selectedBody + 1}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {(segments.bodies?.[selectedBody]?.variant_label ?? 'N/A').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 rounded-lg border border-border px-4 py-3">
-                      <div className="flex size-8 items-center justify-center rounded-full bg-primary/10">
-                        <span className="text-xs font-bold text-primary">
-                          C
-                        </span>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-foreground">
-                          CTA {selectedCta + 1}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {(segments.ctas?.[selectedCta]?.variant_label ?? 'N/A').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    {gen?.mode === "single"
-                      ? "1 hook · 1 body · 1 CTA, your complete ad."
-                      : "3 hooks x 3 bodies x 3 CTAs = 27 possible combinations. Select different segments above to preview other combinations."}
-                  </p>
-                </div>
-              </div>
+              <CombinationPreview
+                hookVideo={segments.hooks?.[selectedHook]}
+                bodyVideo={segments.bodies?.[selectedBody]}
+                ctaVideo={segments.ctas?.[selectedCta]}
+                generationId={generationId}
+                allSegmentEntries={[
+                  ...(segments.hooks ?? []).map((v, i) => ({ name: `hooks/hook_${i + 1}.mp4`, url: v.url })),
+                  ...(segments.bodies ?? []).map((v, i) => ({ name: `bodies/body_${i + 1}.mp4`, url: v.url })),
+                  ...(segments.ctas ?? []).map((v, i) => ({ name: `ctas/cta_${i + 1}.mp4`, url: v.url })),
+                ]}
+                autoStitch
+              />
             </CardContent>
           </Card>
+
+          {/* ============================================================ */}
+          {/*  3. Composite Image + Generated Script - combined card        */}
+          {/* ============================================================ */}
+          {(gen?.composite_image_url || script) && (
+            <Card>
+              <CardHeader>
+                <button
+                  type="button"
+                  onClick={() => setScriptExpanded(!scriptExpanded)}
+                  className="flex w-full items-center justify-between"
+                >
+                  <CardTitle className="text-foreground">
+                    Reference Materials
+                  </CardTitle>
+                  {scriptExpanded ? (
+                    <ChevronUp className="size-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="size-5 text-muted-foreground" />
+                  )}
+                </button>
+              </CardHeader>
+              {scriptExpanded && (
+                <CardContent>
+                  <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
+                    {/* Composite image (left) */}
+                    {gen?.composite_image_url && (
+                      <div className="shrink-0">
+                        <h4 className="mb-2 text-sm font-semibold text-foreground">
+                          POV Composite Image
+                        </h4>
+                        <div className="aspect-[9/16] w-full max-w-[200px] overflow-hidden rounded-lg bg-muted">
+                          <img
+                            src={gen.composite_image_url}
+                            alt="POV composite"
+                            className="size-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Script (right) */}
+                    {script && (
+                      <div className="flex-1">
+                        <h4 className="mb-3 text-sm font-semibold text-foreground">
+                          Generated Script
+                        </h4>
+                        <div className="grid gap-4 md:grid-cols-3">
+                          <div className="flex flex-col gap-2">
+                            <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                              Hooks ({script.hooks?.length ?? 0})
+                            </h5>
+                            {script.hooks?.map((seg, i) => (
+                              <ScriptSegmentCard key={i} segment={seg} type={`Hook ${i + 1}`} />
+                            ))}
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                              Bodies ({script.bodies?.length ?? 0})
+                            </h5>
+                            {script.bodies?.map((seg, i) => (
+                              <ScriptSegmentCard key={i} segment={seg} type={`Body ${i + 1}`} />
+                            ))}
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                              CTAs ({script.ctas?.length ?? 0})
+                            </h5>
+                            {script.ctas?.map((seg, i) => (
+                              <ScriptSegmentCard key={i} segment={seg} type={`CTA ${i + 1}`} />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          )}
         </>
       )}
 

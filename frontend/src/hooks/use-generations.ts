@@ -81,6 +81,7 @@ export function useGenerateCompositeImages() {
       product_id: string;
       persona_id: string;
       format: "9:16" | "16:9";
+      selected_images?: string[];
     }) => {
       const res = await callEdge<CompositeImagesResponse>("generate-composite-images", {
         body: input,

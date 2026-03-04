@@ -9,6 +9,7 @@ export class EdgeError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    public readonly code?: string,
   ) {
     super(message);
     this.name = "EdgeError";
@@ -17,21 +18,22 @@ export class EdgeError extends Error {
 
 const DEFAULT_EDGE_TIMEOUT_MS = 120_000;
 
-async function parseEdgeError(res: Response): Promise<string> {
+async function parseEdgeError(res: Response): Promise<{ message: string; code?: string }> {
   const text = await res.text().catch(() => "");
   if (text) {
     try {
       const json = JSON.parse(text);
-      if (json?.detail) return String(json.detail);
-      if (json?.error?.message) return String(json.error.message);
+      const code = json?.code as string | undefined;
+      if (json?.detail) return { message: String(json.detail), code };
+      if (json?.error?.message) return { message: String(json.error.message), code };
     } catch {
       // Non-JSON payload; return trimmed text below.
     }
-    return text.slice(0, 500);
+    return { message: text.slice(0, 500) };
   }
 
-  if (res.status === 401) return "Authentication required. Please sign in again.";
-  return `Edge function error: ${res.status}`;
+  if (res.status === 401) return { message: "Authentication required. Please sign in again." };
+  return { message: `Edge function error: ${res.status}` };
 }
 
 async function fetchWithTimeout(
@@ -119,7 +121,8 @@ export async function callEdge<T>(
   }
 
   if (!res.ok) {
-    throw new EdgeError(res.status, await parseEdgeError(res));
+    const { message, code } = await parseEdgeError(res);
+    throw new EdgeError(res.status, message, code);
   }
   return res.json();
 }
@@ -148,7 +151,8 @@ export async function callEdgePublic<T>(
   }, timeoutMs);
 
   if (!res.ok) {
-    throw new EdgeError(res.status, await parseEdgeError(res));
+    const { message, code } = await parseEdgeError(res);
+    throw new EdgeError(res.status, message, code);
   }
   return res.json();
 }
@@ -192,7 +196,8 @@ export async function callEdgeMultipart<T>(
   }
 
   if (!res.ok) {
-    throw new EdgeError(res.status, await parseEdgeError(res));
+    const { message, code } = await parseEdgeError(res);
+    throw new EdgeError(res.status, message, code);
   }
   return res.json();
 }

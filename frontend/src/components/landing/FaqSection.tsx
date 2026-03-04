@@ -34,7 +34,7 @@ const faqs = [
   {
     question: "Is there a free trial?",
     answer:
-      "Brand import and AI persona creation are completely free — no credit card required. Import your brand, build your AI persona, and explore the platform before generating your first video.",
+      "Brand import and AI persona creation are completely free - no credit card required. Import your brand, build your AI persona, and explore the platform before generating your first video.",
   },
   {
     question: "Can I cancel anytime?",

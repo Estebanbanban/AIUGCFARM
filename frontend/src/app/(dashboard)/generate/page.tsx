@@ -17,7 +17,6 @@ import {
   Upload,
   Plus,
   Pencil,
-  Sparkles,
   TrendingUp,
   Star,
   Clock,
@@ -224,6 +223,50 @@ function useResolvedProductImages(
   }, [products]);
 
   return imageMap;
+}
+
+/**
+ * Resolve ALL image URLs for a single product (for the image selector).
+ * Returns a map of raw path -> signed URL.
+ */
+function useResolvedAllProductImages(
+  product: { images: string[] } | undefined,
+) {
+  const [urlMap, setUrlMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!product?.images || product.images.length === 0) {
+      setUrlMap({});
+      return;
+    }
+    let cancelled = false;
+    async function resolve() {
+      const result: Record<string, string> = {};
+      const toSign: string[] = [];
+
+      for (const raw of product!.images) {
+        if (!raw || typeof raw !== "string") continue;
+        if (isExternalUrl(raw)) {
+          result[raw] = raw;
+        } else {
+          toSign.push(raw);
+        }
+      }
+
+      if (toSign.length > 0) {
+        const signedUrls = await getSignedImageUrls("product-images", toSign);
+        signedUrls.forEach((url, i) => {
+          if (url) result[toSign[i]] = url;
+        });
+      }
+
+      if (!cancelled) setUrlMap(result);
+    }
+    resolve();
+    return () => { cancelled = true; };
+  }, [product]);
+
+  return urlMap;
 }
 
 function useResolvedPersonaImages(personas: Persona[] | undefined) {
@@ -438,6 +481,7 @@ export default function GeneratePage() {
   const activePersonas = personas ?? [];
 
   const selectedProduct = confirmedProducts.find((p) => p.id === store.productId);
+  const selectedProductAllImages = useResolvedAllProductImages(selectedProduct);
   const selectedPersona = activePersonas.find((p) => p.id === store.personaId);
 
   const creditsRemaining = credits?.remaining ?? 0;
@@ -478,6 +522,7 @@ export default function GeneratePage() {
     setScriptConfigChanged(false);
     if (section === 1) {
       // Also clear format so user explicitly re-chooses
+      store.setSelectedProductImages([]);
       store.setStep(1);
       setSection1SubStep(1);
     } else {
@@ -608,24 +653,21 @@ export default function GeneratePage() {
     store.setCompositeImagePath(null);
     setPreviewEditPrompt("");
 
-    setVideoLoaderStep(0);
-    setVideoLoaderProgress(0);
-    startVideoSim(0, 24, 45_000);
-
     generateComposites.mutate(
-      { product_id: store.productId, persona_id: personaId, format },
+      {
+        product_id: store.productId,
+        persona_id: personaId,
+        format,
+        ...(store.selectedProductImages.length > 0 && {
+          selected_images: store.selectedProductImages,
+        }),
+      },
       {
         onSuccess: (result) => {
-          stopVideoSim();
-          setVideoLoaderStep(-1);
-          setVideoLoaderProgress(0);
           setCompositeImages(result.images);
           trackPreviewGenerated();
         },
         onError: (err) => {
-          stopVideoSim();
-          setVideoLoaderStep(-1);
-          setVideoLoaderProgress(0);
           toast.error(err.message || "Failed to generate preview images");
         },
       },
@@ -637,6 +679,14 @@ export default function GeneratePage() {
     setShowPreviewEditor(false);
     const path = compositeImages[idx].path;
     store.setCompositeImagePath(path);
+    // Paywall pre-check: skip auto-fire script gen if no credits
+    if (!isUnlimitedCredits && creditsRemaining < effectiveCost) {
+      trackPaywallShown("insufficient_credits");
+      offer.startOffer();
+      setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
+      setShowPaywall(true);
+      return;
+    }
     // Auto-fire script generation in background
     const token = ++scriptAutoFireToken.current;
     if (store.productId && store.personaId) {
@@ -713,6 +763,14 @@ export default function GeneratePage() {
   // ── Script generation ─────────────────────────────────────────────────
 
   async function handleGenerateScript() {
+    // Paywall pre-check: block script generation if user has no credits
+    if (!isUnlimitedCredits && creditsRemaining < effectiveCost) {
+      trackPaywallShown("insufficient_credits");
+      offer.startOffer();
+      setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
+      setShowPaywall(true);
+      return;
+    }
     if (requiresCommentKeyword && !commentKeyword) {
       toast.error("Add a comment keyword for the CTA style.");
       return;
@@ -720,6 +778,14 @@ export default function GeneratePage() {
     if (!store.productId || !store.personaId) return;
     if (!store.compositeImagePath) {
       toast.error("Scene preview is still loading, please wait a moment.");
+      return;
+    }
+    // Pre-check credits before generating script to avoid wasted API calls
+    if (!hasEnoughCredits) {
+      trackPaywallShown("insufficient_credits");
+      offer.startOffer();
+      setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
+      setShowPaywall(true);
       return;
     }
     setScriptConfigChanged(false);
@@ -760,7 +826,19 @@ export default function GeneratePage() {
           stopVideoSim();
           setVideoLoaderStep(-1);
           setVideoLoaderProgress(0);
-          toast.error(err.message || "Failed to generate script");
+          if (
+            err instanceof EdgeError &&
+            (err.code === "INSUFFICIENT_CREDITS" || err.status === 402)
+          ) {
+            trackPaywallShown("insufficient_credits");
+            offer.startOffer();
+            setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
+            setShowPaywall(true);
+          } else if (err instanceof EdgeError && err.code === "RATE_LIMITED") {
+            toast.error("You're generating too fast. Please wait a moment and try again.");
+          } else {
+            toast.error(err.message || "Failed to generate script");
+          }
         },
       },
     );
@@ -832,12 +910,17 @@ export default function GeneratePage() {
           stopVideoSim();
           setVideoLoaderStep(-1);
           setVideoLoaderProgress(0);
-          // Backend 402 = insufficient credits → show paywall instead of toast
-          if (err instanceof EdgeError && err.status === 402) {
+          // Structured error code or fallback to HTTP 402
+          if (
+            err instanceof EdgeError &&
+            (err.code === "INSUFFICIENT_CREDITS" || err.status === 402)
+          ) {
             trackPaywallShown("insufficient_credits");
             offer.startOffer();
             setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
             setShowPaywall(true);
+          } else if (err instanceof EdgeError && err.code === "RATE_LIMITED") {
+            toast.error("You're generating too fast. Please wait a moment and try again.");
           } else {
             toast.error(err.message || "Failed to start generation");
           }
@@ -945,7 +1028,7 @@ export default function GeneratePage() {
 
   const paywallHeadline =
     videosGenerated === 0
-      ? "Create your first UGC ad — in seconds."
+      ? "Create your first UGC ad - in seconds."
       : videosGenerated === 1
       ? "It works. Now scale your production."
       : "Scale your ad production.";
@@ -999,7 +1082,7 @@ export default function GeneratePage() {
           <div className="flex items-center gap-3">
             <AlertCircle className="size-4 shrink-0 text-amber-400" />
             <p className="text-sm text-amber-400">
-              You have a script awaiting approval — no credits charged yet.
+              You have a script awaiting approval - no credits charged yet.
             </p>
           </div>
           <Button
@@ -1033,11 +1116,11 @@ export default function GeneratePage() {
         {/* Section header - always visible */}
         <div
           className={cn(
-            "flex items-center justify-between px-5 py-4",
+            "flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-4 sm:px-5 py-3 sm:py-4",
             section1Complete && "border-b-0",
           )}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className={cn(
               "flex size-6 items-center justify-center rounded-full text-xs font-bold",
               section1Complete
@@ -1048,9 +1131,9 @@ export default function GeneratePage() {
             </div>
             <span className="text-sm font-semibold">
               {section1Complete && selectedProduct ? (
-                <span className="flex items-center gap-2 flex-wrap">
-                  <span className="text-foreground">{selectedProduct.name}</span>
-                  <Badge variant="secondary" className="text-xs font-medium">
+                <span className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2 flex-wrap">
+                  <span className="text-foreground truncate max-w-[200px] sm:max-w-none">{selectedProduct.name}</span>
+                  <Badge variant="secondary" className="text-[10px] sm:text-xs font-medium">
                     {store.format === "9:16" ? "Portrait 9:16" : "Landscape 16:9"}
                   </Badge>
                 </span>
@@ -1222,6 +1305,75 @@ export default function GeneratePage() {
               ) : null}
             </div>
 
+            {/* Product image selector (when selected product has >1 image) */}
+            {selectedProduct && selectedProduct.images.length > 1 && store.productId && (
+              <div className="flex flex-col gap-2">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Reference images
+                  <span className="text-xs font-normal ml-1.5">
+                    ({store.selectedProductImages.length > 0
+                      ? store.selectedProductImages.length
+                      : Math.min(selectedProduct.images.length, 4)} of {Math.min(selectedProduct.images.length, 4)} selected)
+                  </span>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Select which product images the AI should reference when creating your preview. All images are used by default.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedProduct.images.slice(0, 4).map((imgPath, idx) => {
+                    const resolvedUrl = selectedProductAllImages[imgPath];
+                    const isSelected =
+                      store.selectedProductImages.length === 0 ||
+                      store.selectedProductImages.includes(imgPath);
+                    return (
+                      <button
+                        key={imgPath}
+                        type="button"
+                        onClick={() => {
+                          const current = store.selectedProductImages.length === 0
+                            ? selectedProduct.images.slice(0, 4)
+                            : [...store.selectedProductImages];
+                          if (current.includes(imgPath)) {
+                            if (current.length <= 1) return;
+                            store.setSelectedProductImages(current.filter((p) => p !== imgPath));
+                          } else {
+                            store.setSelectedProductImages([...current, imgPath]);
+                          }
+                        }}
+                        className={cn(
+                          "relative size-16 rounded-lg overflow-hidden border-2 transition-all shrink-0",
+                          isSelected
+                            ? "border-primary ring-1 ring-primary/30"
+                            : "border-border opacity-50 hover:opacity-75",
+                        )}
+                      >
+                        {resolvedUrl ? (
+                          <img
+                            src={resolvedUrl}
+                            alt={`Product image ${idx + 1}`}
+                            className="size-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <div className="size-full bg-muted flex items-center justify-center">
+                            <ImageIcon className="size-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
+                            <div className="size-4 rounded-full bg-primary flex items-center justify-center">
+                              <Check className="size-2.5 text-primary-foreground" />
+                            </div>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
           </div>
         )}
 
@@ -1302,10 +1454,10 @@ export default function GeneratePage() {
       {store.step >= 2 && (
         <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
           {/* Section header */}
-          <div className="flex items-center justify-between px-5 py-4">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-4 sm:px-5 py-3 sm:py-4">
+            <div className="flex items-center gap-3 min-w-0">
               <div className={cn(
-                "flex size-6 items-center justify-center rounded-full text-xs font-bold",
+                "flex size-6 items-center justify-center rounded-full text-xs font-bold shrink-0",
                 section2Complete
                   ? "bg-primary/15 text-primary"
                   : "bg-primary text-primary-foreground",
@@ -1324,7 +1476,7 @@ export default function GeneratePage() {
                         decoding="async"
                       />
                     )}
-                    <span className="text-foreground">{selectedPersona.name}</span>
+                    <span className="text-foreground truncate max-w-[200px] sm:max-w-none">{selectedPersona.name}</span>
                   </span>
                 ) : (
                   "AI Spokesperson"
@@ -1476,7 +1628,7 @@ export default function GeneratePage() {
       {section3Unlocked && (
         <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
           {/* Section header */}
-          <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-3 px-4 sm:px-5 py-3 sm:py-4 border-b border-border">
             <div className="flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
               3
             </div>
@@ -1900,7 +2052,6 @@ export default function GeneratePage() {
                               size="sm"
                               onClick={() => setShowPreviewEditor((prev) => !prev)}
                             >
-                              <Sparkles className="size-3.5" />
                               {showPreviewEditor ? "Hide" : "Edit"}
                             </Button>
                           </div>
@@ -1927,7 +2078,7 @@ export default function GeneratePage() {
                                 {editComposite.isPending ? (
                                   <><Loader2 className="size-3.5 animate-spin" />Applying...</>
                                 ) : (
-                                  <><Sparkles className="size-3.5" />Apply Edit</>
+                                  <>Apply Edit</>
                                 )}
                               </Button>
                             </div>
@@ -1960,15 +2111,7 @@ export default function GeneratePage() {
                 </div>
 
                 {/* ── Script / Generate area ────────────────────────── */}
-                {generateComposites.isPending && !store.compositeImagePath ? (
-                  <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-8 text-center">
-                    <Loader2 className="size-7 animate-spin text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Preparing your scene…</p>
-                      <p className="text-xs text-muted-foreground mt-1">We're generating a personalized preview with your persona & product. This takes a few seconds.</p>
-                    </div>
-                  </div>
-                ) : generateScript.isPending ? (
+                {generateScript.isPending ? (
                   <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-8 text-center">
                     <Loader2 className="size-7 animate-spin text-primary" />
                     <div>
@@ -2127,12 +2270,15 @@ export default function GeneratePage() {
                 ) : (
                   <Button
                     onClick={handleGenerateScript}
-                    disabled={requiresCommentKeyword && !commentKeyword}
+                    disabled={(requiresCommentKeyword && !commentKeyword) || generateComposites.isPending || !store.compositeImagePath}
                     size="lg"
                     className="w-full"
                   >
-                    <Sparkles className="size-4" />
-                    Generate Script
+                    {generateComposites.isPending ? (
+                      <><Loader2 className="size-4 animate-spin" />Waiting for scene preview...</>
+                    ) : (
+                      <>Generate Script</>
+                    )}
                   </Button>
                 )}
               </div>
@@ -2184,15 +2330,7 @@ export default function GeneratePage() {
                     </div>
 
                     {/* Generate buttons for advanced mode */}
-                    {generateComposites.isPending && !store.compositeImagePath ? (
-                      <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-8 text-center">
-                        <Loader2 className="size-7 animate-spin text-muted-foreground" />
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">Preparing your scene…</p>
-                          <p className="text-xs text-muted-foreground mt-1">We're generating a personalized preview with your persona & product. This takes a few seconds.</p>
-                        </div>
-                      </div>
-                    ) : generateScript.isPending ? (
+                    {generateScript.isPending ? (
                       <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-8 text-center">
                         <Loader2 className="size-7 animate-spin text-primary" />
                         <div>
@@ -2218,11 +2356,15 @@ export default function GeneratePage() {
                     ) : (
                       <Button
                         onClick={handleGenerateScript}
+                        disabled={generateComposites.isPending || !store.compositeImagePath}
                         size="lg"
                         className="w-full"
                       >
-                        <Sparkles className="size-4" />
-                        Generate Script
+                        {generateComposites.isPending ? (
+                          <><Loader2 className="size-4 animate-spin" />Waiting for scene preview...</>
+                        ) : (
+                          <>Generate Script</>
+                        )}
                       </Button>
                     )}
                   </>
@@ -2262,8 +2404,8 @@ export default function GeneratePage() {
           )}
 
           <div className="overflow-y-auto flex-1">
-            <div className="text-center max-w-2xl mx-auto pt-10 pb-6 px-6">
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-foreground mb-3 tracking-tight">
+            <div className="text-center max-w-2xl mx-auto pt-6 sm:pt-10 pb-4 sm:pb-6 px-4 sm:px-6">
+              <h2 className="text-xl sm:text-3xl md:text-4xl font-extrabold text-foreground mb-3 tracking-tight">
                 {paywallHeadline}
               </h2>
               {paywallSublineStatic ? (
@@ -2277,13 +2419,13 @@ export default function GeneratePage() {
               )}
             </div>
 
-            <div className="flex justify-center mb-8 px-4">
-              <div className="bg-muted/80 p-1.5 rounded-full inline-flex border border-border shadow-sm">
+            <div className="flex justify-center mb-6 sm:mb-8 px-4">
+              <div className="bg-muted/80 p-1 sm:p-1.5 rounded-full inline-flex border border-border shadow-sm">
                 <button
                   type="button"
                   onClick={() => setPaywallTab("single")}
                   className={cn(
-                    "px-8 py-2.5 text-sm font-bold rounded-full transition-all duration-200",
+                    "px-4 sm:px-8 py-2 sm:py-2.5 text-xs sm:text-sm font-bold rounded-full transition-all duration-200",
                     paywallTab === "single"
                       ? "bg-background text-foreground shadow-sm ring-1 ring-border"
                       : "text-muted-foreground hover:text-foreground",
@@ -2292,7 +2434,7 @@ export default function GeneratePage() {
                   <>
                     {store.quality === "hd" ? "1 HD Video" : "1 Standard Video"}
                     {isFirstVideo && (
-                      <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                      <span className="ml-1 sm:ml-2 text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
                         -50%
                       </span>
                     )}
@@ -2302,7 +2444,7 @@ export default function GeneratePage() {
                   type="button"
                   onClick={() => setPaywallTab("subscription")}
                   className={cn(
-                    "flex items-center gap-2 px-8 py-2.5 text-sm font-bold rounded-full transition-all duration-200",
+                    "flex items-center gap-1 sm:gap-2 px-4 sm:px-8 py-2 sm:py-2.5 text-xs sm:text-sm font-bold rounded-full transition-all duration-200",
                     paywallTab === "subscription"
                       ? "bg-background text-foreground shadow-sm ring-1 ring-border"
                       : "text-muted-foreground hover:text-foreground",
@@ -2321,7 +2463,7 @@ export default function GeneratePage() {
               </div>
             </div>
 
-            <div className="px-6 pb-10">
+            <div className="px-4 sm:px-6 pb-6 sm:pb-10">
               {paywallTab === "single" ? (
                 <div className="max-w-md mx-auto bg-card p-8 rounded-2xl border border-border shadow-sm">
                   <div className="mb-6">
@@ -2400,7 +2542,7 @@ export default function GeneratePage() {
                 </div>
               ) : (
                 <>
-                  <div className="grid md:grid-cols-3 gap-5 lg:gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5 lg:gap-6">
                     {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
                       const isGrowth = key === "growth";
                       const discountedMonthly = offer.discountedPrice(plan.price);
