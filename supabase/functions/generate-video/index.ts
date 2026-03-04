@@ -503,7 +503,7 @@ Deno.serve(async (req: Request) => {
     const sb = getAdminClient();
 
     const body = await req.json();
-    const { phase, generation_id, override_script, video_provider } = body;
+    const { phase, generation_id, override_script, video_provider, video_quality: quality_override } = body;
     const provider = (video_provider === "sora" ? "sora" : "kling") as "kling" | "sora";
 
     // ══════════════════════════════════════════════════════════════════
@@ -547,12 +547,20 @@ Deno.serve(async (req: Request) => {
       }
 
       const resolvedMode = gen.mode as string;
-      const resolvedQuality = gen.video_quality as string;
+      // Allow the client to override quality (e.g. user switched standard → HD before approving)
+      const resolvedQuality = (quality_override === "hd" || quality_override === "standard")
+        ? quality_override
+        : gen.video_quality as string;
 
       // Validate Sora only supports HD
       if (provider === "sora" && resolvedQuality !== "hd") {
         await sb.from("generations").update({ status: "awaiting_approval" }).eq("id", generation_id);
         return json({ detail: "Sora only supports HD quality. Please select HD quality to use Sora." }, cors, 400);
+      }
+
+      // If quality changed, persist the updated value before charging credits
+      if (resolvedQuality !== gen.video_quality) {
+        await sb.from("generations").update({ video_quality: resolvedQuality }).eq("id", generation_id);
       }
 
       const { variantCount, creditCost, klingModel } = computeCosts(resolvedMode, resolvedQuality, provider);

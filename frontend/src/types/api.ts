@@ -99,6 +99,8 @@ export interface ApproveGenerationParams {
   override_script?: GenerationScript;
   advanced_segments?: AdvancedSegmentsInput;
   video_provider?: "kling" | "sora";
+  /** Override quality stored on the generation record (e.g. user switched standard → HD before approving). */
+  video_quality?: "standard" | "hd";
 }
 
 /** Response from generate-video Edge Function */
