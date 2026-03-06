@@ -165,6 +165,23 @@ export function usePersonaGenerations(personaId: string) {
   });
 }
 
+export function usePersonaMonthlyUsage() {
+  return useQuery<{ personas_created: number; month_year: string } | null>({
+    queryKey: ["persona-monthly-usage"],
+    queryFn: async () => {
+      const supabase = createClient();
+      const now = new Date();
+      const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const { data } = await supabase
+        .from("persona_monthly_limits")
+        .select("personas_created, month_year")
+        .eq("month_year", monthYear)
+        .maybeSingle();
+      return data;
+    },
+  });
+}
+
 /**
  * Resolves a persona image URL. If the URL is already an HTTP URL it is
  * returned as-is; otherwise it is treated as a Supabase Storage path and

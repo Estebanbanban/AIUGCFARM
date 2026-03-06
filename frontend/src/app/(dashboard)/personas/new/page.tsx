@@ -4,8 +4,8 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { resolvePersonaImageUrl, usePersonas } from "@/hooks/use-personas";
-import { useProfile, PERSONA_SLOT_LIMITS } from "@/hooks/use-profile";
+import { resolvePersonaImageUrl, usePersonas, usePersonaMonthlyUsage } from "@/hooks/use-personas";
+import { useProfile, PERSONAS_PER_MONTH_LIMITS } from "@/hooks/use-profile";
 import Image from "next/image";
 import {
   ArrowLeft, Loader2, Check, User, ImageIcon,
@@ -520,28 +520,26 @@ function NewPersonaPageInner() {
   const [isGeneratingQuick, setIsGeneratingQuick] = useState(false);
   const [personaName, setPersonaName] = useState("");
 
-  // Redirect guard: prevent access when at persona limit
+  // Redirect guard: prevent access when at monthly persona limit
   const { data: profile } = useProfile();
   const { data: personas } = usePersonas();
+  const { data: monthlyUsage } = usePersonaMonthlyUsage();
   const isRegeneration = !!store.personaId;
 
-  const personaCount = personas?.length ?? 0;
   const plan = profile?.plan ?? "free";
-  const personaLimit = PERSONA_SLOT_LIMITS[plan as keyof typeof PERSONA_SLOT_LIMITS] ?? 1;
   const isFreePlan = plan === "free" || plan === "starter";
-  const isAtPersonaLimit = personaCount >= personaLimit;
+  const monthlyLimit = PERSONAS_PER_MONTH_LIMITS[plan] ?? 1;
+  const monthlyUsed = monthlyUsage?.personas_created ?? 0;
+  const isAtPersonaLimit = !isRegeneration && profile?.role !== "admin" && monthlyUsed >= monthlyLimit;
 
   useEffect(() => {
-    if (!profile || !personas || isRegeneration) return;
-    const plan = profile.plan ?? "free";
+    if (!profile || isRegeneration) return;
     const isAdmin = profile.role === "admin";
-    const slotLimit = PERSONA_SLOT_LIMITS[plan];
-    const slotsUsed = personas.length;
-    if (!isAdmin && slotsUsed >= slotLimit) {
-      toast.error("You've reached your persona limit. Upgrade to create more.");
+    if (!isAdmin && monthlyUsed >= monthlyLimit) {
+      toast.error("You've reached your monthly persona limit. Upgrade or wait for reset.");
       router.push("/personas");
     }
-  }, [profile, personas, isRegeneration, router]);
+  }, [profile, monthlyUsed, monthlyLimit, isRegeneration, router]);
 
   useEffect(() => {
     if (!store.isGenerating) { setMsgIdx(0); return; }
@@ -816,7 +814,7 @@ function NewPersonaPageInner() {
           </Button>
           {isAtPersonaLimit && (
             <p className="text-xs text-destructive text-center">
-              You have reached your persona limit. Upgrade to create more.
+              You have reached your monthly persona limit. Upgrade or wait for reset.
             </p>
           )}
         </div>

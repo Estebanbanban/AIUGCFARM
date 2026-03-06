@@ -107,6 +107,23 @@ Deno.serve(async (req: Request) => {
       stripeCustomerId = customer.id;
     }
 
+    // Auto-apply plan discount for credit pack purchases
+    if (pack && !validatedCoupon) {
+      const { data: profileData } = await sb
+        .from("profiles")
+        .select("plan")
+        .eq("id", userId)
+        .maybeSingle();
+      const userPlan = profileData?.plan as string | undefined;
+      if (userPlan === "growth") {
+        const growthCoupon = Deno.env.get("STRIPE_GROWTH_COUPON_ID");
+        if (growthCoupon) validatedCoupon = growthCoupon;
+      } else if (userPlan === "scale") {
+        const scaleCoupon = Deno.env.get("STRIPE_SCALE_COUPON_ID");
+        if (scaleCoupon) validatedCoupon = scaleCoupon;
+      }
+    }
+
     // ── Credit pack (one-time payment) ────────────────────────────────────────
     if (pack) {
       const priceId = PACK_PRICE_IDS[pack];

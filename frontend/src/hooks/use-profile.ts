@@ -4,18 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile } from "@/types/database";
 
-export const PERSONA_SLOT_LIMITS: Record<Profile["plan"], number> = {
-  free: 1,
-  starter: 1,
-  growth: 3,
-  scale: 10,
+export const BRAND_LIMITS: Record<string, number> = {
+  free: 1, starter: 1, growth: 3, scale: Infinity,
 };
-
-export const PRODUCT_SLOT_LIMITS: Record<Profile["plan"], number> = {
-  free: 100,
-  starter: 500,
-  growth: 500,
-  scale: 500,
+export const PRODUCTS_PER_BRAND_LIMITS: Record<string, number> = {
+  free: 3, starter: 5, growth: 20, scale: Infinity,
+};
+export const PERSONAS_PER_MONTH_LIMITS: Record<string, number> = {
+  free: 1, starter: 2, growth: 10, scale: 100,
 };
 
 /** Plans that can use HD (Kling V3) video quality */

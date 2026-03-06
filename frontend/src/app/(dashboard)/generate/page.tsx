@@ -3026,7 +3026,7 @@ export default function GeneratePage() {
                             <span className="text-xs text-muted-foreground">/mo</span>
                           </div>
                           <p className="mt-1 text-xs text-orange-500 font-medium">
-                            Up to {plan.personas} persona{plan.personas !== 1 ? "s" : ""}
+                            Up to {plan.personas} persona{(plan.personas as number) !== 1 ? "s" : ""}
                           </p>
                         </div>
                         <Button

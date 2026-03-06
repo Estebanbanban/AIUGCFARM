@@ -1,17 +1,9 @@
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
-import { getAdminClient } from "../_shared/supabase.ts";
 import { validateUrl } from "../_shared/ssrf.ts";
 import { rateLimit } from "../_shared/rate-limit.ts";
 import { callOpenRouter } from "../_shared/openrouter.ts";
-
-const PRODUCT_LIMITS: Record<string, number> = {
-  free: 100,
-  starter: 500,
-  growth: 500,
-  scale: 500,
-};
 
 function stripHtml(html: string): string {
   return html
@@ -40,45 +32,6 @@ interface BrandSummary {
   tone: string;
   demographic: string;
   selling_points: string[];
-}
-
-async function ensureProfileExists(userId: string): Promise<void> {
-  const sb = getAdminClient();
-
-  const { data: existing, error: existingErr } = await sb
-    .from("profiles")
-    .select("id")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (existingErr) {
-    throw new Error(`Failed to check profile: ${existingErr.message}`);
-  }
-  if (existing) return;
-
-  let email = `${userId}@local.invalid`;
-  const { data: authUser, error: authUserErr } = await sb.auth.admin.getUserById(
-    userId,
-  );
-  if (!authUserErr && authUser.user?.email) {
-    email = authUser.user.email;
-  }
-
-  const { error: profileErr } = await sb
-    .from("profiles")
-    .upsert(
-      {
-        id: userId,
-        email,
-        full_name: "",
-        avatar_url: "",
-      },
-      { onConflict: "id" },
-    );
-
-  if (profileErr) {
-    throw new Error(`Failed to create missing profile: ${profileErr.message}`);
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -414,7 +367,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { url, save } = await req.json();
+    const { url } = await req.json();
     if (!url || typeof url !== "string") {
       return json({ detail: "url is required" }, cors, 400);
     }
@@ -456,112 +409,13 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Save to DB if authenticated and requested
-    let savedIds: string[] = [];
-    let saveFailed = false;
-    let saveError: string | null = null;
-    if (userId && save !== false && products.length > 0) {
-      const sb = getAdminClient();
-
-      // ── Enforce product limit per plan ──────────────────────────────
-      const { data: profileRow } = await sb
-        .from("profiles")
-        .select("plan, role")
-        .eq("id", userId)
-        .maybeSingle();
-
-      const userPlan = (profileRow?.plan as string) ?? "free";
-      const isAdmin = profileRow?.role === "admin";
-
-      if (!isAdmin) {
-        const limit = PRODUCT_LIMITS[userPlan] ?? 1;
-        const { count: existingCount } = await sb
-          .from("products")
-          .select("id", { count: "exact", head: true })
-          .eq("owner_id", userId);
-
-        const currentCount = existingCount ?? 0;
-        const availableSlots = Math.max(0, limit - currentCount);
-
-        if (availableSlots === 0) {
-          return json(
-            { detail: `Product limit reached (${limit}) for your ${userPlan} plan. Upgrade to add more products.` },
-            cors,
-            403,
-          );
-        }
-
-        // Truncate products to available slots
-        if (products.length > availableSlots) {
-          products = products.slice(0, availableSlots);
-        }
-      }
-
-      const rows = products.map((p) => ({
-        owner_id: userId,
-        store_url: url,
-        name: p.name,
-        description: p.description,
-        price: p.price,
-        currency: p.currency,
-        images: p.images,
-        category: p.category,
-        brand_summary: brandSummary,
-        source,
-        confirmed: false,
-      }));
-
-      let { data: inserted, error } = await sb
-        .from("products")
-        .insert(rows)
-        .select("id");
-
-      // Self-heal users missing a profiles row (legacy trigger/migration drift),
-      // then retry once.
-      if (
-        error &&
-        error.code === "23503" &&
-        error.message.includes("products_owner_id_fkey")
-      ) {
-        try {
-          await ensureProfileExists(userId);
-          const retry = await sb.from("products").insert(rows).select("id");
-          inserted = retry.data;
-          error = retry.error;
-        } catch (bootstrapErr) {
-          const msg = bootstrapErr instanceof Error
-            ? bootstrapErr.message
-            : String(bootstrapErr);
-          error = {
-            code: "PROFILE_BOOTSTRAP_FAILED",
-            message: msg,
-            details: null,
-            hint: null,
-          };
-        }
-      }
-
-      if (error) {
-        saveFailed = true;
-        saveError = "Failed to save product. Please try again.";
-        console.error("DB insert failed (non-fatal):", {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-        });
-      } else {
-        savedIds = (inserted ?? []).map((r: { id: string }) => r.id);
-      }
-    }
-
     return json(
       {
         data: {
           products: products.map((p, i) => ({
             ...p,
             brand_summary: i === 0 ? brandSummary : null,
-            id: savedIds[i] ?? null,
+            id: null,
           })),
           source,
           platform,
@@ -569,9 +423,6 @@ Deno.serve(async (req: Request) => {
           brand_summary_error: brandSummaryError,
           blocked_by_robots: blockedByRobots,
           fallback_available: fallbackAvailable,
-          saved: savedIds.length > 0,
-          save_failed: saveFailed,
-          save_error: saveError,
         },
       },
       cors,
