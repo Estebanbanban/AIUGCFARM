@@ -854,50 +854,11 @@ export default function GeneratePage() {
     setShowPreviewEditor(false);
     const path = compositeImages[idx].path;
     store.setCompositeImagePath(path);
-    // Auto-fire script generation in background
-    const token = ++scriptAutoFireToken.current;
-    if (store.productId && store.personaId) {
-      if (store.ctaStyle === "comment_keyword" && !store.ctaCommentKeyword.trim()) return;
+    // If switching to a different image after a script was already generated, clear it
+    // so the user knows they need to click "Generate Script" again.
+    if (idx !== selectedCompositeIdx && store.pendingScript) {
       store.clearPendingScript();
       setScriptConfigChanged(false);
-      setVideoLoaderStep(1);
-      setVideoLoaderProgress(25);
-      startVideoSim(25, 49, 75_000);
-
-      generateScript.mutate(
-        {
-          product_id: store.productId,
-          persona_id: store.personaId,
-          mode: store.mode,
-          quality: store.quality,
-          composite_image_path: path,
-          cta_style: store.ctaStyle,
-          language: store.language,
-          phase: "script",
-        },
-        {
-          onSuccess: (result) => {
-            stopVideoSim();
-            setVideoLoaderStep(-1);
-            setVideoLoaderProgress(0);
-            if (scriptAutoFireToken.current !== token) return;
-            if (result.script) {
-              trackScriptGenerated(store.mode, store.quality);
-              store.setPendingScript(
-                result.generation_id,
-                result.script,
-                result.credits_to_charge ?? effectiveCost,
-              );
-            }
-          },
-          onError: () => {
-            stopVideoSim();
-            setVideoLoaderStep(-1);
-            setVideoLoaderProgress(0);
-            toast.error("Script generation failed. Click 'Generate Script' to retry.");
-          },
-        },
-      );
     }
   }
 
@@ -984,9 +945,6 @@ export default function GeneratePage() {
       return;
     }
     setScriptConfigChanged(false);
-    setVideoLoaderStep(1);
-    setVideoLoaderProgress(25);
-    startVideoSim(25, 49, 75_000);
 
     generateScript.mutate(
       {
@@ -1002,9 +960,6 @@ export default function GeneratePage() {
       },
       {
         onSuccess: (result) => {
-          stopVideoSim();
-          setVideoLoaderStep(-1);
-          setVideoLoaderProgress(0);
           if (result.script) {
             trackScriptGenerated(store.mode, store.quality);
             store.setPendingScript(
@@ -1012,15 +967,11 @@ export default function GeneratePage() {
               result.script,
               result.credits_to_charge ?? effectiveCost,
             );
-            // Script now shows inline - no step change needed
           } else {
             toast.error("Script was not returned. Please try again.");
           }
         },
         onError: (err) => {
-          stopVideoSim();
-          setVideoLoaderStep(-1);
-          setVideoLoaderProgress(0);
           if (err instanceof EdgeError && err.code === "RATE_LIMITED") {
             toast.error("You're generating too fast. Please wait a moment and try again.");
           } else {
@@ -1966,10 +1917,7 @@ export default function GeneratePage() {
                           {compositeImages.map((img, i) => (
                             <div key={i} className="group relative">
                               <button
-                                onClick={() => {
-                                  if (i !== selectedCompositeIdx && store.pendingScript) setScriptConfigChanged(true);
-                                  handleSelectComposite(i);
-                                }}
+                                onClick={() => handleSelectComposite(i)}
                                 className="relative w-full overflow-hidden rounded-lg focus:outline-none"
                               >
                                 <div
