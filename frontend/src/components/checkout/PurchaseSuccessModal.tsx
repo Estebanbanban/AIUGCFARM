@@ -37,8 +37,8 @@ const PLAN_PERKS: Record<PlanTier, { icon: React.ElementType; headline: string; 
     bullets: [
       "30 monthly credits (renews automatically)",
       "Create up to 6 standard videos per month",
-      "1 AI persona to represent your brand",
-      "1 brand profile with full UGC pipeline",
+      "2 AI personas/month",
+      "1 brand · 5 products/brand",
       "720p MP4 export, ready for any platform",
       "AI-written hooks, bodies, and CTAs",
     ],
@@ -51,10 +51,10 @@ const PLAN_PERKS: Record<PlanTier, { icon: React.ElementType; headline: string; 
     bullets: [
       "100 monthly credits (renews automatically)",
       "Up to 20 standard or 10 HD videos per month",
-      "3 AI personas - test different voices & styles",
-      "3 brand profiles for multi-product campaigns",
-      "1080p HD export for premium ad placements",
-      "Custom script editor + priority generation queue",
+      "10 AI personas/month - test different voices & styles",
+      "3 brands · 20 products/brand",
+      "10% off credit packs",
+      "1080p HD export + custom script editor",
     ],
   },
   scale: {
@@ -65,10 +65,10 @@ const PLAN_PERKS: Record<PlanTier, { icon: React.ElementType; headline: string; 
     bullets: [
       "250 monthly credits (renews automatically)",
       "Up to 50 standard or 25 HD videos per month",
-      "10 AI personas - cover every audience segment",
-      "10 brand profiles for full portfolio management",
+      "100 AI personas/month - cover every audience segment",
+      "Unlimited brands · unlimited products",
+      "20% off credit packs",
       "1080p export + priority support",
-      "Custom scripts, fastest generation queue",
     ],
   },
 };

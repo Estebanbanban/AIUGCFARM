@@ -41,18 +41,18 @@ const jsonLd = {
         {
           "@type": "Offer",
           name: "Starter",
-          price: "29",
+          price: "25",
           priceCurrency: "USD",
           description:
-            "Up to 81 unique video ads per month, 1 AI persona, 720p exports, AI-Written Scripts",
+            "Up to 81 unique video ads per month, 2 AI personas/month, 1 brand · 5 products/brand, 720p exports, AI-Written Scripts",
         },
         {
           "@type": "Offer",
           name: "Growth",
-          price: "79",
+          price: "80",
           priceCurrency: "USD",
           description:
-            "Up to 270 unique video ads per month, 3 AI personas, 1080p exports, Custom Script Editor",
+            "Up to 270 unique video ads per month, 10 AI personas/month, 3 brands · 20 products/brand, 1080p exports, Custom Script Editor, 10% off credit packs",
         },
         {
           "@type": "Offer",
@@ -60,7 +60,7 @@ const jsonLd = {
           price: "180",
           priceCurrency: "USD",
           description:
-            "Up to 810 unique video ads per month, 10 AI personas, unlimited brand profiles, 5 team seats",
+            "Up to 810 unique video ads per month, 100 AI personas/month, unlimited brands and products, 1080p exports, 20% off credit packs, priority support",
         },
       ],
     },
