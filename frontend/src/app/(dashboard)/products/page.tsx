@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -8,19 +8,17 @@ import {
   Loader2,
   LinkIcon,
   Upload,
-  AlertCircle,
-  ChevronRight,
   ArrowLeft,
   Store,
+  Pencil,
+  Trash2,
+  Lock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-} from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -30,87 +28,52 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useProducts, useScrapeProduct, useDeleteProduct } from '@/hooks/use-products';
-import { useProfile, PRODUCT_SLOT_LIMITS } from '@/hooks/use-profile';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  useProducts,
+  useProductsByBrand,
+  useScrapeProduct,
+  useConfirmProduct,
+  useDeleteProduct,
+} from '@/hooks/use-products';
+import {
+  useBrands,
+  useCreateBrand,
+  useUpdateBrand,
+  useDeleteBrand,
+  type Brand,
+} from '@/hooks/use-brands';
+import { useProfile, BRAND_LIMITS, PRODUCTS_PER_BRAND_LIMITS } from '@/hooks/use-profile';
 import { ProductCard } from '@/components/products/ProductCard';
-import { ScrapeResults } from '@/components/products/ScrapeResults';
 import { ManualUploadForm } from '@/components/products/ManualUploadForm';
 import { isExternalUrl, getSignedImageUrls } from '@/lib/storage';
-import { Badge } from '@/components/ui/badge';
 import type { Product, BrandSummary } from '@/types/database';
 
 /* -------------------------------------------------------------------------- */
-/*  Brand grouping helpers                                                     */
+/*  Image resolution hook                                                     */
 /* -------------------------------------------------------------------------- */
 
-function getBrandKey(storeUrl: string | null): string {
-  if (!storeUrl) return '_manual';
-  try {
-    return new URL(storeUrl).hostname.toLowerCase();
-  } catch {
-    return storeUrl.slice(0, 80).toLowerCase();
-  }
-}
-
-function getBrandName(storeUrl: string | null): string {
-  if (!storeUrl) return 'My Products';
-  try {
-    return new URL(storeUrl).hostname
-      .replace(/^www\./, '')
-      .replace(/\.myshopify\.com$/, '');
-  } catch {
-    return storeUrl;
-  }
-}
-
-interface BrandGroup {
-  key: string;
-  name: string;
-  storeUrl: string | null;
-  products: Product[];
-  source: Product['source'] | null;
-}
-
-function groupByBrand(products: Product[]): BrandGroup[] {
-  const map = new Map<string, BrandGroup>();
-  for (const p of products) {
-    const key = getBrandKey(p.store_url);
-    if (!map.has(key)) {
-      map.set(key, {
-        key,
-        name: getBrandName(p.store_url),
-        storeUrl: p.store_url,
-        products: [],
-        source: p.source,
-      });
-    }
-    map.get(key)!.products.push(p);
-  }
-  return Array.from(map.values());
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Image resolution hook                                                      */
-/* -------------------------------------------------------------------------- */
-
-/** Batch resolve first image for all products (1 API call instead of N) */
 function useResolvedProductImages(products: Product[] | undefined) {
   const [imageMap, setImageMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!products || products.length === 0) return;
-
     let cancelled = false;
     const external: [string, string][] = [];
     const internal: [string, string][] = [];
-
     for (const p of products) {
       const firstImage = p.images?.[0];
       if (!firstImage) continue;
       if (isExternalUrl(firstImage)) external.push([p.id, firstImage]);
       else internal.push([p.id, firstImage]);
     }
-
     const paths = internal.map(([, path]) => path);
     getSignedImageUrls('product-images', paths).then((urls) => {
       if (cancelled) return;
@@ -119,7 +82,6 @@ function useResolvedProductImages(products: Product[] | undefined) {
       internal.forEach(([id], i) => { map[id] = urls[i]; });
       setImageMap(map);
     });
-
     return () => { cancelled = true; };
   }, [products]);
 
@@ -127,67 +89,93 @@ function useResolvedProductImages(products: Product[] | undefined) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Brand card                                                                 */
+/*  Scrape candidate card                                                     */
+/* -------------------------------------------------------------------------- */
+
+function ScrapeCandidate({
+  product,
+  selected,
+  onToggle,
+}: {
+  product: Product;
+  selected: boolean;
+  onToggle: () => void;
+}) {
+  const img = product.images?.[0];
+  return (
+    <div
+      className={`relative flex cursor-pointer flex-col gap-2 rounded-lg border p-3 transition-colors ${selected ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}
+      onClick={onToggle}
+    >
+      <Checkbox
+        checked={selected}
+        className="absolute right-3 top-3"
+        onCheckedChange={onToggle}
+      />
+      {img && (
+        <div className="aspect-video overflow-hidden rounded-md bg-muted">
+          <img src={img} alt={product.name} className="size-full object-cover" loading="lazy" />
+        </div>
+      )}
+      <p className="pr-6 text-sm font-medium line-clamp-2">{product.name}</p>
+      {product.price != null && (
+        <p className="text-xs text-muted-foreground">
+          {product.currency} {product.price}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Skeletons                                                                 */
+/* -------------------------------------------------------------------------- */
+
+function BrandCardSkeleton() {
+  return (
+    <Card className="h-full">
+      <CardContent className="flex flex-col gap-3 p-4">
+        <div className="grid grid-cols-3 gap-1">
+          {[0, 1, 2].map((i) => <Skeleton key={i} className="aspect-square rounded" />)}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Skeleton className="h-5 w-3/4" />
+          <Skeleton className="h-4 w-1/3" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Brand card                                                                */
 /* -------------------------------------------------------------------------- */
 
 function BrandCard({
   brand,
-  imageMap,
+  productCount,
   onClick,
 }: {
-  brand: BrandGroup;
-  imageMap: Record<string, string>;
+  brand: Brand;
+  productCount: number;
   onClick: () => void;
 }) {
-  const previews = brand.products.slice(0, 3);
-  const tone = brand.products[0]?.brand_summary?.tone ?? null;
-
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group w-full text-left"
-    >
-      <Card className="h-full transition-colors hover:border-primary/30 group-hover:border-primary/30">
+    <button type="button" onClick={onClick} className="group w-full text-left">
+      <Card className="h-full transition-colors hover:border-primary/30">
         <CardContent className="flex flex-col gap-3 p-4">
-          {/* Product image preview strip */}
-          <div className="grid grid-cols-3 gap-1 overflow-hidden rounded-lg">
-            {previews.map((p) => (
-              <div key={p.id} className="aspect-square bg-muted">
-                {imageMap[p.id] && (
-                  <img
-                    src={imageMap[p.id]}
-                    alt={p.name}
-                    className="size-full object-cover"
-                    loading="lazy"
-                  />
-                )}
-              </div>
-            ))}
-            {Array.from({ length: Math.max(0, 3 - previews.length) }).map((_, i) => (
-              <div key={`empty-${i}`} className="aspect-square bg-muted rounded" />
-            ))}
-          </div>
-
-          {/* Brand info */}
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="truncate font-medium text-foreground capitalize">{brand.name}</p>
               <p className="text-xs text-muted-foreground">
-                {brand.products.length} product{brand.products.length !== 1 ? 's' : ''}
+                {productCount} product{productCount !== 1 ? 's' : ''}
               </p>
-              {tone && (
-                <p className="mt-1 truncate text-xs text-muted-foreground italic">{tone}</p>
-              )}
             </div>
-            <div className="flex shrink-0 items-center gap-1">
-              {brand.source && brand.source !== '_manual' as string && (
-                <Badge variant="outline" className="text-xs capitalize">
-                  {brand.source}
-                </Badge>
-              )}
-              <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-            </div>
+            {brand.store_url && (
+              <Badge variant="outline" className="text-xs shrink-0">
+                {new URL(brand.store_url.startsWith('http') ? brand.store_url : `https://${brand.store_url}`).hostname.replace(/^www\./, '')}
+              </Badge>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -196,96 +184,115 @@ function BrandCard({
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Skeleton                                                                   */
-/* -------------------------------------------------------------------------- */
-
-function ProductCardSkeleton() {
-  return (
-    <Card className="h-full">
-      <CardContent className="flex flex-col gap-3">
-        <Skeleton className="aspect-video w-full rounded-lg" />
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-5 w-3/4" />
-          <Skeleton className="h-4 w-1/3" />
-        </div>
-        <div className="flex gap-2">
-          <Skeleton className="h-5 w-16 rounded-full" />
-          <Skeleton className="h-5 w-20 rounded-full" />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Main page                                                                  */
+/*  Main page                                                                 */
 /* -------------------------------------------------------------------------- */
 
 export default function ProductsPage() {
-  const { data: products, isLoading, error } = useProducts();
+  const { data: brands, isLoading: brandsLoading, error: brandsError } = useBrands();
   const { data: profile } = useProfile();
+  const createBrand = useCreateBrand();
+  const updateBrand = useUpdateBrand();
+  const deleteBrand = useDeleteBrand();
   const scrapeProduct = useScrapeProduct();
+  const confirmProduct = useConfirmProduct();
   const queryClient = useQueryClient();
-
-  // Brand navigation state (null = brand list, string = selected brand key)
-  const [selectedBrandKey, setSelectedBrandKey] = useState<string | null>(null);
-
-  const [showImportDialog, setShowImportDialog] = useState(false);
-  const [importUrl, setImportUrl] = useState('');
-  const [scrapeError, setScrapeError] = useState<string | null>(null);
-  const [scrapedProducts, setScrapedProducts] = useState<Product[]>([]);
-  const [scrapedBrandSummary, setScrapedBrandSummary] = useState<BrandSummary | null>(null);
-  const [showScrapeResults, setShowScrapeResults] = useState(false);
-
-  const productImageMap = useResolvedProductImages(products);
 
   const plan = profile?.plan ?? 'free';
   const isAdmin = profile?.role === 'admin';
-  const productLimit = PRODUCT_SLOT_LIMITS[plan];
-  const productCount = products?.length ?? 0;
-  const atProductLimit = !isAdmin && productCount >= productLimit;
-  const approachingLimit = !isAdmin && productCount >= productLimit * 0.8;
+  const brandLimit = BRAND_LIMITS[plan] ?? 1;
+  const brandCount = brands?.length ?? 0;
+  const atBrandLimit = !isAdmin && brandLimit !== Infinity && brandCount >= brandLimit;
 
-  // Group all products by brand/store
-  const brands = useMemo(() => groupByBrand(products ?? []), [products]);
-
-  // Currently viewed brand
+  // Navigation state
+  const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null);
   const selectedBrand = useMemo(
-    () => brands.find((b) => b.key === selectedBrandKey) ?? null,
-    [brands, selectedBrandKey],
+    () => brands?.find((b) => b.id === selectedBrandId) ?? null,
+    [brands, selectedBrandId],
   );
 
-  // If the selected brand no longer exists (e.g. all products deleted), go back
+  // Brand products
+  const { data: brandProducts, isLoading: productsLoading } = useProductsByBrand(selectedBrandId);
+  const productImageMap = useResolvedProductImages(brandProducts);
+
+  // New Brand dialog
+  const [showNewBrand, setShowNewBrand] = useState(false);
+  const [newBrandName, setNewBrandName] = useState('');
+  const [newBrandUrl, setNewBrandUrl] = useState('');
+
+  // Edit Brand inline
+  const [editingBrand, setEditingBrand] = useState(false);
+  const [editName, setEditName] = useState('');
+
+  // Import dialog
+  const [showImport, setShowImport] = useState(false);
+  const [importUrl, setImportUrl] = useState('');
+  const [scrapeError, setScrapeError] = useState<string | null>(null);
+  const [scrapedProducts, setScrapedProducts] = useState<Product[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [showCandidates, setShowCandidates] = useState(false);
+
+  // If selected brand disappears (deleted), go back
   useEffect(() => {
-    if (selectedBrandKey && !selectedBrand && !isLoading) {
-      setSelectedBrandKey(null);
+    if (selectedBrandId && !selectedBrand && !brandsLoading) {
+      setSelectedBrandId(null);
     }
-  }, [selectedBrandKey, selectedBrand, isLoading]);
+  }, [selectedBrandId, selectedBrand, brandsLoading]);
+
+  async function handleCreateBrand() {
+    if (!newBrandName.trim()) return;
+    try {
+      await createBrand.mutateAsync({ name: newBrandName.trim(), store_url: newBrandUrl.trim() || undefined });
+      setShowNewBrand(false);
+      setNewBrandName('');
+      setNewBrandUrl('');
+      toast.success('Brand created!');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to create brand';
+      toast.error(msg);
+    }
+  }
+
+  async function handleUpdateBrand() {
+    if (!selectedBrand || !editName.trim()) return;
+    try {
+      await updateBrand.mutateAsync({ brand_id: selectedBrand.id, name: editName.trim() });
+      setEditingBrand(false);
+      toast.success('Brand updated');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to update brand';
+      toast.error(msg);
+    }
+  }
+
+  async function handleDeleteBrand() {
+    if (!selectedBrand) return;
+    try {
+      await deleteBrand.mutateAsync(selectedBrand.id);
+      setSelectedBrandId(null);
+      toast.success('Brand deleted');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete brand';
+      toast.error(msg);
+    }
+  }
 
   async function handleScrape() {
     if (!importUrl.trim()) return;
-
     setScrapeError(null);
+    setScrapedProducts([]);
+    setSelectedProductIds(new Set());
     try {
       const result = await scrapeProduct.mutateAsync({ url: importUrl.trim() });
-      if (result.products.length === 0) {
-        if (result.blocked_by_robots) {
-          throw new Error('This store blocks automated scraping (robots.txt). Try manual upload.');
-        }
-        throw new Error('No products could be extracted from this URL. Try a direct product page.');
+      if (!result || result.products.length === 0) {
+        throw new Error(result?.blocked_by_robots ? 'This store blocks automated scraping. Try manual upload.' : 'No products found at this URL.');
       }
-      if (result.save_failed) {
-        const detail = result.save_error ? ` (${result.save_error})` : '';
-        throw new Error(
-          `We scraped this page but could not save products to your account. Please try again.${detail}`
-        );
-      }
-      const scraped: Product[] = result.products
+      // Products from scrape have real DB IDs (saved unconfirmed)
+      const candidates: Product[] = result.products
         .filter((p) => p.id != null)
         .map((p) => ({
           id: p.id!,
           owner_id: '',
-          store_url: null,
+          store_url: importUrl.trim(),
           name: p.name,
           description: p.description,
           price: p.price,
@@ -298,168 +305,176 @@ export default function ProductsPage() {
           created_at: '',
           updated_at: '',
         }));
-      if (scraped.length === 0) {
-        throw new Error('Products were found but none were saved to your account. Please try again.');
+      if (candidates.length === 0) {
+        throw new Error('Products were found but could not be saved. Please try again.');
       }
-      setScrapedProducts(scraped);
-      setScrapedBrandSummary(result.brand_summary ?? null);
-      setShowScrapeResults(true);
-      setImportUrl('');
+      setScrapedProducts(candidates);
+      setSelectedProductIds(new Set(candidates.map((p) => p.id)));
+      setShowCandidates(true);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to scrape product';
-      setScrapeError(message);
-      toast.error(message, {
-        action: {
-          label: 'Retry',
-          onClick: () => handleScrape(),
-        },
-      });
+      const msg = err instanceof Error ? err.message : 'Failed to scrape URL';
+      setScrapeError(msg);
+      toast.error(msg);
     }
   }
 
-  function handleScrapeConfirmed() {
-    setShowScrapeResults(false);
-    setScrapedProducts([]);
-    setScrapedBrandSummary(null);
-    setShowImportDialog(false);
-    setScrapeError(null);
-    toast.success('Products imported successfully!');
-  }
+  async function handleConfirmProducts() {
+    if (!selectedBrand) return;
+    const selectedIds = [...selectedProductIds];
+    if (selectedIds.length === 0) return;
 
-  function handleUploadSuccess() {
-    queryClient.invalidateQueries({ queryKey: ['products'] });
-    setShowImportDialog(false);
-  }
-
-  function handleDialogClose(open: boolean) {
-    if (!open) {
-      setShowImportDialog(false);
-      setShowScrapeResults(false);
+    try {
+      await confirmProduct.mutateAsync({
+        product_ids: selectedIds,
+        brand_id: selectedBrand.id,
+      });
+      toast.success(`${selectedIds.length} product${selectedIds.length !== 1 ? 's' : ''} imported!`);
+      setShowImport(false);
+      setShowCandidates(false);
       setScrapedProducts([]);
-      setScrapedBrandSummary(null);
+      setSelectedProductIds(new Set());
+      setImportUrl('');
+      setScrapeError(null);
+      queryClient.invalidateQueries({ queryKey: ['products', 'brand', selectedBrandId] });
+      queryClient.invalidateQueries({ queryKey: ['brands'] });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to confirm products';
+      toast.error(msg);
+    }
+  }
+
+  function handleImportClose(open: boolean) {
+    if (!open) {
+      setShowImport(false);
+      setShowCandidates(false);
+      setScrapedProducts([]);
       setImportUrl('');
       setScrapeError(null);
     }
   }
 
-  /* ---------------------------------------------------------------------- */
-  /*  Render: brand list view                                                 */
-  /* ---------------------------------------------------------------------- */
-
-  const showBrandList = selectedBrandKey === null;
+  const showBrandList = selectedBrandId === null;
 
   return (
     <div className="flex flex-col gap-6">
-      {/* ------------------------------------------------------------------ */}
-      {/*  Header                                                             */}
-      {/* ------------------------------------------------------------------ */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {/* Back button when inside a brand */}
           {!showBrandList && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSelectedBrandKey(null)}
-            >
+            <Button variant="ghost" size="icon" onClick={() => setSelectedBrandId(null)}>
               <ArrowLeft className="size-4" />
             </Button>
           )}
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
-              {showBrandList ? 'Brands' : selectedBrand?.name ?? 'Products'}
+              {showBrandList ? 'Brands' : (editingBrand ? 'Edit Brand' : selectedBrand?.name ?? 'Products')}
             </h1>
             <span className="mt-1 block text-sm text-muted-foreground" suppressHydrationWarning>
-              {isLoading ? (
+              {brandsLoading ? (
                 <Skeleton className="inline-block h-4 w-32" />
               ) : showBrandList ? (
-                `${brands.length} brand${brands.length !== 1 ? 's' : ''}`
+                `${brandCount} brand${brandCount !== 1 ? 's' : ''}${!isAdmin && brandLimit !== Infinity ? ` · ${brandLimit - brandCount} slot${brandLimit - brandCount !== 1 ? 's' : ''} left` : ''}`
               ) : (
-                `${selectedBrand?.products.length ?? 0} product${(selectedBrand?.products.length ?? 0) !== 1 ? 's' : ''}`
+                `${brandProducts?.length ?? 0} product${(brandProducts?.length ?? 0) !== 1 ? 's' : ''}`
               )}
             </span>
           </div>
         </div>
 
-        {/* Action buttons */}
-        {(showBrandList ? brands.length > 0 : selectedBrand !== null) && (
-          <div className="flex items-center gap-3">
-            {atProductLimit && (
-              <Badge
+        {showBrandList ? (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button
+                    onClick={() => {
+                      if (atBrandLimit) return;
+                      setShowNewBrand(true);
+                    }}
+                    disabled={atBrandLimit}
+                  >
+                    {atBrandLimit ? <Lock className="size-4" /> : <Plus className="size-4" />}
+                    New Brand
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {atBrandLimit && (
+                <TooltipContent>
+                  Brand limit reached for your {plan} plan. Upgrade to add more.
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+        ) : selectedBrand && (
+          <div className="flex items-center gap-2">
+            {!editingBrand && (
+              <Button
                 variant="outline"
-                className={`text-xs ${approachingLimit ? 'bg-amber-500/10 text-amber-600 border-amber-500/30' : 'text-muted-foreground'}`}
+                size="sm"
+                onClick={() => { setEditingBrand(true); setEditName(selectedBrand.name); }}
               >
-                {atProductLimit && <AlertCircle className="size-3" />}
-                {productCount}/{productLimit} products
-              </Badge>
+                <Pencil className="size-4" />
+                Edit
+              </Button>
             )}
-            <Button
-              onClick={() => {
-                if (atProductLimit) {
-                  toast.error(`You've reached the ${productLimit} product limit for your ${plan} plan. Upgrade to add more.`);
-                  return;
-                }
-                setShowImportDialog(true);
-              }}
-              disabled={atProductLimit}
-            >
+            <Button onClick={() => setShowImport(true)}>
               <Plus className="size-4" />
-              {showBrandList ? 'Add Brand' : 'Add Product'}
+              Import Products
             </Button>
           </div>
         )}
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/*  Error state                                                        */}
-      {/* ------------------------------------------------------------------ */}
-      {error && !isLoading && (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-4 py-12">
-            <p className="text-sm text-destructive">
-              Failed to load products: {error.message}
-            </p>
-            <Button variant="outline" onClick={() => window.location.reload()}>
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ------------------------------------------------------------------ */}
-      {/*  Loading skeletons                                                  */}
-      {/* ------------------------------------------------------------------ */}
-      {isLoading && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <ProductCardSkeleton key={i} />
-          ))}
+      {/* Inline brand edit form */}
+      {!showBrandList && editingBrand && (
+        <div className="flex items-center gap-2">
+          <Input
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            placeholder="Brand name"
+            className="max-w-xs"
+          />
+          <Button size="sm" onClick={handleUpdateBrand} disabled={updateBrand.isPending}>
+            {updateBrand.isPending ? <Loader2 className="size-4 animate-spin" /> : 'Save'}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setEditingBrand(false)}>Cancel</Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={handleDeleteBrand}
+            disabled={deleteBrand.isPending}
+          >
+            <Trash2 className="size-4" />
+            Delete Brand
+          </Button>
         </div>
       )}
 
-      {/* ------------------------------------------------------------------ */}
-      {/*  Brand list view                                                    */}
-      {/* ------------------------------------------------------------------ */}
-      {!isLoading && !error && showBrandList && brands.length > 0 && (
+      {/* Loading */}
+      {(brandsLoading || (selectedBrandId && productsLoading)) && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {brands.map((brand) => (
+          {Array.from({ length: 6 }).map((_, i) => <BrandCardSkeleton key={i} />)}
+        </div>
+      )}
+
+      {/* Brand list */}
+      {!brandsLoading && showBrandList && (brands?.length ?? 0) > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {brands!.map((brand) => (
             <BrandCard
-              key={brand.key}
+              key={brand.id}
               brand={brand}
-              imageMap={productImageMap}
-              onClick={() => setSelectedBrandKey(brand.key)}
+              productCount={brand.product_count ?? 0}
+              onClick={() => setSelectedBrandId(brand.id)}
             />
           ))}
         </div>
       )}
 
-      {/* ------------------------------------------------------------------ */}
-      {/*  Product list view (inside a brand)                                */}
-      {/* ------------------------------------------------------------------ */}
-      {!isLoading && !error && !showBrandList && selectedBrand && (
+      {/* Products list (brand detail) */}
+      {!showBrandList && !productsLoading && (brandProducts?.length ?? 0) > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {selectedBrand.products.map((product) => (
+          {brandProducts!.map((product) => (
             <DeleteProductWrapper
               key={product.id}
               product={product}
@@ -469,10 +484,21 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* ------------------------------------------------------------------ */}
-      {/*  Empty state (no products at all)                                  */}
-      {/* ------------------------------------------------------------------ */}
-      {!isLoading && !error && brands.length === 0 && (
+      {/* Empty brand products */}
+      {!showBrandList && !productsLoading && (brandProducts?.length ?? 0) === 0 && (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 py-12">
+            <Package className="size-10 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">No products yet. Import from URL or upload manually.</p>
+            <Button onClick={() => setShowImport(true)}>
+              <Plus className="size-4" /> Import Products
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Empty brand list */}
+      {!brandsLoading && showBrandList && (brands?.length ?? 0) === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-12">
             <div className="flex size-14 items-center justify-center rounded-full bg-primary/10">
@@ -481,59 +507,108 @@ export default function ProductsPage() {
             <div className="text-center">
               <h3 className="font-semibold">No brands yet</h3>
               <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                Import your store to get started. We&apos;ll automatically group
-                your products by brand.
+                Create a brand to start importing products and generating UGC ads.
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Button onClick={() => setShowImportDialog(true)}>
-                <LinkIcon className="size-4" />
-                Import from Store
-              </Button>
-              <Button variant="outline" onClick={() => setShowImportDialog(true)}>
-                <Upload className="size-4" />
-                Upload Manually
-              </Button>
-            </div>
+            <Button onClick={() => setShowNewBrand(true)}>
+              <Plus className="size-4" /> Add Brand
+            </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* ------------------------------------------------------------------ */}
-      {/*  Import Dialog                                                      */}
-      {/* ------------------------------------------------------------------ */}
-      <Dialog open={showImportDialog} onOpenChange={handleDialogClose}>
+      {/* New Brand Dialog */}
+      <Dialog open={showNewBrand} onOpenChange={(open) => { if (!open) { setShowNewBrand(false); setNewBrandName(''); setNewBrandUrl(''); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New Brand</DialogTitle>
+            <DialogDescription>Add a brand to group your products.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="brand-name">Brand Name</Label>
+              <Input
+                id="brand-name"
+                placeholder="My Store"
+                value={newBrandName}
+                onChange={(e) => setNewBrandName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleCreateBrand(); }}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="brand-url">Store URL (optional)</Label>
+              <Input
+                id="brand-url"
+                placeholder="https://mystore.com"
+                value={newBrandUrl}
+                onChange={(e) => setNewBrandUrl(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowNewBrand(false)}>Cancel</Button>
+              <Button onClick={handleCreateBrand} disabled={!newBrandName.trim() || createBrand.isPending}>
+                {createBrand.isPending ? <Loader2 className="size-4 animate-spin" /> : 'Create Brand'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Dialog */}
+      <Dialog open={showImport} onOpenChange={handleImportClose}>
         <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-lg">
           <DialogHeader className="shrink-0">
-            <DialogTitle>
-              {showBrandList ? 'Add Brand' : 'Add Product'}
-            </DialogTitle>
+            <DialogTitle>Import Products</DialogTitle>
             <DialogDescription>
-              Import a product from a URL or upload one manually.
+              {selectedBrand ? `Adding products to "${selectedBrand.name}"` : 'Import products'}
             </DialogDescription>
           </DialogHeader>
 
-          {showScrapeResults && scrapedProducts.length > 0 ? (
-            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-              <ScrapeResults
-                products={scrapedProducts}
-                brandSummary={scrapedBrandSummary}
-                onConfirmed={handleScrapeConfirmed}
-              />
+          {showCandidates && scrapedProducts.length > 0 ? (
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+              <div className="text-sm text-muted-foreground">
+                {selectedProductIds.size} selected
+                {!isAdmin && PRODUCTS_PER_BRAND_LIMITS[plan] !== Infinity && (
+                  <> &middot; {Math.max(0, PRODUCTS_PER_BRAND_LIMITS[plan] - (brandProducts?.length ?? 0))} slots left</>
+                )}
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {scrapedProducts.map((p) => (
+                  <ScrapeCandidate
+                    key={p.id}
+                    product={p}
+                    selected={selectedProductIds.has(p.id)}
+                    onToggle={() => {
+                      setSelectedProductIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(p.id)) next.delete(p.id);
+                        else next.add(p.id);
+                        return next;
+                      });
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="flex justify-end gap-2 shrink-0">
+                <Button variant="outline" onClick={() => { setShowCandidates(false); setScrapeError(null); }}>Back</Button>
+                <Button
+                  onClick={handleConfirmProducts}
+                  disabled={selectedProductIds.size === 0 || confirmProduct.isPending}
+                >
+                  {confirmProduct.isPending ? <Loader2 className="size-4 animate-spin" /> : `Confirm ${selectedProductIds.size} Product${selectedProductIds.size !== 1 ? 's' : ''}`}
+                </Button>
+              </div>
             </div>
           ) : (
             <Tabs defaultValue="import-url" className="w-full">
               <TabsList className="w-full">
                 <TabsTrigger value="import-url" className="flex-1">
-                  <LinkIcon className="size-3.5" />
-                  Import from URL
+                  <LinkIcon className="size-3.5" /> Import from URL
                 </TabsTrigger>
                 <TabsTrigger value="upload" className="flex-1">
-                  <Upload className="size-3.5" />
-                  Upload Manually
+                  <Upload className="size-3.5" /> Upload Manually
                 </TabsTrigger>
               </TabsList>
-
               <TabsContent value="import-url">
                 <div className="flex flex-col gap-4 pt-2">
                   <div className="flex flex-col gap-2">
@@ -546,45 +621,28 @@ export default function ProductsPage() {
                         value={importUrl}
                         onChange={(e) => setImportUrl(e.target.value)}
                         className="pl-10"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleScrape();
-                          }
-                        }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleScrape(); } }}
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Supports Shopify stores and most e-commerce product pages.
-                    </p>
-                    {scrapeError && (
-                      <p className="text-xs text-destructive">{scrapeError}</p>
-                    )}
+                    {scrapeError && <p className="text-xs text-destructive">{scrapeError}</p>}
                   </div>
                   <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => handleDialogClose(false)}>
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleScrape}
-                      disabled={!importUrl.trim() || scrapeProduct.isPending}
-                    >
+                    <Button variant="outline" onClick={() => handleImportClose(false)}>Cancel</Button>
+                    <Button onClick={handleScrape} disabled={!importUrl.trim() || scrapeProduct.isPending}>
                       {scrapeProduct.isPending ? (
-                        <>
-                          <Loader2 className="size-4 animate-spin" />
-                          Importing...
-                        </>
-                      ) : (
-                        'Import'
-                      )}
+                        <><Loader2 className="size-4 animate-spin" /> Scanning...</>
+                      ) : 'Scan for Products'}
                     </Button>
                   </div>
                 </div>
               </TabsContent>
-
               <TabsContent value="upload">
                 <div className="pt-2">
-                  <ManualUploadForm onSuccess={handleUploadSuccess} />
+                  <ManualUploadForm onSuccess={() => {
+                    queryClient.invalidateQueries({ queryKey: ['products', 'brand', selectedBrandId] });
+                    queryClient.invalidateQueries({ queryKey: ['brands'] });
+                    setShowImport(false);
+                  }} />
                 </div>
               </TabsContent>
             </Tabs>
@@ -596,22 +654,18 @@ export default function ProductsPage() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Delete wrapper (unchanged)                                                */
+/*  Delete wrapper                                                            */
 /* -------------------------------------------------------------------------- */
 
 function DeleteProductWrapper({ product, resolvedImageUrl }: { product: Product; resolvedImageUrl?: string }) {
   const deleteProduct = useDeleteProduct(product.id);
-
   async function handleDelete() {
     try {
       await deleteProduct.mutateAsync();
       toast.success(`"${product.name}" deleted`);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to delete product';
-      toast.error(message);
+      toast.error(err instanceof Error ? err.message : 'Failed to delete product');
     }
   }
-
   return <ProductCard product={product} onDelete={handleDelete} resolvedImageUrl={resolvedImageUrl} />;
 }

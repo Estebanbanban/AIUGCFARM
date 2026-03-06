@@ -8,21 +8,17 @@ import {
   Film,
   Clock,
   Settings,
-  CreditCard,
   Menu,
   LogOut,
   Plus,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import { useCredits } from "@/hooks/use-credits";
 import { useProfile } from "@/hooks/use-profile";
 import { useProducts } from "@/hooks/use-products";
 import { usePersonas } from "@/hooks/use-personas";
 import { useGenerations } from "@/hooks/use-generations";
-import { PLANS } from "@/lib/stripe";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import {
   Sheet,
   SheetContent,
@@ -37,7 +33,6 @@ const navItems = [
   { label: "Generate", href: "/generate", icon: Film },
   { label: "History", href: "/history", icon: Clock },
   { label: "Settings", href: "/settings", icon: Settings },
-  { label: "Billing", href: "/settings/billing", icon: CreditCard },
 ];
 
 const pageTitles: Record<string, string> = {
@@ -58,7 +53,6 @@ function SidebarContent({
   onNavigate?: () => void;
 }) {
   const router = useRouter();
-  const { data: credits } = useCredits();
   const { data: profile } = useProfile();
   const { data: products } = useProducts();
   const { data: personas } = usePersonas();
@@ -69,17 +63,6 @@ function SidebarContent({
     (generations ?? []).some((g) => g.status === "completed"),
   ].filter(Boolean).length;
   const allOnboardingDone = onboardingStepsDone === 3;
-  const creditsRemaining = credits?.remaining ?? 0;
-  const isUnlimitedCredits = credits?.is_unlimited === true;
-  const plan = profile?.plan ?? "free";
-  const creditsTotal =
-    plan !== "free" ? (PLANS[plan as keyof typeof PLANS]?.credits ?? 0) : 9;
-  // Cap at 100% - remaining can exceed plan allocation when trial + subscription credits stack
-  const creditPercent = isUnlimitedCredits
-    ? 100
-    : creditsTotal > 0
-      ? Math.min(100, Math.round((creditsRemaining / creditsTotal) * 100))
-      : 0;
   const userEmail = profile?.email ?? "";
 
   async function handleSignOut() {
@@ -148,31 +131,7 @@ function SidebarContent({
         </div>
       )}
 
-      <div className="flex flex-col gap-3 border-t border-sidebar-border px-4 py-4">
-        <div className="rounded-lg border border-sidebar-border bg-card p-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Credits</span>
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono font-medium text-foreground">
-                {isUnlimitedCredits ? "Unlimited" : creditsRemaining}
-              </span>
-              <Link
-                href="/settings/billing"
-                onClick={onNavigate}
-                className="flex size-4 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
-                aria-label="Buy credits"
-                title="Buy credits"
-              >
-                <Plus className="size-2.5" />
-              </Link>
-            </div>
-          </div>
-          <Progress
-            value={creditPercent}
-            className="mt-2 h-1.5 bg-muted [&>[data-slot=progress-indicator]]:bg-primary"
-          />
-        </div>
-
+      <div className="border-t border-sidebar-border px-4 py-4">
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
           <button

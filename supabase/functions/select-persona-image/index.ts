@@ -38,6 +38,45 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "Persona not found" }, cors, 404);
     }
 
+    // Check monthly persona creation limit
+    const now = new Date();
+    const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+    const PERSONAS_PER_MONTH_LIMITS: Record<string, number> = {
+      free: 1,
+      starter: 2,
+      growth: 10,
+      scale: 100,
+    };
+
+    const { data: profileData } = await sb
+      .from("profiles")
+      .select("plan, role")
+      .eq("id", userId)
+      .maybeSingle();
+
+    const plan = (profileData?.plan as string) ?? "free";
+    const isAdmin = profileData?.role === "admin";
+
+    if (!isAdmin) {
+      const monthLimit = PERSONAS_PER_MONTH_LIMITS[plan] ?? 1;
+      const { data: monthRow } = await sb
+        .from("persona_monthly_limits")
+        .select("personas_created")
+        .eq("owner_id", userId)
+        .eq("month_year", monthYear)
+        .maybeSingle();
+
+      const used = monthRow?.personas_created ?? 0;
+      if (used >= monthLimit) {
+        return json(
+          { detail: `Monthly persona limit reached (${monthLimit}) for your ${plan} plan. Resets next month.` },
+          cors,
+          403,
+        );
+      }
+    }
+
     const images = persona.generated_images as string[];
     if (!images || image_index >= images.length) {
       return json(
@@ -58,6 +97,28 @@ Deno.serve(async (req: Request) => {
       .eq("owner_id", userId);
 
     if (updateErr) throw new Error(`Update failed: ${updateErr.message}`);
+
+    // Increment monthly persona usage
+    const { error: insertErr } = await sb
+      .from("persona_monthly_limits")
+      .insert({ owner_id: userId, month_year: monthYear, personas_created: 1 })
+      .select();
+
+    if (insertErr && insertErr.code === "23505") {
+      // Unique constraint violation - row exists, increment it
+      const { data: cur } = await sb
+        .from("persona_monthly_limits")
+        .select("id, personas_created")
+        .eq("owner_id", userId)
+        .eq("month_year", monthYear)
+        .single();
+      if (cur) {
+        await sb
+          .from("persona_monthly_limits")
+          .update({ personas_created: cur.personas_created + 1 })
+          .eq("id", cur.id);
+      }
+    }
 
     // Generate a fresh signed URL for the frontend to display immediately
     const { data: signedData } = await sb.storage

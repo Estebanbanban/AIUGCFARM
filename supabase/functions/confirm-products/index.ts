@@ -3,6 +3,15 @@ import { requireUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
 
+const MIGRATION_DATE = "2026-03-06T00:00:00.000Z";
+
+const PRODUCTS_PER_BRAND_LIMITS: Record<string, number> = {
+  free: 3,
+  starter: 5,
+  growth: 20,
+  scale: Infinity,
+};
+
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -13,7 +22,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const userId = await requireUserId(req);
-    const { product_ids, edits } = await req.json();
+    const { product_ids, edits, brand_id } = await req.json();
 
     if (!Array.isArray(product_ids) || product_ids.length === 0) {
       return json({ detail: "product_ids must be a non-empty array" }, cors, 400);
@@ -31,9 +40,7 @@ Deno.serve(async (req: Request) => {
     if (fetchErr) throw new Error(`DB error: ${fetchErr.message}`);
 
     const ownedIds = new Set((owned ?? []).map((r: { id: string }) => r.id));
-    const unauthorized = product_ids.filter(
-      (id: string) => !ownedIds.has(id),
-    );
+    const unauthorized = product_ids.filter((id: string) => !ownedIds.has(id));
     if (unauthorized.length > 0) {
       return json(
         { detail: `Products not found or not owned: ${unauthorized.join(", ")}` },
@@ -42,13 +49,63 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Per-brand product limit check (if brand_id provided)
+    if (brand_id && typeof brand_id === "string") {
+      // Verify brand ownership
+      const { data: brand } = await sb
+        .from("brands")
+        .select("id, owner_id")
+        .eq("id", brand_id)
+        .maybeSingle();
+
+      if (!brand || brand.owner_id !== userId) {
+        return json({ detail: "Brand not found" }, cors, 404);
+      }
+
+      // Get plan
+      const { data: profile } = await sb
+        .from("profiles")
+        .select("plan, role")
+        .eq("id", userId)
+        .maybeSingle();
+
+      const plan = (profile?.plan as string) ?? "free";
+      const isAdmin = profile?.role === "admin";
+
+      if (!isAdmin) {
+        const limit = PRODUCTS_PER_BRAND_LIMITS[plan] ?? 3;
+
+        if (limit !== Infinity) {
+          // Count only products confirmed AFTER migration date (grandfathered exemption)
+          const { count: existingCount } = await sb
+            .from("products")
+            .select("id", { count: "exact", head: true })
+            .eq("brand_id", brand_id)
+            .eq("confirmed", true)
+            .gte("created_at", MIGRATION_DATE);
+
+          const newCount = product_ids.length;
+          const totalAfter = (existingCount ?? 0) + newCount;
+
+          if (totalAfter > limit) {
+            return json(
+              {
+                detail: `Product limit for this brand would be exceeded. Limit: ${limit} per brand on your ${plan} plan. Currently: ${existingCount ?? 0}, adding: ${newCount}.`,
+              },
+              cors,
+              403,
+            );
+          }
+        }
+      }
+    }
+
     // Validate edits before applying
     if (edits && typeof edits === "object") {
       for (const productId of product_ids) {
         const edit = edits[productId];
         if (!edit) continue;
 
-        // Validate name: must be non-empty string if provided
         if (edit.name !== undefined) {
           if (typeof edit.name !== "string" || edit.name.trim().length === 0) {
             return json(
@@ -59,7 +116,6 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        // Validate price: must be >= 0 if provided
         if (edit.price !== undefined && edit.price !== null) {
           const price = Number(edit.price);
           if (isNaN(price) || price < 0) {
@@ -71,7 +127,6 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        // Validate images: must be an array if provided
         if (edit.images !== undefined) {
           if (!Array.isArray(edit.images)) {
             return json(
@@ -90,7 +145,10 @@ Deno.serve(async (req: Request) => {
     for (const productId of product_ids) {
       const updates: Record<string, unknown> = { confirmed: true };
 
-      // Merge edits if provided for this product
+      if (brand_id && typeof brand_id === "string") {
+        updates.brand_id = brand_id;
+      }
+
       if (edits && typeof edits === "object" && edits[productId]) {
         const allowed = ["name", "description", "price", "currency", "category", "images"];
         for (const key of allowed) {

@@ -23,9 +23,10 @@ import {
 import {
   useDeletePersona,
   usePersonas,
+  usePersonaMonthlyUsage,
 } from "@/hooks/use-personas";
 import { getSignedImageUrls, isExternalUrl, preloadImages } from "@/lib/storage";
-import { useProfile, PERSONA_SLOT_LIMITS } from "@/hooks/use-profile";
+import { useProfile, PERSONAS_PER_MONTH_LIMITS } from "@/hooks/use-profile";
 import { OptimizedImage } from "@/components/ui/optimized-image";
 import type { Persona } from "@/types/database";
 
@@ -92,6 +93,7 @@ function PersonaCardSkeleton() {
 export default function PersonasPage() {
   const { data: personas, isLoading: personasLoading, error: personasError } = usePersonas();
   const { data: profile, isLoading: profileLoading } = useProfile();
+  const { data: monthlyUsage } = usePersonaMonthlyUsage();
   const imageMap = useResolvedImages(personas);
   const [personaToDelete, setPersonaToDelete] = useState<Persona | null>(null);
   const deleteMutation = useDeletePersona(personaToDelete?.id ?? "");
@@ -99,10 +101,15 @@ export default function PersonasPage() {
   const isLoading = personasLoading || profileLoading;
   const plan = profile?.plan ?? "free";
   const isAdmin = profile?.role === "admin";
-  const slotLimit = PERSONA_SLOT_LIMITS[plan];
-  const slotsUsed = personas?.length ?? 0;
-  const atLimit = !isAdmin && slotsUsed >= slotLimit;
+  const monthlyLimit = PERSONAS_PER_MONTH_LIMITS[plan] ?? 1;
+  const monthlyUsed = monthlyUsage?.personas_created ?? 0;
+  const atLimit = !isAdmin && monthlyUsed >= monthlyLimit;
   const hasPersonas = (personas?.length ?? 0) > 0;
+
+  // Compute next month reset label
+  const now = new Date();
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const resetLabel = nextMonth.toLocaleDateString("en-US", { month: "short", year: "numeric" });
 
   function handleDeletePersona() {
     if (!personaToDelete) return;
@@ -129,8 +136,8 @@ export default function PersonasPage() {
               <Skeleton className="inline-block h-4 w-32" />
             ) : (
               isAdmin
-                ? `${slotsUsed} personas created · unlimited slots (admin)`
-                : `${slotsUsed}/${slotLimit} persona slots used`
+                ? `${personas?.length ?? 0} personas · unlimited (admin)`
+                : `Personas this month: ${monthlyUsed}/${monthlyLimit} · Resets ${resetLabel}`
             )}
           </span>
         </div>
@@ -155,8 +162,8 @@ export default function PersonasPage() {
           <Lock className="size-4 text-amber-600 dark:text-amber-400" />
           <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-amber-800 dark:text-amber-200">
-              You&apos;ve reached your persona limit ({slotsUsed}/{slotLimit}).
-              Upgrade your plan to create more AI personas.
+              You&apos;ve reached your monthly persona limit ({monthlyUsed}/{monthlyLimit}).
+              Resets {resetLabel}. Upgrade your plan for more.
             </span>
             <Button asChild size="sm" variant="default" className="w-fit shrink-0">
               <Link href="/settings/billing">Upgrade Plan</Link>

@@ -101,10 +101,29 @@ export function useScrapeProduct() {
   });
 }
 
+export function useProductsByBrand(brandId: string | null) {
+  return useQuery<Product[]>({
+    queryKey: ["products", "brand", brandId],
+    queryFn: async () => {
+      if (!brandId) return [];
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("brand_id", brandId)
+        .eq("confirmed", true)
+        .order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    enabled: !!brandId,
+  });
+}
+
 export function useConfirmProduct() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { product_ids: string[] }) => {
+    mutationFn: async (data: { product_ids: string[]; brand_id?: string }) => {
       const res = await callEdge<ConfirmProductsResponse>("confirm-products", { body: data });
       return res.data;
     },
