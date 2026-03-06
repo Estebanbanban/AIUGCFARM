@@ -265,6 +265,25 @@ export function useRegenLimit() {
   });
 }
 
+/** Delete a generation record owned by the current user. */
+export function useDeleteGeneration() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (generationId: string) => {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("generations")
+        .delete()
+        .eq("id", generationId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["generation-history"] });
+      queryClient.invalidateQueries({ queryKey: ["generations"] });
+    },
+  });
+}
+
 /** Fetch paginated generation history from the Edge Function. */
 export function useGenerationHistory(page = 1) {
   return useQuery({

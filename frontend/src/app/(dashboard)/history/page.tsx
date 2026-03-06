@@ -15,6 +15,7 @@ import {
   RefreshCw,
   FileText,
   LayoutDashboard,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
@@ -22,7 +23,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useGenerationHistory } from "@/hooks/use-generations";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useGenerationHistory, useDeleteGeneration } from "@/hooks/use-generations";
 import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
 import type { GenerationStatus } from "@/types/database";
 /**
@@ -158,7 +169,9 @@ function sanitizeErrorMessage(raw: string | null | undefined): string {
 export default function HistoryPage() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>("all");
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const { data, isLoading, error } = useGenerationHistory(page);
+  const deleteGeneration = useDeleteGeneration();
   const router = useRouter();
   const wizard = useGenerationWizardStore();
 
@@ -316,10 +329,11 @@ export default function HistoryPage() {
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredGenerations.map((gen) => {
+              const isInProgress = ["locking", "submitting_jobs", "generating_segments"].includes(gen.status);
               return (
               <div
                 key={gen.id}
-                className={cn("group", gen.status !== "failed" && "cursor-pointer")}
+                className={cn("group relative", gen.status !== "failed" && "cursor-pointer")}
                 onClick={() => { if (gen.status !== "failed") router.push(`/generate/${gen.id}`); }}
               >
                 <Card className={cn(
@@ -351,6 +365,17 @@ export default function HistoryPage() {
                           {gen.personas?.name ?? `Persona ${gen.persona_id.slice(0, 8)}...`}
                         </p>
                       </div>
+                      {/* Delete button — hidden while in-progress */}
+                      {!isInProgress && (
+                        <button
+                          type="button"
+                          className="ml-auto shrink-0 rounded-md p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
+                          onClick={(e) => { e.stopPropagation(); setDeleteTargetId(gen.id); }}
+                          title="Delete generation"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      )}
                     </div>
 
                     {/* Status & date */}
@@ -437,6 +462,33 @@ export default function HistoryPage() {
               );
             })}
           </div>
+
+          {/* Delete confirmation dialog */}
+          <AlertDialog open={!!deleteTargetId} onOpenChange={(open) => { if (!open) setDeleteTargetId(null); }}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this generation?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently remove the generation from your history. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleteGeneration.isPending}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                  disabled={deleteGeneration.isPending}
+                  onClick={() => {
+                    if (!deleteTargetId) return;
+                    deleteGeneration.mutate(deleteTargetId, {
+                      onSuccess: () => setDeleteTargetId(null),
+                    });
+                  }}
+                >
+                  {deleteGeneration.isPending ? <Loader2 className="size-4 animate-spin" /> : "Delete"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* Pagination */}
           {pagination && pagination.total_pages > 1 && (
