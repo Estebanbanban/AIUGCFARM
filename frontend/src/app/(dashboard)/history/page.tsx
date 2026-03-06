@@ -317,10 +317,10 @@ export default function HistoryPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredGenerations.map((gen) => {
               return (
-              <Link
+              <div
                 key={gen.id}
-                href={`/generate/${gen.id}`}
-                className="group"
+                className={cn("group", gen.status !== "failed" && "cursor-pointer")}
+                onClick={() => { if (gen.status !== "failed") router.push(`/generate/${gen.id}`); }}
               >
                 <Card className={cn(
                   "h-full transition-colors hover:border-primary/30 border-l-4",
@@ -433,7 +433,7 @@ export default function HistoryPage() {
                     )}
                   </CardContent>
                 </Card>
-              </Link>
+              </div>
               );
             })}
           </div>

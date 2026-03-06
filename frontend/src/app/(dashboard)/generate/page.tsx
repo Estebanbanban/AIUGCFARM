@@ -78,7 +78,7 @@ import {
   useGenerations,
 } from "@/hooks/use-generations";
 import { useCheckout, useBuyCredits } from "@/hooks/use-checkout";
-import { useProfile, HD_QUALITY_PLANS, ADVANCED_MODE_PLANS } from "@/hooks/use-profile";
+import { useProfile, ADVANCED_MODE_PLANS } from "@/hooks/use-profile";
 import { ManualUploadForm } from "@/components/products/ManualUploadForm";
 import { ScrapeResults } from "@/components/products/ScrapeResults";
 import {
