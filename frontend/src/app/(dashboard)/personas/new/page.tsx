@@ -728,7 +728,7 @@ function NewPersonaPageInner() {
               Free plan: 1 persona slot
             </p>
             <p className="text-xs text-amber-600/80 dark:text-amber-500/80 mt-0.5">
-              Choose carefully - you can customize it later, but you can only create 1 persona on the free plan.
+              Choose carefully. You can customize it later, but you can only create 1 persona on the free plan.
             </p>
           </div>
         </div>

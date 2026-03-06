@@ -11,7 +11,7 @@ export function BlogQuote({ children, attribution }: BlogQuoteProps) {
       </blockquote>
       {attribution && (
         <figcaption className="mt-3 text-sm text-muted-foreground">
-          - {attribution}
+          · {attribution}
         </figcaption>
       )}
     </figure>

@@ -472,7 +472,7 @@ const features = [
   {
     title: ["Zero-Input Product ", "Import"],
     description:
-      "Paste any Shopify or e-commerce URL. CineRads extracts products, images, prices, and descriptions - then generates a complete brand profile with AI. No CSV uploads, no data entry.",
+      "Paste any Shopify or e-commerce URL. CineRads extracts products, images, prices, and descriptions, then generates a complete brand profile with AI. No CSV uploads, no data entry.",
     subtext: "Works with Shopify, WooCommerce, and any public product page.",
     bullets: [
       "Auto-detect product data from any URL",
@@ -485,7 +485,7 @@ const features = [
   {
     title: ["Your AI Brand ", "Spokesperson"],
     description:
-      "Design a virtual spokesperson with 9 customizable attributes - skin tone, hair, clothing, age, and more. Save once and reuse the same face across every campaign for brand consistency.",
+      "Design a virtual spokesperson with 9 customizable attributes: skin tone, hair, clothing, age, and more. Save once and reuse the same face across every campaign for brand consistency.",
     subtext: "Create multiple personas per brand.",
     bullets: [
       "9 customizable persona attributes",
@@ -498,7 +498,7 @@ const features = [
   {
     title: ["Scripts ", "Written For You"],
     description:
-      "AI writes attention-grabbing hooks, benefit-driven bodies, and urgency CTAs - all tuned to your product data and brand voice. Each segment is generated as a short, crisp video clip. No copywriting skills needed.",
+      "AI writes attention-grabbing hooks, benefit-driven bodies, and urgency CTAs, all tuned to your product data and brand voice. Each segment is generated as a short, crisp video clip. No copywriting skills needed.",
     subtext: "Under 10s per segment for perfect lip-sync.",
     bullets: [
       "AI-generated scripts tuned to your product",
@@ -511,7 +511,7 @@ const features = [
   {
     title: ["27 Ad Combos From ", "9 Segments"],
     description:
-      "Generate 3 hooks, 3 bodies, and 3 CTAs. Mix and match any combination for 27 unique video ads from a single generation. Assembly is instant - no extra credits.",
+      "Generate 3 hooks, 3 bodies, and 3 CTAs. Mix and match any combination for 27 unique video ads from a single generation. Assembly is instant. No extra credits.",
     subtext: "A/B test hooks, bodies, and CTAs at scale.",
     bullets: [
       "27 unique ad combinations per batch",

@@ -1173,7 +1173,7 @@ export default function GeneratePage() {
 
   const paywallHeadline =
     videosGenerated === 0
-      ? "Create your first UGC ad - in seconds."
+      ? "Create your first UGC ad in seconds."
       : videosGenerated === 1
       ? "It works. Now scale your production."
       : "Scale your ad production.";
@@ -1227,7 +1227,7 @@ export default function GeneratePage() {
           <div className="flex items-center gap-3">
             <AlertCircle className="size-4 shrink-0 text-amber-400" />
             <p className="text-sm text-amber-400">
-              You have a script awaiting approval - no credits charged yet.
+              You have a script awaiting approval. No credits charged yet.
             </p>
           </div>
           <Button
@@ -1770,7 +1770,7 @@ export default function GeneratePage() {
                   <CardContent className="flex flex-col items-center gap-3 py-10">
                     <User className="size-8 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
-                      No personas yet - create one first before generating a video.
+                      No personas yet. Create one first before generating a video.
                     </p>
                     <Button asChild variant="outline" size="sm">
                       <Link href="/personas/new?returnTo=/generate">
@@ -2319,7 +2319,7 @@ export default function GeneratePage() {
                             <>
                               <div className="rounded-xl bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
                                 {store.mode === "triple"
-                                  ? "Customize each of the 9 segments - 3 variants × 3 types. Mix any combo for 27 unique videos."
+                                  ? "Customize each of the 9 segments: 3 variants × 3 types. Mix any combo for 27 unique videos."
                                   : "Customize your Hook, Body, and CTA individually for full creative control."}
                               </div>
                               <AdvancedModePanel
@@ -2911,7 +2911,7 @@ export default function GeneratePage() {
             <div className="bg-primary text-primary-foreground px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm font-medium shrink-0">
               <div className="flex items-center gap-2">
                 <Flame className="size-4" />
-                <span>Limited-time offer - 50% off Starter · 30% off Growth &amp; Scale</span>
+                <span>Limited-time offer: 50% off Starter · 30% off Growth &amp; Scale</span>
               </div>
               <div className="flex items-center gap-2 bg-black/15 px-2.5 py-0.5 rounded font-mono">
                 <Clock className="size-3 opacity-80" />
@@ -2926,7 +2926,7 @@ export default function GeneratePage() {
                 <User className="size-7 text-primary" />
               </div>
               <h2 className="text-2xl font-bold tracking-tight">
-                {offer.isActive ? "Unlock More Personas - Up to 50% Off" : "Unlock More Personas"}
+                {offer.isActive ? "Unlock More Personas (up to 50% off)" : "Unlock More Personas"}
               </h2>
               <p className="mt-2 text-muted-foreground max-w-md mx-auto">
                 {(() => {

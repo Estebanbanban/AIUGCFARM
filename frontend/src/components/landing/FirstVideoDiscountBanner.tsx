@@ -37,7 +37,7 @@ export function FirstVideoDiscountBanner() {
     <div className="sticky top-0 z-50 bg-gradient-to-r from-amber-500 to-orange-500 text-white py-2.5 px-4 flex items-center justify-center gap-3 text-sm font-medium">
       <Sparkles className="size-4 shrink-0" />
       <span>
-        Your first video is <strong>50% OFF</strong> - applied automatically at
+        Your first video is <strong>50% OFF</strong>, applied automatically at
         checkout. No code needed.
       </span>
       <button

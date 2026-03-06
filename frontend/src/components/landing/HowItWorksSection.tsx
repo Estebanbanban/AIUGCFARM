@@ -20,7 +20,7 @@ const steps = [
     number: "02",
     title: "Design Your AI Spokesperson",
     description:
-      "Configure your virtual brand spokesperson with 9 attributes. Tone, energy, style, age - saved and reused across every campaign.",
+      "Configure your virtual brand spokesperson with 9 attributes. Tone, energy, style, age. Saved and reused across every campaign.",
     mediaType: "image" as const,
     mediaSrc:
       "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=1200&q=80",

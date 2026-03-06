@@ -86,7 +86,7 @@ export function BugReportForm() {
         <Zap className="size-4 text-primary shrink-0 mt-0.5" />
         <p className="text-sm text-muted-foreground">
           <span className="font-semibold text-foreground">Earn 5 free credits.</span>{" "}
-          If your report leads to a confirmed bug fix, we&apos;ll credit your account manually - no action needed on your end.
+          If your report leads to a confirmed bug fix, we&apos;ll credit your account manually. No action needed on your end.
         </p>
       </div>
 
@@ -189,7 +189,7 @@ export function BugReportForm() {
       </button>
 
       <p className="text-center text-xs text-muted-foreground">
-        Clicking submit opens your email client with the report pre-filled - just hit send.
+        Clicking submit opens your email client with the report pre-filled. Just hit send.
       </p>
     </form>
   );

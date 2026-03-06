@@ -62,7 +62,7 @@ const STEPS = [
     key: "persona" as const,
     label: "Persona",
     title: "Create your AI creator",
-    description: "Create your AI spokesperson - customize look, style & vibe. They'll star in every video you make. (~5 min)",
+    description: "Create your AI spokesperson. Customize look, style & vibe. They'll star in every video you make. (~5 min)",
     icon: User,
     doneKey: "hasPersonaWithImage" as const,
     view: "step-persona" as WizardView,
@@ -1002,7 +1002,7 @@ function PersonaView({
       {hasExistingPersonas && (
         <div className="flex flex-col gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
           <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
-            You already have {personasWithoutImage.length === 1 ? "a persona" : "personas"} - just need a profile photo:
+            You already have personas. Just add a profile photo:
           </p>
           {personasWithoutImage.map((persona) => (
             <div

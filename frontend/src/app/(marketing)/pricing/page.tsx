@@ -154,7 +154,7 @@ export default function PricingPage() {
                 </div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   <strong className="text-foreground">10 credits</strong> = 1 complete HD ad
-                  rendered with Kling v3 - sharper, more cinematic.
+                  rendered with Kling v3 for sharper, more cinematic results.
                 </p>
               </div>
 
@@ -178,7 +178,7 @@ export default function PricingPage() {
               </p>
               <p className="text-sm text-muted-foreground">
                 One 15-credit batch gives you 27 mix-and-match video combinations to A/B test across
-                TikTok, Reels, and Shorts - finding your winning creative in days, not weeks.
+                TikTok, Reels, and Shorts. Find your winning creative in days, not weeks.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {["15 cr → 27 combos", "$0.56/combo (standard)", "vs $5/single video"].map((tag) => (

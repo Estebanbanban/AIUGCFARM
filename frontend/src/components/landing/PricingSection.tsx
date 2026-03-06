@@ -109,7 +109,7 @@ export function PricingSection() {
             pricing
           </h2>
           <p className="text-muted-foreground mt-3 text-base">
-            Start for free - create your brand and AI persona at no cost.<br />
+            Start for free. Create your brand and AI persona at no cost.<br />
             Pay only when you generate: from $3/video or subscribe from $20/month.
           </p>
 
@@ -226,7 +226,7 @@ export function PricingSection() {
             All plans include: No watermarks · MP4 download · Cancel anytime
           </p>
           <p className="text-center text-xs text-primary mt-3">
-            Beta pricing - lock in your rate forever. Prices increase at public launch.
+            Beta pricing. Lock in your rate forever. Prices increase at public launch.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground mt-5">
             <span className="flex items-center gap-1.5">

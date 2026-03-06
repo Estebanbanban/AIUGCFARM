@@ -1492,7 +1492,7 @@ export default function GenerationDetailPage() {
         <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
           <AlertTriangle className="size-4 shrink-0 text-amber-400" />
           <p className="text-sm text-amber-400">
-            Video is generating - please don&apos;t close this page.
+            Video is generating. Please don&apos;t close this page.
           </p>
         </div>
       )}
@@ -1509,7 +1509,7 @@ export default function GenerationDetailPage() {
               </div>
               <div>
                 <p className="font-semibold text-foreground">
-                  Your script is ready - action required
+                  Your script is ready. Action required.
                 </p>
                 <p className="mt-0.5 text-sm text-muted-foreground">
                   Review and approve your script to start generating videos. No credits have been charged yet.
@@ -1541,7 +1541,7 @@ export default function GenerationDetailPage() {
                   Taking longer than expected
                 </p>
                 <p className="mt-0.5 text-sm text-muted-foreground">
-                  The video provider may be under high load. Your credits are safe - check back in a few minutes.
+                  The video provider may be under high load. Your credits are safe. Check back in a few minutes.
                 </p>
               </div>
             </div>
@@ -1571,7 +1571,7 @@ export default function GenerationDetailPage() {
       {isProcessing && !isStale && (
         <NanoBananaLoader
           title="Generating Your Video"
-          subtitle="Your video is rendering - usually 3-10 minutes"
+          subtitle="Your video is rendering, usually 3-10 minutes"
           steps={RENDER_STEPS}
           currentStep={loaderInfo.step}
           progress={loaderInfo.progress}
@@ -1894,11 +1894,11 @@ export default function GenerationDetailPage() {
                           Estimated time: {formatEstimatedTime(combosToExport.length * 25)}
                           {combosToExport.length > 27 ? (
                             <span className="ml-1 text-red-400">
-                              - Max 27 combinations
+                              Max 27 combinations
                             </span>
                           ) : combosToExport.length > 9 && (
                             <span className="ml-1 text-amber-400">
-                              - Large export, stay on this tab
+                              Large export, stay on this tab
                             </span>
                           )}
                         </p>

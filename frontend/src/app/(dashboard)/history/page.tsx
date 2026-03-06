@@ -419,7 +419,7 @@ export default function HistoryPage() {
                         <FileText className="mt-0.5 size-3.5 shrink-0 text-amber-400" />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-xs text-amber-400">
-                            Script ready - no credits charged yet
+                            Script ready. No credits charged yet
                           </p>
                           <Link
                             href="/dashboard"
