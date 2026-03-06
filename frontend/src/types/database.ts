@@ -88,6 +88,7 @@ export interface Persona {
   attributes: PersonaAttributes;
   selected_image_url: string | null;
   generated_images: string[];
+  image_selection_count: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
