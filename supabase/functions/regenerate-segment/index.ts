@@ -39,6 +39,12 @@ const KLING_MODEL = {
   hd: "kling-v3",
 } as const;
 
+const LANGUAGE_NAMES: Record<string, string> = {
+  es: "Spanish", fr: "French", de: "German", it: "Italian",
+  pt: "Portuguese", ja: "Japanese", zh: "Mandarin Chinese",
+  ar: "Arabic", ru: "Russian",
+};
+
 const SEGMENT_MAP: Record<SegmentType, SegmentPlural> = {
   hook: "hooks",
   body: "bodies",
@@ -87,7 +93,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: generation, error: generationErr } = await sb
       .from("generations")
-      .select("id, owner_id, status, script, composite_image_url, external_job_ids, videos, video_quality, kling_model")
+      .select("id, owner_id, status, script, composite_image_url, external_job_ids, videos, video_quality, kling_model, language")
       .eq("id", generation_id)
       .eq("owner_id", userId)
       .single();
@@ -197,10 +203,13 @@ Deno.serve(async (req: Request) => {
         ?? KLING_MODEL[quality]
         ?? KLING_MODEL.standard;
 
+      const generationLanguage = (generation.language as string | null) ?? "en";
+      const langName = generationLanguage !== "en" ? (LANGUAGE_NAMES[generationLanguage] ?? null) : null;
+      const speakingHint = langName ? `, speaking ${langName}` : "";
       const klingResult = await withRetry(() =>
         submitKlingJob({
           image_url: compositeSignedUrl,
-          script: `A UGC creator speaking directly to camera, saying: "${segment.text}" Natural, authentic talking-head style, casual handheld selfie aesthetic.`,
+          script: `A UGC creator speaking directly to camera${speakingHint}, saying: "${segment.text}" Natural, authentic talking-head style, casual handheld selfie aesthetic.`,
           duration: clampKlingDuration(segment.duration_seconds ?? 5),
           mode: "pro",
           sound: "on",

@@ -161,7 +161,19 @@ function buildSystemPrompt(count: number, language: string): string {
     ? " Each uses a DIFFERENT pattern."
     : " Use the most natural-sounding pattern.";
 
-  const result = `You are an expert UGC (User-Generated Content) ad scriptwriter for e-commerce brands.
+  // Language block goes FIRST so the model sees it before any English-language style rules.
+  const langName = language !== "en" ? (LANGUAGE_NAMES[language] ?? language) : null;
+  const languageBlock = langName
+    ? `═══ LANGUAGE — ABSOLUTE PRIORITY ═══
+ALL output text MUST be written ENTIRELY in ${langName}. This overrides everything else.
+• Every single word — hooks, bodies, CTAs, all text fields — must be in ${langName}.
+• NO English words, not even filler ("link in bio" → adapt naturally in ${langName}).
+• Do NOT translate literally; write like a native ${langName} speaker talking to friends.
+• The hook/body/CTA structures below are universal — apply them naturally in ${langName}.
+═════════════════════════════════════════\n\n`
+    : "";
+
+  const result = `${languageBlock}You are an expert UGC (User-Generated Content) ad scriptwriter for e-commerce brands.
 Write scripts in first-person, conversational tone — exactly how a real person speaks to camera. NOT how a marketer writes.
 
 CRITICAL VOICE RULES:
@@ -226,14 +238,22 @@ Return ONLY valid JSON (exactly ${count} item${plural} per array). Set duration_
 }`;
 
   if (language !== "en") {
-    return result + `\n\nCRITICAL: Write ALL script text ENTIRELY in ${LANGUAGE_NAMES[language]}. Do NOT include any English words or phrases.`;
+    // Reminder at the end too — LLMs pay attention to both start and end of the prompt.
+    return result + `\n\nFINAL REMINDER: Every word in "text" fields MUST be in ${LANGUAGE_NAMES[language] ?? language}. Zero English. Not even one word.`;
   }
   return result;
 }
 
 function buildUserPrompt(product: Record<string, unknown>, language: string): string {
   const brandSummary = (product.brand_summary ?? {}) as Record<string, unknown>;
-  let base = `Product: ${product.name}
+  const langName = language !== "en" ? (LANGUAGE_NAMES[language] ?? language) : null;
+
+  // Language instruction at the TOP of the user message for maximum salience.
+  const langHeader = langName
+    ? `LANGUAGE: Write the ENTIRE script in ${langName} ONLY. No English words at all — not even one.\n\n`
+    : "";
+
+  const base = `${langHeader}Product: ${product.name}
 Description: ${product.description}
 Price: ${product.price ?? "N/A"}
 Brand tone: ${brandSummary.tone ?? "conversational, authentic"}
@@ -246,11 +266,8 @@ CALIBRATION INSTRUCTIONS:
 - Match the hook to a real pain point this demographic actually feels.
 - If price is listed and it's a clear value advantage, you may reference it in the hook or body.
 - Mirror the brand tone: if "playful" → be light and fun; if "premium" → be aspirational but still authentic.
-- Write scripts AS IF the persona IS the target demographic speaking to their peers.`;
+- Write scripts AS IF the persona IS the target demographic speaking to their peers.${langName ? `\n\nRemember: every word in the JSON output must be in ${langName}. Native-speaker level, zero English.` : ""}`;
 
-  if (language !== "en") {
-    base += `\n\nWrite the script ENTIRELY in ${LANGUAGE_NAMES[language]}. No English.`;
-  }
   return base;
 }
 
