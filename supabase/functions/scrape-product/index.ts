@@ -56,6 +56,56 @@ const BROWSER_HEADERS = {
 };
 
 // ---------------------------------------------------------------------------
+// safeFetch  -  SSRF-safe fetch that validates redirect targets before
+// following them.  Replaces bare fetch() calls throughout this file so that
+// an attacker cannot use an open redirect on a legitimate host to reach a
+// private IP after validateUrl() has already approved the original URL.
+// ---------------------------------------------------------------------------
+
+const MAX_REDIRECTS = 5;
+
+async function safeFetch(
+  url: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  let currentUrl = url;
+  let redirectsFollowed = 0;
+
+  while (true) {
+    // Never let fetch follow redirects automatically — we handle them ourselves.
+    const res = await fetch(currentUrl, { ...init, redirect: "manual" });
+
+    const isRedirect =
+      res.status >= 300 && res.status < 400 && res.headers.has("location");
+
+    if (!isRedirect) {
+      // Not a redirect — return the response as-is.
+      return res;
+    }
+
+    if (redirectsFollowed >= MAX_REDIRECTS) {
+      throw new Error("Too many redirects");
+    }
+
+    const location = res.headers.get("location")!;
+
+    // Resolve relative Location headers against the current URL.
+    let nextUrl: string;
+    try {
+      nextUrl = new URL(location, currentUrl).toString();
+    } catch {
+      throw new Error(`Invalid redirect Location header: ${location}`);
+    }
+
+    // Validate the redirect target — throws if it resolves to a private IP.
+    await validateUrl(nextUrl);
+
+    currentUrl = nextUrl;
+    redirectsFollowed++;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Shopify scraper  -  paginate with limit=30, cap at 50 total products
 // ---------------------------------------------------------------------------
 
@@ -67,7 +117,7 @@ async function tryShopify(origin: string): Promise<ProductData[] | null> {
   try {
     let page = 1;
     while (allProducts.length < MAX_TOTAL) {
-      const res = await fetch(
+      const res = await safeFetch(
         `${origin}/products.json?limit=${PER_PAGE}&page=${page}`,
         { headers: BROWSER_HEADERS },
       );
@@ -124,7 +174,7 @@ async function isAllowedByRobots(
   try {
     const controller = new AbortController();
     setTimeout(() => controller.abort(), 3000);
-    const res = await fetch(`${origin}/robots.txt`, {
+    const res = await safeFetch(`${origin}/robots.txt`, {
       headers: BROWSER_HEADERS,
       signal: controller.signal,
     });
@@ -213,9 +263,8 @@ async function scrapeGeneric(
     return { products: [], blocked_by_robots: true };
   }
 
-  const res = await fetch(url, {
+  const res = await safeFetch(url, {
     headers: BROWSER_HEADERS,
-    redirect: "follow",
   });
 
   if (res.status === 403 || res.status === 401 || res.status === 429) {

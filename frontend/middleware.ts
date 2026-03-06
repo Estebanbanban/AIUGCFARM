@@ -52,10 +52,11 @@ export async function middleware(request: NextRequest) {
       }
       // Cache the admin verification for 5 minutes
       supabaseResponse.cookies.set('x-admin-verified', '1', {
-        path: '/',
+        path: '/admin',
         maxAge: 300, // 5 minutes
         httpOnly: true,
         sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
       })
     }
   }

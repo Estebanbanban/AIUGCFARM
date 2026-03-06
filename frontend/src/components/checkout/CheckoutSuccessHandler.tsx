@@ -9,6 +9,8 @@ import type { PlanTier, CreditPackKey, SingleVideoPackKey } from "@/lib/stripe";
 import { PLANS, CREDIT_PACKS, SINGLE_VIDEO_PACKS } from "@/lib/stripe";
 import { trackPurchaseConfirmed } from "@/lib/datafast";
 import type { Profile } from "@/types/database";
+import { useGenerationWizardStore } from "@/stores/generation-wizard";
+import { useApproveAndGenerate } from "@/hooks/use-generations";
 
 export function CheckoutSuccessHandler() {
   const searchParams = useSearchParams();
@@ -18,7 +20,9 @@ export function CheckoutSuccessHandler() {
   const [open, setOpen] = useState(false);
   const [plan, setPlan] = useState<PlanTier | null>(null);
   const [pack, setPack] = useState<CreditPackKey | SingleVideoPackKey | null>(null);
+  const [onGenerateNow, setOnGenerateNow] = useState<(() => void) | undefined>(undefined);
   const isOnGeneratePage = pathname?.startsWith("/generate");
+  const approveAndGenerate = useApproveAndGenerate();
 
   useEffect(() => {
     const checkout = searchParams.get("checkout");
@@ -118,6 +122,17 @@ export function CheckoutSuccessHandler() {
         setPack(packParam as SingleVideoPackKey);
         setOpen(true);
       }
+
+      // If the user was mid-generation when they hit the paywall, offer to
+      // resume immediately after payment rather than making them click again.
+      const pendingGenId = useGenerationWizardStore.getState().pendingGenerationId;
+      const pendingScript = useGenerationWizardStore.getState().pendingScript;
+      if (pendingGenId && pendingScript) {
+        setOnGenerateNow(() => () => {
+          approveAndGenerate.mutate({ generation_id: pendingGenId });
+        });
+      }
+
       router.replace(pathname!);
       return () => { timers.forEach(clearTimeout); };
     }
@@ -140,7 +155,7 @@ export function CheckoutSuccessHandler() {
     return () => {
       timers.forEach(clearTimeout);
     };
-  }, [searchParams, router, queryClient, pathname, isOnGeneratePage]);
+  }, [searchParams, router, queryClient, pathname, isOnGeneratePage, approveAndGenerate]);
 
   const handleClose = () => {
     setOpen(false);
@@ -155,6 +170,7 @@ export function CheckoutSuccessHandler() {
       onClose={handleClose}
       plan={plan}
       pack={pack}
+      onGenerateNow={onGenerateNow}
     />
   );
 }

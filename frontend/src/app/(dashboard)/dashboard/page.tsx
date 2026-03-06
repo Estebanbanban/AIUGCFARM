@@ -13,7 +13,6 @@ import {
   Clock,
   Loader2,
   PlayCircle,
-  Sparkles,
   CheckCircle2,
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -181,11 +180,8 @@ export default function DashboardPage() {
 
       {!allOnboardingDone && (
         <FadeInUp delay={0.05}>
-          <Card className="border-primary/20 bg-primary/5">
+          <Card className="border-border bg-card">
             <CardContent className="flex items-center gap-4 p-4">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                <Sparkles className="size-4 text-primary" />
-              </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground">
                   Get started - {[hasProduct, hasPersonaWithImage, hasCompletedGeneration].filter(Boolean).length}/3 steps complete
@@ -258,8 +254,8 @@ export default function DashboardPage() {
 
       <StaggerContainer className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <motion.div variants={staggerItem}>
-          <Card className="border-border bg-card bg-primary/5">
-            <CardContent className="p-5">
+          <Card className="border-border bg-card bg-primary/5 h-full">
+            <CardContent className="flex flex-col justify-between h-full p-5">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Videos Generated</p>
                 <Video className="size-4 text-muted-foreground" />
@@ -273,8 +269,8 @@ export default function DashboardPage() {
         </motion.div>
 
         <motion.div variants={staggerItem}>
-          <Card className="border-border bg-card bg-primary/5">
-            <CardContent className="flex flex-col gap-3 p-5">
+          <Card className="border-border bg-card bg-primary/5 h-full">
+            <CardContent className="flex flex-col justify-between h-full gap-3 p-5">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Credits Remaining</p>
                 <CreditCard className="size-4 text-muted-foreground" />
@@ -300,8 +296,8 @@ export default function DashboardPage() {
         </motion.div>
 
         <motion.div variants={staggerItem}>
-          <Card className="border-border bg-card bg-primary/5">
-            <CardContent className="p-5">
+          <Card className="border-border bg-card bg-primary/5 h-full">
+            <CardContent className="flex flex-col justify-between h-full p-5">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Active Personas</p>
                 <Users className="size-4 text-muted-foreground" />

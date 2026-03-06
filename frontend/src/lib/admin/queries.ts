@@ -243,12 +243,18 @@ export async function adjustUserCredits(userId: string, amount: number, reason: 
 
 export async function banUser(userId: string) {
   const supabase = getAdminClient();
-  await supabase.from("profiles").update({ banned_at: new Date().toISOString() }).eq("id", userId);
+  await Promise.all([
+    supabase.from("profiles").update({ banned_at: new Date().toISOString() }).eq("id", userId),
+    supabase.auth.admin.updateUserById(userId, { ban_duration: "876600h" }),
+  ]);
 }
 
 export async function unbanUser(userId: string) {
   const supabase = getAdminClient();
-  await supabase.from("profiles").update({ banned_at: null }).eq("id", userId);
+  await Promise.all([
+    supabase.from("profiles").update({ banned_at: null }).eq("id", userId),
+    supabase.auth.admin.updateUserById(userId, { ban_duration: "none" }),
+  ]);
 }
 
 // ─── Usage ────────────────────────────────────────────────────────────────────
