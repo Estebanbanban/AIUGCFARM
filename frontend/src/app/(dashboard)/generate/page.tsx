@@ -2473,6 +2473,22 @@ export default function GeneratePage() {
                                 </div>
                               );
                             })}
+
+                            {/* Switch to Advanced Mode */}
+                            <div className="flex justify-end border-t border-border pt-3">
+                              <button
+                                type="button"
+                                onClick={handleSwitchToAdvanced}
+                                disabled={isInitializingAdvanced}
+                                className="flex items-center gap-1.5 text-xs text-primary underline-offset-2 hover:underline disabled:opacity-50"
+                              >
+                                {isInitializingAdvanced
+                                  ? <Loader2 className="size-3 animate-spin" />
+                                  : <Settings2 className="size-3" />
+                                }
+                                {isInitializingAdvanced ? "Switching to Advanced…" : "Edit in Advanced Mode →"}
+                              </button>
+                            </div>
                           </div>
                         ) : (
                           <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3">
