@@ -6,12 +6,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 // Stripe coupon ID for the new-user 30% discount offer.
 // To rotate: create a new coupon in Stripe Dashboard → copy the coupon ID → update this value.
 // Current coupon: 30% off, applies to Growth/Scale subscription first purchase.
-export const COUPON_30_OFF = "t9QmsQTe"; // 30% off Growth/Scale plans - NewUsers
-// Stripe coupon ID for 50% off Starter subscription during the promo window.
-// TODO: Replace "TODO_STARTER_COUPON_ID" with your actual Stripe coupon ID for Starter -50%.
-export const COUPON_50_OFF_STARTER = "TODO_STARTER_COUPON_ID"; // 50% off Starter plan
-// Stripe coupon ID for 50% off single-video purchase. Coupon ID: VIDEO50
-export const COUPON_50_OFF_FIRST_VIDEO = "VIDEO50"; // 50% off any single video during promo
+export const COUPON_30_OFF = "promo_1T5XZZDofGNcXNHKRrssNcdE"; // 30% off Growth/Scale subscriptions
+export const COUPON_50_OFF_STARTER = "promo_1T5Xb9DofGNcXNHKgaXOtdxQ"; // 50% off Starter subscription
+export const COUPON_50_OFF_FIRST_VIDEO = "promo_1T7tW2DofGNcXNHKHTRW79iU"; // 50% off any single video during promo
 
 const OFFER_KEY_STARTED = "cr_offer_started_at";
 const OFFER_KEY_USED = "cr_offer_used";

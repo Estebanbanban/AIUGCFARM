@@ -64,24 +64,36 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "Provide either 'plan' or 'pack'" }, cors, 400);
     }
 
-    // Validate coupon against Stripe API (no hardcoded allowlist needed).
+    // Validate discount against Stripe API.
+    // Supports both Coupon IDs (e.g. "t9QmsQTe") and Promotion Code IDs (e.g. "promo_1T5...").
     // Coupon flow:
-    //   - Single-video first purchase → client sends COUPON_50_OFF_FIRST_VIDEO ("VIDEO50")
-    //   - Subscription checkout      → client sends COUPON_30_OFF ("t9QmsQTe")
-    //   - Growth/Scale plan packs    → server auto-applies plan discount coupon
-    // If the coupon is invalid/expired, we fall back to allow_promotion_codes so the
-    // user can still manually enter a working code at checkout.
+    //   - Single-video purchase     → client sends COUPON_50_OFF_FIRST_VIDEO (promo_)
+    //   - Starter subscription      → client sends COUPON_50_OFF_STARTER (promo_)
+    //   - Growth/Scale subscription → client sends COUPON_30_OFF (promo_)
+    //   - Credit packs              → no coupon
+    // If the discount is invalid/expired, we fall back to allow_promotion_codes.
     let validatedCoupon: string | null = null;
+    let validatedPromoCode: string | null = null;
     if (couponId && typeof couponId === "string") {
+      const isPromoCode = couponId.startsWith("promo_");
       try {
-        const coupon = await stripe.coupons.retrieve(couponId);
-        if (coupon.valid) {
-          validatedCoupon = couponId;
+        if (isPromoCode) {
+          const promoCode = await stripe.promotionCodes.retrieve(couponId);
+          if (promoCode.active && promoCode.coupon?.valid) {
+            validatedPromoCode = couponId;
+          } else {
+            console.warn(`stripe-checkout: promotion code "${couponId}" is inactive or its coupon is invalid. Falling back to allow_promotion_codes.`);
+          }
         } else {
-          console.warn(`stripe-checkout: coupon "${couponId}" exists but is no longer valid (expired or max_redemptions reached). Falling back to allow_promotion_codes.`);
+          const coupon = await stripe.coupons.retrieve(couponId);
+          if (coupon.valid) {
+            validatedCoupon = couponId;
+          } else {
+            console.warn(`stripe-checkout: coupon "${couponId}" exists but is no longer valid. Falling back to allow_promotion_codes.`);
+          }
         }
-      } catch (couponErr) {
-        console.warn(`stripe-checkout: coupon "${couponId}" could not be retrieved — likely invalid or deleted. Falling back to allow_promotion_codes.`, couponErr instanceof Error ? couponErr.message : String(couponErr));
+      } catch (discountErr) {
+        console.warn(`stripe-checkout: discount "${couponId}" could not be retrieved. Falling back to allow_promotion_codes.`, discountErr instanceof Error ? discountErr.message : String(discountErr));
       }
     }
 
@@ -157,7 +169,9 @@ Deno.serve(async (req: Request) => {
         },
       };
 
-      if (validatedCoupon) {
+      if (validatedPromoCode) {
+        sessionParams.discounts = [{ promotion_code: validatedPromoCode }];
+      } else if (validatedCoupon) {
         sessionParams.discounts = [{ coupon: validatedCoupon }];
       } else {
         sessionParams.allow_promotion_codes = true;
@@ -196,7 +210,9 @@ Deno.serve(async (req: Request) => {
         billing: billing ?? "monthly",
       },
     };
-    if (validatedCoupon) {
+    if (validatedPromoCode) {
+      sessionParams.discounts = [{ promotion_code: validatedPromoCode }];
+    } else if (validatedCoupon) {
       sessionParams.discounts = [{ coupon: validatedCoupon }];
     } else {
       sessionParams.allow_promotion_codes = true;

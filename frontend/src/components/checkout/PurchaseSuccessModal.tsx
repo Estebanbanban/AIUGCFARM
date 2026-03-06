@@ -6,6 +6,7 @@ import confetti from "canvas-confetti";
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -202,7 +203,9 @@ export function PurchaseSuccessModal({ open, onClose, plan, pack, onGenerateNow 
       <DialogContent
         className="sm:max-w-md overflow-hidden p-0"
         onInteractOutside={(e) => e.preventDefault()}
+        aria-describedby={undefined}
       >
+        <DialogTitle className="sr-only">Purchase Complete</DialogTitle>
         {/* Hero band */}
         <div className="relative bg-gradient-to-br from-primary/20 via-primary/10 to-background px-6 pt-8 pb-6">
           <div className="flex items-start gap-4">

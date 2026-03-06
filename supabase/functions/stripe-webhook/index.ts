@@ -115,31 +115,14 @@ Deno.serve(async (req: Request) => {
 
           const credits = PACK_CREDITS[pack] ?? 0;
           if (credits > 0) {
-            const { data: existing } = await sb
-              .from("credit_balances")
-              .select("remaining")
-              .eq("owner_id", userId)
-              .maybeSingle();
-
-            const newBalance = (existing?.remaining ?? 0) + credits;
-
-            const { error: balErr } = await sb.from("credit_balances").upsert(
-              { owner_id: userId, remaining: newBalance },
-              { onConflict: "owner_id" },
-            );
-            if (balErr) {
-              console.error("checkout: pack credit upsert failed:", balErr);
-              processingError = balErr.message;
-            }
-
-            const { error: ledgerErr } = await sb.from("credit_ledger").insert({
-              owner_id: userId,
-              amount: credits,
-              reason: "credit_pack_purchase",
+            const { error: creditErr } = await sb.rpc("increment_credits", {
+              p_owner_id: userId,
+              p_amount: credits,
+              p_reason: "credit_pack_purchase",
             });
-            if (ledgerErr) {
-              console.error("checkout: pack ledger insert failed:", ledgerErr);
-              processingError = ledgerErr.message;
+            if (creditErr) {
+              console.error("checkout: pack credit increment failed:", creditErr);
+              processingError = creditErr.message;
             }
 
             // Atomic check-and-set: only succeeds if first_video_discount_used is still false.
@@ -244,34 +227,17 @@ Deno.serve(async (req: Request) => {
           processingError = profileErr.message;
         }
 
-        // Grant initial credits for the plan (ADD to existing, don't overwrite)
+        // Grant initial credits for the plan (atomically, to avoid race conditions)
         const credits = PLAN_CREDITS[plan] ?? 0;
         if (credits > 0) {
-          const { data: existing } = await sb
-            .from("credit_balances")
-            .select("remaining")
-            .eq("owner_id", userId)
-            .maybeSingle();
-
-          const newBalance = (existing?.remaining ?? 0) + credits;
-
-          const { error: balErr } = await sb.from("credit_balances").upsert(
-            { owner_id: userId, remaining: newBalance },
-            { onConflict: "owner_id" },
-          );
-          if (balErr) {
-            console.error("checkout: credit balance upsert failed:", balErr);
-            processingError = balErr.message;
-          }
-
-          const { error: ledgerErr } = await sb.from("credit_ledger").insert({
-            owner_id: userId,
-            amount: credits,
-            reason: "subscription_purchase",
+          const { error: creditErr } = await sb.rpc("increment_credits", {
+            p_owner_id: userId,
+            p_amount: credits,
+            p_reason: "subscription_purchase",
           });
-          if (ledgerErr) {
-            console.error("checkout: credit ledger insert failed:", ledgerErr);
-            processingError = ledgerErr.message;
+          if (creditErr) {
+            console.error("checkout: subscription credit increment failed:", creditErr);
+            processingError = creditErr.message;
           }
         }
 
@@ -347,34 +313,17 @@ Deno.serve(async (req: Request) => {
           break;
         }
 
-        // Grant renewal credits (ADD to existing balance, don't overwrite)
+        // Grant renewal credits (atomically, to avoid race conditions)
         const credits = PLAN_CREDITS[sub.plan] ?? 0;
         if (credits > 0) {
-          const { data: existing } = await sb
-            .from("credit_balances")
-            .select("remaining")
-            .eq("owner_id", sub.owner_id)
-            .maybeSingle();
-
-          const newBalance = (existing?.remaining ?? 0) + credits;
-
-          const { error: balErr } = await sb.from("credit_balances").upsert(
-            { owner_id: sub.owner_id, remaining: newBalance },
-            { onConflict: "owner_id" },
-          );
-          if (balErr) {
-            console.error("invoice.paid: credit balance upsert failed:", balErr);
-            processingError = balErr.message;
-          }
-
-          const { error: ledgerErr } = await sb.from("credit_ledger").insert({
-            owner_id: sub.owner_id,
-            amount: credits,
-            reason: "subscription_renewal",
+          const { error: creditErr } = await sb.rpc("increment_credits", {
+            p_owner_id: sub.owner_id,
+            p_amount: credits,
+            p_reason: "subscription_renewal",
           });
-          if (ledgerErr) {
-            console.error("invoice.paid: credit ledger insert failed:", ledgerErr);
-            processingError = ledgerErr.message;
+          if (creditErr) {
+            console.error("invoice.paid: credit increment failed:", creditErr);
+            processingError = creditErr.message;
           }
         }
 
@@ -564,33 +513,15 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        // Deduct credits (floor at 0)
-        const { data: existing } = await sb
-          .from("credit_balances")
-          .select("remaining")
-          .eq("owner_id", userId)
-          .maybeSingle();
-
-        const currentBalance = existing?.remaining ?? 0;
-        const newBalance = Math.max(0, currentBalance - creditsToDeduct);
-
-        const { error: balErr } = await sb.from("credit_balances").upsert(
-          { owner_id: userId, remaining: newBalance },
-          { onConflict: "owner_id" },
-        );
-        if (balErr) {
-          console.error("charge.refunded: credit balance deduction failed:", balErr);
-          processingError = balErr.message;
-        }
-
-        const { error: ledgerErr } = await sb.from("credit_ledger").insert({
-          owner_id: userId,
-          amount: creditsToDeduct,
-          reason: "refund",
+        // Deduct credits atomically (floored at 0 inside the RPC)
+        const { error: creditErr } = await sb.rpc("deduct_credits", {
+          p_owner_id: userId,
+          p_amount: creditsToDeduct,
+          p_reason: "refund",
         });
-        if (ledgerErr) {
-          console.error("charge.refunded: credit ledger insert failed:", ledgerErr);
-          processingError = ledgerErr.message;
+        if (creditErr) {
+          console.error("charge.refunded: credit deduction failed:", creditErr);
+          processingError = creditErr.message;
         }
 
         break;

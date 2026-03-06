@@ -155,7 +155,8 @@ export function CheckoutSuccessHandler() {
     return () => {
       timers.forEach(clearTimeout);
     };
-  }, [searchParams, router, queryClient, pathname, isOnGeneratePage, approveAndGenerate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, router, queryClient, pathname, isOnGeneratePage]);
 
   const handleClose = () => {
     setOpen(false);

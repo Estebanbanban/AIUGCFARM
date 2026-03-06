@@ -662,6 +662,8 @@ function CombinationPreview({
 
   // Track whether auto-stitch has been triggered for this combination
   const autoStitchTriggered = useRef(false);
+  // Skip the "reset on selection change" effect on the very first mount
+  const hasMounted = useRef(false);
 
   // Toast on Download Pack failure
   useEffect(() => {
@@ -756,8 +758,12 @@ function CombinationPreview({
     }
   }
 
-  // Reset when selection changes
+  // Reset when selection changes (skip on initial mount to avoid undoing the auto-stitch trigger)
   useEffect(() => {
+    if (!hasMounted.current) {
+      hasMounted.current = true;
+      return;
+    }
     stopAll();
     reset();
     setViewMode("sequential");
@@ -1182,17 +1188,9 @@ export default function GenerationDetailPage() {
     return `~${mins} minutes`;
   }
 
-  // Last checked timestamp
-  const [lastChecked, setLastChecked] = useState(new Date());
+  // Last checked timestamp (ref to avoid restarting the secondsAgo interval on every poll)
+  const lastCheckedRef = useRef(Date.now());
   const [secondsAgo, setSecondsAgo] = useState(0);
-
-  // Tick renderElapsed every second for NanoBananaLoader progress
-  useEffect(() => {
-    const id = setInterval(() => {
-      setRenderElapsed(Date.now() - renderStartedAt.current);
-    }, 1000);
-    return () => clearInterval(id);
-  }, []);
 
   const status = (gen?.status as GenerationStatus) ?? "pending";
   const config = statusConfig[status] ?? statusConfig.scripting;
@@ -1200,6 +1198,16 @@ export default function GenerationDetailPage() {
   const isFailed = status === "failed";
   const isAwaitingApproval = status === "awaiting_approval";
   const isProcessing = !isComplete && !isFailed && !isAwaitingApproval;
+
+  // Tick renderElapsed every second for NanoBananaLoader progress (stop once done/failed)
+  useEffect(() => {
+    if (isComplete || isFailed) return;
+    const id = setInterval(() => {
+      setRenderElapsed(Date.now() - renderStartedAt.current);
+    }, 1000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isComplete, isFailed]);
 
   const skeletonCount = gen?.mode === "triple" ? 9 : 3;
 
@@ -1233,6 +1241,12 @@ export default function GenerationDetailPage() {
     return combos;
   }, [batchMode, selectedHooks, selectedBodies, selectedCtas, segments]);
 
+  const allSegmentEntries = useMemo(() => [
+    ...(segments?.hooks ?? []).map((v, i) => ({ name: `hooks/hook_${i + 1}.mp4`, url: v.url })),
+    ...(segments?.bodies ?? []).map((v, i) => ({ name: `bodies/body_${i + 1}.mp4`, url: v.url })),
+    ...(segments?.ctas ?? []).map((v, i) => ({ name: `ctas/cta_${i + 1}.mp4`, url: v.url })),
+  ], [segments]);
+
   // Collapse script when videos are ready
   useEffect(() => {
     if (isComplete && segments) {
@@ -1253,10 +1267,10 @@ export default function GenerationDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFailed]);
 
-  // Update lastChecked whenever generation data refreshes
+  // Update lastChecked ref whenever generation data refreshes (no re-render needed)
   useEffect(() => {
     if (gen) {
-      setLastChecked(new Date());
+      lastCheckedRef.current = Date.now();
     }
   }, [gen]);
 
@@ -1264,10 +1278,11 @@ export default function GenerationDetailPage() {
   useEffect(() => {
     if (!isProcessing) return;
     const interval = setInterval(() => {
-      setSecondsAgo(Math.floor((Date.now() - lastChecked.getTime()) / 1000));
+      setSecondsAgo(Math.floor((Date.now() - lastCheckedRef.current) / 1000));
     }, 1000);
     return () => clearInterval(interval);
-  }, [isProcessing, lastChecked]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isProcessing]);
 
   // Client-side stale timeout - after 12 minutes of non-terminal status, stop
   // polling and show a "taking longer than expected" card.
@@ -1975,11 +1990,7 @@ export default function GenerationDetailPage() {
                 bodyVideo={segments.bodies?.[selectedBody]}
                 ctaVideo={segments.ctas?.[selectedCta]}
                 generationId={generationId}
-                allSegmentEntries={[
-                  ...(segments.hooks ?? []).map((v, i) => ({ name: `hooks/hook_${i + 1}.mp4`, url: v.url })),
-                  ...(segments.bodies ?? []).map((v, i) => ({ name: `bodies/body_${i + 1}.mp4`, url: v.url })),
-                  ...(segments.ctas ?? []).map((v, i) => ({ name: `ctas/cta_${i + 1}.mp4`, url: v.url })),
-                ]}
+                allSegmentEntries={allSegmentEntries}
                 autoStitch
               />
             </CardContent>
