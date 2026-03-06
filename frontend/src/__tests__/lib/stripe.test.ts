@@ -41,7 +41,7 @@ describe("stripe constants", () => {
     it("starter plan has correct pricing and limits", () => {
       expect(PLANS.starter.price).toBe(25);
       expect(PLANS.starter.credits).toBe(30);
-      expect(PLANS.starter.personas).toBe(1);
+      expect(PLANS.starter.personas).toBe(2);
       expect(PLANS.starter.brands).toBe(1);
       expect(PLANS.starter.resolution).toBe("720p");
     });
@@ -49,7 +49,7 @@ describe("stripe constants", () => {
     it("growth plan has correct pricing and limits", () => {
       expect(PLANS.growth.price).toBe(80);
       expect(PLANS.growth.credits).toBe(100);
-      expect(PLANS.growth.personas).toBe(3);
+      expect(PLANS.growth.personas).toBe(10);
       expect(PLANS.growth.brands).toBe(3);
       expect(PLANS.growth.resolution).toBe("1080p");
     });
@@ -57,8 +57,8 @@ describe("stripe constants", () => {
     it("scale plan has correct pricing and limits", () => {
       expect(PLANS.scale.price).toBe(180);
       expect(PLANS.scale.credits).toBe(250);
-      expect(PLANS.scale.personas).toBe(10);
-      expect(PLANS.scale.brands).toBe(10);
+      expect(PLANS.scale.personas).toBe(100);
+      expect(PLANS.scale.brands).toBe(999);
       expect(PLANS.scale.resolution).toBe("1080p");
     });
 

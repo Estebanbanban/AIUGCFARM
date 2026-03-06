@@ -13,6 +13,7 @@ import {
   Pencil,
   Trash2,
   Lock,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -53,6 +54,7 @@ import {
 import { useProfile, BRAND_LIMITS, PRODUCTS_PER_BRAND_LIMITS } from '@/hooks/use-profile';
 import { ProductCard } from '@/components/products/ProductCard';
 import { ManualUploadForm } from '@/components/products/ManualUploadForm';
+import Link from 'next/link';
 import { isExternalUrl, getSignedImageUrls } from '@/lib/storage';
 import type { Product, BrandSummary } from '@/types/database';
 
@@ -355,6 +357,14 @@ export default function ProductsPage() {
 
   const showBrandList = selectedBrandId === null;
 
+  // Import dialog — product slot helpers
+  const slotsLeft = PRODUCTS_PER_BRAND_LIMITS[plan] === Infinity
+    ? Infinity
+    : Math.max(0, PRODUCTS_PER_BRAND_LIMITS[plan] - (brandProducts?.length ?? 0));
+  const isAtLimit = !isAdmin && slotsLeft === 0;
+  const isOverSelection = !isAdmin && PRODUCTS_PER_BRAND_LIMITS[plan] !== Infinity
+    && selectedProductIds.size > slotsLeft;
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -566,12 +576,24 @@ export default function ProductsPage() {
 
           {showCandidates && scrapedProducts.length > 0 ? (
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-              <div className="text-sm text-muted-foreground">
+              <div className={`text-sm ${isOverSelection || isAtLimit ? 'text-red-400' : 'text-muted-foreground'}`}>
                 {selectedProductIds.size} selected
                 {!isAdmin && PRODUCTS_PER_BRAND_LIMITS[plan] !== Infinity && (
-                  <> &middot; {Math.max(0, PRODUCTS_PER_BRAND_LIMITS[plan] - (brandProducts?.length ?? 0))} slots left</>
+                  <> &middot; {slotsLeft} slot{slotsLeft !== 1 ? 's' : ''} left{isOverSelection ? ' (too many selected)' : ''}</>
                 )}
               </div>
+              {isAtLimit && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2.5">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-400" />
+                  <p className="text-sm">
+                    <span className="font-medium text-red-400">Product limit reached</span>
+                    <span className="text-muted-foreground"> — upgrade to add more.</span>
+                    <Link href="/settings/billing" className="ml-1 text-xs text-primary underline-offset-2 hover:underline">
+                      Upgrade →
+                    </Link>
+                  </p>
+                </div>
+              )}
               <div className="grid gap-3 sm:grid-cols-2">
                 {scrapedProducts.map((p) => (
                   <ScrapeCandidate
@@ -593,7 +615,7 @@ export default function ProductsPage() {
                 <Button variant="outline" onClick={() => { setShowCandidates(false); setScrapeError(null); }}>Back</Button>
                 <Button
                   onClick={handleConfirmProducts}
-                  disabled={selectedProductIds.size === 0 || confirmProduct.isPending}
+                  disabled={selectedProductIds.size === 0 || confirmProduct.isPending || isOverSelection}
                 >
                   {confirmProduct.isPending ? <Loader2 className="size-4 animate-spin" /> : `Confirm ${selectedProductIds.size} Product${selectedProductIds.size !== 1 ? 's' : ''}`}
                 </Button>
