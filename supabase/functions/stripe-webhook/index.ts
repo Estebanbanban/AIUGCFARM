@@ -63,14 +63,30 @@ Deno.serve(async (req: Request) => {
 
     const sb = getAdminClient();
 
-    // Idempotency check: skip if this event was already processed
-    const { data: existingLog } = await sb
+    // Insert audit log row first — this serves as the idempotency mutex.
+    // ON CONFLICT on event_id means only one concurrent execution proceeds.
+    const { data: auditRow, error: auditInsertError } = await sb
       .from("audit_logs")
+      .insert({
+        action: `stripe.${event.type}`,
+        event_id: event.id,
+        metadata: { type: event.type, livemode: event.livemode },
+      })
       .select("id")
-      .eq("event_id", event.id)
       .maybeSingle();
 
-    if (existingLog) {
+    if (auditInsertError) {
+      // Unique violation (code 23505) means this event was already processed
+      if (auditInsertError.code === "23505") {
+        return json({ data: { received: true, duplicate: true } }, headers);
+      }
+      // Any other error inserting the audit log — fail so Stripe retries
+      console.error("stripe-webhook: failed to insert audit log:", auditInsertError);
+      return json({ detail: "Failed to record event" }, headers, 500);
+    }
+
+    if (!auditRow) {
+      // No row returned without error = conflict = duplicate
       return json({ data: { received: true, duplicate: true } }, headers);
     }
 
@@ -126,19 +142,15 @@ Deno.serve(async (req: Request) => {
               processingError = ledgerErr.message;
             }
 
-            // Mark first_video_discount_used to prevent double discount
-            const { data: discountProfile } = await sb
+            // Atomic check-and-set: only succeeds if first_video_discount_used is still false.
+            // Prevents race condition from concurrent webhook deliveries.
+            const { data: discountRows } = await sb
               .from("profiles")
-              .select("first_video_discount_used")
+              .update({ first_video_discount_used: true })
               .eq("id", userId)
-              .single();
-
-            if (discountProfile && !discountProfile.first_video_discount_used) {
-              await sb
-                .from("profiles")
-                .update({ first_video_discount_used: true })
-                .eq("id", userId);
-            }
+              .eq("first_video_discount_used", false)
+              .select("id");
+            // discountRows will be empty if flag was already true — no action needed
 
             // Send post-purchase confirmation email
             try {
@@ -630,22 +642,12 @@ Deno.serve(async (req: Request) => {
         console.log(`Unhandled Stripe event type: ${event.type}`);
     }
 
-    // If a critical DB operation failed, return 500 so Stripe retries the event.
-    // Don't insert audit_log so the idempotency guard won't block the retry.
     if (processingError) {
-      console.error(
-        `stripe-webhook: returning 500 for ${event.type} due to DB error:`,
-        processingError,
-      );
+      console.error(`stripe-webhook: returning 500 for ${event.type} due to DB error:`, processingError);
+      // Delete the audit log row we inserted above so Stripe can retry this event
+      await sb.from("audit_logs").delete().eq("event_id", event.id);
       return json({ detail: "Processing failed, will retry" }, headers, 500);
     }
-
-    // Log the event for idempotency (only on success)
-    await sb.from("audit_logs").insert({
-      action: `stripe.${event.type}`,
-      event_id: event.id,
-      metadata: { type: event.type, livemode: event.livemode },
-    });
 
     return json({ data: { received: true } }, headers);
   } catch (e: unknown) {

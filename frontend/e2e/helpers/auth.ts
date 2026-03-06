@@ -1,11 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Page } from "@playwright/test";
 
-const SUPABASE_URL = "https://nuodqvvgfwptnnlvmqbe.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im51b2RxdnZnZndwdG5ubHZtcWJlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxNzc1MjksImV4cCI6MjA4Nzc1MzUyOX0.kA_8qrjDvasEtzPgI5jMTHS4HhkrbGM0TUBhiX_3sCQ";
-const SUPABASE_SERVICE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im51b2RxdnZnZndwdG5ubHZtcWJlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjE3NzUyOSwiZXhwIjoyMDg3NzUzNTI5fQ.la7L5epIEuMQeLvig6KBWLrV7YV684gyUUNG5xQzJyQ";
+const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY ?? "";
 
 export function uniqueEmail(label: string) {
   const ts = Date.now();

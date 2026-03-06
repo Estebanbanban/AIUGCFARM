@@ -22,7 +22,10 @@ const HOOK_SECRET = Deno.env.get("SEND_EMAIL_HOOK_SECRET");
  * The secret in env is stored as "v1,whsec_<base64>"  -  we extract the base64 key part.
  */
 async function verifyHookSignature(req: Request, body: string): Promise<boolean> {
-  if (!HOOK_SECRET) return true;
+  if (!HOOK_SECRET) {
+    console.error("SEND_EMAIL_HOOK_SECRET is not configured — rejecting hook call");
+    return false;
+  }
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) return false;
