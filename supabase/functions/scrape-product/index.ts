@@ -1,6 +1,7 @@
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
+import { getAdminClient } from "../_shared/supabase.ts";
 import { validateUrl } from "../_shared/ssrf.ts";
 import { rateLimit } from "../_shared/rate-limit.ts";
 import { callOpenRouter } from "../_shared/openrouter.ts";
@@ -409,13 +410,40 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Save products as unconfirmed if authenticated (no limit check — limits are
+    // enforced later in confirm-products when the user actually confirms a brand).
+    let savedIds: (string | null)[] = products.map(() => null);
+    if (userId && products.length > 0) {
+      const sb = getAdminClient();
+      const rows = products.map((p) => ({
+        owner_id: userId,
+        store_url: url,
+        name: p.name,
+        description: p.description,
+        price: p.price,
+        currency: p.currency,
+        images: p.images,
+        category: p.category,
+        brand_summary: brandSummary,
+        source,
+        confirmed: false,
+      }));
+      const { data: inserted } = await sb
+        .from("products")
+        .insert(rows)
+        .select("id");
+      if (inserted) {
+        savedIds = inserted.map((r: { id: string }) => r.id);
+      }
+    }
+
     return json(
       {
         data: {
           products: products.map((p, i) => ({
             ...p,
             brand_summary: i === 0 ? brandSummary : null,
-            id: null,
+            id: savedIds[i],
           })),
           source,
           platform,

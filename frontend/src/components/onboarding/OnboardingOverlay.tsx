@@ -568,13 +568,6 @@ function BrandImportView({
         );
       }
 
-      if (result.save_failed) {
-        const detail = result.save_error ? ` (${result.save_error})` : "";
-        throw new Error(
-          `Products found but could not be saved. Please try again.${detail}`,
-        );
-      }
-
       const scraped: Product[] = result.products
         .filter((p) => p.id != null)
         .map((p) => ({

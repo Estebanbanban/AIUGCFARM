@@ -714,12 +714,6 @@ export default function GeneratePage() {
           "No products could be extracted from this URL. Try a direct product page.",
         );
       }
-      if (result.save_failed) {
-        const detail = result.save_error ? ` (${result.save_error})` : "";
-        throw new Error(
-          `We scraped this page but could not save products to your account. Please try again.${detail}`,
-        );
-      }
       const scraped: Product[] = result.products
         .filter((p) => p.id != null)
         .map((p) => ({

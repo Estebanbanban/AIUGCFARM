@@ -287,14 +287,10 @@ export default function BillingPage() {
                     <Check className="size-3.5 shrink-0 text-emerald-500" strokeWidth={2.5} />
                     <strong className="text-foreground">{p.credits} credits</strong>/month
                   </li>
-                  <li className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Check className="size-3.5 shrink-0 text-emerald-500" strokeWidth={2.5} />
-                    {videosStandard} standard or {videosHd} HD videos
-                  </li>
                   {tripleStandard > 0 && (
                     <li className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Check className="size-3.5 shrink-0 text-emerald-500" strokeWidth={2.5} />
-                      Up to <strong className="text-foreground ml-0.5">{combosTriple} ad combos</strong>
+                      <strong className="text-foreground">{tripleStandard} Triple batches</strong>&nbsp;= {combosTriple} unique ad combos
                     </li>
                   )}
                   {p.features.slice(2).map((feature) => (
