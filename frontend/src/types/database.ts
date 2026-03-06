@@ -53,6 +53,7 @@ export interface BrandSummary {
 export interface Product {
   id: string;
   owner_id: string;
+  brand_id?: string | null;
   store_url: string | null;
   name: string;
   description: string | null;

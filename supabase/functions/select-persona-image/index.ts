@@ -24,10 +24,10 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "image_index must be a non-negative number" }, cors, 400);
     }
 
-    // Fetch persona and verify ownership
+    // Fetch persona and verify ownership (also fetch selected_image_url to detect re-selections)
     const { data: persona, error: fetchErr } = await sb
       .from("personas")
-      .select("id, owner_id, generated_images")
+      .select("id, owner_id, generated_images, selected_image_url")
       .eq("id", persona_id)
       .single();
 
@@ -58,7 +58,11 @@ Deno.serve(async (req: Request) => {
     const plan = (profileData?.plan as string) ?? "free";
     const isAdmin = profileData?.role === "admin";
 
-    if (!isAdmin) {
+    // Only count against monthly limit when creating a NEW persona selection.
+    // Changing an already-selected image on the same persona does NOT count.
+    const isFirstSelection = !persona.selected_image_url;
+
+    if (!isAdmin && isFirstSelection) {
       const monthLimit = PERSONAS_PER_MONTH_LIMITS[plan] ?? 1;
       const { data: monthRow } = await sb
         .from("persona_monthly_limits")
@@ -98,25 +102,27 @@ Deno.serve(async (req: Request) => {
 
     if (updateErr) throw new Error(`Update failed: ${updateErr.message}`);
 
-    // Increment monthly persona usage
-    const { error: insertErr } = await sb
-      .from("persona_monthly_limits")
-      .insert({ owner_id: userId, month_year: monthYear, personas_created: 1 })
-      .select();
-
-    if (insertErr && insertErr.code === "23505") {
-      // Unique constraint violation - row exists, increment it
-      const { data: cur } = await sb
+    // Increment monthly persona usage only for first-time selections
+    if (!isAdmin && isFirstSelection) {
+      const { error: insertErr } = await sb
         .from("persona_monthly_limits")
-        .select("id, personas_created")
-        .eq("owner_id", userId)
-        .eq("month_year", monthYear)
-        .single();
-      if (cur) {
-        await sb
+        .insert({ owner_id: userId, month_year: monthYear, personas_created: 1 })
+        .select();
+
+      if (insertErr && insertErr.code === "23505") {
+        // Unique constraint violation — row exists, increment it
+        const { data: cur } = await sb
           .from("persona_monthly_limits")
-          .update({ personas_created: cur.personas_created + 1 })
-          .eq("id", cur.id);
+          .select("id, personas_created")
+          .eq("owner_id", userId)
+          .eq("month_year", monthYear)
+          .single();
+        if (cur) {
+          await sb
+            .from("persona_monthly_limits")
+            .update({ personas_created: cur.personas_created + 1 })
+            .eq("id", cur.id);
+        }
       }
     }
 

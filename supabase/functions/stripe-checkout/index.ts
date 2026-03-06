@@ -77,10 +77,10 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Get user profile for email
+    // Get user profile for email and plan (single fetch, used in both pack and subscription flows)
     const { data: profile } = await sb
       .from("profiles")
-      .select("email")
+      .select("email, plan")
       .eq("id", userId)
       .single();
 
@@ -107,14 +107,9 @@ Deno.serve(async (req: Request) => {
       stripeCustomerId = customer.id;
     }
 
-    // Auto-apply plan discount for credit pack purchases
+    // Auto-apply plan discount for credit pack purchases (uses profile already fetched above)
     if (pack && !validatedCoupon) {
-      const { data: profileData } = await sb
-        .from("profiles")
-        .select("plan")
-        .eq("id", userId)
-        .maybeSingle();
-      const userPlan = profileData?.plan as string | undefined;
+      const userPlan = profile.plan as string | undefined;
       if (userPlan === "growth") {
         const growthCoupon = Deno.env.get("STRIPE_GROWTH_COUPON_ID");
         if (growthCoupon) validatedCoupon = growthCoupon;

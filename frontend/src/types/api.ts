@@ -30,13 +30,11 @@ export interface ScrapeProduct {
 export interface ScrapeResponseData {
   products: ScrapeProduct[];
   source: "shopify" | "generic";
+  platform: "shopify" | "generic";
   brand_summary: { tone: string; demographic: string; selling_points: string[] } | null;
   brand_summary_error?: string;
   blocked_by_robots?: boolean;
   fallback_available?: boolean;
-  saved: boolean;
-  save_failed?: boolean;
-  save_error?: string | null;
 }
 
 export interface ScrapeResponse {
