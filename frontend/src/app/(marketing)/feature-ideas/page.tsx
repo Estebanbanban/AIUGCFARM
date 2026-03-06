@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { Lightbulb, Mail, Rocket, ThumbsUp, ExternalLink } from "lucide-react";
+import { Rocket } from "lucide-react";
 import Link from "next/link";
+import { FeatureIdeasForm } from "./FeatureIdeasForm";
 
 export const metadata: Metadata = {
   title: "Feature Ideas | CineRads",
@@ -38,24 +39,6 @@ const onRoadmap = [
   },
 ];
 
-const tips = [
-  {
-    icon: "💡",
-    title: "Describe the problem, not the solution",
-    body: "\"I can't easily find which ad combo performed best\" is more useful than \"add a graph\".",
-  },
-  {
-    icon: "🎯",
-    title: "Tell us your use case",
-    body: "Who would benefit? How often would you use it? This helps us gauge priority.",
-  },
-  {
-    icon: "📣",
-    title: "Vote with others",
-    body: "Mention ideas that overlap with things you've already seen requested — it helps us spot patterns.",
-  },
-];
-
 export default function FeatureIdeasPage() {
   return (
     <div className="bg-background px-4 pt-40 pb-24 sm:px-6">
@@ -75,50 +58,10 @@ export default function FeatureIdeasPage() {
           </p>
         </div>
 
-        {/* CTA card */}
-        <a
-          href="mailto:ideas@cinerads.com?subject=Feature%20Idea%20-%20[Brief%20title]"
-          className="group mb-10 flex items-start gap-4 rounded-2xl border border-primary/30 bg-primary/5 p-6 hover:border-primary/60 transition-colors"
-        >
-          <div className="size-10 rounded-full bg-primary/15 flex items-center justify-center shrink-0 mt-0.5">
-            <Lightbulb className="size-4 text-primary" />
-          </div>
-          <div className="flex-1">
-            <p className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-2">
-              Submit your idea by email
-              <ExternalLink className="size-3.5 text-muted-foreground" />
-            </p>
-            <p className="text-sm text-primary mt-0.5">ideas@cinerads.com</p>
-            <p className="text-xs text-muted-foreground mt-2">
-              Every idea is read by the product team. We reply when your idea moves to the roadmap.
-            </p>
-          </div>
-        </a>
-
-        {/* Tips */}
-        <div className="mb-10">
-          <h2 className="text-base font-semibold text-foreground mb-5 flex items-center gap-2">
-            <ThumbsUp className="size-4 text-primary" />
-            Tips for a great submission
-          </h2>
-          <div className="space-y-3">
-            {tips.map((tip) => (
-              <div
-                key={tip.title}
-                className="flex gap-4 rounded-xl border border-border bg-card p-4"
-              >
-                <span className="text-xl shrink-0 mt-0.5">{tip.icon}</span>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{tip.title}</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">{tip.body}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <FeatureIdeasForm />
 
         {/* Roadmap snapshot */}
-        <div className="mb-10">
+        <div className="mt-14 mb-10">
           <h2 className="text-base font-semibold text-foreground mb-5 flex items-center gap-2">
             <Rocket className="size-4 text-primary" />
             What&apos;s already on the roadmap
