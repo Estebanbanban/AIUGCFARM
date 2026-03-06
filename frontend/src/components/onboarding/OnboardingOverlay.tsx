@@ -26,6 +26,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -84,6 +85,7 @@ export function OnboardingOverlay() {
   const [view, setView] = useState<WizardView>("checklist");
   const [skipped, setSkipped] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [showProductPicker, setShowProductPicker] = useState(false);
 
   const { data: products, isLoading: productsLoading } = useProducts();
   const { data: personas, isLoading: personasLoading } = usePersonas();
@@ -165,13 +167,37 @@ export function OnboardingOverlay() {
     // composites or a pending script in the store, preserve their session
     // entirely so we don't trigger expensive regeneration.
     const hasPriorSession = !!(wizardStore.compositeImagePath || wizardStore.pendingScript || wizardStore.pendingGenerationId);
-    if (!hasPriorSession && products && products.length > 0) {
-      wizardStore.setProductId(products[0].id);
-      if (!wizardStore.format) {
-        wizardStore.setFormat("9:16");
-      }
-      wizardStore.setStep(2);
+
+    // Auto-select persona (first persona with a selected image from onboarding)
+    const personaWithImage = (personas ?? []).find(p => p.selected_image_url != null);
+    if (personaWithImage && !hasPriorSession) {
+      wizardStore.setPersonaId(personaWithImage.id);
     }
+
+    if (!hasPriorSession && products && products.length > 0) {
+      if (products.length === 1) {
+        // Only one product — auto-select silently
+        wizardStore.setProductId(products[0].id);
+        if (!wizardStore.format) wizardStore.setFormat("9:16");
+        wizardStore.setStep(2);
+        setView("banner");
+        router.push("/generate");
+      } else {
+        // Multiple products — show picker modal
+        setShowProductPicker(true);
+      }
+    } else {
+      setView("banner");
+      router.push("/generate");
+    }
+  };
+
+  const handleProductPickerSelect = (productId: string) => {
+    const wizardStore = useGenerationWizardStore.getState();
+    wizardStore.setProductId(productId);
+    if (!wizardStore.format) wizardStore.setFormat("9:16");
+    wizardStore.setStep(2);
+    setShowProductPicker(false);
     setView("banner");
     router.push("/generate");
   };
@@ -236,6 +262,44 @@ export function OnboardingOverlay() {
           onDismiss={handleSkip}
         />
       </AnimatePresence>
+    );
+  }
+
+  // ── Product picker modal ──────────────────────────────────────────────────
+  if (showProductPicker) {
+    return (
+      <Dialog open={showProductPicker} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Which product are you promoting?</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-1">
+            {(products ?? []).map((product) => (
+              <button
+                key={product.id}
+                onClick={() => handleProductPickerSelect(product.id)}
+                className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 text-left transition-all hover:border-primary/50 hover:bg-primary/5"
+              >
+                {product.images?.[0] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={product.images[0]}
+                    alt={product.name}
+                    className="size-10 shrink-0 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <Package className="size-5 text-muted-foreground" />
+                  </div>
+                )}
+                <p className="text-sm font-medium text-foreground line-clamp-2">
+                  {product.name}
+                </p>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 
