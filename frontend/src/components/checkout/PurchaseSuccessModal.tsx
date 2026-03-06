@@ -26,6 +26,8 @@ interface PurchaseSuccessModalProps {
   onClose: () => void;
   plan?: PlanTier | null;
   pack?: CreditPackKey | SingleVideoPackKey | null;
+  /** If set, the CTA becomes "Generate My Video →" and calls this instead of navigating to /generate */
+  onGenerateNow?: () => void;
 }
 
 const PLAN_PERKS: Record<PlanTier, { icon: React.ElementType; headline: string; sub: string; bullets: string[]; highlight: string }> = {
@@ -159,7 +161,7 @@ function fireConfetti() {
   })();
 }
 
-export function PurchaseSuccessModal({ open, onClose, plan, pack }: PurchaseSuccessModalProps) {
+export function PurchaseSuccessModal({ open, onClose, plan, pack, onGenerateNow }: PurchaseSuccessModalProps) {
   const firedRef = useRef(false);
 
   const fire = useCallback(() => {
@@ -264,12 +266,19 @@ export function PurchaseSuccessModal({ open, onClose, plan, pack }: PurchaseSucc
 
         {/* CTA */}
         <div className="flex flex-col gap-2 px-6 pb-6">
-          <Button asChild size="lg" className="w-full" onClick={onClose}>
-            <Link href="/generate">
-              <Film className="size-4" />
-              Generate Your First Video →
-            </Link>
-          </Button>
+          {onGenerateNow ? (
+            <Button size="lg" className="w-full" onClick={() => { onGenerateNow(); onClose(); }}>
+              <Zap className="size-4" />
+              Generate My Video →
+            </Button>
+          ) : (
+            <Button asChild size="lg" className="w-full" onClick={onClose}>
+              <Link href="/generate">
+                <Film className="size-4" />
+                Generate Your First Video →
+              </Link>
+            </Button>
+          )}
           <button
             onClick={onClose}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors text-center py-1"

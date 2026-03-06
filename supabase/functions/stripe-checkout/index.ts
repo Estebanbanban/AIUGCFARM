@@ -64,16 +64,24 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "Provide either 'plan' or 'pack'" }, cors, 400);
     }
 
-    // Validate coupon against Stripe API (no hardcoded allowlist needed)
+    // Validate coupon against Stripe API (no hardcoded allowlist needed).
+    // Coupon flow:
+    //   - Single-video first purchase → client sends COUPON_50_OFF_FIRST_VIDEO ("VIDEO50")
+    //   - Subscription checkout      → client sends COUPON_30_OFF ("t9QmsQTe")
+    //   - Growth/Scale plan packs    → server auto-applies plan discount coupon
+    // If the coupon is invalid/expired, we fall back to allow_promotion_codes so the
+    // user can still manually enter a working code at checkout.
     let validatedCoupon: string | null = null;
     if (couponId && typeof couponId === "string") {
       try {
         const coupon = await stripe.coupons.retrieve(couponId);
         if (coupon.valid) {
           validatedCoupon = couponId;
+        } else {
+          console.warn(`stripe-checkout: coupon "${couponId}" exists but is no longer valid (expired or max_redemptions reached). Falling back to allow_promotion_codes.`);
         }
-      } catch {
-        // Invalid or expired coupon -- ignore, allow_promotion_codes will be set instead
+      } catch (couponErr) {
+        console.warn(`stripe-checkout: coupon "${couponId}" could not be retrieved — likely invalid or deleted. Falling back to allow_promotion_codes.`, couponErr instanceof Error ? couponErr.message : String(couponErr));
       }
     }
 
