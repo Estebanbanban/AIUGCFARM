@@ -640,7 +640,7 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
       .from('personas')
       .select('regen_count')
       .eq('id', store.personaId)
-      .single()
+      .maybeSingle()
       .then(({ data }: { data: { regen_count: number } | null }) => {
         if (!cancelled && data?.regen_count != null) setRegenCount(data.regen_count);
       });
