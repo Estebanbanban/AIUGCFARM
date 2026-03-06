@@ -47,6 +47,7 @@ import { useGenerationStatus, useRegenerateSegment, useRegenLimit } from "@/hook
 import { useProfile } from "@/hooks/use-profile";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { GenerationStatus, ScriptSegment, SegmentVideo } from "@/types/database";
+import { generateSrt } from "@/lib/srt";
 import { trackVideoCompleted, trackVideoFailed, trackVideoDownloaded } from "@/lib/datafast";
 import { useVideoStitcher, STITCH_STATUS_LABELS } from "@/hooks/use-video-stitcher";
 import { useZipDownload } from "@/hooks/use-zip-download";
@@ -628,6 +629,9 @@ function CombinationPreview({
   ctaVideo,
   generationId,
   allSegmentEntries,
+  hookScript,
+  bodyScript,
+  ctaScript,
   autoStitch = false,
 }: {
   hookVideo: SegmentVideo | undefined;
@@ -635,6 +639,9 @@ function CombinationPreview({
   ctaVideo: SegmentVideo | undefined;
   generationId: string;
   allSegmentEntries: Array<{ name: string; url: string }>;
+  hookScript?: ScriptSegment;
+  bodyScript?: ScriptSegment;
+  ctaScript?: ScriptSegment;
   autoStitch?: boolean;
 }) {
   const hookRef = useRef<HTMLVideoElement>(null);
@@ -817,6 +824,27 @@ function CombinationPreview({
       `cinerades-${generationId.slice(0, 8)}-pack.zip`,
     );
   }
+
+  function handleDownloadSrt() {
+    if (!hookVideo || !bodyVideo || !ctaVideo || !hookScript || !bodyScript || !ctaScript) return;
+    const srt = generateSrt([
+      { text: hookScript.text, durationS: hookVideo.duration },
+      { text: bodyScript.text, durationS: bodyVideo.duration },
+      { text: ctaScript.text, durationS: ctaVideo.duration },
+    ]);
+    const blob = new Blob([srt], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cinerads-${generationId.slice(0, 8)}-captions.srt`;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  const hasSrt = !!(hookScript && bodyScript && ctaScript && hookVideo && bodyVideo && ctaVideo);
 
   const segmentLabels: Record<string, string> = {
     idle: "Ready to preview",
@@ -1057,6 +1085,24 @@ function CombinationPreview({
           <p className="mt-2 text-xs text-red-400">{stitchError}</p>
         )}
       </div>
+
+      {/* SRT caption download */}
+      {hasSrt && (
+        <div className="w-full rounded-lg border border-border bg-muted/40 px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-0.5">
+              <p className="text-xs font-medium text-foreground">Captions (.srt)</p>
+              <p className="text-xs text-muted-foreground">
+                Import into CapCut, Premiere, or DaVinci to add subtitles
+              </p>
+            </div>
+            <Button size="sm" variant="outline" onClick={handleDownloadSrt}>
+              <FileText className="size-3.5" />
+              Download SRT
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1741,7 +1787,15 @@ export default function GenerationDetailPage() {
               <Button
                 variant={batchMode ? "default" : "outline"}
                 size="sm"
-                onClick={() => setBatchMode((m) => !m)}
+                onClick={() => {
+                  const entering = !batchMode;
+                  setBatchMode(entering);
+                  if (entering && segments) {
+                    setSelectedHooks(new Set((segments.hooks ?? []).map((_, i) => i)));
+                    setSelectedBodies(new Set((segments.bodies ?? []).map((_, i) => i)));
+                    setSelectedCtas(new Set((segments.ctas ?? []).map((_, i) => i)));
+                  }
+                }}
               >
                 <Layers className="size-4" />
                 Batch Export
@@ -1778,7 +1832,21 @@ export default function GenerationDetailPage() {
           <div className="grid gap-6 md:grid-cols-3">
             {/* Hooks column */}
             <div className="flex flex-col gap-3">
-              <h3 className="text-sm font-semibold text-primary">Hooks</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-primary">Hooks</h3>
+                {batchMode && (segments?.hooks?.length ?? 0) > 1 && (
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      const all = (segments?.hooks ?? []).map((_, i) => i);
+                      setSelectedHooks(selectedHooks.size === all.length ? new Set([all[0]]) : new Set(all));
+                    }}
+                  >
+                    {selectedHooks.size === (segments?.hooks?.length ?? 0) ? "Deselect All" : "Select All"}
+                  </button>
+                )}
+              </div>
               {segments.hooks?.map((video, i) => (
                 <VideoSegmentCard
                   key={i}
@@ -1810,7 +1878,21 @@ export default function GenerationDetailPage() {
 
             {/* Bodies column */}
             <div className="flex flex-col gap-3">
-              <h3 className="text-sm font-semibold text-primary">Bodies</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-primary">Bodies</h3>
+                {batchMode && (segments?.bodies?.length ?? 0) > 1 && (
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      const all = (segments?.bodies ?? []).map((_, i) => i);
+                      setSelectedBodies(selectedBodies.size === all.length ? new Set([all[0]]) : new Set(all));
+                    }}
+                  >
+                    {selectedBodies.size === (segments?.bodies?.length ?? 0) ? "Deselect All" : "Select All"}
+                  </button>
+                )}
+              </div>
               {segments.bodies?.map((video, i) => (
                 <VideoSegmentCard
                   key={i}
@@ -1842,7 +1924,21 @@ export default function GenerationDetailPage() {
 
             {/* CTAs column */}
             <div className="flex flex-col gap-3">
-              <h3 className="text-sm font-semibold text-primary">CTAs</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-primary">CTAs</h3>
+                {batchMode && (segments?.ctas?.length ?? 0) > 1 && (
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      const all = (segments?.ctas ?? []).map((_, i) => i);
+                      setSelectedCtas(selectedCtas.size === all.length ? new Set([all[0]]) : new Set(all));
+                    }}
+                  >
+                    {selectedCtas.size === (segments?.ctas?.length ?? 0) ? "Deselect All" : "Select All"}
+                  </button>
+                )}
+              </div>
               {segments.ctas?.map((video, i) => (
                 <VideoSegmentCard
                   key={i}
@@ -1992,6 +2088,9 @@ export default function GenerationDetailPage() {
                 ctaVideo={segments.ctas?.[selectedCta]}
                 generationId={generationId}
                 allSegmentEntries={allSegmentEntries}
+                hookScript={script?.hooks?.[selectedHook]}
+                bodyScript={script?.bodies?.[selectedBody]}
+                ctaScript={script?.ctas?.[selectedCta]}
                 autoStitch
               />
             </CardContent>
