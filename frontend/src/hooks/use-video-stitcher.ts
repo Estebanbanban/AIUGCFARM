@@ -23,10 +23,7 @@ async function getFFmpeg(): Promise<FFmpeg> {
   const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
   await ffmpeg.load({
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(
-      `${baseURL}/ffmpeg-core.wasm`,
-      "application/wasm",
-    ),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
   });
 
   ffmpegSingleton = ffmpeg;
@@ -46,21 +43,26 @@ function parseDuration(log: string): number {
   );
 }
 
+const TRANSITION_BUFFER     = 0.2;   // 200ms buffer at each edge of every cut
+const MIN_SILENCE_TO_CUT    = 0.8;   // Only remove silences > 800ms (net removed >= 400ms)
+const MIN_SEGMENT_DURATION  = 0.3;   // Discard speech segments < 300ms
+const MAX_SEGMENTS_PER_CLIP = 6;     // Safety cap; fall back to full-clip if exceeded
+
+type Segment = { start: number; end: number };
+
 /**
  * Parse silence regions from FFmpeg silencedetect log output.
- * Returns the speech start/end trimpoints (cutting leading + trailing silence).
+ * Returns an ordered list of speech segments to keep, with TRANSITION_BUFFER
+ * of audio preserved at each edge of every cut.
+ *
+ * Only silences longer than MIN_SILENCE_TO_CUT are removed — shorter pauses
+ * (breath, emphasis) are preserved. Exported for unit testing.
  *
  * FFmpeg log format (per silent region):
- *   silence_start: 0.000000
- *   silence_end: 0.542 | silence_duration: 0.542
+ *   silence_start: 3.000000
+ *   silence_end: 5.500 | silence_duration: 2.500
  */
-const TRANSITION_BUFFER = 0.08; // 80ms breathing room at clip boundaries
-const MIN_TRAILING_SILENCE = 0.15; // Cut trailing silence longer than 150ms
-
-function getSpeechBounds(
-  log: string,
-  duration: number,
-): { start: number; end: number } {
+export function getSpeechSegments(log: string, duration: number): Segment[] {
   const silenceStarts = [
     ...log.matchAll(/silence_start: ([\d.]+)/g),
   ].map((m) => parseFloat(m[1]));
@@ -69,72 +71,140 @@ function getSpeechBounds(
     ...log.matchAll(/silence_end: ([\d.]+)/g),
   ].map((m) => parseFloat(m[1]));
 
-  let speechStart = 0;
-  let speechEnd = duration;
+  // Trailing silence has no silence_end — use clip duration
+  const silences: Segment[] = silenceStarts.map((start, i) => ({
+    start,
+    end: silenceEnds[i] ?? duration,
+  }));
 
-  // Leading silence: first silence starts at or very close to 0
-  // Kling often has 200-400ms of ambient silence before speech starts.
-  // Keep TRANSITION_BUFFER of pre-speech audio so clips don't feel cut mid-breath.
-  if (silenceStarts.length > 0 && silenceStarts[0] < 0.5) {
-    speechStart = Math.max(0, (silenceEnds[0] ?? 0) - TRANSITION_BUFFER);
-  }
+  const cuttable = silences.filter((s) => s.end - s.start > MIN_SILENCE_TO_CUT);
+  if (cuttable.length === 0) return [{ start: 0, end: duration }];
 
-  // Trailing silence: last silence_start has no matching silence_end
-  // OR its silence_end is within 0.3s of total duration
-  const lastStart = silenceStarts[silenceStarts.length - 1];
-  const lastEnd = silenceEnds[silenceEnds.length - 1];
+  const segments: Segment[] = [];
+  let cursor = 0;
 
-  if (lastStart !== undefined) {
-    const isLastSilenceTrailing =
-      lastEnd === undefined || Math.abs(lastEnd - duration) < 0.3;
-    // Only treat as trailing if it's not the same silence as the leading one
-    const isDifferentFromLeading =
-      silenceStarts.length > 1 || silenceStarts[0] >= 0.15;
-    // Only cut if trailing silence is long enough to be noticeable
-    const trailingSilenceDuration = duration - lastStart;
-    if (isLastSilenceTrailing && isDifferentFromLeading && trailingSilenceDuration > MIN_TRAILING_SILENCE) {
-      speechEnd = lastStart + TRANSITION_BUFFER; // keep 100ms after last word
+  for (const silence of cuttable) {
+    const segEnd = Math.min(silence.start + TRANSITION_BUFFER, duration);
+    if (segEnd - cursor >= MIN_SEGMENT_DURATION) {
+      segments.push({ start: cursor, end: segEnd });
     }
+    cursor = Math.max(cursor, silence.end - TRANSITION_BUFFER);
   }
 
-  // Safety clamp - always leave at least 0.5s of content
-  return {
-    start: Math.max(0, speechStart),
-    end: Math.min(duration, Math.max(speechEnd, speechStart + 0.5)),
-  };
+  if (duration - cursor >= MIN_SEGMENT_DURATION) {
+    segments.push({ start: cursor, end: duration });
+  }
+
+  // Safety cap: pathological inputs fall back to full-clip trim
+  if (segments.length > MAX_SEGMENTS_PER_CLIP) {
+    return [{ start: 0, end: duration }];
+  }
+
+  return segments.length > 0 ? segments : [{ start: 0, end: duration }];
 }
 
 /** Run silencedetect on a file already in the FFmpeg virtual FS */
-async function detectSpeechBounds(
+async function detectSpeechSegments(
   ffmpeg: FFmpeg,
   filename: string,
-): Promise<{ start: number; end: number }> {
+): Promise<Segment[]> {
   let log = "";
   const handler = ({ message }: { message: string }) => {
     log += message + "\n";
   };
 
   ffmpeg.on("log", handler);
-  // -f null -  → discard output, only need the log
-  await ffmpeg.exec([
-    "-i",
-    filename,
-    "-af",
-    "silencedetect=n=-30dB:d=0.08",
-    "-f",
-    "null",
-    "-",
-  ]);
-  ffmpeg.off("log", handler);
+  try {
+    await ffmpeg.exec([
+      "-i", filename,
+      "-af", "silencedetect=n=-40dB:d=0.15",
+      "-f", "null", "-",
+    ]);
+  } finally {
+    // Always detach — even if exec throws, so stale output doesn't bleed into later runs
+    ffmpeg.off("log", handler);
+  }
 
-  const duration = parseDuration(log);
-  return getSpeechBounds(log, duration);
+  return getSpeechSegments(log, parseDuration(log));
 }
 
-/** Clean up temp files in the FFmpeg virtual FS between batch calls */
-async function cleanupFFmpegFiles(ffmpeg: FFmpeg) {
-  const tempFiles = ["hook.mp4", "body.mp4", "cta.mp4", "hook_t.mp4", "body_t.mp4", "cta_t.mp4", "list.txt", "output.mp4"];
-  for (const f of tempFiles) {
+/**
+ * Trim a clip to its speech segments and write the result to outputFile.
+ * Single segment: one re-encode pass.
+ * Multiple segments: re-encode each → internal concat → outputFile.
+ * Returns all temp file names created (caller passes to cleanupFFmpegFiles).
+ */
+async function trimClipToSegments(
+  ffmpeg: FFmpeg,
+  inputFile: string,
+  segments: Segment[],
+  outputFile: string,
+): Promise<string[]> {
+  const created: string[] = [];
+
+  if (segments.length === 1) {
+    const seg = segments[0];
+    await ffmpeg.exec([
+      "-i", inputFile,
+      "-ss", seg.start.toFixed(3),
+      "-to", seg.end.toFixed(3),
+      "-c:v", "libx264", "-c:a", "aac",
+      outputFile,
+    ]);
+    created.push(outputFile);
+    return created;
+  }
+
+  // Multi-segment: trim each piece to a temp file, then concat
+  const prefix = outputFile.replace(/\.mp4$/, "");
+  const segFiles: string[] = [];
+
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    const segFile = `${prefix}_s${i}.mp4`;
+    segFiles.push(segFile);
+    created.push(segFile);
+    await ffmpeg.exec([
+      "-i", inputFile,
+      "-ss", seg.start.toFixed(3),
+      "-to", seg.end.toFixed(3),
+      "-c:v", "libx264", "-c:a", "aac",
+      segFile,
+    ]);
+  }
+
+  const listFile = `${prefix}_list.txt`;
+  created.push(listFile);
+  const manifest = segFiles.map((f) => `file '${f}'`).join("\n") + "\n";
+  await ffmpeg.writeFile(listFile, new TextEncoder().encode(manifest));
+  await ffmpeg.exec([
+    "-f", "concat", "-safe", "0",
+    "-i", listFile,
+    "-c", "copy",
+    outputFile,
+  ]);
+  created.push(outputFile);
+  return created;
+}
+
+/** Detect speech segments and trim clip to outputFile in one step */
+async function prepareClip(
+  ffmpeg: FFmpeg,
+  inputFile: string,
+  outputFile: string,
+): Promise<string[]> {
+  const segments = await detectSpeechSegments(ffmpeg, inputFile);
+  return trimClipToSegments(ffmpeg, inputFile, segments, outputFile);
+}
+
+/** Clean up temp files in the FFmpeg virtual FS */
+async function cleanupFFmpegFiles(ffmpeg: FFmpeg, extraFiles: string[] = []) {
+  const baseFiles = [
+    "hook.mp4", "body.mp4", "cta.mp4",
+    "hook_t.mp4", "body_t.mp4", "cta_t.mp4",
+    "list.txt", "output.mp4",
+  ];
+  for (const f of [...new Set([...baseFiles, ...extraFiles])]) {
     try { await ffmpeg.deleteFile(f); } catch { /* ignore - file may not exist */ }
   }
 }
@@ -158,7 +228,7 @@ export async function stitchToBlob(
       import("@ffmpeg/util"),
     ]);
 
-    // Clean up any leftover files from a previous run
+    // Pre-run cleanup — clear stale files from any previous run on this singleton
     await cleanupFFmpegFiles(ffmpeg);
 
     await Promise.all([
@@ -170,15 +240,11 @@ export async function stitchToBlob(
         .catch(async () => ffmpeg.writeFile("cta.mp4", await fetchFile(ctaUrl))),
     ]);
 
-    const [hookB, bodyB, ctaB] = await Promise.all([
-      detectSpeechBounds(ffmpeg, "hook.mp4"),
-      detectSpeechBounds(ffmpeg, "body.mp4"),
-      detectSpeechBounds(ffmpeg, "cta.mp4"),
-    ]);
-
-    await ffmpeg.exec(["-i", "hook.mp4", "-ss", hookB.start.toFixed(3), "-to", hookB.end.toFixed(3), "-c:v", "libx264", "-c:a", "aac", "hook_t.mp4"]);
-    await ffmpeg.exec(["-i", "body.mp4", "-ss", bodyB.start.toFixed(3), "-to", bodyB.end.toFixed(3), "-c:v", "libx264", "-c:a", "aac", "body_t.mp4"]);
-    await ffmpeg.exec(["-i", "cta.mp4",  "-ss", ctaB.start.toFixed(3),  "-to", ctaB.end.toFixed(3),  "-c:v", "libx264", "-c:a", "aac", "cta_t.mp4"]);
+    // Sequential — FFmpeg WASM is single-threaded
+    const hookTmp = await prepareClip(ffmpeg, "hook.mp4", "hook_t.mp4");
+    const bodyTmp = await prepareClip(ffmpeg, "body.mp4", "body_t.mp4");
+    const ctaTmp  = await prepareClip(ffmpeg, "cta.mp4",  "cta_t.mp4");
+    const extraTempFiles = [...hookTmp, ...bodyTmp, ...ctaTmp];
 
     const manifest = "file 'hook_t.mp4'\nfile 'body_t.mp4'\nfile 'cta_t.mp4'\n";
     await ffmpeg.writeFile("list.txt", new TextEncoder().encode(manifest));
@@ -187,7 +253,7 @@ export async function stitchToBlob(
     const data = (await ffmpeg.readFile("output.mp4")) as Uint8Array;
     const blob = new Blob([data.buffer as ArrayBuffer], { type: "video/mp4" });
 
-    await cleanupFFmpegFiles(ffmpeg);
+    await cleanupFFmpegFiles(ffmpeg, extraTempFiles);
     return blob;
   } finally {
     ffmpegBusy = false;
@@ -250,71 +316,49 @@ export function useVideoStitcher() {
       setError(null);
       setProgress(0);
 
+      // Declared outside try so catch/finally can access them
+      let ffmpeg: FFmpeg | null = null;
+      let extraTempFiles: string[] = [];
+
       try {
         setStatus("loading_ffmpeg");
         setProgress(5);
-        const [ffmpeg, { fetchFile }] = await Promise.all([
+        const [ffmpegInstance, { fetchFile }] = await Promise.all([
           getFFmpeg(),
           import("@ffmpeg/util"),
         ]);
+        ffmpeg = ffmpegInstance;
+
+        // Pre-run cleanup — clear stale files from any previous run on this singleton
+        await cleanupFFmpegFiles(ffmpeg);
 
         setStatus("fetching");
         setProgress(15);
         await Promise.all([
           ffmpeg
             .writeFile("hook.mp4", await fetchFile(hookUrl))
-            .catch(async () => ffmpeg.writeFile("hook.mp4", await fetchFile(hookUrl))),
+            .catch(async () => ffmpeg!.writeFile("hook.mp4", await fetchFile(hookUrl))),
           ffmpeg
             .writeFile("body.mp4", await fetchFile(bodyUrl))
-            .catch(async () => ffmpeg.writeFile("body.mp4", await fetchFile(bodyUrl))),
+            .catch(async () => ffmpeg!.writeFile("body.mp4", await fetchFile(bodyUrl))),
           ffmpeg
             .writeFile("cta.mp4", await fetchFile(ctaUrl))
-            .catch(async () => ffmpeg.writeFile("cta.mp4", await fetchFile(ctaUrl))),
-        ]);
-
-        setStatus("detecting");
-        setProgress(30);
-        const [hookB, bodyB, ctaB] = await Promise.all([
-          detectSpeechBounds(ffmpeg, "hook.mp4"),
-          detectSpeechBounds(ffmpeg, "body.mp4"),
-          detectSpeechBounds(ffmpeg, "cta.mp4"),
+            .catch(async () => ffmpeg!.writeFile("cta.mp4", await fetchFile(ctaUrl))),
         ]);
 
         setStatus("trimming");
         setProgress(45);
-        // Trim each clip to its speech boundaries (re-encode for frame-accurate cuts)
-        await ffmpeg.exec([
-          "-i", "hook.mp4",
-          "-ss", hookB.start.toFixed(3),
-          "-to", hookB.end.toFixed(3),
-          "-c:v", "libx264", "-c:a", "aac",
-          "hook_t.mp4",
-        ]);
+        const hookTmp = await prepareClip(ffmpeg, "hook.mp4", "hook_t.mp4");
         setProgress(55);
-        await ffmpeg.exec([
-          "-i", "body.mp4",
-          "-ss", bodyB.start.toFixed(3),
-          "-to", bodyB.end.toFixed(3),
-          "-c:v", "libx264", "-c:a", "aac",
-          "body_t.mp4",
-        ]);
+        const bodyTmp = await prepareClip(ffmpeg, "body.mp4", "body_t.mp4");
         setProgress(65);
-        await ffmpeg.exec([
-          "-i", "cta.mp4",
-          "-ss", ctaB.start.toFixed(3),
-          "-to", ctaB.end.toFixed(3),
-          "-c:v", "libx264", "-c:a", "aac",
-          "cta_t.mp4",
-        ]);
+        const ctaTmp  = await prepareClip(ffmpeg, "cta.mp4",  "cta_t.mp4");
+        extraTempFiles = [...hookTmp, ...bodyTmp, ...ctaTmp];
 
         setStatus("concat");
         setProgress(80);
         const manifest = "file 'hook_t.mp4'\nfile 'body_t.mp4'\nfile 'cta_t.mp4'\n";
-        await ffmpeg.writeFile(
-          "list.txt",
-          new TextEncoder().encode(manifest),
-        );
-
+        await ffmpeg.writeFile("list.txt", new TextEncoder().encode(manifest));
         await ffmpeg.exec([
           "-f", "concat",
           "-safe", "0",
@@ -331,11 +375,16 @@ export function useVideoStitcher() {
         setStitchedUrl(url);
         setProgress(100);
         setStatus("done");
+
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Stitching failed";
         setError(msg);
         setStatus("error");
       } finally {
+        // Always clean up temp files and release the mutex
+        if (ffmpeg) {
+          await cleanupFFmpegFiles(ffmpeg, extraTempFiles).catch(() => {});
+        }
         ffmpegBusy = false;
       }
     },
