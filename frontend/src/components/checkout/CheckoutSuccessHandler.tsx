@@ -101,15 +101,23 @@ export function CheckoutSuccessHandler() {
       trackPurchaseConfirmed("credits", packParam);
     }
 
-    // On /generate: just toast + clean URL, don't navigate away or show modal.
-    // Still poll credits so they appear even if webhook hasn't landed yet.
+    // On /generate: show success modal with confetti, then stay on page.
     if (isOnGeneratePage) {
       queryClient.invalidateQueries({ queryKey: ["credits"] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       for (let t = 2_000; t <= 15_000; t += 2_000) {
         timers.push(setTimeout(invalidateCreditsOnly, t));
       }
-      toast.success("Payment confirmed! Your credits are ready - generate your video now");
+      if (expectedPlan) {
+        setPlan(expectedPlan as PlanTier);
+        setOpen(true);
+      } else if (packParam && packParam in CREDIT_PACKS) {
+        setPack(packParam as CreditPackKey);
+        setOpen(true);
+      } else if (packParam && packParam in SINGLE_VIDEO_PACKS) {
+        setPack(packParam as SingleVideoPackKey);
+        setOpen(true);
+      }
       router.replace(pathname!);
       return () => { timers.forEach(clearTimeout); };
     }
@@ -136,7 +144,9 @@ export function CheckoutSuccessHandler() {
 
   const handleClose = () => {
     setOpen(false);
-    router.replace("/dashboard");
+    if (!isOnGeneratePage) {
+      router.replace("/dashboard");
+    }
   };
 
   return (
