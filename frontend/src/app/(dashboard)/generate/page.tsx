@@ -2911,7 +2911,7 @@ export default function GeneratePage() {
             <div className="bg-primary text-primary-foreground px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm font-medium shrink-0">
               <div className="flex items-center gap-2">
                 <Flame className="size-4" />
-                <span>Limited-time offer — 50% off Starter · 30% off Growth &amp; Scale</span>
+                <span>Limited-time offer - 50% off Starter · 30% off Growth &amp; Scale</span>
               </div>
               <div className="flex items-center gap-2 bg-black/15 px-2.5 py-0.5 rounded font-mono">
                 <Clock className="size-3 opacity-80" />
@@ -2926,7 +2926,7 @@ export default function GeneratePage() {
                 <User className="size-7 text-primary" />
               </div>
               <h2 className="text-2xl font-bold tracking-tight">
-                {offer.isActive ? "Unlock More Personas — Up to 50% Off" : "Unlock More Personas"}
+                {offer.isActive ? "Unlock More Personas - Up to 50% Off" : "Unlock More Personas"}
               </h2>
               <p className="mt-2 text-muted-foreground max-w-md mx-auto">
                 {(() => {

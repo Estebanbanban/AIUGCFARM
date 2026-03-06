@@ -357,7 +357,7 @@ export default function ProductsPage() {
 
   const showBrandList = selectedBrandId === null;
 
-  // Import dialog — product slot helpers
+  // Import dialog - product slot helpers
   const slotsLeft = PRODUCTS_PER_BRAND_LIMITS[plan] === Infinity
     ? Infinity
     : Math.max(0, PRODUCTS_PER_BRAND_LIMITS[plan] - (brandProducts?.length ?? 0));
@@ -587,7 +587,7 @@ export default function ProductsPage() {
                   <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-400" />
                   <p className="text-sm">
                     <span className="font-medium text-red-400">Product limit reached</span>
-                    <span className="text-muted-foreground"> — upgrade to add more.</span>
+                    <span className="text-muted-foreground"> - upgrade to add more.</span>
                     <Link href="/settings/billing" className="ml-1 text-xs text-primary underline-offset-2 hover:underline">
                       Upgrade →
                     </Link>

@@ -50,7 +50,7 @@ export function FeatureIdeasForm() {
         <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-emerald-500/10">
           <CheckCircle2 className="size-7 text-emerald-500" />
         </div>
-        <h2 className="text-xl font-bold text-foreground">Idea submitted — thank you!</h2>
+        <h2 className="text-xl font-bold text-foreground">Idea submitted - thank you!</h2>
         <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
           Your email client just opened with the pre-filled idea. Hit send and the product
           team will read it.
@@ -83,7 +83,7 @@ export function FeatureIdeasForm() {
         <Zap className="size-4 text-primary shrink-0 mt-0.5" />
         <p className="text-sm text-muted-foreground">
           <span className="font-semibold text-foreground">Earn 5 free credits.</span>{" "}
-          If your idea makes it into the product, we&apos;ll credit your account manually — no action needed on your end.
+          If your idea makes it into the product, we&apos;ll credit your account manually - no action needed on your end.
         </p>
       </div>
 
@@ -171,7 +171,7 @@ export function FeatureIdeasForm() {
       </button>
 
       <p className="text-center text-xs text-muted-foreground">
-        Clicking submit opens your email client with the idea pre-filled — just hit send.
+        Clicking submit opens your email client with the idea pre-filled - just hit send.
       </p>
     </form>
   );

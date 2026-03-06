@@ -40,7 +40,7 @@ describe("plan limits", () => {
   });
 
   describe("PERSONA_IMAGE_CHANGE_LIMITS (documented values)", () => {
-    // This constant is not yet exported — values documented here as source of truth.
+    // This constant is not yet exported - values documented here as source of truth.
     const PERSONA_IMAGE_CHANGE_LIMITS: Record<string, number> = {
       free: 0,
       starter: 5,
@@ -81,7 +81,7 @@ describe("plan limits", () => {
     });
   });
 
-  describe("Triple Mode math — Standard (CREDITS_PER_BATCH = 15)", () => {
+  describe("Triple Mode math - Standard (CREDITS_PER_BATCH = 15)", () => {
     it("starter: 2 batches × 27 combos = 54 unique ad combos", () => {
       const batches = Math.floor(PLANS.starter.credits / CREDITS_PER_BATCH);
       expect(batches * COMBOS_PER_BATCH).toBe(54);
@@ -98,7 +98,7 @@ describe("plan limits", () => {
     });
   });
 
-  describe("Triple Mode math — HD (CREDITS_PER_BATCH_HD = 30)", () => {
+  describe("Triple Mode math - HD (CREDITS_PER_BATCH_HD = 30)", () => {
     it("starter: 1 HD batch × 27 combos = 27 unique ad combos", () => {
       const batches = Math.floor(PLANS.starter.credits / CREDITS_PER_BATCH_HD);
       expect(batches * COMBOS_PER_BATCH).toBe(27);

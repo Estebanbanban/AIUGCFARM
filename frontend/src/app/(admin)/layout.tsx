@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { AdminShell } from "@/components/admin/AdminShell";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  // Server-side auth guard — defense in depth beyond middleware
+  // Server-side auth guard - defense in depth beyond middleware
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");

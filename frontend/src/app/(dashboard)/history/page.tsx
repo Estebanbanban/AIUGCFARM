@@ -143,7 +143,7 @@ function sanitizeErrorMessage(raw: string | null | undefined): string {
   if (raw.includes("All video job submissions failed") || raw.includes("temporarily overloaded")) {
     return "AI video service is temporarily busy. Please try again in a moment.";
   }
-  // Insufficient credits — already user-friendly, keep as-is
+  // Insufficient credits - already user-friendly, keep as-is
   if (raw.includes("Insufficient credits") || raw.includes("credits")) {
     return raw;
   }
@@ -365,7 +365,7 @@ export default function HistoryPage() {
                           {gen.personas?.name ?? `Persona ${gen.persona_id.slice(0, 8)}...`}
                         </p>
                       </div>
-                      {/* Delete button — hidden while in-progress */}
+                      {/* Delete button - hidden while in-progress */}
                       {!isInProgress && (
                         <button
                           type="button"

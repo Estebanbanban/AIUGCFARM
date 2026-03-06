@@ -53,7 +53,7 @@ export function BugReportForm() {
         <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-emerald-500/10">
           <CheckCircle2 className="size-7 text-emerald-500" />
         </div>
-        <h2 className="text-xl font-bold text-foreground">Report sent — thank you!</h2>
+        <h2 className="text-xl font-bold text-foreground">Report sent - thank you!</h2>
         <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
           Your email client just opened with the pre-filled report. Hit send and we&apos;ll
           triage within 24 hours.
@@ -86,7 +86,7 @@ export function BugReportForm() {
         <Zap className="size-4 text-primary shrink-0 mt-0.5" />
         <p className="text-sm text-muted-foreground">
           <span className="font-semibold text-foreground">Earn 5 free credits.</span>{" "}
-          If your report leads to a confirmed bug fix, we&apos;ll credit your account manually — no action needed on your end.
+          If your report leads to a confirmed bug fix, we&apos;ll credit your account manually - no action needed on your end.
         </p>
       </div>
 
@@ -189,7 +189,7 @@ export function BugReportForm() {
       </button>
 
       <p className="text-center text-xs text-muted-foreground">
-        Clicking submit opens your email client with the report pre-filled — just hit send.
+        Clicking submit opens your email client with the report pre-filled - just hit send.
       </p>
     </form>
   );

@@ -6,7 +6,7 @@ import { FeatureIdeasForm } from "./FeatureIdeasForm";
 export const metadata: Metadata = {
   title: "Feature Ideas | CineRads",
   description:
-    "Have an idea to improve CineRads? Share it with us — the best features come from our users.",
+    "Have an idea to improve CineRads? Share it with us - the best features come from our users.",
 };
 
 const onRoadmap = [
@@ -54,7 +54,7 @@ export default function FeatureIdeasPage() {
           </h1>
           <p className="mt-4 text-lg text-muted-foreground">
             Our best features were built from user ideas. If something would
-            make your workflow faster or your ads better — we want to hear it.
+            make your workflow faster or your ads better - we want to hear it.
           </p>
         </div>
 

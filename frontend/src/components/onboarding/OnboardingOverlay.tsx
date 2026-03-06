@@ -176,14 +176,14 @@ export function OnboardingOverlay() {
 
     if (!hasPriorSession && products && products.length > 0) {
       if (products.length === 1) {
-        // Only one product — auto-select silently
+        // Only one product - auto-select silently
         wizardStore.setProductId(products[0].id);
         if (!wizardStore.format) wizardStore.setFormat("9:16");
         wizardStore.setStep(2);
         setView("banner");
         router.push("/generate");
       } else {
-        // Multiple products — show picker modal
+        // Multiple products - show picker modal
         setShowProductPicker(true);
       }
     } else {

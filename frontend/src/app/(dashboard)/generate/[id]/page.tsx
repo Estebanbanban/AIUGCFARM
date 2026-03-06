@@ -1492,7 +1492,7 @@ export default function GenerationDetailPage() {
         <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
           <AlertTriangle className="size-4 shrink-0 text-amber-400" />
           <p className="text-sm text-amber-400">
-            Video is generating — please don&apos;t close this page.
+            Video is generating - please don&apos;t close this page.
           </p>
         </div>
       )}

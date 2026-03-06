@@ -152,6 +152,6 @@
     @apply bg-background text-foreground;
   }
   /* Theme color transitions are handled by next-themes disableTransitionOnChange.
-     Avoid a blanket * transition — it causes compositor instability during HMR
+     Avoid a blanket * transition - it causes compositor instability during HMR
      rebuilds and React re-renders, which breaks Playwright screenshots. */
 }

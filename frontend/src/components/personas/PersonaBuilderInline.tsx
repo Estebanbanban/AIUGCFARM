@@ -1162,7 +1162,7 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
               </div>
             )}
 
-            {/* Action buttons — only after images have been generated */}
+            {/* Action buttons - only after images have been generated */}
             {store.generatedImages.length > 0 && (
               <div className="mt-4 flex flex-col gap-3">
                 <Button
