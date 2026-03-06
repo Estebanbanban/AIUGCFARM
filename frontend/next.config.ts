@@ -32,9 +32,9 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://*.posthog.com https://*.sentry.io",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://*.posthog.com https://*.sentry.io https://datafa.st",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com",
+              "img-src 'self' data: blob: https:",
               "media-src 'self' blob: https://*.supabase.co",
               "connect-src 'self' https://*.supabase.co https://*.supabase.in https://api.stripe.com https://*.posthog.com https://*.sentry.io",
               "frame-src https://js.stripe.com https://hooks.stripe.com",
