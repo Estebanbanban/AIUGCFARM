@@ -13,6 +13,7 @@ export interface NanoBananaLoaderProps {
   progress: number;
   className?: string;
   progressLabel?: string;
+  compact?: boolean;
 }
 
 function HudSpinner() {
@@ -46,20 +47,22 @@ export function NanoBananaLoader({
   progress,
   className,
   progressLabel,
+  compact = false,
 }: NanoBananaLoaderProps) {
   const clampedProgress = Math.max(0, Math.min(100, progress));
 
   return (
     <div
       className={cn(
-        "w-full flex flex-col items-center justify-center gap-8 py-8",
+        "w-full flex flex-col items-center justify-center",
+        compact ? "gap-4 py-3" : "gap-8 py-8",
         className
       )}
     >
       {/* Title */}
       {title && (
         <div className="text-center space-y-1">
-          <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+          <h3 className={cn("font-semibold text-foreground", compact ? "text-base" : "text-lg")}>{title}</h3>
           {subtitle && (
             <p className="text-sm text-muted-foreground">{subtitle}</p>
           )}
@@ -67,7 +70,7 @@ export function NanoBananaLoader({
       )}
 
       {/* HUD container */}
-      <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 space-y-6">
+      <div className={cn("w-full max-w-md rounded-xl border border-border bg-card", compact ? "p-4 space-y-4" : "p-6 space-y-6")}>
 
         {/* Spinner + progress section */}
         <div className="flex flex-col items-center gap-4">

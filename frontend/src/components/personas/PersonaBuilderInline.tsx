@@ -849,11 +849,28 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
         </div>
       )}
 
+      {/* ── Generating: full-width centered loader ─────────────────── */}
+      {(isGeneratingQuick || store.isGenerating) && store.generatedImages.length === 0 && (
+        <div className="flex items-center justify-center py-2">
+          <NanoBananaLoader
+            compact
+            title="Creating Your Persona"
+            subtitle="Generating unique portraits – usually 60–90 seconds"
+            steps={PERSONA_STEPS}
+            currentStep={loaderStep}
+            progress={loaderProgress}
+            progressLabel="Processing · ~1 minute"
+          />
+        </div>
+      )}
+
       <div className={cn(
         "grid gap-6",
-        store.generatedImages.length > 0
-          ? "lg:grid-cols-2"
-          : "lg:grid-cols-[1fr_300px]",
+        (isGeneratingQuick || store.isGenerating) && store.generatedImages.length === 0
+          ? "hidden"
+          : store.generatedImages.length > 0
+            ? "lg:grid-cols-2"
+            : "lg:grid-cols-[1fr_300px]",
       )}>
 
         {/* ── Left: Sims-style criteria builder ─────────────────────── */}
@@ -1065,32 +1082,6 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
         <div className="flex flex-col gap-4">
           <div className="sticky top-6">
 
-            {/* Generating loader (Quick Create) */}
-            {isGeneratingQuick && store.generatedImages.length === 0 && (
-              <NanoBananaLoader
-                title="Creating Your Persona"
-                subtitle="Generating unique portraits - usually 60-90 seconds"
-                steps={PERSONA_STEPS}
-                currentStep={loaderStep}
-                progress={loaderProgress}
-                progressLabel={`Processing · ~1 minute`}
-                className="min-h-[400px]"
-              />
-            )}
-
-            {/* Generating loader (Custom mode) */}
-            {store.isGenerating && !isGeneratingQuick && store.generatedImages.length === 0 && (
-              <NanoBananaLoader
-                title="Creating Your Persona"
-                subtitle="Generating unique portraits - usually 60-90 seconds"
-                steps={PERSONA_STEPS}
-                currentStep={loaderStep}
-                progress={loaderProgress}
-                progressLabel={`Processing · ~1 minute`}
-                className="min-h-[400px]"
-              />
-            )}
-
             {/* Attribute summary (before generating) */}
             {store.generatedImages.length === 0 && !store.isGenerating && !isGeneratingQuick && (
               <div className="rounded-xl border border-border bg-card p-4">
@@ -1240,17 +1231,13 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
                 ? (!quickDescription.trim() || isGeneratingQuick)
                 : store.isGenerating
             }
-            className="w-full"
+            className="flex w-full items-center justify-center gap-2"
             size="lg"
           >
-            {isGeneratingQuick || store.isGenerating ? (
-              <span className="flex items-center justify-center gap-2">
-                <Loader2 className="size-4 animate-spin" />
-                Generating…
-              </span>
-            ) : (
-              "Generate Persona"
+            {(isGeneratingQuick || store.isGenerating) && (
+              <Loader2 className="size-4 animate-spin" />
             )}
+            {isGeneratingQuick || store.isGenerating ? "Generating…" : "Generate Persona"}
           </Button>
         ) : (
           <Button
