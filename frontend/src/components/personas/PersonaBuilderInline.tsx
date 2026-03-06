@@ -1086,6 +1086,7 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
                 steps={PERSONA_STEPS}
                 currentStep={loaderStep}
                 progress={loaderProgress}
+                progressLabel={`Processing · ~1 minute`}
                 className="min-h-[400px]"
               />
             )}
@@ -1098,6 +1099,7 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
                 steps={PERSONA_STEPS}
                 currentStep={loaderStep}
                 progress={loaderProgress}
+                progressLabel={`Processing · ~1 minute`}
                 className="min-h-[400px]"
               />
             )}
