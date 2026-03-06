@@ -15,13 +15,28 @@ export default function DashboardLayout({
 }) {
   useEffect(() => {
     const supabase = createClient();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string) => {
       if (event === "SIGNED_IN") {
         localStorage.removeItem("onboarding-skipped");
         useGenerationWizardStore.getState().reset();
       }
     });
-    return () => subscription.unsubscribe();
+
+    // Refresh session when the user comes back to the tab after inactivity.
+    // Browsers throttle/kill background JS timers, which can prevent Supabase's
+    // auto-refresh ticker from firing and let the access token expire silently.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        supabase.auth.getUser(); // triggers a token refresh if the access token is expired
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   return (

@@ -27,10 +27,19 @@ export async function middleware(request: NextRequest) {
   )
 
   if (!user && requiresAuth) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    const redirectResponse = NextResponse.redirect(new URL('/login', request.url))
+    // Forward any refreshed session cookies so they are not lost on redirect
+    supabaseResponse.cookies.getAll().forEach(({ name, value, ...rest }) =>
+      redirectResponse.cookies.set(name, value, rest)
+    )
+    return redirectResponse
   }
   if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    const redirectResponse = NextResponse.redirect(new URL('/dashboard', request.url))
+    supabaseResponse.cookies.getAll().forEach(({ name, value, ...rest }) =>
+      redirectResponse.cookies.set(name, value, rest)
+    )
+    return redirectResponse
   }
 
   // Admin route protection

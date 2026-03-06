@@ -1,4 +1,4 @@
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase/client";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -61,7 +61,7 @@ async function fetchWithTimeout(
 }
 
 async function getEdgeAccessToken(
-  supabase: ReturnType<typeof createBrowserClient>,
+  supabase: ReturnType<typeof createClient>,
 ): Promise<string> {
   const {
     data: { session },
@@ -92,7 +92,7 @@ export async function callEdge<T>(
   fn: string,
   options: { method?: string; body?: unknown; timeoutMs?: number } = {}
 ): Promise<T> {
-  const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
+  const supabase = createClient();
   const timeoutMs = options.timeoutMs ?? DEFAULT_EDGE_TIMEOUT_MS;
   let accessToken = await getEdgeAccessToken(supabase);
 
@@ -142,7 +142,7 @@ export async function callEdgePublic<T>(
   headers.apikey = supabaseAnonKey;
 
   try {
-    const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
+    const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
     if (session) headers.Authorization = `Bearer ${session.access_token}`;
   } catch { /* no auth available */ }
@@ -168,7 +168,7 @@ export async function callEdgeMultipart<T>(
   formData: FormData,
   options: { timeoutMs?: number } = {}
 ): Promise<T> {
-  const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
+  const supabase = createClient();
   const timeoutMs = options.timeoutMs ?? DEFAULT_EDGE_TIMEOUT_MS;
   let accessToken = await getEdgeAccessToken(supabase);
 
