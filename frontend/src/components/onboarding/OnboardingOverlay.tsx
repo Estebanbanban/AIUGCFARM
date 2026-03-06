@@ -268,7 +268,7 @@ export function OnboardingOverlay() {
   // ── Product picker modal ──────────────────────────────────────────────────
   if (showProductPicker) {
     return (
-      <Dialog open={showProductPicker} onOpenChange={() => {}}>
+      <Dialog open={showProductPicker} onOpenChange={(open) => { if (!open) setShowProductPicker(false); }}>
         <DialogContent className="sm:max-w-md" showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>Which product are you promoting?</DialogTitle>
@@ -298,6 +298,13 @@ export function OnboardingOverlay() {
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            className="mt-1 w-full rounded-lg py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            onClick={() => setShowProductPicker(false)}
+          >
+            Cancel
+          </button>
         </DialogContent>
       </Dialog>
     );
@@ -1032,7 +1039,8 @@ function PersonaView({
       <PersonaBuilderInline
         onSaved={handleSaved}
         onCancel={onBack}
-        onGenerationStarted={() => {
+        onGenerationStarted={(personaId) => {
+          useGenerationWizardStore.getState().setPersonaId(personaId);
           setCanProceedWhileGenerating(true);
           toast.info("Portraits are generating. You can continue to step 3 now.");
         }}

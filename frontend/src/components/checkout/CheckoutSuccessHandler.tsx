@@ -155,7 +155,7 @@ export function CheckoutSuccessHandler() {
     return () => {
       timers.forEach(clearTimeout);
     };
-  }, [searchParams, router, queryClient, pathname, isOnGeneratePage]);
+  }, [searchParams, router, queryClient, pathname, isOnGeneratePage, approveAndGenerate]);
 
   const handleClose = () => {
     setOpen(false);
