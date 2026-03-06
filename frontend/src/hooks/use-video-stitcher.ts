@@ -56,7 +56,6 @@ function parseDuration(log: string): number {
  */
 const TRANSITION_BUFFER = 0.08; // 80ms breathing room at clip boundaries
 const MIN_TRAILING_SILENCE = 0.15; // Cut trailing silence longer than 150ms
-const FADE_DURATION = 0.25; // 250ms fade-in/fade-out on each segment
 
 function getSpeechBounds(
   log: string,
@@ -177,22 +176,9 @@ export async function stitchToBlob(
       detectSpeechBounds(ffmpeg, "cta.mp4"),
     ]);
 
-    // Build fade filters for each segment: fade-in at start + fade-out at end.
-    // This creates smooth visual/audio transitions at every cut point.
-    function fadeFilters(dur: number) {
-      const fo = Math.max(0, dur - FADE_DURATION).toFixed(3);
-      return {
-        vf: `fade=t=in:st=0:d=${FADE_DURATION},fade=t=out:st=${fo}:d=${FADE_DURATION}`,
-        af: `afade=t=in:st=0:d=${FADE_DURATION},afade=t=out:st=${fo}:d=${FADE_DURATION}`,
-      };
-    }
-    const hf = fadeFilters(hookB.end - hookB.start);
-    const bf = fadeFilters(bodyB.end - bodyB.start);
-    const cf = fadeFilters(ctaB.end - ctaB.start);
-
-    await ffmpeg.exec(["-i", "hook.mp4", "-ss", hookB.start.toFixed(3), "-to", hookB.end.toFixed(3), "-vf", hf.vf, "-af", hf.af, "-c:v", "libx264", "-c:a", "aac", "hook_t.mp4"]);
-    await ffmpeg.exec(["-i", "body.mp4", "-ss", bodyB.start.toFixed(3), "-to", bodyB.end.toFixed(3), "-vf", bf.vf, "-af", bf.af, "-c:v", "libx264", "-c:a", "aac", "body_t.mp4"]);
-    await ffmpeg.exec(["-i", "cta.mp4",  "-ss", ctaB.start.toFixed(3),  "-to", ctaB.end.toFixed(3),  "-vf", cf.vf, "-af", cf.af, "-c:v", "libx264", "-c:a", "aac", "cta_t.mp4"]);
+    await ffmpeg.exec(["-i", "hook.mp4", "-ss", hookB.start.toFixed(3), "-to", hookB.end.toFixed(3), "-c:v", "libx264", "-c:a", "aac", "hook_t.mp4"]);
+    await ffmpeg.exec(["-i", "body.mp4", "-ss", bodyB.start.toFixed(3), "-to", bodyB.end.toFixed(3), "-c:v", "libx264", "-c:a", "aac", "body_t.mp4"]);
+    await ffmpeg.exec(["-i", "cta.mp4",  "-ss", ctaB.start.toFixed(3),  "-to", ctaB.end.toFixed(3),  "-c:v", "libx264", "-c:a", "aac", "cta_t.mp4"]);
 
     const manifest = "file 'hook_t.mp4'\nfile 'body_t.mp4'\nfile 'cta_t.mp4'\n";
     await ffmpeg.writeFile("list.txt", new TextEncoder().encode(manifest));
@@ -296,23 +282,11 @@ export function useVideoStitcher() {
 
         setStatus("trimming");
         setProgress(45);
-        // Trim each clip to its speech boundaries, adding fade-in/fade-out for smooth cuts.
-        function fadeFilters(dur: number) {
-          const fo = Math.max(0, dur - FADE_DURATION).toFixed(3);
-          return {
-            vf: `fade=t=in:st=0:d=${FADE_DURATION},fade=t=out:st=${fo}:d=${FADE_DURATION}`,
-            af: `afade=t=in:st=0:d=${FADE_DURATION},afade=t=out:st=${fo}:d=${FADE_DURATION}`,
-          };
-        }
-        const hf = fadeFilters(hookB.end - hookB.start);
-        const bf = fadeFilters(bodyB.end - bodyB.start);
-        const cf = fadeFilters(ctaB.end - ctaB.start);
-
+        // Trim each clip to its speech boundaries (re-encode for frame-accurate cuts)
         await ffmpeg.exec([
           "-i", "hook.mp4",
           "-ss", hookB.start.toFixed(3),
           "-to", hookB.end.toFixed(3),
-          "-vf", hf.vf, "-af", hf.af,
           "-c:v", "libx264", "-c:a", "aac",
           "hook_t.mp4",
         ]);
@@ -321,7 +295,6 @@ export function useVideoStitcher() {
           "-i", "body.mp4",
           "-ss", bodyB.start.toFixed(3),
           "-to", bodyB.end.toFixed(3),
-          "-vf", bf.vf, "-af", bf.af,
           "-c:v", "libx264", "-c:a", "aac",
           "body_t.mp4",
         ]);
@@ -330,14 +303,12 @@ export function useVideoStitcher() {
           "-i", "cta.mp4",
           "-ss", ctaB.start.toFixed(3),
           "-to", ctaB.end.toFixed(3),
-          "-vf", cf.vf, "-af", cf.af,
           "-c:v", "libx264", "-c:a", "aac",
           "cta_t.mp4",
         ]);
 
         setStatus("concat");
         setProgress(80);
-        // Write concat manifest and join (clips are already encoded with fades)
         const manifest = "file 'hook_t.mp4'\nfile 'body_t.mp4'\nfile 'cta_t.mp4'\n";
         await ffmpeg.writeFile(
           "list.txt",
