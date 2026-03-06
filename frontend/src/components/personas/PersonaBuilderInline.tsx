@@ -889,30 +889,17 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
 
             {/* Quick Create mode */}
             {createMode === 'quick' && (
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="inline-quick-description" className="text-xs">Describe your persona</Label>
-                  <Textarea
-                    id="inline-quick-description"
-                    placeholder="e.g. A 28-year-old Black woman with natural hair, casual sporty style, friendly energy"
-                    value={quickDescription}
-                    onChange={(e) => setQuickDescription(e.target.value)}
-                    rows={3}
-                    className="resize-none text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">The AI will generate images from your description.</p>
-                </div>
-                <Button
-                  onClick={handleQuickCreate}
-                  disabled={!quickDescription.trim() || isGeneratingQuick}
-                  className="w-full gap-2"
-                >
-                  {isGeneratingQuick ? (
-                    <><Loader2 className="size-4 animate-spin" />Generating...</>
-                  ) : (
-                    <>Generate from description</>
-                  )}
-                </Button>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="inline-quick-description" className="text-xs">Describe your persona</Label>
+                <Textarea
+                  id="inline-quick-description"
+                  placeholder="e.g. A 28-year-old Black woman with natural hair, casual sporty style, friendly energy"
+                  value={quickDescription}
+                  onChange={(e) => setQuickDescription(e.target.value)}
+                  rows={3}
+                  className="resize-none text-sm"
+                />
+                <p className="text-xs text-muted-foreground">The AI will generate images from your description.</p>
               </div>
             )}
 
@@ -1184,82 +1171,60 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
               </div>
             )}
 
-            {/* Action buttons */}
-            <div className="mt-4 flex flex-col gap-3">
-              {store.generatedImages.length === 0 ? (
+            {/* Action buttons — only after images have been generated */}
+            {store.generatedImages.length > 0 && (
+              <div className="mt-4 flex flex-col gap-3">
                 <Button
-                  onClick={handleGenerate}
-                  disabled={store.isGenerating}
-                  className="w-full disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
+                  onClick={handleSave}
+                  disabled={store.selectedImageIndex === null || !store.personaId || store.isSaving}
+                  className="w-full"
                   size="lg"
                 >
-                  {store.isGenerating ? (
-                    <>
+                  {store.isSaving ? (
+                    <span className="flex items-center gap-2">
                       <Loader2 className="size-4 animate-spin" />
-                      Generating…
-                    </>
+                      Saving…
+                    </span>
                   ) : (
                     <>
-                      Generate Persona
+                      <Check className="size-4" />
+                      Use This Persona
                     </>
                   )}
                 </Button>
-              ) : (
-                <>
-                  <Button
-                    onClick={handleSave}
-                    disabled={store.selectedImageIndex === null || !store.personaId || store.isSaving}
-                    className="w-full"
-                    size="lg"
-                  >
-                    {store.isSaving ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" />
-                        Saving…
-                      </>
-                    ) : (
-                      <>
-                        <Check className="size-4" />
-                        Use This Persona
-                      </>
+                {profile?.plan === 'free' && regenCount > 0 && (
+                  <p className="text-center text-xs text-muted-foreground">{regenCount} of 4 regenerations used</p>
+                )}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="w-full">
+                        <Button
+                          onClick={handleGenerate}
+                          variant="outline"
+                          disabled={store.isGenerating || store.isSaving || (profile?.plan === 'free' && regenCount >= 4)}
+                          className="w-full"
+                        >
+                          {store.isGenerating ? (
+                            <span className="flex items-center gap-2">
+                              <Loader2 className="size-4 animate-spin" />
+                              Regenerating…
+                            </span>
+                          ) : (
+                            <>Regenerate</>
+                          )}
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {profile?.plan === 'free' && regenCount >= 4 && (
+                      <TooltipContent>
+                        <p>Upgrade to regenerate more images</p>
+                      </TooltipContent>
                     )}
-                  </Button>
-                  {profile?.plan === 'free' && regenCount > 0 && (
-                    <p className="text-center text-xs text-muted-foreground">{regenCount} of 4 regenerations used</p>
-                  )}
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="w-full">
-                          <Button
-                            onClick={handleGenerate}
-                            variant="outline"
-                            disabled={store.isGenerating || store.isSaving || (profile?.plan === 'free' && regenCount >= 4)}
-                            className="w-full"
-                          >
-                            {store.isGenerating ? (
-                              <>
-                                <Loader2 className="size-4 animate-spin" />
-                                Regenerating…
-                              </>
-                            ) : (
-                              <>
-                                Regenerate
-                              </>
-                            )}
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      {profile?.plan === 'free' && regenCount >= 4 && (
-                        <TooltipContent>
-                          <p>Upgrade to regenerate more images</p>
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-                  </TooltipProvider>
-                </>
-              )}
-            </div>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            )}
 
           </div>
         </div>
@@ -1279,12 +1244,12 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
             size="lg"
           >
             {isGeneratingQuick || store.isGenerating ? (
-              <>
+              <span className="flex items-center justify-center gap-2">
                 <Loader2 className="size-4 animate-spin" />
                 Generating…
-              </>
+              </span>
             ) : (
-              <>Generate Persona</>
+              "Generate Persona"
             )}
           </Button>
         ) : (
@@ -1295,10 +1260,10 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
             size="lg"
           >
             {store.isSaving ? (
-              <>
+              <span className="flex items-center justify-center gap-2">
                 <Loader2 className="size-4 animate-spin" />
                 Saving…
-              </>
+              </span>
             ) : (
               <>
                 <Check className="size-4" />
