@@ -39,17 +39,34 @@ export function useBatchStitcher() {
 
       try {
         const files: Record<string, Uint8Array> = {};
+        const failedLabels: string[] = [];
 
         for (let i = 0; i < combos.length; i++) {
           const combo = combos[i];
           setCurrentLabel(combo.label);
           setProgress({ current: i, total: combos.length });
 
-          const blob = await stitchToBlob(combo.hookUrl, combo.bodyUrl, combo.ctaUrl);
-          const buffer = await blob.arrayBuffer();
-          files[`combo_${combo.label}.mp4`] = new Uint8Array(buffer);
+          try {
+            const blob = await stitchToBlob(combo.hookUrl, combo.bodyUrl, combo.ctaUrl);
+            const buffer = await blob.arrayBuffer();
+            files[`combo_${combo.label}.mp4`] = new Uint8Array(buffer);
+          } catch (comboErr) {
+            const msg = comboErr instanceof Error ? comboErr.message : "Unknown error";
+            failedLabels.push(`${combo.label}: ${msg}`);
+          }
 
           setProgress({ current: i + 1, total: combos.length });
+        }
+
+        const successCount = Object.keys(files).length;
+        if (successCount === 0) {
+          throw new Error(`All ${combos.length} combos failed. ${failedLabels[0] ?? ""}`);
+        }
+
+        // Include error report in ZIP if any combos failed
+        if (failedLabels.length > 0) {
+          const report = `Batch Export — ${failedLabels.length} combo(s) failed\n\n${failedLabels.join("\n")}`;
+          files["errors.txt"] = new TextEncoder().encode(report);
         }
 
         setStatus("zipping");
@@ -74,6 +91,9 @@ export function useBatchStitcher() {
         });
 
         setStatus("done");
+        if (failedLabels.length > 0) {
+          setError(`${failedLabels.length} of ${combos.length} combo(s) failed — see errors.txt in ZIP`);
+        }
         setTimeout(() => setStatus("idle"), 4000);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Batch export failed";

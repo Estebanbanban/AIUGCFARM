@@ -38,6 +38,7 @@ Complete epic and story breakdown for AIUGC. Originally decomposed from PRD v2.0
 | 8 | Admin Panel & Operations | P1 | Epic 2 | 4 | ✅ Complete |
 | 9 | Observability & Platform Health | P1 | Epic 2, 8 | 5 | 🟡 Partial (2/5 Done) |
 | 10 | Automatic Video Variations | P2 | Epic 5, 6 | 4 | 🔲 Planned |
+| 11 | Multi-Segment Silence Removal | P1 | Epic 6 | 1 | 🔲 Planned |
 
 **Total: 10 epics, 61 stories**
 
@@ -661,6 +662,48 @@ Rather than every video segment using the same generic "person speaking to camer
 4. Update `generate-video/` to accept user-provided variation selections and skip automatic assignment
 5. Update `generate-segment-script/` to accept a `variation_type` parameter for per-segment regeneration
 6. QA: Advanced Mode — select types, generate, verify prompts and output match selections
+
+---
+
+---
+
+## Epic 11: Multi-Segment Silence Removal
+
+> **Status: Planned — implementation plan at `docs/plans/2026-03-07-multi-segment-silence-removal.md`**
+
+Remove silence gaps anywhere within a generated video clip, not just at the beginning and end. The current stitcher only computes a single `{start, end}` trim window per clip, leaving middle silences (e.g. a 2-second pause between sentences in an 8-second body clip) fully intact in the final output. This epic replaces the single-bounds model with a multi-segment model that identifies every speech region, removes every silence gap longer than 500ms (preserving natural sub-500ms pauses), and reassembles the clip frame-accurately before the inter-clip concat.
+
+**Depends on:** Epic 6 | **Arch:** `frontend/src/hooks/use-video-stitcher.ts` only — no server, no DB, no new files
+
+### Story 11.1: Multi-Segment Silence Removal in Video Stitcher
+**Status:** 🔲 Planned
+
+**As a** user stitching video segments,
+**I want** silence gaps anywhere in a clip to be automatically removed,
+**So that** the final video feels tight and professional even when generated clips have mid-speech pauses.
+
+**Acceptance Criteria:**
+- [ ] `getSpeechSegments(log, duration)` returns an array of speech segments (one entry per speech island between cuttable silences)
+- [ ] Only silences > 500ms are removed; shorter pauses (breath, emphasis) are preserved
+- [ ] 200ms of audio is kept at each edge of every cut for natural transitions
+- [ ] Single-segment clips use a fast path (one trim, no internal concat overhead)
+- [ ] Multi-segment clips are trimmed individually then concated into one clip before the inter-clip concat
+- [ ] All intermediate temp files are tracked and cleaned from the FFmpeg WASM virtual FS
+- [ ] `stitchToBlob` (used by batch stitcher) and `useVideoStitcher` (used by generate page) both use the new logic
+- [ ] Public API of both consumers is unchanged (no call-site changes required)
+- [ ] TypeScript strict-mode build passes with zero errors
+
+**Tasks:**
+1. Add `Segment` type + `MIN_SILENCE_TO_CUT` / `MIN_SEGMENT_DURATION` constants; remove `MIN_TRAILING_SILENCE`
+2. Replace `getSpeechBounds` with `getSpeechSegments` (returns `Segment[]`)
+3. Replace `detectSpeechBounds` with `detectSpeechSegments` (returns `Promise<Segment[]>`)
+4. Add `trimClipToSegments(ffmpeg, inputFile, segments, outputFile)` helper
+5. Update `cleanupFFmpegFiles` to accept `extraFiles` parameter
+6. Update `stitchToBlob` to use new functions + pass `extraTempFiles` to cleanup
+7. Update `useVideoStitcher.stitch()` to use new functions + cleanup on error
+8. Delete dead code (`getSpeechBounds`, `detectSpeechBounds`, `MIN_TRAILING_SILENCE`)
+9. Run `bun run build` — zero TypeScript errors
+10. Manual test: stitch a combo with a known mid-clip silence and verify the gap is removed
 
 ---
 
