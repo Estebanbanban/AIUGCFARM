@@ -15,7 +15,7 @@ export default function DashboardLayout({
 }) {
   useEffect(() => {
     const supabase = createClient();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string) => {
       if (event === "SIGNED_IN") {
         localStorage.removeItem("onboarding-skipped");
         useGenerationWizardStore.getState().reset();
