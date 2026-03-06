@@ -36,7 +36,11 @@ export default function SignupPage() {
     });
 
     if (error) {
-      setError(error.message);
+      if (error.status === 429 || error.message.toLowerCase().includes("rate limit")) {
+        setError("Too many signups right now. Please wait a few minutes and try again, or sign up with Google instead.");
+      } else {
+        setError(error.message);
+      }
       setLoading(false);
       return;
     }
@@ -71,7 +75,14 @@ export default function SignupPage() {
   async function handleResend() {
     setError(null);
     const supabase = createClient();
-    await supabase.auth.resend({ type: "signup", email });
+    const { error } = await supabase.auth.resend({ type: "signup", email });
+    if (error) {
+      if (error.status === 429 || error.message.toLowerCase().includes("rate limit")) {
+        setError("Too many requests. Please wait a few minutes before requesting another code.");
+      } else {
+        setError(error.message);
+      }
+    }
   }
 
   async function handleGoogleSignup() {
