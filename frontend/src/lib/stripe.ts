@@ -31,7 +31,7 @@ export const PLANS = {
     resolution: "720p",
     features: [
       "30 credits/month ($30 value)",
-      "6 Kling 2.6 or 3 Kling 3.0 videos",
+      "2 Triple batches = 54 unique ad combos",
       "1 brand \u00b7 5 products/brand",
       "2 AI personas/month",
       "AI-Written Scripts",
@@ -47,7 +47,7 @@ export const PLANS = {
     resolution: "1080p",
     features: [
       "100 credits/month ($100 value)",
-      "20 Kling 2.6 or 10 Kling 3.0 videos",
+      "6 Triple batches = 162 unique ad combos",
       "3 brands \u00b7 20 products/brand",
       "10 AI personas/month",
       "10% off credit packs",
@@ -65,7 +65,7 @@ export const PLANS = {
     resolution: "1080p",
     features: [
       "250 credits/month ($250 value)",
-      "50 Kling 2.6 or 25 Kling 3.0 videos",
+      "16 Triple batches = 432 unique ad combos",
       "Unlimited brands \u00b7 unlimited products",
       "100 AI personas/month",
       "20% off credit packs",

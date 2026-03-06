@@ -15,8 +15,8 @@ export const metadata: Metadata = {
 
 const comparisonRows = [
   { feature: "Credits/month", starter: "30", growth: "100", scale: "250" },
-  { feature: "Standard videos/mo", starter: "6", growth: "20", scale: "50" },
-  { feature: "HD videos/mo", starter: "3", growth: "10", scale: "25" },
+  { feature: "Ad combos/mo · Standard Triple", starter: "54", growth: "162", scale: "432" },
+  { feature: "Ad combos/mo · HD Triple", starter: "27", growth: "81", scale: "216" },
   { feature: "Brands", starter: "1", growth: "3", scale: "Unlimited" },
   { feature: "Products/brand", starter: "5", growth: "20", scale: "Unlimited" },
   { feature: "AI personas/month", starter: "2", growth: "10", scale: "100" },
