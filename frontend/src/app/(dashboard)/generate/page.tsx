@@ -481,7 +481,7 @@ export default function GeneratePage() {
         if (cancelled) return;
         const restored = pathsToRestore
           .map((path, i) => ({ path, signed_url: signed[i] }))
-          .filter((img) => typeof img.signed_url === "string" && img.signed_url.length > 0) as Array<{
+          .filter((img) => typeof img.signed_url === "string" && img.signed_url.startsWith("https://")) as Array<{
             path: string;
             signed_url: string;
           }>;
