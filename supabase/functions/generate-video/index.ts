@@ -740,7 +740,23 @@ Deno.serve(async (req: Request) => {
       }
 
       // ── Debit credits ───────────────────────────────────────────
-      await debitCredits(userId, effectiveCost, generation_id);
+      // Wrapped in try-catch: if debit fails, revert to "awaiting_approval"
+      // so the user can retry, instead of being stuck in "locking" forever.
+      try {
+        await debitCredits(userId, effectiveCost, generation_id);
+      } catch (debitErr) {
+        captureException(debitErr);
+        await sb
+          .from("generations")
+          .update({ status: "awaiting_approval" })
+          .eq("id", generation_id);
+        return errorResponse(
+          ErrorCodes.INTERNAL_ERROR,
+          "Failed to process credits. Your credits were not charged — please try again.",
+          500,
+          cors,
+        );
+      }
 
       if (isFirstVideo) {
         await sb

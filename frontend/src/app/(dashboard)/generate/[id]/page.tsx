@@ -473,6 +473,7 @@ function VideoSegmentCard({
   }
 
   async function handleDownload() {
+    trackVideoDownloaded("segment");
     try {
       const response = await fetch(video.url);
       const blob = await response.blob();
