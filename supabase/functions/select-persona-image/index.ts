@@ -3,6 +3,27 @@ import { requireUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
 
+// Monthly creation limit: how many new personas a user can create per month.
+const PERSONAS_PER_MONTH_LIMITS: Record<string, number> = {
+  free: 1,
+  starter: 2,
+  growth: 10,
+  scale: 100,
+};
+
+// Image re-selection limit: how many times a user can CHANGE the selected
+// image on an already-created persona (after the first pick).
+//   free    → 0  (pick once, cannot change)
+//   starter → 5  (reasonable flexibility)
+//   growth  → unlimited
+//   scale   → unlimited
+const PERSONA_IMAGE_CHANGE_LIMITS: Record<string, number> = {
+  free: 0,
+  starter: 5,
+  growth: Infinity,
+  scale: Infinity,
+};
+
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -24,10 +45,10 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "image_index must be a non-negative number" }, cors, 400);
     }
 
-    // Fetch persona and verify ownership (also fetch selected_image_url to detect re-selections)
+    // Fetch persona and verify ownership. Include image_selection_count + selected_image_url.
     const { data: persona, error: fetchErr } = await sb
       .from("personas")
-      .select("id, owner_id, generated_images, selected_image_url")
+      .select("id, owner_id, generated_images, selected_image_url, image_selection_count")
       .eq("id", persona_id)
       .single();
 
@@ -38,17 +59,7 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "Persona not found" }, cors, 404);
     }
 
-    // Check monthly persona creation limit
-    const now = new Date();
-    const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-
-    const PERSONAS_PER_MONTH_LIMITS: Record<string, number> = {
-      free: 1,
-      starter: 2,
-      growth: 10,
-      scale: 100,
-    };
-
+    // Fetch plan once — used for both limits below.
     const { data: profileData } = await sb
       .from("profiles")
       .select("plan, role")
@@ -58,26 +69,45 @@ Deno.serve(async (req: Request) => {
     const plan = (profileData?.plan as string) ?? "free";
     const isAdmin = profileData?.role === "admin";
 
-    // Only count against monthly limit when creating a NEW persona selection.
-    // Changing an already-selected image on the same persona does NOT count.
     const isFirstSelection = !persona.selected_image_url;
+    const selectionCount = (persona.image_selection_count as number) ?? 0;
 
-    if (!isAdmin && isFirstSelection) {
-      const monthLimit = PERSONAS_PER_MONTH_LIMITS[plan] ?? 1;
-      const { data: monthRow } = await sb
-        .from("persona_monthly_limits")
-        .select("personas_created")
-        .eq("owner_id", userId)
-        .eq("month_year", monthYear)
-        .maybeSingle();
+    if (!isAdmin) {
+      if (isFirstSelection) {
+        // ── Monthly creation quota ──────────────────────────────────────────
+        const now = new Date();
+        const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        const monthLimit = PERSONAS_PER_MONTH_LIMITS[plan] ?? 1;
 
-      const used = monthRow?.personas_created ?? 0;
-      if (used >= monthLimit) {
-        return json(
-          { detail: `Monthly persona limit reached (${monthLimit}) for your ${plan} plan. Resets next month.` },
-          cors,
-          403,
-        );
+        const { data: monthRow } = await sb
+          .from("persona_monthly_limits")
+          .select("personas_created")
+          .eq("owner_id", userId)
+          .eq("month_year", monthYear)
+          .maybeSingle();
+
+        const used = monthRow?.personas_created ?? 0;
+        if (used >= monthLimit) {
+          return json(
+            { detail: `Monthly persona limit reached (${monthLimit}) for your ${plan} plan. Resets next month.` },
+            cors,
+            403,
+          );
+        }
+      } else {
+        // ── Per-persona image change limit ──────────────────────────────────
+        const changeLimit = PERSONA_IMAGE_CHANGE_LIMITS[plan] ?? 0;
+        if (changeLimit !== Infinity && selectionCount >= changeLimit) {
+          return json(
+            {
+              detail: changeLimit === 0
+                ? `Free plan personas cannot have their image changed after the initial selection. Upgrade to change persona images.`
+                : `Image change limit reached (${changeLimit}) for this persona on your ${plan} plan.`,
+            },
+            cors,
+            403,
+          );
+        }
       }
     }
 
@@ -90,27 +120,32 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // generated_images stores storage paths  -  select the path
     const selectedPath = images[image_index];
 
-    // Store the storage PATH as selected_image_url (not a signed URL)
+    // Update selected image + increment selection counter atomically.
     const { error: updateErr } = await sb
       .from("personas")
-      .update({ selected_image_url: selectedPath })
+      .update({
+        selected_image_url: selectedPath,
+        image_selection_count: selectionCount + 1,
+      })
       .eq("id", persona_id)
       .eq("owner_id", userId);
 
     if (updateErr) throw new Error(`Update failed: ${updateErr.message}`);
 
-    // Increment monthly persona usage only for first-time selections
+    // Increment monthly persona creation counter (first selection only).
     if (!isAdmin && isFirstSelection) {
+      const now = new Date();
+      const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
       const { error: insertErr } = await sb
         .from("persona_monthly_limits")
         .insert({ owner_id: userId, month_year: monthYear, personas_created: 1 })
         .select();
 
       if (insertErr && insertErr.code === "23505") {
-        // Unique constraint violation — row exists, increment it
+        // Row exists — increment it.
         const { data: cur } = await sb
           .from("persona_monthly_limits")
           .select("id, personas_created")
@@ -126,10 +161,10 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Generate a fresh signed URL for the frontend to display immediately
+    // Return a fresh signed URL for immediate display.
     const { data: signedData } = await sb.storage
       .from("persona-images")
-      .createSignedUrl(selectedPath, 3600); // 1 hour
+      .createSignedUrl(selectedPath, 3600);
 
     return json(
       {
