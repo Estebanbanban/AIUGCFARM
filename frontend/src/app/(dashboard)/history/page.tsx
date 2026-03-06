@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import {
   Clock,
   Video,
@@ -116,6 +118,40 @@ function toStatusFilter(status: GenerationStatus): Exclude<HistoryStatusFilter, 
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Error message sanitizer                                                   */
+/* -------------------------------------------------------------------------- */
+
+function sanitizeErrorMessage(raw: string | null | undefined): string {
+  if (!raw) return "Generation failed. Please try again.";
+
+  // TDZ / JavaScript initialization errors
+  if (raw.includes("before initialization") || raw.includes("TDZ")) {
+    return "Video generation failed due to a processing error. Please try again.";
+  }
+  // All jobs failed / AI service overloaded
+  if (raw.includes("All video job submissions failed") || raw.includes("temporarily overloaded")) {
+    return "AI video service is temporarily busy. Please try again in a moment.";
+  }
+  // Insufficient credits — already user-friendly, keep as-is
+  if (raw.includes("Insufficient credits") || raw.includes("credits")) {
+    return raw;
+  }
+  // Script/composite image errors
+  if (raw.includes("composite image") || raw.includes("signed URL")) {
+    return "Failed to prepare the scene image. Please try again.";
+  }
+  // Strip bare "Error:" prefix
+  if (raw.startsWith("Error: ")) {
+    return raw.slice(7);
+  }
+  // Anything too long or too technical
+  if (raw.length > 120) {
+    return "Video generation failed. Our team has been notified. Please try again.";
+  }
+  return raw;
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Main page                                                                 */
 /* -------------------------------------------------------------------------- */
 
@@ -123,6 +159,18 @@ export default function HistoryPage() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>("all");
   const { data, isLoading, error } = useGenerationHistory(page);
+  const router = useRouter();
+  const wizard = useGenerationWizardStore();
+
+  function handleTryAgain(gen: { product_id: string; persona_id: string; mode: string; video_quality?: string | null }) {
+    wizard.reset();
+    if (gen.product_id) wizard.setProductId(gen.product_id);
+    if (gen.persona_id) wizard.setPersonaId(gen.persona_id);
+    if (gen.mode) wizard.setMode(gen.mode as "single" | "triple");
+    if (gen.video_quality) wizard.setQuality(gen.video_quality as "standard" | "hd");
+    wizard.setStep(2);
+    router.push("/generate");
+  }
 
   const generations = data?.generations ?? [];
   const pagination = data?.pagination;
@@ -369,16 +417,17 @@ export default function HistoryPage() {
                         <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-red-400" />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-xs text-red-400">
-                            {gen.error_message ?? "Generation failed"}
+                            {sanitizeErrorMessage(gen.error_message)}
                           </p>
-                          <Link
-                            href="/generate"
-                            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 px-2 py-1 rounded transition-colors"
-                            onClick={(e) => e.stopPropagation()}
+                          <p className="text-xs text-muted-foreground mt-1">Credits returned to your account.</p>
+                          <button
+                            type="button"
+                            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary border border-primary/40 bg-primary/10 hover:bg-primary/20 px-2 py-1 rounded transition-colors"
+                            onClick={(e) => { e.stopPropagation(); handleTryAgain(gen); }}
                           >
                             <RefreshCw className="size-3" />
-                            Try again
-                          </Link>
+                            Try Again
+                          </button>
                         </div>
                       </div>
                     )}
