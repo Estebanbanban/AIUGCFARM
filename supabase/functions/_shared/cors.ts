@@ -16,7 +16,7 @@ export function getCorsHeaders(req: Request): HeadersInit {
 
   // If ALLOWED_ORIGIN is set, only allow those origins.
   // If unset, allow localhost for development but block arbitrary origins in production.
-  let allowOrigin = "*";
+  let allowOrigin = ""; // deny by default when no explicit list is configured
   if (allowedOrigins.size > 0) {
     if (requestOrigin && allowedOrigins.has(requestOrigin)) {
       allowOrigin = requestOrigin;
@@ -38,6 +38,6 @@ export function getCorsHeaders(req: Request): HeadersInit {
     "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin",
-    ...(allowOrigin === "*" ? {} : { "Access-Control-Allow-Credentials": "true" }),
+    ...(allowOrigin && allowOrigin !== "*" ? { "Access-Control-Allow-Credentials": "true" } : {}),
   };
 }

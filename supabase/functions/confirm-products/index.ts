@@ -27,6 +27,9 @@ Deno.serve(async (req: Request) => {
     if (!Array.isArray(product_ids) || product_ids.length === 0) {
       return json({ detail: "product_ids must be a non-empty array" }, cors, 400);
     }
+    if (product_ids.length > 100) {
+      return json({ detail: "product_ids must contain 100 items or fewer per request" }, cors, 400);
+    }
 
     const sb = getAdminClient();
 

@@ -113,6 +113,20 @@ Deno.serve(async (req: Request) => {
     if (!segment_type || !["hook", "body", "cta"].includes(segment_type)) {
       return errorResponse(ErrorCodes.INVALID_INPUT, "segment_type must be 'hook', 'body', or 'cta'", 400, cors);
     }
+    if (cta_comment_keyword !== undefined && cta_comment_keyword !== null) {
+      if (
+        typeof cta_comment_keyword !== "string" ||
+        cta_comment_keyword.length > 50 ||
+        !/^[\w\s#@\-]+$/u.test(cta_comment_keyword)
+      ) {
+        return errorResponse(
+          ErrorCodes.INVALID_INPUT,
+          "cta_comment_keyword must be 50 characters or fewer and contain only letters, numbers, spaces, hyphens, # or @",
+          400,
+          cors,
+        );
+      }
+    }
 
     // Verify product ownership
     const { data: product, error: prodErr } = await sb

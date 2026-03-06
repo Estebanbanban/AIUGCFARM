@@ -50,6 +50,9 @@ Deno.serve(async (req: Request) => {
 
     if (!product_id) return json({ detail: "product_id is required" }, cors, 400);
     if (!persona_id) return json({ detail: "persona_id is required" }, cors, 400);
+    if (Array.isArray(selected_images) && selected_images.length > 20) {
+      return json({ detail: "selected_images must contain 20 items or fewer" }, cors, 400);
+    }
     if (format !== "9:16" && format !== "16:9") {
       return json({ detail: "format must be '9:16' or '16:9'" }, cors, 400);
     }

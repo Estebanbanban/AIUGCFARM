@@ -862,7 +862,8 @@ Deno.serve(async (req: Request) => {
     if (!composite_image_path) return errorResponse(ErrorCodes.INVALID_INPUT, "composite_image_path is required", 400, cors);
     if (
       typeof composite_image_path !== "string" ||
-      !composite_image_path.startsWith(`${userId}/`)
+      composite_image_path.includes("..") ||
+      composite_image_path.split("/")[0] !== userId
     ) {
       return errorResponse(ErrorCodes.UNAUTHORIZED, "Access denied for this composite image", 403, cors);
     }
@@ -935,7 +936,7 @@ Deno.serve(async (req: Request) => {
     if (advanced_segments) {
       for (const segType of ["hooks", "bodies", "ctas"] as const) {
         for (const seg of advanced_segments[segType]) {
-          if (seg.image_path && !seg.image_path.startsWith(`${userId}/`)) {
+          if (seg.image_path && (seg.image_path.includes("..") || seg.image_path.split("/")[0] !== userId)) {
             return errorResponse(ErrorCodes.UNAUTHORIZED, "Access denied for segment image path", 403, cors);
           }
         }
@@ -957,6 +958,22 @@ Deno.serve(async (req: Request) => {
     // PHASE "script" — Generate script only, no credit debit
     // ══════════════════════════════════════════════════════════════════
     if (phase === "script") {
+      // ── Rate limit: max 30 script generations per hour ────────────
+      const oneHourAgo = new Date(Date.now() - 3_600_000).toISOString();
+      const { count: recentScripts } = await sb
+        .from("generations")
+        .select("id", { count: "exact", head: true })
+        .eq("owner_id", userId)
+        .gte("started_at", oneHourAgo);
+      if ((recentScripts ?? 0) >= 30) {
+        return errorResponse(
+          ErrorCodes.INVALID_INPUT,
+          "Rate limit: maximum 30 script generations per hour. Please wait before generating more.",
+          429,
+          cors,
+        );
+      }
+
       // ── Create generation record with awaiting_approval status ───
       const { data: generation, error: genErr } = await sb
         .from("generations")

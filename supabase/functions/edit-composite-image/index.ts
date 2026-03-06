@@ -68,7 +68,11 @@ Deno.serve(async (req: Request) => {
     }
 
     // Only allow editing composite images owned by this user.
-    if (!composite_image_path.startsWith(`${userId}/`)) {
+    // Check first path component exactly (prevents ../traversal attacks).
+    if (
+      composite_image_path.includes("..") ||
+      composite_image_path.split("/")[0] !== userId
+    ) {
       return json({ detail: "Access denied for this composite image" }, cors, 403);
     }
 
