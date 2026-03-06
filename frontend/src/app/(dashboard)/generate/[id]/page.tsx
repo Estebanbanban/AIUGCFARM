@@ -2091,7 +2091,7 @@ export default function GenerationDetailPage() {
                 hookScript={script?.hooks?.[selectedHook]}
                 bodyScript={script?.bodies?.[selectedBody]}
                 ctaScript={script?.ctas?.[selectedCta]}
-                autoStitch
+                autoStitch={gen?.mode === "single"}
               />
             </CardContent>
           </Card>
