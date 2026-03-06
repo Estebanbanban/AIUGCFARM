@@ -7,6 +7,7 @@ import {
   Check,
   ImageIcon,
   Loader2,
+  Maximize2,
   Monitor,
   Package,
   RefreshCw,
@@ -387,6 +388,7 @@ export default function GeneratePage() {
   const [previewRestoreReady, setPreviewRestoreReady] = useState(false);
   const [showPreviewEditor, setShowPreviewEditor] = useState(false);
   const [previewEditPrompt, setPreviewEditPrompt] = useState("");
+  const [zoomedCompositeUrl, setZoomedCompositeUrl] = useState<string | null>(null);
   const [ctaOpen, setCtaOpen] = useState(false);
 
   const [showMoreCta, setShowMoreCta] = useState(false);
@@ -1962,40 +1964,53 @@ export default function GeneratePage() {
                       {!generateComposites.isPending && compositeImages.length > 0 && (
                         <div className={cn("grid gap-2", store.format === "9:16" ? "grid-cols-2" : "grid-cols-1")}>
                           {compositeImages.map((img, i) => (
-                            <button
-                              key={i}
-                              onClick={() => {
-                                if (i !== selectedCompositeIdx && store.pendingScript) setScriptConfigChanged(true);
-                                handleSelectComposite(i);
-                              }}
-                              className="group relative overflow-hidden rounded-lg focus:outline-none"
-                            >
-                              <div
-                                className={cn(
-                                  "relative overflow-hidden rounded-lg border-2 transition-all",
-                                  store.format === "9:16" ? "aspect-[9/16]" : "aspect-video",
-                                  selectedCompositeIdx === i
-                                    ? "border-primary ring-2 ring-primary/30"
-                                    : "border-transparent group-hover:border-muted-foreground/40",
-                                )}
+                            <div key={i} className="group relative">
+                              <button
+                                onClick={() => {
+                                  if (i !== selectedCompositeIdx && store.pendingScript) setScriptConfigChanged(true);
+                                  handleSelectComposite(i);
+                                }}
+                                className="relative w-full overflow-hidden rounded-lg focus:outline-none"
                               >
-                                <img
-                                  src={img.signed_url}
-                                  alt={`Preview ${i + 1}`}
-                                  className="size-full object-cover"
-                                  loading="lazy"
-                                  decoding="async"
-                                />
-                                {selectedCompositeIdx === i && (
-                                  <div className="absolute inset-0 flex items-end justify-center bg-primary/10 pb-2">
-                                    <div className="flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
-                                      <Check className="size-2.5" />
-                                      Selected
+                                <div
+                                  className={cn(
+                                    "relative overflow-hidden rounded-lg border-2 transition-all",
+                                    store.format === "9:16" ? "aspect-[9/16]" : "aspect-video",
+                                    selectedCompositeIdx === i
+                                      ? "border-primary ring-2 ring-primary/30"
+                                      : "border-transparent group-hover:border-muted-foreground/40",
+                                  )}
+                                >
+                                  <img
+                                    src={img.signed_url}
+                                    alt={`Preview ${i + 1}`}
+                                    className="size-full object-cover"
+                                    loading="lazy"
+                                    decoding="async"
+                                  />
+                                  {selectedCompositeIdx === i && (
+                                    <div className="absolute inset-0 flex items-end justify-center bg-primary/10 pb-2">
+                                      <div className="flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
+                                        <Check className="size-2.5" />
+                                        Selected
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
-                              </div>
-                            </button>
+                                  )}
+                                </div>
+                              </button>
+                              {/* Zoom / fullscreen button */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setZoomedCompositeUrl(img.signed_url);
+                                }}
+                                className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-black/50 text-white opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+                                aria-label="View full size"
+                              >
+                                <Maximize2 className="size-3" />
+                              </button>
+                            </div>
                           ))}
                         </div>
                       )}
@@ -2906,6 +2921,25 @@ export default function GeneratePage() {
               )}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Composite image zoom dialog ───────────────────────────────── */}
+      <Dialog open={zoomedCompositeUrl !== null} onOpenChange={(open) => { if (!open) setZoomedCompositeUrl(null); }}>
+        <DialogContent className="flex flex-col items-center gap-4 sm:max-w-2xl p-4">
+          <DialogHeader className="w-full">
+            <DialogTitle className="text-sm font-medium">Scene Preview</DialogTitle>
+          </DialogHeader>
+          {zoomedCompositeUrl && (
+            <img
+              src={zoomedCompositeUrl}
+              alt="Scene preview full size"
+              className={cn(
+                "w-full rounded-lg object-contain",
+                store.format === "9:16" ? "max-h-[75vh]" : "max-h-[60vh]",
+              )}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
