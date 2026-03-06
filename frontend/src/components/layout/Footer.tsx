@@ -12,6 +12,8 @@ const links = {
     { label: "About", href: "/about" },
     { label: "Blog", href: "/blog" },
     { label: "Contact", href: "/contact" },
+    { label: "Bug Report", href: "/bug-report" },
+    { label: "Feature Ideas", href: "/feature-ideas" },
   ],
   Legal: [
     { label: "Terms", href: "/terms" },
