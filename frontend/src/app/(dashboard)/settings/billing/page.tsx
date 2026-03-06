@@ -73,9 +73,13 @@ export default function BillingPage() {
   const offer = useFirstPurchaseOffer();
 
   function handleSwitchPlan(planKey: PlanTier) {
-    checkout.mutate({ plan: planKey }, {
-      onSuccess: (url) => { window.location.href = url; },
-      onError:   (err) => toast.error(err.message || "Failed to start checkout"),
+    const couponId = offer.getSubscriptionCoupon(planKey);
+    checkout.mutate({ plan: planKey, couponId }, {
+      onSuccess: (url) => {
+        if (couponId) offer.markUsed();
+        window.location.href = url;
+      },
+      onError: (err) => toast.error(err.message || "Failed to start checkout"),
     });
   }
 
@@ -230,10 +234,15 @@ export default function BillingPage() {
           {(Object.entries(PLANS) as [PlanTier, typeof PLANS[PlanTier]][]).map(([key, p]) => {
             const isCurrent = plan === key;
             const ui = PLAN_HIGHLIGHTS[key];
+            const isStarter = key === "starter";
             const videosStandard = Math.floor(p.credits / 5);
             const videosHd = Math.floor(p.credits / 10);
             const tripleStandard = Math.floor(p.credits / 15);
             const combosTriple = tripleStandard * 27;
+            const displayPrice = offer.isActive
+              ? (isStarter ? offer.discountedStarterPrice(p.price) : offer.discountedPrice(p.price))
+              : p.price;
+            const discountLabel = isStarter ? "-50%" : "-30%";
 
             return (
               <div
@@ -267,14 +276,14 @@ export default function BillingPage() {
                 {/* Price */}
                 <div className="mb-1 flex items-baseline gap-1">
                   <span className="text-4xl font-bold text-foreground">
-                    ${offer.isActive ? offer.discountedPrice(p.price) : p.price}
+                    ${displayPrice}
                   </span>
                   <span className="text-muted-foreground">/mo</span>
                 </div>
                 {offer.isActive && (
                   <div className="mb-1 flex items-center gap-2 text-sm">
                     <span className="line-through text-muted-foreground">${p.price}/mo</span>
-                    <span className="text-primary bg-primary/10 px-2 py-0.5 rounded-md text-xs font-bold">-30%</span>
+                    <span className="text-primary bg-primary/10 px-2 py-0.5 rounded-md text-xs font-bold">{discountLabel}</span>
                   </div>
                 )}
                 <p className="mb-5 text-xs text-primary">
@@ -372,15 +381,9 @@ export default function BillingPage() {
 
                 <div className="mb-1 flex items-baseline gap-1">
                   <span className="text-3xl font-bold text-foreground">
-                    ${offer.isActive ? offer.discountedPrice(pack.price) : pack.price}
+                    ${pack.price}
                   </span>
                 </div>
-                {offer.isActive && (
-                  <div className="mb-1 flex items-center gap-2 text-sm">
-                    <span className="line-through text-muted-foreground">${pack.price}</span>
-                    <span className="text-primary bg-primary/10 px-2 py-0.5 rounded-md text-xs font-bold">-30%</span>
-                  </div>
-                )}
                 <p className="mb-4 text-xs text-primary">${pack.pricePerCredit}/credit</p>
 
                 <ul className="mb-5 flex flex-1 flex-col gap-2 text-sm text-muted-foreground">

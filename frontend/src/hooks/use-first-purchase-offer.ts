@@ -5,10 +5,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
 // Stripe coupon IDs (server-side validated - safe to reference client-side)
 // Stripe coupon ID for the new-user 30% discount offer.
 // To rotate: create a new coupon in Stripe Dashboard → copy the coupon ID → update this value.
-// Current coupon: 30% off, applies to first subscription purchase only.
-export const COUPON_30_OFF = "t9QmsQTe"; // 30% off any plan, once - NewUsers
-// Stripe coupon ID for 50% off first single-video purchase. Coupon ID: VIDEO50
-export const COUPON_50_OFF_FIRST_VIDEO = "VIDEO50";
+// Current coupon: 30% off, applies to Growth/Scale subscription first purchase.
+export const COUPON_30_OFF = "t9QmsQTe"; // 30% off Growth/Scale plans - NewUsers
+// Stripe coupon ID for 50% off Starter subscription during the promo window.
+// TODO: Replace "TODO_STARTER_COUPON_ID" with your actual Stripe coupon ID for Starter -50%.
+export const COUPON_50_OFF_STARTER = "TODO_STARTER_COUPON_ID"; // 50% off Starter plan
+// Stripe coupon ID for 50% off single-video purchase. Coupon ID: VIDEO50
+export const COUPON_50_OFF_FIRST_VIDEO = "VIDEO50"; // 50% off any single video during promo
 
 const OFFER_KEY_STARTED = "cr_offer_started_at";
 const OFFER_KEY_USED = "cr_offer_used";
@@ -21,10 +24,14 @@ export interface FirstPurchaseOffer {
   secondsLeft: number;
   /** Minutes:seconds formatted string e.g. "23:41" */
   timeDisplay: string;
-  /** Discounted price given a full price (30% off) */
+  /** Discounted price for Growth/Scale plans (30% off) */
   discountedPrice: (original: number) => number;
-  /** Discounted price for first video (50% off) */
+  /** Discounted price for Starter plan (50% off) */
+  discountedStarterPrice: (original: number) => number;
+  /** Discounted price for single videos (50% off) */
   discountedVideoPrice: (original: number) => number;
+  /** Returns the coupon ID to use for a subscription plan, or undefined if offer is not active */
+  getSubscriptionCoupon: (plan: string) => string | undefined;
   /** Start the timer (idempotent - only sets once) */
   startOffer: () => void;
   /** Mark offer as permanently used */
@@ -100,10 +107,23 @@ export function useFirstPurchaseOffer(): FirstPurchaseOffer {
     [],
   );
 
+  const discountedStarterPrice = useCallback(
+    (original: number) => Math.floor(original * 0.5),
+    [],
+  );
+
   const discountedVideoPrice = useCallback(
     (original: number) => Math.floor(original * 0.5),
     [],
   );
 
-  return { isActive, secondsLeft, timeDisplay, discountedPrice, discountedVideoPrice, startOffer, markUsed };
+  const getSubscriptionCoupon = useCallback(
+    (plan: string): string | undefined => {
+      if (!isActive) return undefined;
+      return plan === "starter" ? COUPON_50_OFF_STARTER : COUPON_30_OFF;
+    },
+    [isActive],
+  );
+
+  return { isActive, secondsLeft, timeDisplay, discountedPrice, discountedStarterPrice, discountedVideoPrice, getSubscriptionCoupon, startOffer, markUsed };
 }

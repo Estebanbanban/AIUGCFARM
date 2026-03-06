@@ -29,7 +29,7 @@ import {
   Settings2,
   FlaskConical,
 } from "lucide-react";
-import { useFirstPurchaseOffer, COUPON_30_OFF, COUPON_50_OFF_FIRST_VIDEO } from "@/hooks/use-first-purchase-offer";
+import { useFirstPurchaseOffer, COUPON_50_OFF_FIRST_VIDEO } from "@/hooks/use-first-purchase-offer";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -1138,7 +1138,7 @@ export default function GeneratePage() {
   }
 
   async function handleCheckout(plan: PlanTier) {
-    const couponId = COUPON_30_OFF;
+    const couponId = offer.getSubscriptionCoupon(plan);
     checkout.mutate({ plan, couponId }, {
       onSuccess: (url) => {
         trackCheckoutStarted(plan);
@@ -1151,9 +1151,8 @@ export default function GeneratePage() {
 
   async function handleBuyPack(pack: CreditPackKey | SingleVideoPackKey) {
     const isSingleVideo = pack === "single_standard" || pack === "single_hd";
-    const couponId = isSingleVideo
-      ? (isFirstVideo ? COUPON_50_OFF_FIRST_VIDEO : undefined)
-      : COUPON_30_OFF;
+    // Single videos: -50% during promo window. Credit packs: never discounted.
+    const couponId = isSingleVideo && offer.isActive ? COUPON_50_OFF_FIRST_VIDEO : undefined;
     buyCredits.mutate({ pack, couponId, generation_id: store.pendingGenerationId ?? undefined }, {
       onSuccess: (url) => {
         if (pack in { pack_10: 1, pack_30: 1, pack_100: 1 }) {
@@ -2709,7 +2708,7 @@ export default function GeneratePage() {
                       ? "bg-primary/10 text-primary"
                       : "bg-muted-foreground/20 text-muted-foreground",
                   )}>
-                    -30%
+                    {offer.isActive ? "up to -50%" : "-30%"}
                   </span>
                 </button>
               </div>
@@ -2797,7 +2796,11 @@ export default function GeneratePage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5 lg:gap-6">
                     {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
                       const isGrowth = key === "growth";
-                      const discountedMonthly = offer.discountedPrice(plan.price);
+                      const isStarter = key === "starter";
+                      const discountedMonthly = offer.isActive
+                        ? (isStarter ? offer.discountedStarterPrice(plan.price) : offer.discountedPrice(plan.price))
+                        : plan.price;
+                      const discountLabel = isStarter ? "-50%" : "-30%";
                       return (
                         <div
                           key={key}
@@ -2824,7 +2827,7 @@ export default function GeneratePage() {
                             </div>
                             <div className="flex items-center gap-2 text-sm font-medium">
                               <span className="line-through text-muted-foreground">${plan.price}/mo</span>
-                              <span className="text-primary bg-primary/10 px-2 py-0.5 rounded-md text-xs font-bold">-30%</span>
+                              <span className="text-primary bg-primary/10 px-2 py-0.5 rounded-md text-xs font-bold">{discountLabel}</span>
                             </div>
                             <div className="mt-3 inline-flex bg-muted border border-border text-muted-foreground text-xs font-bold px-3 py-1.5 rounded-lg">
                               ≈ ${(plan.price / (plan.credits / CREDITS_PER_SINGLE)).toFixed(2)}/video
@@ -2857,7 +2860,6 @@ export default function GeneratePage() {
                     </p>
                     <div className="flex flex-wrap justify-center gap-3">
                       {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => {
-                        const discountedPackPrice = isFirstVideo ? offer.discountedVideoPrice(pack.price) : offer.discountedPrice(pack.price);
                         return (
                           <button
                             key={key}
@@ -2868,11 +2870,7 @@ export default function GeneratePage() {
                           >
                             <span className="font-bold text-foreground">{pack.credits} credits</span>
                             {" "}
-                            <span className="text-muted-foreground">
-                              -{" "}
-                              <span className="line-through">${pack.price}</span>{" "}
-                              <span className="text-primary font-semibold">${discountedPackPrice}</span>
-                            </span>
+                            <span className="text-muted-foreground text-primary font-semibold">${pack.price}</span>
                           </button>
                         );
                       })}
@@ -2913,7 +2911,7 @@ export default function GeneratePage() {
             <div className="bg-primary text-primary-foreground px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm font-medium shrink-0">
               <div className="flex items-center gap-2">
                 <Flame className="size-4" />
-                <span>Limited-time offer - 30% off your first plan</span>
+                <span>Limited-time offer — 50% off Starter · 30% off Growth &amp; Scale</span>
               </div>
               <div className="flex items-center gap-2 bg-black/15 px-2.5 py-0.5 rounded font-mono">
                 <Clock className="size-3 opacity-80" />
@@ -2928,7 +2926,7 @@ export default function GeneratePage() {
                 <User className="size-7 text-primary" />
               </div>
               <h2 className="text-2xl font-bold tracking-tight">
-                {offer.isActive ? "Unlock More Personas - 30% Off" : "Unlock More Personas"}
+                {offer.isActive ? "Unlock More Personas — Up to 50% Off" : "Unlock More Personas"}
               </h2>
               <p className="mt-2 text-muted-foreground max-w-md mx-auto">
                 {(() => {
@@ -2948,7 +2946,10 @@ export default function GeneratePage() {
                 <div className="grid gap-4 sm:grid-cols-3 max-w-3xl mx-auto">
                   {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
                     const isGrowth = key === "growth";
-                    const discountedMonthly = offer.discountedPrice(plan.price);
+                    const isStarter = key === "starter";
+                    const discountedMonthly = offer.isActive
+                      ? (isStarter ? offer.discountedStarterPrice(plan.price) : offer.discountedPrice(plan.price))
+                      : plan.price;
                     const isCurrentPlan = currentPlan === key;
                     const isDowngrade = plan.personas <= currentLimit && !isCurrentPlan;
                     const isDisabled = checkout.isPending || isCurrentPlan || isDowngrade;
@@ -2970,7 +2971,7 @@ export default function GeneratePage() {
                           <p className="font-semibold text-base">{plan.name}</p>
                           <div className="mt-1 flex items-baseline gap-1">
                             <span className="text-2xl font-bold">${discountedMonthly}</span>
-                            <span className="text-sm text-muted-foreground line-through">${plan.price}</span>
+                            {offer.isActive && <span className="text-sm text-muted-foreground line-through">${plan.price}</span>}
                             <span className="text-xs text-muted-foreground">/mo</span>
                           </div>
                           <p className="mt-1 text-xs text-orange-500 font-medium">
