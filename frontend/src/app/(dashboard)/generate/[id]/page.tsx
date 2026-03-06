@@ -44,6 +44,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { useGenerationStatus, useRegenerateSegment } from "@/hooks/use-generations";
+import { useProfile } from "@/hooks/use-profile";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { GenerationStatus, ScriptSegment, SegmentVideo } from "@/types/database";
 import { trackVideoCompleted, trackVideoFailed, trackVideoDownloaded } from "@/lib/datafast";
 import { useVideoStitcher, STITCH_STATUS_LABELS } from "@/hooks/use-video-stitcher";
@@ -438,6 +440,7 @@ function VideoSegmentCard({
   onRegenerate,
   isRegenerating,
   multiSelect = false,
+  userPlan = "free",
 }: {
   video: SegmentVideo;
   label: string;
@@ -446,6 +449,7 @@ function VideoSegmentCard({
   onRegenerate: () => void;
   isRegenerating: boolean;
   multiSelect?: boolean;
+  userPlan?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -559,23 +563,31 @@ function VideoSegmentCard({
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8 shrink-0"
-            title="Regenerate this segment (1 credit)"
-            disabled={isRegenerating}
-            onClick={(e) => {
-              e.stopPropagation();
-              onRegenerate();
-            }}
-          >
-            {isRegenerating ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <RotateCcw className="size-4" />
-            )}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 shrink-0"
+                  disabled={isRegenerating || userPlan === "free"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRegenerate();
+                  }}
+                >
+                  {isRegenerating ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <RotateCcw className="size-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{userPlan === "free" ? "Upgrade to a paid plan to regenerate" : "Regenerate this segment (1 credit)"}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Button
             variant="ghost"
             size="icon"
@@ -1100,6 +1112,8 @@ export default function GenerationDetailPage() {
     refetch,
   } = useGenerationStatus(generationId, isStale);
   const regenerateSegment = useRegenerateSegment();
+  const { data: profile } = useProfile();
+  const userPlan = profile?.plan ?? "free";
 
   // Script collapsible state
   const [scriptExpanded, setScriptExpanded] = useState(true);
@@ -1736,6 +1750,7 @@ export default function GenerationDetailPage() {
                   onRegenerate={() => handleRegenerateSegment("hook", i + 1)}
                   isRegenerating={regeneratingKey === `hook_${i + 1}`}
                   multiSelect={batchMode}
+                  userPlan={userPlan}
                 />
               ))}
               {(!segments.hooks || segments.hooks.length === 0) && (
@@ -1764,6 +1779,7 @@ export default function GenerationDetailPage() {
                   onRegenerate={() => handleRegenerateSegment("body", i + 1)}
                   isRegenerating={regeneratingKey === `body_${i + 1}`}
                   multiSelect={batchMode}
+                  userPlan={userPlan}
                 />
               ))}
               {(!segments.bodies || segments.bodies.length === 0) && (
@@ -1792,6 +1808,7 @@ export default function GenerationDetailPage() {
                   onRegenerate={() => handleRegenerateSegment("cta", i + 1)}
                   isRegenerating={regeneratingKey === `cta_${i + 1}`}
                   multiSelect={batchMode}
+                  userPlan={userPlan}
                 />
               ))}
               {(!segments.ctas || segments.ctas.length === 0) && (

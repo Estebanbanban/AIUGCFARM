@@ -1090,33 +1090,16 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
               />
             )}
 
-            {/* Generating skeleton (Visual Builder - custom mode) */}
+            {/* Generating loader (Custom mode) */}
             {store.isGenerating && !isGeneratingQuick && store.generatedImages.length === 0 && (
-              <div className="rounded-xl border border-border bg-card p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-sm font-medium text-foreground">
-                    {GENERATING_MESSAGES[generatingMessage]}
-                  </p>
-                  <span className="text-xs text-muted-foreground">{generatingElapsed}s</span>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="relative flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl border-2 border-transparent bg-muted animate-pulse">
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
-                      <User className="size-8" />
-                      <span className="text-xs">Portrait 1</span>
-                    </div>
-                  </div>
-                  <div className="relative flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl border-2 border-transparent bg-muted animate-pulse">
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
-                      <User className="size-8" />
-                      <span className="text-xs">Portrait 2</span>
-                    </div>
-                  </div>
-                </div>
-                <p className="mt-3 text-center text-xs text-muted-foreground">
-                  Expected time: ~35-45 seconds per portrait
-                </p>
-              </div>
+              <NanoBananaLoader
+                title="Creating Your Persona"
+                subtitle="Generating unique portraits - usually 60-90 seconds"
+                steps={PERSONA_STEPS}
+                currentStep={loaderStep}
+                progress={loaderProgress}
+                className="min-h-[400px]"
+              />
             )}
 
             {/* Attribute summary (before generating) */}
