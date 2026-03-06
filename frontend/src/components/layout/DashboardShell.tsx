@@ -136,7 +136,7 @@ function SidebarContent({
           <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
           <button
             onClick={handleSignOut}
-            className="text-muted-foreground transition-colors hover:text-foreground"
+            className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
             aria-label="Sign out"
           >
             <LogOut className="size-4" />
