@@ -247,6 +247,24 @@ export function useGenerateSegmentComposite() {
   });
 }
 
+/** Fetch the number of segment regenerations used this calendar month. */
+export function useRegenLimit() {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["regen-limit"],
+    queryFn: async () => {
+      const month = new Date().toISOString().slice(0, 7);
+      const { data } = await supabase
+        .from("regeneration_limits")
+        .select("regens_used")
+        .eq("month_year", month)
+        .maybeSingle();
+      return data?.regens_used ?? 0;
+    },
+    staleTime: 30_000,
+  });
+}
+
 /** Fetch paginated generation history from the Edge Function. */
 export function useGenerationHistory(page = 1) {
   return useQuery({

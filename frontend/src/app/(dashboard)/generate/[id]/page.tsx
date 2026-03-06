@@ -43,7 +43,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { useGenerationStatus, useRegenerateSegment } from "@/hooks/use-generations";
+import { useGenerationStatus, useRegenerateSegment, useRegenLimit } from "@/hooks/use-generations";
 import { useProfile } from "@/hooks/use-profile";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { GenerationStatus, ScriptSegment, SegmentVideo } from "@/types/database";
@@ -441,6 +441,9 @@ function VideoSegmentCard({
   isRegenerating,
   multiSelect = false,
   userPlan = "free",
+  canRegenerate = false,
+  regenRemaining = 0,
+  monthlyLimit = 0,
 }: {
   video: SegmentVideo;
   label: string;
@@ -450,6 +453,9 @@ function VideoSegmentCard({
   isRegenerating: boolean;
   multiSelect?: boolean;
   userPlan?: string;
+  canRegenerate?: boolean;
+  regenRemaining?: number;
+  monthlyLimit?: number;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -570,7 +576,7 @@ function VideoSegmentCard({
                   variant="ghost"
                   size="icon"
                   className="size-8 shrink-0"
-                  disabled={isRegenerating || userPlan === "free"}
+                  disabled={isRegenerating || !canRegenerate}
                   onClick={(e) => {
                     e.stopPropagation();
                     onRegenerate();
@@ -584,7 +590,13 @@ function VideoSegmentCard({
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>{userPlan === "free" ? "Upgrade to a paid plan to regenerate" : "Regenerate this segment (1 credit)"}</p>
+                <p>
+                  {userPlan === "free"
+                    ? "Upgrade to regenerate"
+                    : regenRemaining === 0
+                      ? `Monthly limit reached (${monthlyLimit}/${monthlyLimit})`
+                      : `Regenerate (1 credit) · ${regenRemaining} regens left`}
+                </p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -1115,6 +1127,14 @@ export default function GenerationDetailPage() {
   const { data: profile } = useProfile();
   const userPlan = profile?.plan ?? "free";
 
+  const PLAN_REGEN_LIMITS: Record<string, number> = {
+    free: 0, starter: 10, growth: 20, scale: 50,
+  };
+  const { data: regenUsed = 0, refetch: refetchRegenLimit } = useRegenLimit();
+  const monthlyLimit = PLAN_REGEN_LIMITS[userPlan] ?? 0;
+  const regenRemaining = Math.max(0, monthlyLimit - regenUsed);
+  const canRegenerate = userPlan !== "free" && regenRemaining > 0;
+
   // Script collapsible state
   const [scriptExpanded, setScriptExpanded] = useState(true);
 
@@ -1311,6 +1331,7 @@ export default function GenerationDetailPage() {
         `Regenerating ${segmentType.toUpperCase()} ${variation}. 1 credit used.`,
       );
       refetch();
+      refetchRegenLimit();
     } catch (err) {
       toast.error(
         sanitizeMsg(err instanceof Error ? err.message : "Failed to regenerate segment."),
@@ -1732,6 +1753,12 @@ export default function GenerationDetailPage() {
             </div>
           </div>
 
+          {userPlan !== "free" && (
+            <p className="text-xs text-muted-foreground">
+              Regenerations this month: {regenUsed}/{monthlyLimit}
+            </p>
+          )}
+
           <div className="grid gap-6 md:grid-cols-3">
             {/* Hooks column */}
             <div className="flex flex-col gap-3">
@@ -1751,6 +1778,9 @@ export default function GenerationDetailPage() {
                   isRegenerating={regeneratingKey === `hook_${i + 1}`}
                   multiSelect={batchMode}
                   userPlan={userPlan}
+                  canRegenerate={canRegenerate}
+                  regenRemaining={regenRemaining}
+                  monthlyLimit={monthlyLimit}
                 />
               ))}
               {(!segments.hooks || segments.hooks.length === 0) && (
@@ -1780,6 +1810,9 @@ export default function GenerationDetailPage() {
                   isRegenerating={regeneratingKey === `body_${i + 1}`}
                   multiSelect={batchMode}
                   userPlan={userPlan}
+                  canRegenerate={canRegenerate}
+                  regenRemaining={regenRemaining}
+                  monthlyLimit={monthlyLimit}
                 />
               ))}
               {(!segments.bodies || segments.bodies.length === 0) && (
@@ -1809,6 +1842,9 @@ export default function GenerationDetailPage() {
                   isRegenerating={regeneratingKey === `cta_${i + 1}`}
                   multiSelect={batchMode}
                   userPlan={userPlan}
+                  canRegenerate={canRegenerate}
+                  regenRemaining={regenRemaining}
+                  monthlyLimit={monthlyLimit}
                 />
               ))}
               {(!segments.ctas || segments.ctas.length === 0) && (

@@ -136,6 +136,33 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Plan-based monthly regeneration limits
+    const PLAN_REGEN_LIMITS: Record<string, number> = {
+      free: 0, starter: 10, growth: 20, scale: 50,
+    };
+
+    const { data: planProfile } = await sb
+      .from("profiles").select("plan").eq("id", userId).single();
+    const userPlan = (planProfile?.plan as string) ?? "free";
+    const monthLimit = PLAN_REGEN_LIMITS[userPlan] ?? 0;
+
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const { data: limitRow } = await sb
+      .from("regeneration_limits")
+      .select("regens_used")
+      .eq("owner_id", userId)
+      .eq("month_year", currentMonth)
+      .maybeSingle();
+
+    const regenCount = limitRow?.regens_used ?? 0;
+    if (regenCount >= monthLimit) {
+      return json(
+        { detail: `Monthly regeneration limit reached (${monthLimit}/${monthLimit}). Resets next month.` },
+        cors,
+        403,
+      );
+    }
+
     // Dynamic credit cost: 2 for HD, 1 for standard
     const resolvedQuality = quality || (generation.video_quality as string) || "standard";
     const creditCost = resolvedQuality === "hd" ? 2 : 1;
@@ -218,6 +245,12 @@ Deno.serve(async (req: Request) => {
       if (updateErr) {
         throw new Error(`Failed to update generation: ${updateErr.message}`);
       }
+
+      // Increment monthly regeneration counter
+      await sb.from("regeneration_limits").upsert(
+        { owner_id: userId, month_year: currentMonth, regens_used: regenCount + 1 },
+        { onConflict: "owner_id,month_year" },
+      );
 
       return json(
         {
