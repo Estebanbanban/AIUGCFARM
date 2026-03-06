@@ -39,7 +39,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: blob: https:",
               "media-src 'self' blob: https://*.supabase.co",
               "worker-src blob:",
-              "connect-src 'self' https://*.supabase.co https://*.supabase.in https://api.stripe.com https://*.posthog.com https://*.sentry.io https://datafa.st https://unpkg.com",
+              "connect-src 'self' blob: https://*.supabase.co https://*.supabase.in https://api.stripe.com https://*.posthog.com https://*.sentry.io https://datafa.st https://unpkg.com",
               "frame-src https://js.stripe.com https://hooks.stripe.com",
               "font-src 'self'",
               "base-uri 'self'",
