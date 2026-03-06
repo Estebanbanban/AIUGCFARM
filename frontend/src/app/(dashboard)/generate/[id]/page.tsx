@@ -47,7 +47,7 @@ import { useGenerationStatus, useRegenerateSegment, useRegenLimit } from "@/hook
 import { useProfile } from "@/hooks/use-profile";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { GenerationStatus, ScriptSegment, SegmentVideo } from "@/types/database";
-import { generateSrt } from "@/lib/srt";
+import { generateSrt, buildWordCues, type WordCue } from "@/lib/srt";
 import { trackVideoCompleted, trackVideoFailed, trackVideoDownloaded } from "@/lib/datafast";
 import { useVideoStitcher, STITCH_STATUS_LABELS } from "@/hooks/use-video-stitcher";
 import { useZipDownload } from "@/hooks/use-zip-download";
@@ -445,6 +445,7 @@ function VideoSegmentCard({
   canRegenerate = false,
   regenRemaining = 0,
   monthlyLimit = 0,
+  scriptText,
 }: {
   video: SegmentVideo;
   label: string;
@@ -457,9 +458,29 @@ function VideoSegmentCard({
   canRegenerate?: boolean;
   regenRemaining?: number;
   monthlyLimit?: number;
+  scriptText?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [captionsOn, setCaptionsOn] = useState(false);
+  const [activeWordIdx, setActiveWordIdx] = useState(-1);
+
+  const wordCues = useMemo<WordCue[]>(
+    () => (scriptText ? buildWordCues(scriptText, video.duration) : []),
+    [scriptText, video.duration],
+  );
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !captionsOn || wordCues.length === 0) return;
+    function onTimeUpdate() {
+      const t = el!.currentTime;
+      const idx = wordCues.findIndex((w) => t >= w.start && t < w.end);
+      setActiveWordIdx(idx);
+    }
+    el.addEventListener("timeupdate", onTimeUpdate);
+    return () => el.removeEventListener("timeupdate", onTimeUpdate);
+  }, [captionsOn, wordCues]);
 
   function togglePlay() {
     const el = videoRef.current;
@@ -555,6 +576,24 @@ function VideoSegmentCard({
             )}
           </div>
         </div>
+
+        {/* Word-by-word caption overlay */}
+        {captionsOn && wordCues.length > 0 && (
+          <div className="pointer-events-none absolute bottom-5 left-0 right-0 z-30 flex justify-center px-3">
+            <div className="max-w-[88%] rounded-lg bg-black/75 px-3 py-2 text-center">
+              <p className="text-[15px] font-bold leading-snug tracking-wide">
+                {wordCues.map((w, i) => (
+                  <span
+                    key={i}
+                    className={i === activeWordIdx ? "text-yellow-300" : "text-white"}
+                  >
+                    {w.word}{" "}
+                  </span>
+                ))}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Card info */}
@@ -602,6 +641,24 @@ function VideoSegmentCard({
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+          {wordCues.length > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "size-8 shrink-0 text-[11px] font-bold",
+                captionsOn && "bg-primary/10 text-primary",
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                setCaptionsOn((v) => !v);
+                setActiveWordIdx(-1);
+              }}
+              title={captionsOn ? "Hide captions" : "Show captions"}
+            >
+              CC
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -846,6 +903,44 @@ function CombinationPreview({
 
   const hasSrt = !!(hookScript && bodyScript && ctaScript && hookVideo && bodyVideo && ctaVideo);
 
+  // ── Word-by-word captions ──────────────────────────────────────────────────
+  const [captionsOn, setCaptionsOn] = useState(false);
+  const [captionActiveIdx, setCaptionActiveIdx] = useState(-1);
+
+  const captionCues = useMemo<WordCue[]>(() => {
+    if (!hookScript || !bodyScript || !ctaScript || !hookVideo || !bodyVideo || !ctaVideo) return [];
+    return [
+      ...buildWordCues(hookScript.text, hookVideo.duration, 0),
+      ...buildWordCues(bodyScript.text, bodyVideo.duration, hookVideo.duration),
+      ...buildWordCues(ctaScript.text, ctaVideo.duration, hookVideo.duration + bodyVideo.duration),
+    ];
+  }, [hookScript, bodyScript, ctaScript, hookVideo, bodyVideo, ctaVideo]);
+
+  // rAF loop: compute global time from whichever video is currently active
+  useEffect(() => {
+    if (!captionsOn || captionCues.length === 0) return;
+    let rafId: number;
+    function tick() {
+      let t = -1;
+      if (viewMode === "stitched" && stitchedRef.current) {
+        t = stitchedRef.current.currentTime;
+      } else if (currentSegment === "hook" && hookRef.current) {
+        t = hookRef.current.currentTime;
+      } else if (currentSegment === "body" && bodyRef.current && hookVideo) {
+        t = hookVideo.duration + bodyRef.current.currentTime;
+      } else if (currentSegment === "cta" && ctaRef.current && hookVideo && bodyVideo) {
+        t = hookVideo.duration + bodyVideo.duration + ctaRef.current.currentTime;
+      }
+      if (t >= 0) {
+        const idx = captionCues.findIndex((w) => t >= w.start && t < w.end);
+        setCaptionActiveIdx(idx);
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [captionsOn, captionCues, viewMode, currentSegment, hookVideo, bodyVideo]);
+
   const segmentLabels: Record<string, string> = {
     idle: "Ready to preview",
     hook: "Playing Hook",
@@ -965,6 +1060,24 @@ function CombinationPreview({
             </Badge>
           </div>
         )}
+
+        {/* Word-by-word caption overlay */}
+        {captionsOn && captionCues.length > 0 && (
+          <div className="pointer-events-none absolute bottom-8 left-0 right-0 z-40 flex justify-center px-3">
+            <div className="max-w-[88%] rounded-lg bg-black/75 px-3 py-2 text-center">
+              <p className="text-[15px] font-bold leading-snug tracking-wide">
+                {captionCues.map((w, i) => (
+                  <span
+                    key={i}
+                    className={i === captionActiveIdx ? "text-yellow-300" : "text-white"}
+                  >
+                    {w.word}{" "}
+                  </span>
+                ))}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Play controls */}
@@ -982,6 +1095,16 @@ function CombinationPreview({
             </>
           )}
         </Button>
+        {captionCues.length > 0 && (
+          <Button
+            variant={captionsOn ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => { setCaptionsOn((v) => !v); setCaptionActiveIdx(-1); }}
+            title={captionsOn ? "Hide captions" : "Show captions"}
+          >
+            CC
+          </Button>
+        )}
         {viewMode === "sequential" && (
           <span className="text-xs text-muted-foreground">
             {segmentLabels[currentSegment]}
@@ -1852,6 +1975,7 @@ export default function GenerationDetailPage() {
                   key={i}
                   video={video}
                   label={`Hook ${i + 1}`}
+                  scriptText={script?.hooks?.[i]?.text}
                   isSelected={batchMode ? selectedHooks.has(i) : selectedHook === i}
                   onSelect={() =>
                     batchMode
@@ -1898,6 +2022,7 @@ export default function GenerationDetailPage() {
                   key={i}
                   video={video}
                   label={`Body ${i + 1}`}
+                  scriptText={script?.bodies?.[i]?.text}
                   isSelected={batchMode ? selectedBodies.has(i) : selectedBody === i}
                   onSelect={() =>
                     batchMode
@@ -1944,6 +2069,7 @@ export default function GenerationDetailPage() {
                   key={i}
                   video={video}
                   label={`CTA ${i + 1}`}
+                  scriptText={script?.ctas?.[i]?.text}
                   isSelected={batchMode ? selectedCtas.has(i) : selectedCta === i}
                   onSelect={() =>
                     batchMode
