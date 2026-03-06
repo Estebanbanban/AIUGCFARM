@@ -2499,8 +2499,20 @@ export default function GeneratePage() {
                           </div>
                         )
                       ) : (
-                        <div className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
-                          Generate a script to review Hook, Body, and CTA text before launching the final video render.
+                        <div className="rounded-xl border border-dashed border-border px-4 py-8 flex flex-col items-center gap-4 text-center">
+                          <p className="text-sm text-muted-foreground">
+                            Generate a script to review Hook, Body, and CTA text before launching the final video render.
+                          </p>
+                          <Button
+                            onClick={handleGenerateScript}
+                            disabled={(requiresCommentKeyword && !commentKeyword) || generateComposites.isPending || !store.compositeImagePath}
+                          >
+                            {generateComposites.isPending ? (
+                              <><Loader2 className="size-4 animate-spin" />Waiting for scene preview...</>
+                            ) : (
+                              <>Generate Script</>
+                            )}
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -2519,35 +2531,20 @@ export default function GeneratePage() {
                       </p>
                     </div>
                     <div className="w-full sm:w-auto">
-                      {store.pendingScript ? (
-                        <Button
-                          onClick={handleApproveAndGenerate}
-                          disabled={approveAndGenerate.isPending || creditsLoading}
-                          size="lg"
-                          className="w-full sm:min-w-[220px]"
-                        >
-                          {approveAndGenerate.isPending ? (
-                            <><Loader2 className="size-4 animate-spin" />Starting generation...</>
-                          ) : creditsLoading ? (
-                            <><Loader2 className="size-4 animate-spin" />Checking credits...</>
-                          ) : (
-                            <><Zap className="size-4" />Generate Video</>
-                          )}
-                        </Button>
-                      ) : (
-                        <Button
-                          onClick={handleGenerateScript}
-                          disabled={(requiresCommentKeyword && !commentKeyword) || generateComposites.isPending || !store.compositeImagePath}
-                          size="lg"
-                          className="w-full sm:min-w-[220px]"
-                        >
-                          {generateComposites.isPending ? (
-                            <><Loader2 className="size-4 animate-spin" />Waiting for scene preview...</>
-                          ) : (
-                            <>Generate Script</>
-                          )}
-                        </Button>
-                      )}
+                      <Button
+                        onClick={handleApproveAndGenerate}
+                        disabled={!store.pendingScript || approveAndGenerate.isPending || creditsLoading}
+                        size="lg"
+                        className="w-full sm:min-w-[220px]"
+                      >
+                        {approveAndGenerate.isPending ? (
+                          <><Loader2 className="size-4 animate-spin" />Starting generation...</>
+                        ) : creditsLoading ? (
+                          <><Loader2 className="size-4 animate-spin" />Checking credits...</>
+                        ) : (
+                          <><Zap className="size-4" />Generate Video</>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </div>
