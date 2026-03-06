@@ -669,7 +669,7 @@ Deno.serve(async (req: Request) => {
 
       const resolvedMode = gen.mode as string;
       const generationLanguageRaw = typeof gen.language === "string" ? gen.language : "en";
-      const resolvedLanguage = VALID_LANGUAGES.has(generationLanguageRaw)
+      const approvedLanguage = VALID_LANGUAGES.has(generationLanguageRaw)
         ? generationLanguageRaw
         : "en";
       // Allow the client to override quality (e.g. user switched standard → HD before approving)
@@ -784,7 +784,7 @@ Deno.serve(async (req: Request) => {
           klingModel,
           provider,
           compositeImageBlob,
-          resolvedLanguage,
+          approvedLanguage,
         );
 
         // ── Update generation with job IDs and provider ───────────
