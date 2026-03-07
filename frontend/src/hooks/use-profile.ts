@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
+import { callEdge } from "@/lib/api";
 import type { Profile } from "@/types/database";
 
 export const BRAND_LIMITS: Record<string, number> = {
@@ -24,13 +24,7 @@ export function useProfile() {
   return useQuery<Profile>({
     queryKey: ["profile"],
     queryFn: async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .maybeSingle();
-      if (error) throw new Error(error.message);
-      return data as Profile;
+      return callEdge<Profile>("get-profile", { method: "GET" });
     },
   });
 }

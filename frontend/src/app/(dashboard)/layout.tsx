@@ -1,43 +1,29 @@
 "use client";
 
 import { Suspense, useEffect } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { DashboardShell } from "@/components/layout/DashboardShell";
 import { OnboardingOverlay } from "@/components/onboarding/OnboardingOverlay";
 import { OfferBanner } from "@/components/dashboard/OfferBanner";
 import { CheckoutSuccessHandler } from "@/components/checkout/CheckoutSuccessHandler";
-import { createClient } from "@/lib/supabase/client";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
+import { useRouter } from "next/navigation";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { isLoaded, isSignedIn } = useAuth();
+  const router = useRouter();
+
   useEffect(() => {
-    const supabase = createClient();
+    if (isLoaded && !isSignedIn) {
+      router.push("/sign-in");
+    }
+  }, [isLoaded, isSignedIn, router]);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string) => {
-      if (event === "SIGNED_IN") {
-        localStorage.removeItem("onboarding-skipped");
-        useGenerationWizardStore.getState().reset();
-      }
-    });
-
-    // Refresh session when the user comes back to the tab after inactivity.
-    // Browsers throttle/kill background JS timers, which can prevent Supabase's
-    // auto-refresh ticker from firing and let the access token expire silently.
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        supabase.auth.getUser(); // triggers a token refresh if the access token is expired
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      subscription.unsubscribe();
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, []);
+  if (!isLoaded || !isSignedIn) return null;
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">

@@ -8,6 +8,7 @@ import { QueryProvider } from "@/components/providers/query-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
 import { CookieBanner } from "@/components/layout/CookieBanner";
+import { ClerkProvider } from "@clerk/nextjs";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -56,28 +57,30 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans min-h-screen bg-background text-foreground antialiased`}>
-        <NextTopLoader color="hsl(var(--primary))" showSpinner={false} height={3} />
-        <Script
-          src="https://datafa.st/js/script.js"
-          data-website-id="dfid_aeeAwbTgJDYJIXhN8pSZx"
-          data-domain="www.cinerads.com"
-          strategy="afterInteractive"
-        />
-        <PostHogProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-            storageKey="cinerads-theme"
-          >
-            <QueryProvider>
-              {children}
-              <Toaster />
-              <CookieBanner />
-            </QueryProvider>
-          </ThemeProvider>
-        </PostHogProvider>
+        <ClerkProvider>
+          <NextTopLoader color="hsl(var(--primary))" showSpinner={false} height={3} />
+          <Script
+            src="https://datafa.st/js/script.js"
+            data-website-id="dfid_aeeAwbTgJDYJIXhN8pSZx"
+            data-domain="www.cinerads.com"
+            strategy="afterInteractive"
+          />
+          <PostHogProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+              storageKey="cinerads-theme"
+            >
+              <QueryProvider>
+                {children}
+                <Toaster />
+                <CookieBanner />
+              </QueryProvider>
+            </ThemeProvider>
+          </PostHogProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

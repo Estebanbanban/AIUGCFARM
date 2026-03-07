@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.0.1",
     "@ffmpeg/core": "^0.12.10",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
@@ -62,6 +63,7 @@
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
     "stripe": "^20.4.0",
+    "svix": "^1.86.0",
     "tailwind-merge": "^3.5.0",
     "zod": "^4.3.6",
     "zustand": "^5.0.11"

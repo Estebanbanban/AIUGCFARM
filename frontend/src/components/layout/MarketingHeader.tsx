@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Menu, X, LayoutDashboard, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { createClient } from "@/lib/supabase/client";
+import { useUser, useClerk } from "@clerk/nextjs";
 import { Logo } from "@/components/ui/Logo";
 
 interface AuthUser {
@@ -24,6 +24,7 @@ function UserMenu({ user }: { user: AuthUser }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const { signOut } = useClerk();
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -36,11 +37,8 @@ function UserMenu({ user }: { user: AuthUser }) {
   }, []);
 
   const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOut(() => router.push("/"));
     setOpen(false);
-    router.push("/");
-    router.refresh();
   };
 
   return (
@@ -102,8 +100,16 @@ function UserMenu({ user }: { user: AuthUser }) {
 export function MarketingHeader() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
   const router = useRouter();
+
+  const authUser: AuthUser | null = isLoaded && user
+    ? {
+        name: user.fullName || user.emailAddresses[0]?.emailAddress?.split("@")[0] || "Account",
+        avatar_url: user.imageUrl || null,
+      }
+    : null;
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 24);
@@ -111,49 +117,9 @@ export function MarketingHeader() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  useEffect(() => {
-    const supabase = createClient();
-
-    const loadUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setAuthUser(null);
-        return;
-      }
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name, avatar_url")
-        .single();
-      setAuthUser({
-        name:
-          profile?.full_name ||
-          session.user.email?.split("@")[0] ||
-          "Account",
-        avatar_url: profile?.avatar_url ?? null,
-      });
-    };
-
-    loadUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event: string, session: unknown) => {
-        if (session) {
-          loadUser();
-        } else {
-          setAuthUser(null);
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
-
   const handleMobileSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOut(() => router.push("/"));
     setMobileOpen(false);
-    router.push("/");
-    router.refresh();
   };
 
   return (
