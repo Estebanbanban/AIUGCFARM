@@ -30,8 +30,8 @@ const BASE_URL = (process.env.BLOG_BASE_URL || 'https://www.cinerads.com').repla
 // High volume + poor/no ranking = high gap score = high priority.
 function computeGapScore(searchVolume, position, clicks) {
   if (!searchVolume || searchVolume === 0) return 0;
-  // Position factor: not ranking = 0.001, position 1 = 1.0, position 50 = 0.02
-  const posFactor = position ? 1 / position : 0.001;
+  // Position factor: not ranking = 1.0 (max gap), position 1 = 0.01 (already there), position 50 = 0.5
+  const posFactor = position ? Math.min(position / 100, 1.0) : 1.0;
   // Click bonus: existing clicks mean the page is being found, slight reward
   const clickBonus = clicks ? Math.log1p(clicks) * 0.05 : 0;
   return Math.round(searchVolume * posFactor * (1 + clickBonus));
