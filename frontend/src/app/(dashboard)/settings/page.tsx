@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { useUser, useClerk } from "@clerk/nextjs";
 import { callEdge } from "@/lib/api";
 import { toast } from "sonner";
 import { ArrowRight, CreditCard, User, Lock, AlertTriangle } from "lucide-react";
@@ -31,6 +31,8 @@ import { Separator } from "@/components/ui/separator";
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -42,9 +44,7 @@ export default function SettingsPage() {
     setDeleting(true);
     try {
       await callEdge("delete-account", { body: { confirm: true } });
-      const supabase = createClient();
-      await supabase.auth.signOut();
-      router.push("/");
+      await signOut(() => router.push("/"));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete account");
     } finally {
@@ -54,29 +54,22 @@ export default function SettingsPage() {
   }
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }: { data: { user: { email?: string; user_metadata?: Record<string, string> } | null } }) => {
-      if (user) {
-        setEmail(user.email ?? "");
-        setFullName(user.user_metadata?.full_name ?? "");
-      }
-    });
-  }, []);
+    if (isLoaded && user) {
+      setEmail(user.emailAddresses[0]?.emailAddress ?? "");
+      setFullName(user.fullName ?? "");
+    }
+  }, [isLoaded, user]);
 
   async function handleUpdateProfile(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({
-      data: { full_name: fullName },
-    });
-
-    if (error) {
-      setMessage(error.message);
-    } else {
+    try {
+      await user?.update({ firstName: fullName.split(" ")[0], lastName: fullName.split(" ").slice(1).join(" ") });
       setMessage("Profile updated successfully.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to update profile.");
     }
     setLoading(false);
   }

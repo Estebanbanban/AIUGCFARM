@@ -1,5 +1,3 @@
-import { createClient } from "@/lib/supabase/client";
-
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const EDGE_URL = `${supabaseUrl}/functions/v1`;
@@ -60,68 +58,32 @@ async function fetchWithTimeout(
   }
 }
 
-async function getEdgeAccessToken(
-  supabase: ReturnType<typeof createClient>,
-): Promise<string> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (session?.access_token) {
-    return session.access_token;
-  }
-
-  // Fallback path: force server validation/refresh if local session is stale.
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (!user || userError) {
-    throw new Error("Authentication required. Please sign in again.");
-  }
-
-  const {
-    data: { session: refreshedSession },
-  } = await supabase.auth.getSession();
-  if (!refreshedSession?.access_token) {
-    throw new Error("Authentication required. Please sign in again.");
-  }
-  return refreshedSession.access_token;
+async function getEdgeAccessToken(): Promise<string> {
+  const token = await (window as any).Clerk?.session?.getToken();
+  if (!token) throw new Error("Authentication required. Please sign in again.");
+  return token;
 }
 
 export async function callEdge<T>(
   fn: string,
   options: { method?: string; body?: unknown; timeoutMs?: number } = {}
 ): Promise<T> {
-  const supabase = createClient();
   const timeoutMs = options.timeoutMs ?? DEFAULT_EDGE_TIMEOUT_MS;
-  let accessToken = await getEdgeAccessToken(supabase);
+  const accessToken = await getEdgeAccessToken();
 
-  const makeRequest = (accessToken: string) =>
-    fetchWithTimeout(`${EDGE_URL}/${fn}`, {
-      method: options.method || "POST",
-      mode: "cors",
-      credentials: "omit",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: supabaseAnonKey,
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    }, timeoutMs);
-
-  let res = await makeRequest(accessToken);
+  const res = await fetchWithTimeout(`${EDGE_URL}/${fn}`, {
+    method: options.method || "POST",
+    mode: "cors",
+    credentials: "omit",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  }, timeoutMs);
 
   if (res.status === 401) {
-    const refreshed = await supabase.auth.refreshSession();
-    const retrySession = refreshed.data.session;
-    if (retrySession?.access_token) {
-      accessToken = retrySession.access_token;
-      res = await makeRequest(accessToken);
-    }
-  }
-
-  if (res.status === 401) {
-    await supabase.auth.signOut();
     throw new EdgeError(401, "Authentication required. Please sign in again.");
   }
 
@@ -142,9 +104,8 @@ export async function callEdgePublic<T>(
   headers.apikey = supabaseAnonKey;
 
   try {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) headers.Authorization = `Bearer ${session.access_token}`;
+    const token = await (window as any).Clerk?.session?.getToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
   } catch { /* no auth available */ }
 
   const res = await fetchWithTimeout(`${EDGE_URL}/${fn}`, {
@@ -168,35 +129,21 @@ export async function callEdgeMultipart<T>(
   formData: FormData,
   options: { timeoutMs?: number } = {}
 ): Promise<T> {
-  const supabase = createClient();
   const timeoutMs = options.timeoutMs ?? DEFAULT_EDGE_TIMEOUT_MS;
-  let accessToken = await getEdgeAccessToken(supabase);
+  const accessToken = await getEdgeAccessToken();
 
-  const makeRequest = (token: string) =>
-    fetchWithTimeout(`${EDGE_URL}/${fn}`, {
-      method: "POST",
-      mode: "cors",
-      credentials: "omit",
-      headers: {
-        apikey: supabaseAnonKey,
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
-    }, timeoutMs);
-
-  let res = await makeRequest(accessToken);
+  const res = await fetchWithTimeout(`${EDGE_URL}/${fn}`, {
+    method: "POST",
+    mode: "cors",
+    credentials: "omit",
+    headers: {
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: formData,
+  }, timeoutMs);
 
   if (res.status === 401) {
-    const refreshed = await supabase.auth.refreshSession();
-    const retrySession = refreshed.data.session;
-    if (retrySession?.access_token) {
-      accessToken = retrySession.access_token;
-      res = await makeRequest(accessToken);
-    }
-  }
-
-  if (res.status === 401) {
-    await supabase.auth.signOut();
     throw new EdgeError(401, "Authentication required. Please sign in again.");
   }
 
