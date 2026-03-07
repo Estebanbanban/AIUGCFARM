@@ -159,12 +159,36 @@ async function detectSpeechSegments(
   return segs;
 }
 
+/** Re-encode one segment of a clip with slow seek for frame-accurate trimming. */
+async function encodeSegment(
+  ffmpeg: FFmpeg,
+  inputFile: string,
+  start: number,
+  duration: number,
+  outputFile: string,
+): Promise<void> {
+  // Slow seek (-ss after -i) = exact trim at silence boundary, not keyframe-snapped.
+  // Re-encode with libx264 so every output segment starts with an I-frame,
+  // which is required for clean concat (both internal per-clip and final 3-clip).
+  await execOrThrow(ffmpeg, [
+    "-i", inputFile,
+    "-ss", start.toFixed(3),
+    "-t", duration.toFixed(3),
+    "-c:v", "libx264",
+    "-preset", "ultrafast",
+    "-crf", "35",
+    "-c:a", "aac",
+    "-b:a", "128k",
+    outputFile,
+  ], `encode-${outputFile}`);
+}
+
 /**
- * Detect speech outer bounds and re-encode the clip to outputFile.
- * Re-encoding is required for frame-accurate silence removal: -c copy with fast seek
- * snaps to the nearest keyframe (every ~2s), so silence is never actually removed.
- * libx264 ultrafast always starts the output with an I-frame → clean final concat.
- * Returns [outputFile] for caller to pass to cleanupFFmpegFiles.
+ * Detect speech segments, re-encode each one, then concat them into outputFile.
+ * Single segment: one encode pass.
+ * Multiple segments: encode each → internal -f concat -c copy → outputFile.
+ * Re-encoding guarantees I-frame starts, so the internal concat is safe (unlike -c copy).
+ * Returns all temp file names created (caller passes to cleanupFFmpegFiles).
  */
 async function prepareClip(
   ffmpeg: FFmpeg,
@@ -172,26 +196,42 @@ async function prepareClip(
   outputFile: string,
 ): Promise<string[]> {
   const segments = await detectSpeechSegments(ffmpeg, inputFile);
-  const start = segments[0].start;
-  const end = segments[segments.length - 1].end;
-  console.log(`[stitcher] encode ${inputFile}: ${start.toFixed(3)}s → ${end.toFixed(3)}s`);
+  const created: string[] = [];
 
-  // Slow seek (-ss after -i) for frame-accurate trim at the silence boundary.
-  // Re-encode with libx264 so output always starts with an I-frame (clean concat).
-  // ultrafast + crf 35 = fastest encode pass, acceptable quality for UGC ads.
+  if (segments.length === 1) {
+    const seg = segments[0];
+    console.log(`[stitcher] encode ${inputFile}: ${seg.start.toFixed(3)}s → ${seg.end.toFixed(3)}s`);
+    await encodeSegment(ffmpeg, inputFile, seg.start, seg.end - seg.start, outputFile);
+    created.push(outputFile);
+    return created;
+  }
+
+  // Multiple segments: encode each separately (each gets a fresh I-frame start),
+  // then concat with -c copy (safe because all inputs start with I-frames).
+  const prefix = outputFile.replace(/\.mp4$/, "");
+  const segFiles: string[] = [];
+
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    const segFile = `${prefix}_s${i}.mp4`;
+    segFiles.push(segFile);
+    created.push(segFile);
+    console.log(`[stitcher] encode ${inputFile} seg${i}: ${seg.start.toFixed(3)}s → ${seg.end.toFixed(3)}s`);
+    await encodeSegment(ffmpeg, inputFile, seg.start, seg.end - seg.start, segFile);
+  }
+
+  const listFile = `${prefix}_list.txt`;
+  created.push(listFile);
+  const manifest = segFiles.map((f) => `file '${f}'`).join("\n") + "\n";
+  await ffmpeg.writeFile(listFile, new TextEncoder().encode(manifest));
   await execOrThrow(ffmpeg, [
-    "-i", inputFile,
-    "-ss", start.toFixed(3),
-    "-t", (end - start).toFixed(3),
-    "-c:v", "libx264",
-    "-preset", "ultrafast",
-    "-crf", "35",
-    "-c:a", "aac",
-    "-b:a", "128k",
+    "-f", "concat", "-safe", "0",
+    "-i", listFile,
+    "-c", "copy",
     outputFile,
-  ], `encode-${inputFile}`);
-
-  return [outputFile];
+  ], `concat-${inputFile}-segs`);
+  created.push(outputFile);
+  return created;
 }
 
 /** Clean up temp files in the FFmpeg virtual FS */
