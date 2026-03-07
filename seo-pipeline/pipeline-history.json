@@ -1,0 +1,136 @@
+{
+  "version": "1.0",
+  "note": "Each pipeline run appends a snapshot. Use REPORT mode to compare delta vs previous run.",
+  "runs": [
+    {
+      "runId": "2026-03-07T00:00:00Z",
+      "date": "2026-03-07",
+      "triggeredBy": "manual — initial pipeline setup",
+      "gscSummary": {
+        "totalPages": 7,
+        "blogPages": 2,
+        "totalImpressions": 86,
+        "totalClicks": 1,
+        "avgPosition": 6.1,
+        "dateRange": {
+          "start": "2025-12-07",
+          "end": "2026-03-07"
+        }
+      },
+      "articleStatus": {
+        "total": 15,
+        "top3": 0,
+        "page1": 2,
+        "page2": 0,
+        "notRanking": 13,
+        "gscDataAvailable": 2
+      },
+      "rankingArticles": [
+        {
+          "slug": "ecommerce-video-marketing-guide",
+          "position": 8.9,
+          "impressions": 38,
+          "clicks": 0,
+          "ctr": 0,
+          "topQuery": "e-commerce video content at scale"
+        },
+        {
+          "slug": "video-ad-testing-framework",
+          "position": 6.2,
+          "impressions": 5,
+          "clicks": 0,
+          "ctr": 0,
+          "topQuery": null
+        }
+      ],
+      "keywordData": {
+        "totalEnriched": 35,
+        "withVolume": 2,
+        "withVolumeViaSeed": 17,
+        "topOpportunity": {
+          "keyword": "tiktok creative center",
+          "volume": 12100,
+          "kd": 19
+        }
+      },
+      "backlogStatus": {
+        "total": 20,
+        "pending": 20,
+        "inProgress": 0,
+        "written": 0,
+        "published": 0
+      },
+      "deltaFromPrevious": null
+    },
+    {
+      "runId": "2026-03-07T15:18:36.227Z",
+      "date": "2026-03-07",
+      "triggeredBy": "pipeline run",
+      "gscSummary": {
+        "totalPages": 7,
+        "blogPages": 4,
+        "totalImpressions": 85,
+        "totalClicks": 1,
+        "avgPosition": 5.5,
+        "dateRange": {
+          "start": "2025-12-07",
+          "end": "2026-03-07"
+        }
+      },
+      "articleStatus": {
+        "totalArticles": 15,
+        "top3": 0,
+        "page1": 2,
+        "page2": 0,
+        "notRanking": 13,
+        "highOpportunity": 0,
+        "mediumOpportunity": 0,
+        "keywordGaps": 20,
+        "gscDataAvailable": 2
+      },
+      "rankingArticles": [
+        {
+          "slug": "ecommerce-video-marketing-guide",
+          "position": 8.9,
+          "impressions": 38,
+          "clicks": 0,
+          "ctr": 0,
+          "topQuery": "performance video ads for e-commerce brands"
+        },
+        {
+          "slug": "video-ad-testing-framework",
+          "position": 6.2,
+          "impressions": 5,
+          "clicks": 0,
+          "ctr": 0,
+          "topQuery": null
+        }
+      ],
+      "keywordData": {
+        "totalEnriched": 35,
+        "withVolume": 2,
+        "withVolumeViaSeed": 17,
+        "topOpportunity": {
+          "keyword": "tiktok creative center guide 2026",
+          "volume": 12100,
+          "kd": null
+        }
+      },
+      "backlogStatus": {
+        "total": 19,
+        "pending": 19,
+        "inProgress": 0,
+        "written": 0,
+        "published": 0
+      },
+      "deltaFromPrevious": {
+        "impressionsDelta": -1,
+        "clicksDelta": 0,
+        "page1Delta": 0,
+        "notRankingDelta": 0,
+        "newlyRanking": [],
+        "previousRunDate": "2026-03-07"
+      }
+    }
+  ]
+}

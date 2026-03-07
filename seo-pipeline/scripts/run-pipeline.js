@@ -16,9 +16,10 @@ import { dirname, join } from 'path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const STEPS = [
-  { file: 'pull-gsc-data.js', label: 'Step 1/3 — GSC Data Pull' },
-  { file: 'enrich-keywords.js', label: 'Step 2/3 — Keyword Enrichment (DataForSEO)' },
-  { file: 'audit-articles.js', label: 'Step 3/3 — Article Audit' },
+  { file: 'pull-gsc-data.js', label: 'Step 1/4 — GSC Data Pull' },
+  { file: 'enrich-keywords.js', label: 'Step 2/4 — Keyword Enrichment (DataForSEO)' },
+  { file: 'audit-articles.js', label: 'Step 3/4 — Article Audit' },
+  { file: 'save-history.js', label: 'Step 4/4 — Save History Snapshot' },
 ];
 
 function hr(char = '-', len = 60) {
