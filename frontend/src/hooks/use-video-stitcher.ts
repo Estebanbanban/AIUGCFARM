@@ -12,14 +12,12 @@ let ffmpegBusy = false;
 async function getFFmpeg(): Promise<FFmpeg> {
   if (ffmpegSingleton?.loaded) return ffmpegSingleton;
 
-  // Dynamically import FFmpeg libraries only when first needed (~1.5-2MB)
   const [{ FFmpeg: FFmpegClass }, { toBlobURL }] = await Promise.all([
     import("@ffmpeg/ffmpeg"),
     import("@ffmpeg/util"),
   ]);
 
   const ffmpeg = new FFmpegClass();
-  // Use non-MT core (no SharedArrayBuffer / no COOP+COEP headers required)
   const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
   await ffmpeg.load({
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
@@ -43,6 +41,25 @@ function parseDuration(log: string): number {
   );
 }
 
+/**
+ * Wrapper around ffmpeg.exec() that throws on non-zero exit code.
+ * ffmpeg.exec() resolves with the exit code — it never rejects — so without
+ * this wrapper a failed FFmpeg command silently continues.
+ */
+async function execOrThrow(
+  ffmpeg: FFmpeg,
+  args: string[],
+  step: string,
+): Promise<void> {
+  const code = await ffmpeg.exec(args);
+  if (code !== 0) {
+    throw new Error(
+      `Stitching failed at "${step}" (FFmpeg exit ${code}). ` +
+      `The video may be corrupt, inaccessible, or in an unsupported format.`,
+    );
+  }
+}
+
 const TRANSITION_BUFFER     = 0.2;   // 200ms buffer at each edge of every cut
 const MIN_SILENCE_TO_CUT    = 0.8;   // Only remove silences > 800ms (net removed >= 400ms)
 const MIN_SEGMENT_DURATION  = 0.3;   // Discard speech segments < 300ms
@@ -52,15 +69,8 @@ type Segment = { start: number; end: number };
 
 /**
  * Parse silence regions from FFmpeg silencedetect log output.
- * Returns an ordered list of speech segments to keep, with TRANSITION_BUFFER
- * of audio preserved at each edge of every cut.
- *
- * Only silences longer than MIN_SILENCE_TO_CUT are removed — shorter pauses
- * (breath, emphasis) are preserved. Exported for unit testing.
- *
- * FFmpeg log format (per silent region):
- *   silence_start: 3.000000
- *   silence_end: 5.500 | silence_duration: 2.500
+ * Returns an ordered list of speech segments to keep.
+ * Exported for unit testing.
  */
 export function getSpeechSegments(log: string, duration: number): Segment[] {
   const silenceStarts = [
@@ -71,7 +81,6 @@ export function getSpeechSegments(log: string, duration: number): Segment[] {
     ...log.matchAll(/silence_end: ([\d.]+)/g),
   ].map((m) => parseFloat(m[1]));
 
-  // Trailing silence has no silence_end — use clip duration
   const silences: Segment[] = silenceStarts.map((start, i) => ({
     start,
     end: silenceEnds[i] ?? duration,
@@ -95,7 +104,6 @@ export function getSpeechSegments(log: string, duration: number): Segment[] {
     segments.push({ start: cursor, end: duration });
   }
 
-  // Safety cap: pathological inputs fall back to full-clip trim
   if (segments.length > MAX_SEGMENTS_PER_CLIP) {
     return [{ start: 0, end: duration }];
   }
@@ -115,17 +123,25 @@ async function detectSpeechSegments(
 
   ffmpeg.on("log", handler);
   try {
-    await ffmpeg.exec([
+    await execOrThrow(ffmpeg, [
       "-i", filename,
       "-af", "silencedetect=n=-40dB:d=0.15",
       "-f", "null", "-",
-    ]);
+    ], `detect-${filename}`);
   } finally {
     // Always detach — even if exec throws, so stale output doesn't bleed into later runs
     ffmpeg.off("log", handler);
   }
 
-  return getSpeechSegments(log, parseDuration(log));
+  const duration = parseDuration(log);
+  if (duration === 0) {
+    throw new Error(
+      `Could not read duration from "${filename}". ` +
+      `The video URL may have expired or the file may be corrupt.`,
+    );
+  }
+
+  return getSpeechSegments(log, duration);
 }
 
 /**
@@ -144,18 +160,17 @@ async function trimClipToSegments(
 
   if (segments.length === 1) {
     const seg = segments[0];
-    await ffmpeg.exec([
+    await execOrThrow(ffmpeg, [
       "-i", inputFile,
       "-ss", seg.start.toFixed(3),
       "-to", seg.end.toFixed(3),
       "-c:v", "libx264", "-c:a", "aac",
       outputFile,
-    ]);
+    ], `trim-${inputFile}`);
     created.push(outputFile);
     return created;
   }
 
-  // Multi-segment: trim each piece to a temp file, then concat
   const prefix = outputFile.replace(/\.mp4$/, "");
   const segFiles: string[] = [];
 
@@ -164,25 +179,25 @@ async function trimClipToSegments(
     const segFile = `${prefix}_s${i}.mp4`;
     segFiles.push(segFile);
     created.push(segFile);
-    await ffmpeg.exec([
+    await execOrThrow(ffmpeg, [
       "-i", inputFile,
       "-ss", seg.start.toFixed(3),
       "-to", seg.end.toFixed(3),
       "-c:v", "libx264", "-c:a", "aac",
       segFile,
-    ]);
+    ], `trim-${inputFile}-seg${i}`);
   }
 
   const listFile = `${prefix}_list.txt`;
   created.push(listFile);
   const manifest = segFiles.map((f) => `file '${f}'`).join("\n") + "\n";
   await ffmpeg.writeFile(listFile, new TextEncoder().encode(manifest));
-  await ffmpeg.exec([
+  await execOrThrow(ffmpeg, [
     "-f", "concat", "-safe", "0",
     "-i", listFile,
     "-c", "copy",
     outputFile,
-  ]);
+  ], `concat-${inputFile}-segments`);
   created.push(outputFile);
   return created;
 }
@@ -212,7 +227,6 @@ async function cleanupFFmpegFiles(ffmpeg: FFmpeg, extraFiles: string[] = []) {
 /**
  * Non-hook version: returns a Blob directly.
  * Used by useBatchStitcher to stitch combos sequentially without React state.
- * Cleans up all temp files after each run to prevent WASM memory leaks.
  */
 export async function stitchToBlob(
   hookUrl: string,
@@ -228,7 +242,6 @@ export async function stitchToBlob(
       import("@ffmpeg/util"),
     ]);
 
-    // Pre-run cleanup — clear stale files from any previous run on this singleton
     await cleanupFFmpegFiles(ffmpeg);
 
     await Promise.all([
@@ -240,7 +253,6 @@ export async function stitchToBlob(
         .catch(async () => ffmpeg.writeFile("cta.mp4", await fetchFile(ctaUrl))),
     ]);
 
-    // Sequential — FFmpeg WASM is single-threaded
     const hookTmp = await prepareClip(ffmpeg, "hook.mp4", "hook_t.mp4");
     const bodyTmp = await prepareClip(ffmpeg, "body.mp4", "body_t.mp4");
     const ctaTmp  = await prepareClip(ffmpeg, "cta.mp4",  "cta_t.mp4");
@@ -248,7 +260,7 @@ export async function stitchToBlob(
 
     const manifest = "file 'hook_t.mp4'\nfile 'body_t.mp4'\nfile 'cta_t.mp4'\n";
     await ffmpeg.writeFile("list.txt", new TextEncoder().encode(manifest));
-    await ffmpeg.exec(["-f", "concat", "-safe", "0", "-i", "list.txt", "-c", "copy", "output.mp4"]);
+    await execOrThrow(ffmpeg, ["-f", "concat", "-safe", "0", "-i", "list.txt", "-c", "copy", "output.mp4"], "final-concat");
 
     const data = (await ffmpeg.readFile("output.mp4")) as Uint8Array;
     const blob = new Blob([data.buffer as ArrayBuffer], { type: "video/mp4" });
@@ -290,7 +302,6 @@ export function useVideoStitcher() {
   const [error, setError] = useState<string | null>(null);
   const prevBlobUrl = useRef<string | null>(null);
 
-  // Reset the busy flag on unmount so a remount doesn't get stuck
   useEffect(() => {
     return () => {
       ffmpegBusy = false;
@@ -306,7 +317,6 @@ export function useVideoStitcher() {
       }
       ffmpegBusy = true;
 
-      // Revoke previous blob to free memory
       if (prevBlobUrl.current) {
         URL.revokeObjectURL(prevBlobUrl.current);
         prevBlobUrl.current = null;
@@ -316,7 +326,6 @@ export function useVideoStitcher() {
       setError(null);
       setProgress(0);
 
-      // Declared outside try so catch/finally can access them
       let ffmpeg: FFmpeg | null = null;
       let extraTempFiles: string[] = [];
 
@@ -359,13 +368,13 @@ export function useVideoStitcher() {
         setProgress(80);
         const manifest = "file 'hook_t.mp4'\nfile 'body_t.mp4'\nfile 'cta_t.mp4'\n";
         await ffmpeg.writeFile("list.txt", new TextEncoder().encode(manifest));
-        await ffmpeg.exec([
+        await execOrThrow(ffmpeg, [
           "-f", "concat",
           "-safe", "0",
           "-i", "list.txt",
           "-c", "copy",
           "output.mp4",
-        ]);
+        ], "final-concat");
 
         setProgress(90);
         const data = (await ffmpeg.readFile("output.mp4")) as Uint8Array;
@@ -381,7 +390,6 @@ export function useVideoStitcher() {
         setError(msg);
         setStatus("error");
       } finally {
-        // Always clean up temp files and release the mutex
         if (ffmpeg) {
           await cleanupFFmpegFiles(ffmpeg, extraTempFiles).catch(() => {});
         }

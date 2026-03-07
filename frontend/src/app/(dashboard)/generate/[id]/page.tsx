@@ -1122,7 +1122,7 @@ function CombinationPreview({
       </div>
 
       {/* ── Stitch bar ── */}
-      <div className="w-full rounded-lg border border-border bg-muted/40 px-4 py-3">
+      <div className={`w-full rounded-lg border px-4 py-3 ${stitchStatus === "error" ? "border-red-500/50 bg-red-500/5" : "border-border bg-muted/40"}`}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-col gap-0.5">
             <p className="text-xs font-medium text-foreground">
@@ -1204,8 +1204,11 @@ function CombinationPreview({
           </div>
         )}
 
-        {stitchError && (
-          <p className="mt-2 text-xs text-red-400">{stitchError}</p>
+        {stitchStatus === "error" && stitchError && (
+          <div className="mt-2 flex items-start gap-1.5 text-red-400">
+            <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
+            <p className="text-xs">{stitchError}</p>
+          </div>
         )}
       </div>
 
