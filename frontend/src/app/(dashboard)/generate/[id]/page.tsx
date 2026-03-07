@@ -2047,11 +2047,14 @@ export default function GenerationDetailPage() {
                   label={`Hook ${i + 1}`}
                   scriptText={script?.hooks?.[i]?.text}
                   isSelected={batchMode ? selectedHooks.has(i) : selectedHook === i}
-                  onSelect={() =>
-                    batchMode
-                      ? toggleBatchSelection(selectedHooks, setSelectedHooks, i)
-                      : setSelectedHook(i)
-                  }
+                  onSelect={() => {
+                    if (batchMode) {
+                      toggleBatchSelection(selectedHooks, setSelectedHooks, i);
+                      setSelectedHook(i);
+                    } else {
+                      setSelectedHook(i);
+                    }
+                  }}
                   onRegenerate={() => handleRegenerateSegment("hook", i + 1)}
                   isRegenerating={regeneratingKey === `hook_${i + 1}`}
                   multiSelect={batchMode}
@@ -2094,11 +2097,14 @@ export default function GenerationDetailPage() {
                   label={`Body ${i + 1}`}
                   scriptText={script?.bodies?.[i]?.text}
                   isSelected={batchMode ? selectedBodies.has(i) : selectedBody === i}
-                  onSelect={() =>
-                    batchMode
-                      ? toggleBatchSelection(selectedBodies, setSelectedBodies, i)
-                      : setSelectedBody(i)
-                  }
+                  onSelect={() => {
+                    if (batchMode) {
+                      toggleBatchSelection(selectedBodies, setSelectedBodies, i);
+                      setSelectedBody(i);
+                    } else {
+                      setSelectedBody(i);
+                    }
+                  }}
                   onRegenerate={() => handleRegenerateSegment("body", i + 1)}
                   isRegenerating={regeneratingKey === `body_${i + 1}`}
                   multiSelect={batchMode}
@@ -2141,11 +2147,14 @@ export default function GenerationDetailPage() {
                   label={`CTA ${i + 1}`}
                   scriptText={script?.ctas?.[i]?.text}
                   isSelected={batchMode ? selectedCtas.has(i) : selectedCta === i}
-                  onSelect={() =>
-                    batchMode
-                      ? toggleBatchSelection(selectedCtas, setSelectedCtas, i)
-                      : setSelectedCta(i)
-                  }
+                  onSelect={() => {
+                    if (batchMode) {
+                      toggleBatchSelection(selectedCtas, setSelectedCtas, i);
+                      setSelectedCta(i);
+                    } else {
+                      setSelectedCta(i);
+                    }
+                  }}
                   onRegenerate={() => handleRegenerateSegment("cta", i + 1)}
                   isRegenerating={regeneratingKey === `cta_${i + 1}`}
                   multiSelect={batchMode}
