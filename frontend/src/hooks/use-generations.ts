@@ -260,6 +260,7 @@ export function useGenerateSegmentComposite() {
 
 /** Fetch the number of segment regenerations used this calendar month. */
 export function useRegenLimit() {
+  const { isLoaded, isSignedIn } = useAuth();
   return useQuery({
     queryKey: ["regen-limit"],
     queryFn: async () => {
@@ -270,6 +271,7 @@ export function useRegenLimit() {
       );
       return res.data?.regens_used ?? 0;
     },
+    enabled: isLoaded && isSignedIn === true,
     staleTime: 30_000,
     retry: false,
   });
@@ -291,6 +293,7 @@ export function useDeleteGeneration() {
 
 /** Fetch paginated generation history from the Edge Function. */
 export function useGenerationHistory(page = 1) {
+  const { isLoaded, isSignedIn } = useAuth();
   return useQuery({
     queryKey: ["generation-history", page],
     queryFn: async () => {
@@ -300,5 +303,6 @@ export function useGenerationHistory(page = 1) {
       );
       return res.data;
     },
+    enabled: isLoaded && isSignedIn === true,
   });
 }

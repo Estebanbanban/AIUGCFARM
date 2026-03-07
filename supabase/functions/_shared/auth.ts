@@ -102,12 +102,48 @@ export async function requireUserId(req: Request): Promise<string> {
     .eq("clerk_user_id", clerkUserId)
     .maybeSingle();
 
-  if (error || !profile) {
-    console.error("Profile not found for Clerk user:", clerkUserId, error);
-    throw new Error("Unauthorized");
+  if (!error && profile) return profile.id;
+
+  // Profile not found by clerk_user_id — attempt lazy backfill.
+  // This handles existing users whose profiles pre-date the Clerk migration
+  // (their clerk_user_id column is null but their profile exists by email).
+  console.warn("Profile not found by clerk_user_id, attempting lazy backfill for:", clerkUserId);
+  const clerkSecretKey = Deno.env.get("CLERK_SECRET_KEY");
+  if (clerkSecretKey) {
+    try {
+      const clerkRes = await fetch(`https://api.clerk.com/v1/users/${clerkUserId}`, {
+        headers: { Authorization: `Bearer ${clerkSecretKey}` },
+      });
+      if (clerkRes.ok) {
+        const clerkUser = await clerkRes.json() as { email_addresses?: Array<{ email_address: string }> };
+        const email = clerkUser.email_addresses?.[0]?.email_address;
+        if (email) {
+          // Find existing profile by email (pre-migration profile with null clerk_user_id)
+          const { data: existingProfile } = await adminClient
+            .from("profiles")
+            .select("id")
+            .eq("email", email)
+            .is("clerk_user_id", null)
+            .maybeSingle();
+
+          if (existingProfile) {
+            // Backfill the clerk_user_id so future lookups succeed instantly
+            await adminClient
+              .from("profiles")
+              .update({ clerk_user_id: clerkUserId })
+              .eq("id", existingProfile.id);
+            console.log("Backfilled clerk_user_id for profile:", existingProfile.id);
+            return existingProfile.id;
+          }
+        }
+      }
+    } catch (backfillErr) {
+      console.error("Lazy backfill failed:", backfillErr);
+    }
   }
 
-  return profile.id;
+  console.error("Profile not found for Clerk user:", clerkUserId, error);
+  throw new Error("Unauthorized");
 }
 
 export async function optionalUserId(req: Request): Promise<string | null> {
