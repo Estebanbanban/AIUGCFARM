@@ -1879,6 +1879,7 @@ export default function GeneratePage() {
 
             {videoLoaderStep < 0 && store.productId && (
               <BrandProfileCard
+                key={store.productId}
                 brandSummary={brandSummary}
                 onSave={handleBrandSummaryUpdate}
                 productId={store.productId}
