@@ -11,6 +11,8 @@ import {
   Menu,
   LogOut,
   Plus,
+  Users,
+  Package,
 } from "lucide-react";
 import { useClerk } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
@@ -31,6 +33,8 @@ import { useGenerationNotifications } from "@/hooks/use-generation-notifications
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Generate", href: "/generate", icon: Film },
+  { label: "Personas", href: "/personas", icon: Users },
+  { label: "Brand", href: "/products", icon: Package },
   { label: "History", href: "/history", icon: Clock },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
