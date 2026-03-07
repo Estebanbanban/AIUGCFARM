@@ -122,10 +122,11 @@ async function detectSpeechSegments(
   };
 
   ffmpeg.on("log", handler);
+  let detectCode = 0;
   try {
     // Use plain exec — a non-zero exit (e.g. no audio stream) is handled
     // gracefully below rather than throwing, so silence detection is non-fatal.
-    await ffmpeg.exec([
+    detectCode = await ffmpeg.exec([
       "-i", filename,
       "-af", "silencedetect=n=-40dB:d=0.15",
       "-f", "null", "-",
@@ -135,7 +136,11 @@ async function detectSpeechSegments(
     ffmpeg.off("log", handler);
   }
 
+  console.log(`[stitcher] silencedetect ${filename} exit=${detectCode}`);
+
   const duration = parseDuration(log);
+  console.log(`[stitcher] parsed duration=${duration}s for ${filename}`);
+
   if (duration === 0) {
     // Can't even probe the file → real error (corrupt or URL expired)
     throw new Error(
@@ -145,7 +150,9 @@ async function detectSpeechSegments(
   }
 
   // getSpeechSegments handles partial log (e.g. no audio → no silence events → full clip)
-  return getSpeechSegments(log, duration);
+  const segs = getSpeechSegments(log, duration);
+  console.log(`[stitcher] speech segments for ${filename}:`, segs);
+  return segs;
 }
 
 /**
@@ -161,6 +168,7 @@ async function trimClipToSegments(
   outputFile: string,
 ): Promise<string[]> {
   const created: string[] = [];
+  console.log(`[stitcher] trimming ${inputFile} to ${segments.length} segment(s)`, segments);
 
   if (segments.length === 1) {
     const seg = segments[0];
@@ -241,13 +249,16 @@ export async function stitchToBlob(
   ffmpegBusy = true;
 
   try {
+    console.log("[stitcher] loading FFmpeg…");
     const [ffmpeg, { fetchFile }] = await Promise.all([
       getFFmpeg(),
       import("@ffmpeg/util"),
     ]);
+    console.log("[stitcher] FFmpeg loaded OK");
 
     await cleanupFFmpegFiles(ffmpeg);
 
+    console.log("[stitcher] fetching clips…");
     await Promise.all([
       ffmpeg.writeFile("hook.mp4", await fetchFile(hookUrl))
         .catch(async () => ffmpeg.writeFile("hook.mp4", await fetchFile(hookUrl))),
@@ -256,20 +267,27 @@ export async function stitchToBlob(
       ffmpeg.writeFile("cta.mp4", await fetchFile(ctaUrl))
         .catch(async () => ffmpeg.writeFile("cta.mp4", await fetchFile(ctaUrl))),
     ]);
+    console.log("[stitcher] clips fetched OK");
 
+    console.log("[stitcher] preparing hook…");
     const hookTmp = await prepareClip(ffmpeg, "hook.mp4", "hook_t.mp4");
+    console.log("[stitcher] preparing body…");
     const bodyTmp = await prepareClip(ffmpeg, "body.mp4", "body_t.mp4");
+    console.log("[stitcher] preparing cta…");
     const ctaTmp  = await prepareClip(ffmpeg, "cta.mp4",  "cta_t.mp4");
     const extraTempFiles = [...hookTmp, ...bodyTmp, ...ctaTmp];
+    console.log("[stitcher] all clips prepared, concatenating…");
 
     const manifest = "file 'hook_t.mp4'\nfile 'body_t.mp4'\nfile 'cta_t.mp4'\n";
     await ffmpeg.writeFile("list.txt", new TextEncoder().encode(manifest));
     await execOrThrow(ffmpeg, ["-f", "concat", "-safe", "0", "-i", "list.txt", "-c", "copy", "output.mp4"], "final-concat");
+    console.log("[stitcher] concat done");
 
     const data = (await ffmpeg.readFile("output.mp4")) as Uint8Array;
     const blob = new Blob([data.buffer as ArrayBuffer], { type: "video/mp4" });
 
     await cleanupFFmpegFiles(ffmpeg, extraTempFiles);
+    console.log("[stitcher] done, blob size:", blob.size);
     return blob;
   } finally {
     ffmpegBusy = false;
@@ -336,11 +354,13 @@ export function useVideoStitcher() {
       try {
         setStatus("loading_ffmpeg");
         setProgress(5);
+        console.log("[stitcher:hook] loading FFmpeg…");
         const [ffmpegInstance, { fetchFile }] = await Promise.all([
           getFFmpeg(),
           import("@ffmpeg/util"),
         ]);
         ffmpeg = ffmpegInstance;
+        console.log("[stitcher:hook] FFmpeg loaded OK");
 
         // Pre-run cleanup — clear stale files from any previous run on this singleton
         await cleanupFFmpegFiles(ffmpeg);
@@ -391,6 +411,7 @@ export function useVideoStitcher() {
 
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Stitching failed";
+        console.error("[stitcher:hook] FAILED:", msg, err);
         setError(msg);
         setStatus("error");
       } finally {
