@@ -21,6 +21,8 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Send,
   Scissors,
   Layers,
@@ -1488,6 +1490,35 @@ export default function GenerationDetailPage() {
     ...(segments?.ctas ?? []).map((v, i) => ({ name: `ctas/cta_${i + 1}.mp4`, url: v.url })),
   ], [segments]);
 
+  // Triple-mode combo navigator (#146)
+  const allCombos = useMemo(() => {
+    if (gen?.mode !== "triple") return [];
+    const combos: Array<{ hookIdx: number; bodyIdx: number; ctaIdx: number }> = [];
+    for (let h = 0; h < 3; h++) {
+      for (let b = 0; b < 3; b++) {
+        for (let c = 0; c < 3; c++) {
+          combos.push({ hookIdx: h, bodyIdx: b, ctaIdx: c });
+        }
+      }
+    }
+    return combos; // 27 combos
+  }, [gen?.mode]);
+
+  const currentComboIndex = useMemo(() => {
+    if (allCombos.length === 0) return -1;
+    return allCombos.findIndex(
+      (c) => c.hookIdx === selectedHook && c.bodyIdx === selectedBody && c.ctaIdx === selectedCta
+    );
+  }, [allCombos, selectedHook, selectedBody, selectedCta]);
+
+  const goToCombo = useCallback((idx: number) => {
+    const combo = allCombos[idx];
+    if (!combo) return;
+    setSelectedHook(combo.hookIdx);
+    setSelectedBody(combo.bodyIdx);
+    setSelectedCta(combo.ctaIdx);
+  }, [allCombos]);
+
   // Collapse script when videos are ready
   useEffect(() => {
     if (isComplete && segments) {
@@ -2305,9 +2336,38 @@ export default function GenerationDetailPage() {
                 <CardTitle className="text-foreground">
                   Combination Preview
                 </CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  Hook {selectedHook + 1} + Body {selectedBody + 1} + CTA {selectedCta + 1}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    Hook {selectedHook + 1} + Body {selectedBody + 1} + CTA {selectedCta + 1}
+                  </p>
+                  {gen?.mode === "triple" && allCombos.length > 0 && (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        disabled={currentComboIndex === -1}
+                        onClick={() => goToCombo((currentComboIndex - 1 + 27) % 27)}
+                        aria-label="Previous combination"
+                      >
+                        <ChevronLeft className="h-3 w-3" />
+                      </Button>
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {currentComboIndex === -1 ? "? / 27" : `${currentComboIndex + 1} / 27`}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        disabled={currentComboIndex === -1}
+                        onClick={() => goToCombo((currentComboIndex + 1) % 27)}
+                        aria-label="Next combination"
+                      >
+                        <ChevronRight className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
