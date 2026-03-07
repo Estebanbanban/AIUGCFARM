@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/nextjs";
 import { callEdge } from "@/lib/api";
 import type { Generation } from "@/types/database";
 import type {
@@ -45,6 +46,7 @@ export interface GenerationWithRelations extends Generation {
 }
 
 export function useGenerations() {
+  const { isLoaded, isSignedIn } = useAuth();
   return useQuery<GenerationWithRelations[]>({
     queryKey: ["generations"],
     queryFn: async () => {
@@ -54,6 +56,7 @@ export function useGenerations() {
       );
       return res.data;
     },
+    enabled: isLoaded && isSignedIn === true,
     retry: false,
   });
 }

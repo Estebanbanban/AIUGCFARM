@@ -92,7 +92,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const wizard = useGenerationWizardStore();
-  const { user } = useUser();
+  const { user, isLoaded, isSignedIn } = useUser();
   const firstName = user?.firstName || user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] || "there";
   const [presets, setPresets] = useState<Preset[]>([]);
 
@@ -167,10 +167,11 @@ export default function DashboardPage() {
   }, [searchParams]);
 
   useEffect(() => {
-    callEdge<{ data: Preset[] }>("list-presets").then((res) => {
+    if (!isLoaded || !isSignedIn) return;
+    callEdge<{ data: Preset[] }>("list-presets", { method: "GET" }).then((res) => {
       setPresets(res.data ?? []);
     }).catch(() => {});
-  }, []);
+  }, [isLoaded, isSignedIn]);
 
   function handleLoadPreset(preset: Preset) {
     wizard.loadPreset(preset.config);

@@ -1,17 +1,20 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/nextjs";
 import { callEdge } from "@/lib/api";
 import type { Product } from "@/types/database";
 import type { ScrapeResponse, ConfirmProductsResponse } from "@/types/api";
 
 export function useProducts() {
+  const { isLoaded, isSignedIn } = useAuth();
   return useQuery<Product[]>({
     queryKey: ["products"],
     queryFn: async () => {
       const res = await callEdge<{ data: Product[] }>("list-products", { method: "GET" });
       return res.data;
     },
+    enabled: isLoaded && isSignedIn === true,
     retry: false,
   });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@clerk/nextjs";
 import { callEdge } from "@/lib/api";
 import type { Profile } from "@/types/database";
 
@@ -21,10 +22,12 @@ export const HD_QUALITY_PLANS: Set<Profile["plan"]> = new Set(["free", "starter"
 export const ADVANCED_MODE_PLANS: Set<Profile["plan"]> = new Set(["free", "starter", "growth", "scale"]);
 
 export function useProfile() {
+  const { isLoaded, isSignedIn } = useAuth();
   return useQuery<Profile>({
     queryKey: ["profile"],
     queryFn: async () => {
       return callEdge<Profile>("get-profile", { method: "GET" });
     },
+    enabled: isLoaded && isSignedIn === true,
   });
 }

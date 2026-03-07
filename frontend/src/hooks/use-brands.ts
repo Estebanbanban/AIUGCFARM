@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/nextjs";
 import { callEdge } from "@/lib/api";
 
 export interface Brand {
@@ -17,12 +18,14 @@ export interface Brand {
 }
 
 export function useBrands() {
+  const { isLoaded, isSignedIn } = useAuth();
   return useQuery<Brand[]>({
     queryKey: ["brands"],
     queryFn: async () => {
       const res = await callEdge<{ data: Brand[] }>("list-brands", { method: "GET" });
       return res.data;
     },
+    enabled: isLoaded && isSignedIn === true,
     retry: false,
   });
 }

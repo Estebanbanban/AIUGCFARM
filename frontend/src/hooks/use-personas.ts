@@ -1,18 +1,21 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/nextjs";
 import { callEdge } from "@/lib/api";
 import { getSignedImageUrl } from "@/lib/storage";
 import type { Persona, Generation } from "@/types/database";
 import type { CreatePersonaInput } from "@/schemas/persona";
 
 export function usePersonas() {
+  const { isLoaded, isSignedIn } = useAuth();
   return useQuery<Persona[]>({
     queryKey: ["personas"],
     queryFn: async () => {
       const res = await callEdge<{ data: Persona[] }>("list-personas", { method: "GET" });
       return res.data;
     },
+    enabled: isLoaded && isSignedIn === true,
     retry: false,
   });
 }

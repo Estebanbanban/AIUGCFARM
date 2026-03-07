@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@clerk/nextjs";
 import { callEdge } from "@/lib/api";
 
 interface CreditInfo {
@@ -14,6 +15,7 @@ interface CreditBalanceResponse {
 }
 
 export function useCredits() {
+  const { isLoaded, isSignedIn } = useAuth();
   return useQuery<CreditInfo>({
     queryKey: ["credits"],
     queryFn: async () => {
@@ -22,5 +24,6 @@ export function useCredits() {
       });
       return res.data;
     },
+    enabled: isLoaded && isSignedIn === true,
   });
 }
