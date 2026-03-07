@@ -21,6 +21,9 @@ export interface PresetConfig {
   cta_comment_keyword?: string;
   language: string;
   video_provider?: "kling" | "sora";
+  hooks_count?: number;
+  bodies_count?: number;
+  ctas_count?: number;
 }
 
 interface GenerationWizardState {
@@ -50,6 +53,9 @@ interface GenerationWizardState {
   // Advanced Mode
   advancedMode: boolean;
   advancedSegments: AdvancedSegmentsConfig | null;
+  hooksCount: number;
+  bodiesCount: number;
+  ctasCount: number;
   // Video provider (HD only)
   videoProvider: "kling" | "sora";
   // Actions
@@ -82,6 +88,9 @@ interface GenerationWizardState {
   clearPendingScript: () => void;
   setAdvancedMode: (enabled: boolean) => void;
   setAdvancedSegments: (segments: AdvancedSegmentsConfig | null) => void;
+  setHooksCount: (n: number) => void;
+  setBodiesCount: (n: number) => void;
+  setCtasCount: (n: number) => void;
   setVideoProvider: (provider: "kling" | "sora") => void;
   updateAdvancedSegment: (
     type: "hooks" | "bodies" | "ctas",
@@ -122,6 +131,9 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
       compositePreviewCache: {},
       advancedMode: false,
       advancedSegments: null,
+      hooksCount: 3,
+      bodiesCount: 3,
+      ctasCount: 3,
       videoProvider: "kling",
       setStep: (step) =>
         set((state) => {
@@ -220,6 +232,9 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
         set((state) => {
           state.advancedSegments = segments;
         }),
+      setHooksCount: (n) => set({ hooksCount: Math.min(5, Math.max(1, n)) }),
+      setBodiesCount: (n) => set({ bodiesCount: Math.min(5, Math.max(1, n)) }),
+      setCtasCount: (n) => set({ ctasCount: Math.min(5, Math.max(1, n)) }),
       setVideoProvider: (provider) =>
         set((state) => {
           state.videoProvider = provider;
@@ -242,6 +257,9 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
           ctaCommentKeyword: config.cta_comment_keyword ?? "",
           language: config.language,
           videoProvider: config.video_provider ?? "kling",
+          hooksCount: config.hooks_count ?? 3,
+          bodiesCount: config.bodies_count ?? 3,
+          ctasCount: config.ctas_count ?? 3,
           step: 4,
           // Reset session-specific state
           compositeImagePath: null,
@@ -320,6 +338,9 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
         compositePreviewCache: state.compositePreviewCache,
         advancedMode: state.advancedMode,
         videoProvider: state.videoProvider,
+        hooksCount: state.hooksCount,
+        bodiesCount: state.bodiesCount,
+        ctasCount: state.ctasCount,
         // advancedSegments intentionally excluded - complex, per-session
       }),
       version: 1,
