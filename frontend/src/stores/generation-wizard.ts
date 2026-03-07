@@ -11,6 +11,18 @@ interface PendingScript {
 
 type CompositePreviewCache = Record<string, string[]>;
 
+export interface PresetConfig {
+  product_id: string;
+  persona_id: string;
+  mode: "single" | "triple";
+  quality: "standard" | "hd";
+  format: "9:16" | "16:9";
+  cta_style: string;
+  cta_comment_keyword?: string;
+  language: string;
+  video_provider?: "kling" | "sora";
+}
+
 interface GenerationWizardState {
   step: number;
   productId: string | null;
@@ -76,6 +88,7 @@ interface GenerationWizardState {
     index: number,
     patch: Partial<AdvancedSegmentConfig>,
   ) => void;
+  loadPreset: (config: PresetConfig) => void;
   /** Hydrate the wizard from a DB generation record (for dashboard resume). */
   resumeFromGeneration: (params: {
     generationId: string;
@@ -217,6 +230,27 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
           const seg = state.advancedSegments[type][index];
           if (!seg) return;
           Object.assign(seg, patch);
+        }),
+      loadPreset: (config) =>
+        set({
+          productId: config.product_id,
+          personaId: config.persona_id,
+          mode: config.mode,
+          quality: config.quality,
+          format: config.format,
+          ctaStyle: config.cta_style,
+          ctaCommentKeyword: config.cta_comment_keyword ?? "",
+          language: config.language,
+          videoProvider: config.video_provider ?? "kling",
+          step: 4,
+          // Reset session-specific state
+          compositeImagePath: null,
+          selectedProductImages: [],
+          pendingGenerationId: null,
+          pendingScript: null,
+          creditsToCharge: null,
+          advancedMode: false,
+          advancedSegments: null,
         }),
       resumeFromGeneration: ({ generationId, script, creditsToCharge, productId, personaId, mode, quality }) =>
         set((state) => {
