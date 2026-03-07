@@ -34,9 +34,6 @@ verify_jwt = false
 [functions.persona-images]
 verify_jwt = false
 
-[functions.regenerate-segment]
-verify_jwt = false
-
 [functions.scrape-product]
 verify_jwt = false
 
