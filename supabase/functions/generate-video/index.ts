@@ -152,14 +152,14 @@ const LANGUAGE_NAMES: Record<string, string> = {
 function buildSystemPrompt(count: number, language: string): string {
   const plural = count > 1 ? "s" : "";
   const hookAngles = count > 1
-    ? " Each uses a DIFFERENT angle from the list below."
-    : " Use the BEST angle from the list below for this product.";
+    ? " Each uses a DIFFERENT angle from the SGE framework below."
+    : " Use the BEST angle from the SGE framework below for this product.";
   const bodyAngles = count > 1
     ? " Each uses a DIFFERENT structure."
     : " Use whichever structure fits best.";
   const ctaAngles = count > 1
-    ? " Each uses a DIFFERENT pattern."
-    : " Use the most natural-sounding pattern.";
+    ? " Each uses a DIFFERENT invisible-CTA pattern."
+    : " Use the most natural-sounding invisible-CTA pattern.";
 
   // Language block goes FIRST so the model sees it before any English-language style rules.
   const langName = language !== "en" ? (LANGUAGE_NAMES[language] ?? language) : null;
@@ -179,36 +179,53 @@ Write scripts in first-person, conversational tone — exactly how a real person
 CRITICAL VOICE RULES:
 - Sound like a friend sharing something they genuinely love, not a brand announcing a product.
 - Use contractions and natural speech patterns ("I've been using", "honestly", "I was like").
-- Be SPECIFIC: "lost 8 lbs in 3 weeks" beats "great results". "$30 cheaper" beats "affordable".
 - NEVER use: "game-changer", "amazing", "incredible", "life-changing", "must-have" — these sound fake.
+- No emojis in scripts.
 - Write at a natural speaking pace: ~2.5 words per second. Set duration_seconds based on actual word count.
+
+SPECIFICITY RULE (NEVER BREAK): Every claim must contain at least one specific number, timeframe, named ingredient, or named feature. Vague claims are forbidden.
+- BAD: "long-lasting mascara" | GOOD: "this mascara holds for 14 hours in 90% humidity"
+- BAD: "most users see results" | GOOD: "87% of users saw results in 2 weeks"
+- BAD: "affordable" | GOOD: "$12 cheaper than the department store version"
 
 ---
 
-HOOK — ${count} variant${plural} | 2–4 seconds each | 5–10 words max${hookAngles}
-The hook must STOP THE SCROLL in the first 2 seconds. One punchy sentence. No setup.
+HOOK FRAMEWORK — 4 Viral SGE Angles:
 
-Available hook angles:
-- pain_point: "I used to [problem] until I found this..."
-- skeptic_convert: "I was literally about to return this when..."
-- specific_result: "I [specific measurable result] using this one thing."
-- pattern_interrupt: Unexpected statement that creates a "wait, what?" moment.
-- direct_address: "If you have [exact problem], you need to stop scrolling."
-- before_after: "My [thing] before vs. after — I can't believe this is real."
-- social_proof: "I've seen this everywhere so I finally caved and... wow."
-- gatekeeping: "I've been lowkey hiding this for months but I can't anymore."
+${count} variant${plural}${hookAngles}
+The hook must STOP THE SCROLL in the first 2 seconds. Max 2 sentences. No setup.
+
+1. LATE_DISCOVERY ("I wish I'd known about this sooner")
+   Pattern: "I've been [doing thing wrong] for [time] until I found [product]"
+   Psychology: FOMO + embarrassment + relief
+   Example: "I spent 3 years trying every moisturizer before I found this one"
+
+2. PRICE_SHOCK ("This costs HOW much?")
+   Pattern: Lead with the price (high OR low) before revealing what it is
+   Psychology: Pattern interrupt, curiosity gap
+   Example: "This $12 serum outperforms my $200 one" OR "I can't believe I paid $800 for this"
+
+3. SPECIFICITY_LEAD ("The weirdly specific claim that makes it real")
+   Pattern: Use a concrete number, timeframe, or measurement — never vague promises
+   Psychology: Specificity = credibility
+   Example: "This mascara holds for 14 hours in 90% humidity" (not "long-lasting mascara")
+
+4. EVERYONE_KNOWS_BUT_YOU ("The open secret")
+   Pattern: Reference something that 'everyone in [niche] knows' but the viewer might not
+   Psychology: Tribal identity + curiosity + authority
+   Example: "Every dermatologist has this in their cabinet but nobody talks about it"
 
 ---
 
 BODY — ${count} variant${plural} | 5–9 seconds each | 12–22 words max${bodyAngles}
-Deliver the payoff fast. Cover: what it does → why it works → one proof point.
+Deliver the payoff fast. Cover: what it does → why it works → one specific proof point.
 At 2.5 words/sec: 5s ≈ 12 words, 7s ≈ 17 words, 9s ≈ 22 words. Stay within limits.
 
 CRITICAL BODY RULES (NEVER BREAK):
-- The body MUST NOT restate, echo, or mirror the hook's opening problem or pain point. The viewer already heard the hook.
-- Do NOT start the body with another problem statement if the hook already opened with one.
+- The body MUST NOT restate, echo, or mirror the hook's opening problem or pain point.
 - The body must CONTINUE from the hook: deliver proof, sensory detail, specific benefit, or social evidence.
-- Assume the hook has already established the problem. The body should answer: "here's what happened / here's why it works / here's the result."
+- Assume the hook has already established the problem. Body answers: "here's what happened / here's why it works / here's the result."
+- Must contain at least one specific number, timeframe, or named ingredient/feature.
 
 Available body structures:
 - problem_solution: "[Problem] was ruining [thing]. This [does X] in [timeframe]. [Specific result]."
@@ -219,22 +236,26 @@ Available body structures:
 ---
 
 CTA — ${count} variant${plural} | 2–4 seconds each | 5–10 words max${ctaAngles}
-One clear action. Low friction. Natural, not pushy. Never just "buy now."
 
-Available CTA patterns:
-- link_drop: "Link's in [bio/comments] — I put the exact one I use."
-- risk_reversal: "Try it — if it doesn't work, it's fully returnable."
-- urgency_soft: "Grab it before [reason] — [link/where to find it]."
-- comment_trigger: "Comment [word] and I'll drop the link — seriously."
-- recommendation: "If you're dealing with [problem], just try it. I promise."
+INVISIBLE CTA RULE (NEVER BREAK): Never say "link in bio", "shop now", "buy now", or any explicit purchase command.
+End with a natural conversational close that makes the viewer WANT to look it up themselves.
+Good example: "I actually don't recommend this for everyone, but if you're [specific situation], look it up."
+Good example: "Honestly I wasn't going to share this, but here we are."
+
+Available invisible-CTA patterns:
+- soft_recommendation: "If you're dealing with [specific problem], it's worth looking into."
+- gatekeeping_release: "I wasn't going to tell anyone about this, but I can't keep it to myself."
+- specific_qualifier: "I don't recommend this for everyone — but if you [specific condition], look it up."
+- social_nudge: "Everyone in [niche community] already knows about this — just saying."
+- curiosity_close: "I'll leave it at that. You'll know it when you find it."
 
 ---
 
 Return ONLY valid JSON (exactly ${count} item${plural} per array). Set duration_seconds to match actual word count at 2.5 words/sec:
 {
-  "hooks": [{ "text": "...", "duration_seconds": 3, "variant_label": "pain_point" }${count > 1 ? ", ..." : ""}],
+  "hooks": [{ "text": "...", "duration_seconds": 3, "variant_label": "LATE_DISCOVERY" }${count > 1 ? ", ..." : ""}],
   "bodies": [{ "text": "...", "duration_seconds": 7, "variant_label": "problem_solution" }${count > 1 ? ", ..." : ""}],
-  "ctas": [{ "text": "...", "duration_seconds": 3, "variant_label": "link_drop" }${count > 1 ? ", ..." : ""}]
+  "ctas": [{ "text": "...", "duration_seconds": 3, "variant_label": "soft_recommendation" }${count > 1 ? ", ..." : ""}]
 }`;
 
   if (language !== "en") {
@@ -242,6 +263,19 @@ Return ONLY valid JSON (exactly ${count} item${plural} per array). Set duration_
     return result + `\n\nFINAL REMINDER: Every word in "text" fields MUST be in ${LANGUAGE_NAMES[language] ?? language}. Zero English. Not even one word.`;
   }
   return result;
+}
+
+// ── Category-aware hook angle selection ───────────────────────────────
+
+function getCategoryAngles(category: string): [string, string] {
+  const cat = (category ?? "").toLowerCase();
+  if (/skin|beauty|cosmetic|makeup|serum|moistur/.test(cat)) return ["SPECIFICITY_LEAD", "LATE_DISCOVERY"];
+  if (/fitness|supplement|protein|workout|gym/.test(cat)) return ["PRICE_SHOCK", "SPECIFICITY_LEAD"];
+  if (/fashion|apparel|cloth|wear|dress|shoe/.test(cat)) return ["LATE_DISCOVERY", "EVERYONE_KNOWS_BUT_YOU"];
+  if (/tech|gadget|electronic|device|software|app/.test(cat)) return ["PRICE_SHOCK", "SPECIFICITY_LEAD"];
+  if (/food|beverage|drink|snack|nutrition|meal/.test(cat)) return ["SPECIFICITY_LEAD", "LATE_DISCOVERY"];
+  if (/home|lifestyle|decor|kitchen|clean/.test(cat)) return ["LATE_DISCOVERY", "PRICE_SHOCK"];
+  return ["LATE_DISCOVERY", "SPECIFICITY_LEAD"];
 }
 
 function buildUserPrompt(product: Record<string, unknown>, language: string): string {
@@ -253,20 +287,57 @@ function buildUserPrompt(product: Record<string, unknown>, language: string): st
     ? `LANGUAGE: Write the ENTIRE script in ${langName} ONLY. No English words at all — not even one.\n\n`
     : "";
 
+  // ── Brand summary fields (safe optional access for both 3-field and 10-field shapes) ──
+  const tone = (brandSummary?.tone as string | undefined) ?? "conversational, authentic";
+  const demographic = (brandSummary?.demographic as string | undefined) ?? "general adults";
+  const sellingPoints = Array.isArray(brandSummary?.selling_points)
+    ? (brandSummary.selling_points as string[]).join(", ")
+    : (brandSummary?.selling_points as string | undefined) ?? "N/A";
+  const tagline = (brandSummary?.tagline as string | undefined) ?? "";
+  const uniqueValueProp = (brandSummary?.unique_value_prop as string | undefined) ?? "";
+  const customerPainPoints = Array.isArray(brandSummary?.customer_pain_points)
+    ? (brandSummary.customer_pain_points as string[]).join(", ")
+    : "";
+  const socialProof = (brandSummary?.social_proof as string | undefined) ?? "";
+  const pricePositioning = (brandSummary?.price_positioning as string | undefined) ?? "";
+  const productCategory = (brandSummary?.product_category as string | undefined) ?? (product.category as string | undefined) ?? "";
+  const competitorPositioning = (brandSummary?.competitor_positioning as string | undefined) ?? "";
+
+  // ── Category-aware angle shortlist ───────────────────────────────────
+  const [angle1, angle2] = getCategoryAngles(productCategory);
+  const categoryBlock = productCategory
+    ? `RECOMMENDED HOOK ANGLES for ${productCategory}: ${angle1}, ${angle2}. Choose the best one for this specific product — these are recommendations, not hard constraints.`
+    : `RECOMMENDED HOOK ANGLES: LATE_DISCOVERY, SPECIFICITY_LEAD. Choose the best one for this specific product.`;
+
+  // ── Optional brand fields (only include if present) ──────────────────
+  const optionalLines: string[] = [];
+  if (tagline) optionalLines.push(`Brand tagline: ${tagline}`);
+  if (socialProof && socialProof !== "Not mentioned") optionalLines.push(`Social proof / credibility: ${socialProof}`);
+  if (pricePositioning) optionalLines.push(`Price positioning: ${pricePositioning}`);
+  if (competitorPositioning) optionalLines.push(`Competitor differentiation: ${competitorPositioning}`);
+  const optionalBlock = optionalLines.length > 0 ? "\n" + optionalLines.join("\n") : "";
+
   const base = `${langHeader}Product: ${product.name}
 Description: ${product.description}
-Price: ${product.price ?? "N/A"}
-Brand tone: ${brandSummary.tone ?? "conversational, authentic"}
-Target demographic: ${brandSummary.demographic ?? "general adults"}
-Key selling points: ${brandSummary.selling_points ?? "N/A"}
+Price: ${product.price ?? "N/A"} ${product.currency ?? ""}
+Brand tone: ${tone}
+Target demographic: ${demographic}
+Key selling points: ${sellingPoints}${optionalBlock}
+${uniqueValueProp ? `Unique value proposition: ${uniqueValueProp}` : ""}
+${customerPainPoints ? `Target these pain points: ${customerPainPoints}` : ""}
 
-PRICE NOTE: The product costs ${product.price} ${product.currency}. Do NOT use phrases like "just $X" or "only $X" unless this price is clearly budget-friendly for the product category. Present the price truthfully and contextually.
+PRICE NOTE: The product costs ${product.price} ${product.currency ?? ""}. Do NOT use phrases like "just $X" or "only $X" unless this price is clearly budget-friendly for the product category. Present the price truthfully and contextually.
+
+${categoryBlock}
+
+REQUIRED: Every hook and body sentence must contain at least one specific number, timeframe, or named ingredient/feature. No vague claims allowed. "Long-lasting" → "holds for 14 hours". "Most users" → "87% of users". This is non-negotiable.
 
 CALIBRATION INSTRUCTIONS:
-- Match the hook to a real pain point this demographic actually feels.
+- Match the hook angle to a real pain point this demographic actually feels.
 - If price is listed and it's a clear value advantage, you may reference it in the hook or body.
 - Mirror the brand tone: if "playful" → be light and fun; if "premium" → be aspirational but still authentic.
-- Write scripts AS IF the persona IS the target demographic speaking to their peers.${langName ? `\n\nRemember: every word in the JSON output must be in ${langName}. Native-speaker level, zero English.` : ""}`;
+- Write scripts AS IF the persona IS the target demographic speaking to their peers.
+- CTA must be invisible — no "link in bio", no "shop now", no "buy now". End with a natural close that makes viewers want to seek it out themselves.${langName ? `\n\nRemember: every word in the JSON output must be in ${langName}. Native-speaker level, zero English.` : ""}`;
 
   return base;
 }
