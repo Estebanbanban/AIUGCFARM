@@ -48,6 +48,7 @@ import { useProfile } from "@/hooks/use-profile";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { GenerationStatus, ScriptSegment, SegmentVideo } from "@/types/database";
 import { generateSrt, buildWordCues, type WordCue } from "@/lib/srt";
+import { burnCaptionsToVideo } from "@/lib/burn-captions";
 import { trackVideoCompleted, trackVideoFailed, trackVideoDownloaded } from "@/lib/datafast";
 import { useVideoStitcher, STITCH_STATUS_LABELS } from "@/hooks/use-video-stitcher";
 import { useZipDownload } from "@/hooks/use-zip-download";
@@ -464,6 +465,8 @@ function VideoSegmentCard({
   const [isPlaying, setIsPlaying] = useState(false);
   const [captionsOn, setCaptionsOn] = useState(false);
   const [activeWordIdx, setActiveWordIdx] = useState(-1);
+  const [burning, setBurning] = useState(false);
+  const [burnProgress, setBurnProgress] = useState(0);
 
   const wordCues = useMemo<WordCue[]>(
     () => (scriptText ? buildWordCues(scriptText, video.duration) : []),
@@ -516,6 +519,35 @@ function VideoSegmentCard({
     } catch {
       // Fallback to opening in new tab if blob fetch fails
       window.open(video.url, "_blank");
+    }
+  }
+
+  async function handleDownloadWithCaptions() {
+    if (wordCues.length === 0 || burning) return;
+    setBurning(true);
+    setBurnProgress(0);
+    try {
+      const { blob, mimeType } = await burnCaptionsToVideo(
+        video.url,
+        wordCues,
+        ({ ratio }) => setBurnProgress(Math.round(ratio * 100)),
+      );
+      const ext = mimeType === "video/mp4" ? "mp4" : "webm";
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `cinerads-${label.replace(/\s+/g, "-").toLowerCase()}-captions.${ext}`;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      trackVideoDownloaded("segment");
+    } catch {
+      toast.error("Failed to burn captions. Try downloading the .srt instead.");
+    } finally {
+      setBurning(false);
+      setBurnProgress(0);
     }
   }
 
@@ -667,6 +699,26 @@ function VideoSegmentCard({
               title={captionsOn ? "Hide captions" : "Show captions"}
             >
               CC
+            </Button>
+          )}
+          {wordCues.length > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 shrink-0 relative"
+              disabled={burning}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDownloadWithCaptions();
+              }}
+              aria-label="Download with captions burned in"
+              title={burning ? `Burning captions… ${burnProgress}%` : "Download with captions"}
+            >
+              {burning ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <FileText className="size-4" />
+              )}
             </Button>
           )}
           <Button
