@@ -11,7 +11,8 @@ export function UrlInputCta({ location = "hero" }: { location?: "hero" | "final_
     if (url.trim()) {
       trackCtaClicked(location);
       localStorage.setItem("pendingScrapeUrl", url);
-      window.location.href = `/sign-up?redirect_url=/dashboard?import=${encodeURIComponent(url)}`;
+      const redirectTarget = `/dashboard?import=${encodeURIComponent(url)}`;
+      window.location.href = `/sign-up?redirect_url=${encodeURIComponent(redirectTarget)}`;
     }
   };
 

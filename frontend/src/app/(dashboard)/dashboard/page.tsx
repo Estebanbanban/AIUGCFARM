@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
+import { useSearchParams } from "next/navigation";
 import {
   Video,
   CreditCard,
@@ -89,6 +90,7 @@ const quickActions = [
 
 export default function DashboardPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const wizard = useGenerationWizardStore();
   const { user } = useUser();
   const firstName = user?.firstName || user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] || "there";
@@ -156,12 +158,13 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    const pendingUrl = localStorage.getItem("pendingScrapeUrl");
+    const importFromQuery = searchParams.get("import");
+    const pendingUrl = importFromQuery || localStorage.getItem("pendingScrapeUrl");
     if (pendingUrl) {
       localStorage.removeItem("pendingScrapeUrl");
       router.push(`/products?importUrl=${encodeURIComponent(pendingUrl)}`);
     }
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     callEdge<{ data: Preset[] }>("list-presets").then((res) => {
