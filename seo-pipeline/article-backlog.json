@@ -596,7 +596,7 @@
       "competition": "MEDIUM",
       "compositeScore": 240,
       "priority": 21,
-      "status": "pending",
+      "status": "written",
       "category": "ai-marketing",
       "agentPair": 11,
       "competitorResearch": [
@@ -605,7 +605,7 @@
         "https://creatify.ai"
       ],
       "notes": "HeyGen is the biggest brand in AI video. KD 5 = very winnable. Buyers looking to switch come with high intent. CineRads angle: ecommerce-first, batch generation, $3/video vs HeyGen pricing.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -620,7 +620,7 @@
       "competition": "MEDIUM",
       "compositeScore": 200,
       "priority": 22,
-      "status": "pending",
+      "status": "written",
       "category": "ai-marketing",
       "agentPair": 11,
       "competitorResearch": [
@@ -629,7 +629,7 @@
         "https://www.heygen.com"
       ],
       "notes": "Synthesia is enterprise-focused ($30/month+). KD 3 = very easy. Ecommerce brands are overcharged. CineRads angle: purpose-built for ads vs. Synthesia built for training videos.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -644,7 +644,7 @@
       "competition": "MEDIUM",
       "compositeScore": 180,
       "priority": 23,
-      "status": "pending",
+      "status": "written",
       "category": "ai-marketing",
       "agentPair": 12,
       "competitorResearch": [
@@ -653,7 +653,7 @@
         "https://arcads.ai"
       ],
       "notes": "InVideo has 500K+ users but poor ad performance. KD 2 = almost no competition. Buyers frustrated with template quality. CineRads: real avatars, 27 combos, ecommerce-native.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -668,7 +668,7 @@
       "competition": "LOW",
       "compositeScore": 160,
       "priority": 24,
-      "status": "pending",
+      "status": "written",
       "category": "ugc-video",
       "agentPair": 12,
       "competitorResearch": [
@@ -676,7 +676,7 @@
         "https://www.heygen.com/blog/ecommerce-video-ads"
       ],
       "notes": "KD=0 = completely open. Unboxing is the #1 UGC format on TikTok/Reels. AI avatars simulate unboxing without shipping products to creators. Bridge to CineRads batch generation.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -691,7 +691,7 @@
       "competition": "LOW",
       "compositeScore": 144,
       "priority": 25,
-      "status": "pending",
+      "status": "written",
       "category": "ecommerce",
       "agentPair": 13,
       "competitorResearch": [
@@ -699,7 +699,7 @@
         "https://www.heygen.com/blog/ecommerce-video-ads"
       ],
       "notes": "KD=0, huge DTC vertical. Supplements have strict FDA ad rules \u2014 AI avatars avoid endorsement claims better than real creators. Bridge: how CineRads helps supplement brands scale safely.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -714,7 +714,7 @@
       "competition": "LOW",
       "compositeScore": 144,
       "priority": 26,
-      "status": "pending",
+      "status": "written",
       "category": "ecommerce",
       "agentPair": 13,
       "competitorResearch": [
@@ -722,7 +722,7 @@
         "https://creatify.ai/blog"
       ],
       "notes": "KD=0, growing DTC vertical. Fitness brands typically pay premium for creator partnerships. AI avatars = consistent brand voice at $3/video. Pair with supplement article for agent research overlap.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -737,7 +737,7 @@
       "competition": "LOW",
       "compositeScore": 144,
       "priority": 27,
-      "status": "pending",
+      "status": "written",
       "category": "ecommerce",
       "agentPair": 14,
       "competitorResearch": [
@@ -745,7 +745,7 @@
         "https://www.heygen.com/blog/ecommerce-video-ads"
       ],
       "notes": "KD=0, WooCommerce has 30%+ of all ecommerce stores. We have shopify-video-ads-tutorial but not WooCommerce. Same angle: paste product URL \u2192 generate ads. Easy partner article.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -760,7 +760,7 @@
       "competition": "MEDIUM",
       "compositeScore": 132,
       "priority": 28,
-      "status": "pending",
+      "status": "written",
       "category": "ai-marketing",
       "agentPair": 14,
       "competitorResearch": [
@@ -769,7 +769,7 @@
         "https://arcads.ai"
       ],
       "notes": "Core CineRads use case. KD 2 = nearly open. Different from ai-ugc-creator-comparison \u2014 this focuses on how avatars work in ads, best practices, hook delivery via avatar. Directly sells CineRads.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -784,7 +784,7 @@
       "competition": "LOW",
       "compositeScore": 96,
       "priority": 29,
-      "status": "pending",
+      "status": "written",
       "category": "ecommerce",
       "agentPair": 15,
       "competitorResearch": [
@@ -792,7 +792,7 @@
         "https://invideo.io/blog/ai-ugc-ads/"
       ],
       "notes": "KD=0, strategic angle. No competitor covers full-funnel video creative strategy. Bridge: CineRads generates 27 variations = enough creative for all funnel stages simultaneously.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -807,7 +807,7 @@
       "competition": "LOW",
       "compositeScore": 90,
       "priority": 30,
-      "status": "pending",
+      "status": "written",
       "category": "tutorials",
       "agentPair": 15,
       "competitorResearch": [
@@ -815,7 +815,7 @@
         "https://creatify.ai/blog"
       ],
       "notes": "KD=0, transactional intent = people will download/use this. Different from ugc-creator-brief-template (that's for hiring humans). This is the script itself. Lead magnet \u2192 CineRads signup.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -830,7 +830,7 @@
       "competition": "LOW",
       "compositeScore": 80,
       "priority": 31,
-      "status": "pending",
+      "status": "written",
       "category": "ecommerce",
       "agentPair": 16,
       "competitorResearch": [
@@ -838,7 +838,7 @@
         "https://www.heygen.com/blog/ecommerce-video-ads"
       ],
       "notes": "KD=0, pet DTC is a $6B+ market. Pet brands typically need real animals in ads \u2014 AI avatars narrate while product footage plays. Angle: human avatar talking about your pet product = more relatable than stock footage.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -853,7 +853,7 @@
       "competition": "LOW",
       "compositeScore": 80,
       "priority": 32,
-      "status": "pending",
+      "status": "written",
       "category": "ecommerce",
       "agentPair": 16,
       "competitorResearch": [
@@ -861,7 +861,7 @@
         "https://creatify.ai/blog"
       ],
       "notes": "KD=0, home goods is top 3 DTC category. Lifestyle shoots are expensive. AI avatar review-style ads replace lifestyle footage. Bridge to CineRads cost savings vs. studio shoots.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -876,7 +876,7 @@
       "competition": "LOW",
       "compositeScore": 80,
       "priority": 33,
-      "status": "pending",
+      "status": "written",
       "category": "ecommerce",
       "agentPair": 17,
       "competitorResearch": [
@@ -884,7 +884,7 @@
         "https://creatify.ai/blog"
       ],
       "notes": "KD=0, tech accessories (phone cases, earbuds, chargers) is huge DTC segment. Feature-focused hooks work well. Avatar explains features = replaces expensive demo videos. Batch testing angle.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -899,7 +899,7 @@
       "competition": "LOW",
       "compositeScore": 60,
       "priority": 34,
-      "status": "pending",
+      "status": "written",
       "category": "ugc-video",
       "agentPair": 17,
       "competitorResearch": [
@@ -907,7 +907,7 @@
         "https://creatify.ai/blog"
       ],
       "notes": "KD=0, directly complements ugc-video-hook-examples. The CTA is the third piece of the Hook/Body/CTA framework. Different article, same hub. Transactional intent = people will use these CTAs immediately.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -922,7 +922,7 @@
       "competition": "LOW",
       "compositeScore": 60,
       "priority": 35,
-      "status": "pending",
+      "status": "written",
       "category": "ugc-video",
       "agentPair": 18,
       "competitorResearch": [
@@ -930,7 +930,7 @@
         "https://invideo.io/blog/ai-ugc-ads/"
       ],
       "notes": "KD=0. The first 3 seconds is the single most discussed topic in performance creative. Highly shareable, linkable article. Different angle from ugc-video-hook-examples \u2014 this is specifically about the timing mechanics.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -945,7 +945,7 @@
       "competition": "LOW",
       "compositeScore": 50,
       "priority": 36,
-      "status": "pending",
+      "status": "written",
       "category": "ugc-video",
       "agentPair": 18,
       "competitorResearch": [
@@ -953,7 +953,7 @@
         "https://invideo.io/blog/impact-of-ai-on-ugc/"
       ],
       "notes": "KD 2 = very easy. Testimonial-style ads have highest conversion rates in ecommerce. AI avatars simulate real customer testimonials. Bridges social-proof-video-ads article with AI generation angle.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -968,7 +968,7 @@
       "competition": "LOW",
       "compositeScore": 50,
       "priority": 37,
-      "status": "pending",
+      "status": "written",
       "category": "ugc-video",
       "agentPair": 19,
       "competitorResearch": [
@@ -976,7 +976,7 @@
         "https://arcads.ai"
       ],
       "notes": "KD 3, $20 CPC = very valuable audience. Marketers searching this are media buyers at scale. Angle: the formula IS Hook/Body/CTA \u00d7 3 variants = 27 combos. CineRads automates the formula.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -991,7 +991,7 @@
       "competition": "LOW",
       "compositeScore": 48,
       "priority": 38,
-      "status": "pending",
+      "status": "written",
       "category": "ai-marketing",
       "agentPair": 19,
       "competitorResearch": [
@@ -999,7 +999,7 @@
         "https://creatify.ai/blog"
       ],
       "notes": "KD 10, decent volume (200/mo). Search intent = people want to generate scripts via AI. CineRads generates Hook/Body/CTA scripts automatically. This article is the top-of-funnel for that use case.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -1014,7 +1014,7 @@
       "competition": "LOW",
       "compositeScore": 33,
       "priority": 39,
-      "status": "pending",
+      "status": "written",
       "category": "ecommerce",
       "agentPair": 20,
       "competitorResearch": [
@@ -1022,7 +1022,7 @@
         "https://creatify.ai/blog/tiktok-ads-complete-guide-to-creating-high-performing-creatives-in-2026"
       ],
       "notes": "1,000/mo volume \u2014 highest traffic potential in this batch. KD 15 = manageable. YouTube Shorts is the fastest-growing short-form ad platform. Angles: specs, UGC-style content, AI avatar delivery for Shorts.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     },
     {
@@ -1037,7 +1037,7 @@
       "competition": "LOW",
       "compositeScore": 14,
       "priority": 40,
-      "status": "pending",
+      "status": "written",
       "category": "tutorials",
       "agentPair": 20,
       "competitorResearch": [
@@ -1045,7 +1045,7 @@
         "https://creatify.ai/blog"
       ],
       "notes": "KD 5, informational. High linkability \u2014 every ecommerce marketer needs this reference. Internal links to TikTok, Instagram Reels, YouTube Shorts articles. Drives long-tail impressions.",
-      "writtenAt": null,
+      "writtenAt": "2026-03-07",
       "publishedAt": null
     }
   ]
