@@ -17,7 +17,7 @@ export interface PresetConfig {
   mode: "single" | "triple";
   quality: "standard" | "hd";
   format: "9:16" | "16:9";
-  cta_style: string;
+  cta_style: "auto" | "product_name_drop" | "link_in_bio" | "link_in_comments" | "comment_keyword" | "check_description" | "direct_website" | "discount_code";
   cta_comment_keyword?: string;
   language: string;
   video_provider?: "kling" | "sora";
