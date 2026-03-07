@@ -123,24 +123,28 @@ async function detectSpeechSegments(
 
   ffmpeg.on("log", handler);
   try {
-    await execOrThrow(ffmpeg, [
+    // Use plain exec — a non-zero exit (e.g. no audio stream) is handled
+    // gracefully below rather than throwing, so silence detection is non-fatal.
+    await ffmpeg.exec([
       "-i", filename,
       "-af", "silencedetect=n=-40dB:d=0.15",
       "-f", "null", "-",
-    ], `detect-${filename}`);
+    ]);
   } finally {
-    // Always detach — even if exec throws, so stale output doesn't bleed into later runs
+    // Always detach so stale output doesn't bleed into later runs
     ffmpeg.off("log", handler);
   }
 
   const duration = parseDuration(log);
   if (duration === 0) {
+    // Can't even probe the file → real error (corrupt or URL expired)
     throw new Error(
       `Could not read duration from "${filename}". ` +
       `The video URL may have expired or the file may be corrupt.`,
     );
   }
 
+  // getSpeechSegments handles partial log (e.g. no audio → no silence events → full clip)
   return getSpeechSegments(log, duration);
 }
 
