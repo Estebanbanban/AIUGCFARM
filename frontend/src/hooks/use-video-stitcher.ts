@@ -160,9 +160,10 @@ async function detectSpeechSegments(
 }
 
 /**
- * Detect speech outer bounds and trim clip to outputFile using fast seek.
- * -ss BEFORE -i = fast seek → output always starts on an I-frame (no broken P/B refs).
- * Single trim pass, no internal concat → concat of hook/body/cta always works.
+ * Detect speech outer bounds and re-encode the clip to outputFile.
+ * Re-encoding is required for frame-accurate silence removal: -c copy with fast seek
+ * snaps to the nearest keyframe (every ~2s), so silence is never actually removed.
+ * libx264 ultrafast always starts the output with an I-frame → clean final concat.
  * Returns [outputFile] for caller to pass to cleanupFFmpegFiles.
  */
 async function prepareClip(
@@ -173,18 +174,22 @@ async function prepareClip(
   const segments = await detectSpeechSegments(ffmpeg, inputFile);
   const start = segments[0].start;
   const end = segments[segments.length - 1].end;
-  console.log(`[stitcher] trim ${inputFile}: ${start.toFixed(3)}s → ${end.toFixed(3)}s`);
+  console.log(`[stitcher] encode ${inputFile}: ${start.toFixed(3)}s → ${end.toFixed(3)}s`);
 
-  // -ss before -i = fast seek → I-frame aligned start, no broken P/B-frame refs.
-  // -t duration (not -to) + -avoid_negative_ts make_zero reset DTS to 0 for concat.
+  // Slow seek (-ss after -i) for frame-accurate trim at the silence boundary.
+  // Re-encode with libx264 so output always starts with an I-frame (clean concat).
+  // ultrafast + crf 35 = fastest encode pass, acceptable quality for UGC ads.
   await execOrThrow(ffmpeg, [
-    "-ss", start.toFixed(3),
     "-i", inputFile,
+    "-ss", start.toFixed(3),
     "-t", (end - start).toFixed(3),
-    "-c", "copy",
-    "-avoid_negative_ts", "make_zero",
+    "-c:v", "libx264",
+    "-preset", "ultrafast",
+    "-crf", "35",
+    "-c:a", "aac",
+    "-b:a", "128k",
     outputFile,
-  ], `trim-${inputFile}`);
+  ], `encode-${inputFile}`);
 
   return [outputFile];
 }
@@ -276,7 +281,7 @@ export const STITCH_STATUS_LABELS: Record<StitchStatus, string> = {
   loading_ffmpeg: "Loading editor…",
   fetching: "Fetching segments…",
   detecting: "Detecting speech…",
-  trimming: "Trimming silence…",
+  trimming: "Encoding clips (30–60s)…",
   concat: "Stitching clips…",
   done: "Download Stitched",
   error: "Retry Stitch",
