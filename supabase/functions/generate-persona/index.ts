@@ -13,6 +13,14 @@ const PERSONA_LIMITS: Record<string, number> = {
   scale: 10,
 };
 
+// Monthly creation limits (how many NEW personas a user can create per calendar month)
+const MONTHLY_PERSONA_LIMITS: Record<string, number> = {
+  free: 1,
+  starter: 2,
+  growth: 10,
+  scale: 100,
+};
+
 // Free-tier: max regeneration attempts per persona (2 images/call × 5 calls = 10 images)
 const FREE_REGEN_LIMIT = 4; // 4 regen calls after initial creation = 10 total images
 
@@ -525,6 +533,51 @@ Deno.serve(async (req: Request) => {
     // The frontend will then fire parallel image-generation calls using the
     // returned persona_id + attributes.
     if (imageCount === 0 && !hasPersonaId) {
+      // Monthly creation limit check (server-side enforcement)
+      if (!isAdmin) {
+        const monthYear = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+        const { data: monthlyRow } = await sb
+          .from("persona_monthly_limits")
+          .select("personas_created")
+          .eq("owner_id", userId)
+          .eq("month_year", monthYear)
+          .maybeSingle();
+        const monthlyUsed = monthlyRow?.personas_created ?? 0;
+        const monthlyLimit = MONTHLY_PERSONA_LIMITS[plan] ?? 1;
+        if (monthlyUsed >= monthlyLimit) {
+          return json(
+            {
+              detail:
+                plan === "free"
+                  ? `Free plan allows 1 persona per month. Upgrade to create more.`
+                  : `Your ${plan} plan allows ${monthlyLimit} persona(s) per month. Resets next month.`,
+            },
+            cors,
+            403,
+          );
+        }
+      }
+
+      // Increment monthly counter after successful creation
+      const incrementMonthlyCount = async () => {
+        if (isAdmin) return;
+        const monthYear = new Date().toISOString().slice(0, 7);
+        const { data: cur } = await sb
+          .from("persona_monthly_limits")
+          .select("personas_created")
+          .eq("owner_id", userId)
+          .eq("month_year", monthYear)
+          .maybeSingle();
+        await sb.from("persona_monthly_limits").upsert(
+          {
+            owner_id: userId,
+            month_year: monthYear,
+            personas_created: (cur?.personas_created ?? 0) + 1,
+          },
+          { onConflict: "owner_id,month_year" },
+        );
+      };
+
       // Reuse any existing ghost persona (empty generated_images) so retries
       // after a failed generation don't accumulate wasted slots.
       const { data: existingGhost } = await sb
@@ -545,6 +598,7 @@ Deno.serve(async (req: Request) => {
           .select("id, name, attributes")
           .single();
         if (updateErr) throw new Error(`DB update ghost persona failed: ${updateErr.message}`);
+        await incrementMonthlyCount();
         console.log(`[generate-persona] init (reused ghost ${existingGhost.id}): ${Date.now() - t0}ms`);
         return json({ data: { id: updated!.id, attributes: validAttrs } }, cors, 201);
       }
@@ -585,6 +639,7 @@ Deno.serve(async (req: Request) => {
       } else {
         initPersona = d1;
       }
+      await incrementMonthlyCount();
       console.log(`[generate-persona] init done: ${Date.now() - t0}ms`);
       return json({ data: { id: initPersona!.id, attributes: validAttrs } }, cors, 201);
     }
