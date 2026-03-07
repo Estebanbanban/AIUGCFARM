@@ -3,9 +3,7 @@ import { HeroSection } from "@/components/landing/HeroSection";
 import { VideoCarousel } from "@/components/landing/VideoCarousel";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
 import { FeaturesSection } from "@/components/landing/FeaturesSection";
-import { MetricsBar } from "@/components/landing/MetricsBar";
-import { TestimonialSection } from "@/components/landing/TestimonialSection";
-import { ComparisonSection } from "@/components/landing/ComparisonSection";
+import { CombinationCalculatorSection } from "@/components/landing/CombinationCalculatorSection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FaqSection } from "@/components/landing/FaqSection";
 import { FinalCtaSection } from "@/components/landing/FinalCtaSection";
@@ -155,10 +153,8 @@ export default function LandingPage() {
       <HeroSection />
       <VideoCarousel />
       <HowItWorksSection />
-<ComparisonSection />
+<CombinationCalculatorSection />
       <FeaturesSection />
-      <MetricsBar />
-      <TestimonialSection />
       <PricingSection />
       <FaqSection />
       <FinalCtaSection />
