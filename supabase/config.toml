@@ -60,3 +60,60 @@ verify_jwt = false
 
 [functions.video-status]
 verify_jwt = false
+
+[functions.list-personas]
+verify_jwt = false
+
+[functions.update-persona]
+verify_jwt = false
+
+[functions.delete-persona]
+verify_jwt = false
+
+[functions.list-products]
+verify_jwt = false
+
+[functions.update-product]
+verify_jwt = false
+
+[functions.delete-product]
+verify_jwt = false
+
+[functions.list-brands]
+verify_jwt = false
+
+[functions.list-generations]
+verify_jwt = false
+
+[functions.delete-generation]
+verify_jwt = false
+
+[functions.get-regen-limit]
+verify_jwt = false
+
+[functions.get-persona-monthly-usage]
+verify_jwt = false
+
+[functions.get-subscription]
+verify_jwt = false
+
+[functions.get-credit-ledger]
+verify_jwt = false
+
+[functions.get-profile]
+verify_jwt = false
+
+[functions.create-brand]
+verify_jwt = false
+
+[functions.update-brand]
+verify_jwt = false
+
+[functions.delete-brand]
+verify_jwt = false
+
+[functions.generate-segment-script]
+verify_jwt = false
+
+[functions.regenerate-segment]
+verify_jwt = false
