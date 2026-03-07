@@ -809,6 +809,9 @@ Deno.serve(async (req: Request) => {
       const approveIsAdmin = profileData?.role === "admin";
 
       // ── Compute effective cost + check credits ──────────────────
+      // first_video_discount_used is a paywall conversion tracking flag only.
+      // It tracks whether the user has ever approved a generation, so the paywall
+      // can show a "first video" discounted price. No credit reduction is applied here.
       const isFirstVideo = profileData?.first_video_discount_used === false;
       const effectiveCost = creditCost;
 
