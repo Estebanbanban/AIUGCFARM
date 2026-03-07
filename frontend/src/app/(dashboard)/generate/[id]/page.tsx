@@ -38,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -45,7 +46,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { useGenerationStatus, useRegenerateSegment, useRegenLimit } from "@/hooks/use-generations";
+import { useGenerationStatus, useRegenerateSegment, useRegenLimit, useApproveAndGenerate } from "@/hooks/use-generations";
 import { useProfile } from "@/hooks/use-profile";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { GenerationStatus, ScriptSegment, SegmentVideo } from "@/types/database";
@@ -1372,6 +1373,7 @@ export default function GenerationDetailPage() {
     refetch,
   } = useGenerationStatus(generationId, isStale);
   const regenerateSegment = useRegenerateSegment();
+  const approveAndGenerate = useApproveAndGenerate();
   const { data: profile } = useProfile();
   const userPlan = profile?.plan ?? "free";
 
@@ -1385,6 +1387,13 @@ export default function GenerationDetailPage() {
 
   // Script collapsible state
   const [scriptExpanded, setScriptExpanded] = useState(true);
+
+  // Product and persona names for header subtitle (#154)
+  const [productName, setProductName] = useState<string | null>(null);
+  const [personaName, setPersonaName] = useState<string | null>(null);
+
+  // Inline approval state (#150)
+  const [isApprovingInline, setIsApprovingInline] = useState(false);
 
   // Combination builder selection
   const [selectedHook, setSelectedHook] = useState(0);
@@ -1539,6 +1548,24 @@ export default function GenerationDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFailed]);
 
+  // One-time fetch of product + persona names for header subtitle (#154)
+  useEffect(() => {
+    if (!generationId || productName !== null) return;
+    import("@/lib/supabase/client").then(({ createClient }) => {
+      const supabase = createClient();
+      supabase
+        .from("generations")
+        .select("products(name), personas(name)")
+        .eq("id", generationId)
+        .single()
+        .then(({ data }: { data: { products: { name: string } | null; personas: { name: string } | null } | null }) => {
+          if (data?.products?.name) setProductName(data.products.name);
+          if (data?.personas?.name) setPersonaName(data.personas.name);
+        });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generationId]);
+
   // Update lastChecked ref whenever generation data refreshes (no re-render needed)
   useEffect(() => {
     if (gen) {
@@ -1573,7 +1600,8 @@ export default function GenerationDetailPage() {
   }, [isProcessing]);
 
   // Warn user before closing tab during generation
-  const isGenerating = !!gen && !["completed", "failed"].includes(status);
+  // Exclude awaiting_approval so the user can navigate away to approve without a warning
+  const isGenerating = !!gen && !["completed", "failed", "awaiting_approval"].includes(status);
   useEffect(() => {
     if (!isGenerating) return;
     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
@@ -1625,6 +1653,26 @@ export default function GenerationDetailPage() {
       );
     } finally {
       setRegeneratingKey(null);
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /*  Inline approval handler (#150)                                        */
+  /* ---------------------------------------------------------------------- */
+
+  async function handleApproveInline() {
+    if (isApprovingInline || approveAndGenerate.isPending) return;
+    setIsApprovingInline(true);
+    try {
+      await approveAndGenerate.mutateAsync({ generation_id: generationId });
+      toast.success("Approved! Generating your video...");
+      refetch();
+    } catch (err) {
+      toast.error(
+        sanitizeMsg(err instanceof Error ? err.message : "Failed to approve script."),
+      );
+    } finally {
+      setIsApprovingInline(false);
     }
   }
 
@@ -1718,7 +1766,7 @@ export default function GenerationDetailPage() {
             Generation Result
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            ID: {generationId.slice(0, 8)}...
+            {productName && personaName ? `${productName} × ${personaName}` : `ID: ${generationId.slice(0, 8)}...`}
           </p>
         </div>
         {isAwaitingApproval && (
@@ -1769,30 +1817,92 @@ export default function GenerationDetailPage() {
       )}
 
       {/* ---------------------------------------------------------------- */}
-      {/*  Awaiting approval - script ready, nothing is generating        */}
+      {/*  Awaiting approval — inline script review + approval (#150)     */}
       {/* ---------------------------------------------------------------- */}
       {isAwaitingApproval && (
         <Card className="border-amber-500/30 bg-amber-500/5">
-          <CardContent className="flex flex-col gap-4 py-6">
+          <CardHeader>
             <div className="flex items-center gap-3">
               <div className="flex size-10 items-center justify-center rounded-full bg-amber-500/10">
                 <FileText className="size-5 text-amber-400" />
               </div>
               <div>
-                <p className="font-semibold text-foreground">
-                  Your script is ready. Action required.
-                </p>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  Review and approve your script to start generating videos. No credits have been charged yet.
-                </p>
+                <CardTitle className="text-foreground">Review Your Script</CardTitle>
+                <CardDescription className="mt-0.5">
+                  Approve to start video generation, or go back to regenerate. No credits have been charged yet.
+                </CardDescription>
               </div>
             </div>
-            <Button asChild className="w-full sm:w-auto">
-              <Link href="/dashboard">
-                <LayoutDashboard className="size-4" />
-                Go to Dashboard to Approve Script
-              </Link>
-            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Script segments */}
+            {script && (
+              <div className="grid gap-4 md:grid-cols-3">
+                {/* Hooks */}
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Hooks ({script.hooks?.length ?? 0})
+                  </h3>
+                  {script.hooks?.map((seg, i) => (
+                    <ScriptSegmentCard key={i} segment={seg} type={`Hook ${i + 1}`} />
+                  ))}
+                  {(!script.hooks || script.hooks.length === 0) && (
+                    <p className="py-2 text-xs text-muted-foreground">No hook variants.</p>
+                  )}
+                </div>
+                {/* Bodies */}
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Bodies ({script.bodies?.length ?? 0})
+                  </h3>
+                  {script.bodies?.map((seg, i) => (
+                    <ScriptSegmentCard key={i} segment={seg} type={`Body ${i + 1}`} />
+                  ))}
+                  {(!script.bodies || script.bodies.length === 0) && (
+                    <p className="py-2 text-xs text-muted-foreground">No body variants.</p>
+                  )}
+                </div>
+                {/* CTAs */}
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    CTAs ({script.ctas?.length ?? 0})
+                  </h3>
+                  {script.ctas?.map((seg, i) => (
+                    <ScriptSegmentCard key={i} segment={seg} type={`CTA ${i + 1}`} />
+                  ))}
+                  {(!script.ctas || script.ctas.length === 0) && (
+                    <p className="py-2 text-xs text-muted-foreground">No CTA variants.</p>
+                  )}
+                </div>
+              </div>
+            )}
+            {/* Action buttons */}
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                className="flex-1"
+                onClick={handleApproveInline}
+                disabled={isApprovingInline || approveAndGenerate.isPending}
+              >
+                {isApprovingInline || approveAndGenerate.isPending ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Starting generation...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="size-4" />
+                    Approve &amp; Generate
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push("/generate")}
+              >
+                <RotateCcw className="size-4" />
+                Regenerate Script
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
