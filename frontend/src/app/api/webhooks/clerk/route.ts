@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   try {
     evt = wh.verify(body, { "svix-id": svix_id, "svix-timestamp": svix_timestamp, "svix-signature": svix_signature });
   } catch {
-    return new Response("Invalid signature", { status: 400 });
+    return new Response("Invalid signature", { status: 401 });
   }
 
   if (evt.type === "user.created") {

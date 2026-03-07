@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Film,
@@ -12,7 +12,7 @@ import {
   LogOut,
   Plus,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { useClerk } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { useProfile } from "@/hooks/use-profile";
 import { useProducts } from "@/hooks/use-products";
@@ -52,7 +52,7 @@ function SidebarContent({
   pathname: string;
   onNavigate?: () => void;
 }) {
-  const router = useRouter();
+  const { signOut } = useClerk();
   const { data: profile } = useProfile();
   const { data: products } = useProducts();
   const { data: personas } = usePersonas();
@@ -66,11 +66,7 @@ function SidebarContent({
   const userEmail = profile?.email ?? "";
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut({ scope: "global" });
-    localStorage.setItem("force_account_select", "1");
-    router.push("/login");
-    router.refresh();
+    await signOut({ redirectUrl: "/sign-in" });
   }
 
   return (
