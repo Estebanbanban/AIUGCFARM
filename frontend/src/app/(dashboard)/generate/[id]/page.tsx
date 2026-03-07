@@ -2347,20 +2347,20 @@ export default function GenerationDetailPage() {
                         size="sm"
                         className="h-6 w-6 p-0"
                         disabled={currentComboIndex === -1}
-                        onClick={() => goToCombo((currentComboIndex - 1 + 27) % 27)}
+                        onClick={() => goToCombo((currentComboIndex - 1 + allCombos.length) % allCombos.length)}
                         aria-label="Previous combination"
                       >
                         <ChevronLeft className="h-3 w-3" />
                       </Button>
                       <span className="text-xs text-muted-foreground tabular-nums">
-                        {currentComboIndex === -1 ? "? / 27" : `${currentComboIndex + 1} / 27`}
+                        {currentComboIndex === -1 ? `? / ${allCombos.length}` : `${currentComboIndex + 1} / ${allCombos.length}`}
                       </span>
                       <Button
                         variant="outline"
                         size="sm"
                         className="h-6 w-6 p-0"
                         disabled={currentComboIndex === -1}
-                        onClick={() => goToCombo((currentComboIndex + 1) % 27)}
+                        onClick={() => goToCombo((currentComboIndex + 1) % allCombos.length)}
                         aria-label="Next combination"
                       >
                         <ChevronRight className="h-3 w-3" />
