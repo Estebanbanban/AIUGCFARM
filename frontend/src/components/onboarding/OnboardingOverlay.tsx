@@ -113,20 +113,41 @@ export function OnboardingOverlay() {
     setHasActiveWizardSession(!!(compositeImagePath || pendingScript || pendingGenerationId));
   }, []);
 
-  // Read skip state from localStorage (client-only, avoids SSR mismatch)
+  // Read skip state from localStorage (client-only, avoids SSR mismatch).
+  // If the user has zero progress (brand new or after a data wipe), always
+  // reset the skip flag so onboarding shows regardless of prior localStorage state.
   useEffect(() => {
-    setSkipped(localStorage.getItem(SKIP_KEY) === "true");
+    if (!isLoading && !hasProduct && !hasPersonaWithImage && !hasCompletedGeneration) {
+      localStorage.removeItem(SKIP_KEY);
+      setSkipped(false);
+    } else {
+      setSkipped(localStorage.getItem(SKIP_KEY) === "true");
+    }
     setHydrated(true);
+  }, [isLoading, hasProduct, hasPersonaWithImage, hasCompletedGeneration]);
 
+  // Re-register the resume handler whenever onboarding state changes so the
+  // closure always reads up-to-date completion flags rather than stale ones.
+  useEffect(() => {
     function handleResume() {
       localStorage.removeItem(SKIP_KEY);
       setSkipped(false);
       setHasActiveWizardSession(false);
-      setView("checklist");
+      // Jump directly to the first incomplete step so the user doesn't have to
+      // click through the checklist when resuming mid-onboarding.
+      if (!hasProduct) {
+        setView("step-brand");
+      } else if (!hasPersonaWithImage) {
+        setView("step-persona");
+      } else if (!hasCompletedGeneration) {
+        setView("step-video");
+      } else {
+        setView("checklist");
+      }
     }
     window.addEventListener("onboarding:resume", handleResume);
     return () => window.removeEventListener("onboarding:resume", handleResume);
-  }, []);
+  }, [hasProduct, hasPersonaWithImage, hasCompletedGeneration]);
 
   // Auto-dismiss banner when the generation step completes
   useEffect(() => {
@@ -202,10 +223,14 @@ export function OnboardingOverlay() {
     router.push("/generate");
   };
 
+  // Wait for localStorage to be read before showing anything — prevents flash
+  // of the loading skeleton for users who already dismissed the overlay.
+  if (!hydrated) return null;
+
   // Suppress the blocking overlay (not banner) if the user has an active wizard session
   if (allDone || skipped || (hasActiveWizardSession && view !== "banner")) return null;
 
-  if (!hydrated || isLoading) {
+  if (isLoading) {
     return (
       <AnimatePresence>
         <>
