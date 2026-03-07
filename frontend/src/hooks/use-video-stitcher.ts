@@ -60,9 +60,9 @@ async function execOrThrow(
   }
 }
 
-const TRANSITION_BUFFER     = 0.2;   // 200ms buffer at each edge of every cut
-const MIN_SILENCE_TO_CUT    = 0.8;   // Only remove silences > 800ms (net removed >= 400ms)
-const MIN_SEGMENT_DURATION  = 0.3;   // Discard speech segments < 300ms
+const TRANSITION_BUFFER     = 0.15;  // 150ms buffer at each edge of every cut
+const MIN_SILENCE_TO_CUT    = 0.5;   // Only remove silences > 500ms
+const MIN_SEGMENT_DURATION  = 0.2;   // Discard speech segments < 200ms
 const MAX_SEGMENTS_PER_CLIP = 6;     // Safety cap; fall back to full-clip if exceeded
 
 type Segment = { start: number; end: number };
@@ -128,7 +128,7 @@ async function detectSpeechSegments(
     // gracefully below rather than throwing, so silence detection is non-fatal.
     detectCode = await ffmpeg.exec([
       "-i", filename,
-      "-af", "silencedetect=n=-40dB:d=0.15",
+      "-af", "silencedetect=n=-30dB:d=0.1",
       "-f", "null", "-",
     ]);
   } finally {
@@ -151,7 +151,11 @@ async function detectSpeechSegments(
 
   // getSpeechSegments handles partial log (e.g. no audio → no silence events → full clip)
   const segs = getSpeechSegments(log, duration);
-  console.log(`[stitcher] speech segments for ${filename}:`, segs);
+  const segStr = segs.map(s => `${s.start.toFixed(2)}-${s.end.toFixed(2)}`).join(", ");
+  console.log(`[stitcher] ${filename} → ${segs.length} seg(s): [${segStr}] (total ${duration.toFixed(2)}s)`);
+  if (segs.length === 1 && segs[0].start === 0 && segs[0].end >= duration - 0.1) {
+    console.warn(`[stitcher] ${filename}: no silence detected at -30dB — full clip used`);
+  }
   return segs;
 }
 
