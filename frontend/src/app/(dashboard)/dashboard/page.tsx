@@ -251,7 +251,7 @@ export default function DashboardPage() {
                 </p>
               </div>
               <Button size="sm" variant="outline" asChild className="shrink-0">
-                <Link href="/history">View progress →</Link>
+                <Link href={`/generate/${activeGenerations[0]?.id}`}>View progress →</Link>
               </Button>
             </CardContent>
           </Card>
@@ -273,7 +273,7 @@ export default function DashboardPage() {
                 </p>
               </div>
               <Button size="sm" asChild className="shrink-0">
-                <Link href="/history">View videos →</Link>
+                <Link href={`/generate/${justCompletedGenerations[0]?.id}`}>View result →</Link>
               </Button>
             </CardContent>
           </Card>
