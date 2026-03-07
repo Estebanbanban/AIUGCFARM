@@ -76,7 +76,7 @@ export function AdvancedModePanel({
                 <Info className="size-3.5 text-muted-foreground" />
               </TooltipTrigger>
               <TooltipContent side="top">
-                3 hooks &times; 3 bodies &times; 3 CTAs = 27 possible video combinations
+                Up to 5 hooks &times; 5 bodies &times; 5 CTAs = up to 125 possible combinations
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

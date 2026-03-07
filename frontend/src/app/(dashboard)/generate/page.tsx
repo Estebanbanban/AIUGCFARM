@@ -2237,6 +2237,7 @@ export default function GeneratePage() {
                                           className="h-7 w-7 p-0"
                                           onClick={() => set(value - 1)}
                                           disabled={value <= 1}
+                                          aria-label={`Decrease ${label} count`}
                                         >
                                           <Minus className="h-3 w-3" />
                                         </Button>
@@ -2248,6 +2249,7 @@ export default function GeneratePage() {
                                           className="h-7 w-7 p-0"
                                           onClick={() => set(value + 1)}
                                           disabled={value >= 5}
+                                          aria-label={`Increase ${label} count`}
                                         >
                                           <Plus className="h-3 w-3" />
                                         </Button>

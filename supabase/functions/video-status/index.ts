@@ -554,6 +554,9 @@ Deno.serve(async (req: Request) => {
             composite_image_url: compositeImageUrl,
             segments,
             progress: { completed: completedCount, total: totalCount },
+            hooks_count: gen.hooks_count ?? 3,
+            bodies_count: gen.bodies_count ?? 3,
+            ctas_count: gen.ctas_count ?? 3,
           },
         }, cors);
       }
