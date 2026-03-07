@@ -2,6 +2,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
+import { generateBrandSummary } from "../_shared/brand-summary.ts";
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -152,7 +153,24 @@ Deno.serve(async (req: Request) => {
 
     if (insertErr) throw new Error(`DB insert failed: ${insertErr.message}`);
 
-    return json({ data: product }, cors, 201);
+    // Generate brand summary and update the record (graceful degradation — failure does not block response)
+    const brandSummary = await generateBrandSummary([
+      {
+        name,
+        description,
+        price,
+        currency,
+        category,
+      },
+    ]);
+    if (brandSummary) {
+      await sb
+        .from("products")
+        .update({ brand_summary: brandSummary })
+        .eq("id", product.id);
+    }
+
+    return json({ data: { ...product, brand_summary: brandSummary } }, cors, 201);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg === "Unauthorized") {

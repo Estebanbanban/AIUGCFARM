@@ -4,7 +4,7 @@ import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
 import { validateUrl } from "../_shared/ssrf.ts";
 import { rateLimit } from "../_shared/rate-limit.ts";
-import { callOpenRouter } from "../_shared/openrouter.ts";
+import { generateBrandSummary, BrandSummary } from "../_shared/brand-summary.ts";
 
 function stripHtml(html: string): string {
   return html
@@ -27,12 +27,6 @@ interface ProductData {
   images: string[];
   category: string | null;
   source: "shopify" | "generic";
-}
-
-interface BrandSummary {
-  tone: string;
-  demographic: string;
-  selling_points: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -335,59 +329,6 @@ async function scrapeGeneric(
 }
 
 // ---------------------------------------------------------------------------
-// Brand summary generation via OpenRouter
-// ---------------------------------------------------------------------------
-
-async function generateBrandSummary(
-  products: ProductData[],
-): Promise<BrandSummary | null> {
-  try {
-    // Build product summary from ALL products, truncating descriptions
-    const productSummaries = products
-      .map((p, i) => {
-        const desc =
-          p.description.length > 200
-            ? p.description.slice(0, 200) + "..."
-            : p.description;
-        return `Product ${i + 1}: ${p.name}\nDescription: ${desc}\nPrice: ${p.price ?? "unknown"} ${p.currency}\nCategory: ${p.category ?? "unknown"}`;
-      })
-      .join("\n\n");
-
-    const content = await callOpenRouter(
-      [
-        {
-          role: "system",
-          content:
-            'You are a brand analyst. Given product data, return a JSON object with exactly these keys: "tone" (brand voice tone, 1-2 words), "demographic" (who this product is for, 1 sentence), "selling_points" (array of 3-5 bullet point strings). Return ONLY valid JSON, no markdown.',
-        },
-        {
-          role: "user",
-          content: productSummaries,
-        },
-      ],
-      { maxTokens: 500, timeoutMs: 10000 },
-    );
-
-    const parsed = JSON.parse(content);
-
-    // Validate expected shape
-    if (
-      typeof parsed.tone !== "string" ||
-      typeof parsed.demographic !== "string" ||
-      !Array.isArray(parsed.selling_points)
-    ) {
-      console.error("Brand summary has unexpected shape:", parsed);
-      return null;
-    }
-
-    return parsed as BrandSummary;
-  } catch (e) {
-    console.error("Brand summary generation failed:", e);
-    return null;
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
 
@@ -491,7 +432,7 @@ Deno.serve(async (req: Request) => {
         data: {
           products: products.map((p, i) => ({
             ...p,
-            brand_summary: i === 0 ? brandSummary : null,
+            brand_summary: brandSummary,
             id: savedIds[i],
           })),
           source,
