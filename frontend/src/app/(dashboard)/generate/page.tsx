@@ -92,6 +92,7 @@ import {
 } from "@/lib/datafast";
 import { AdvancedModePanel } from "@/components/generate/AdvancedModePanel";
 import { NanoBananaLoader } from "@/components/ui/nano-loader";
+import { BrandProfileCard } from "@/components/brand-profile-card";
 import { callEdge, EdgeError } from "@/lib/api";
 import type { GenerateSegmentScriptResponse, AdvancedSegmentsInput } from "@/types/api";
 import type { AdvancedSegmentConfig, AdvancedSegmentsConfig } from "@/types/database";
@@ -399,6 +400,9 @@ export default function GeneratePage() {
   // Tracks config changed after auto-fired script
   const [scriptConfigChanged, setScriptConfigChanged] = useState(false);
 
+  // Brand summary editable state (synced from selected product)
+  const [brandSummary, setBrandSummary] = useState<BrandSummary | null>(null);
+
   // NanoBananaLoader state for video generation flow
   const [videoLoaderProgress, setVideoLoaderProgress] = useState(0);
   const [videoLoaderStep, setVideoLoaderStep] = useState(-1);
@@ -594,6 +598,22 @@ export default function GeneratePage() {
   const selectedProduct = confirmedProducts.find((p) => p.id === store.productId);
   const selectedProductAllImages = useResolvedAllProductImages(selectedProduct);
   const selectedPersona = activePersonas.find((p) => p.id === store.personaId);
+
+  // Sync brandSummary state whenever the selected product changes
+  useEffect(() => {
+    setBrandSummary(selectedProduct?.brand_summary ?? null);
+  }, [selectedProduct?.id]);
+
+  async function handleBrandSummaryUpdate(updated: BrandSummary) {
+    if (!store.productId) return;
+    const supabase = createClient();
+    await supabase
+      .from("products")
+      .update({ brand_summary: updated })
+      .eq("id", store.productId);
+    setBrandSummary(updated);
+    toast.success("Brand profile updated");
+  }
 
   const creditsRemaining = credits?.remaining ?? 0;
   const isUnlimitedCredits = credits?.is_unlimited === true;
@@ -1855,6 +1875,14 @@ export default function GeneratePage() {
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
                 You can set video options now. Select a persona in step 2 once portraits are ready to auto-generate scene previews.
               </div>
+            )}
+
+            {videoLoaderStep < 0 && store.productId && (
+              <BrandProfileCard
+                brandSummary={brandSummary}
+                onSave={handleBrandSummaryUpdate}
+                productId={store.productId}
+              />
             )}
 
             {videoLoaderStep < 0 && (
