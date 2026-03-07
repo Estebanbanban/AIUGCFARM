@@ -1,0 +1,21 @@
+{
+  "version": "1.0",
+  "updatedAt": "2026-03-07",
+  "articles": [
+    { "slug": "ugc-video-ads-complete-guide", "title": "The UGC Video Playbook That's Quietly Replacing Every Brand Ad on Your Feed", "category": "ugc-video", "status": "published", "generated_at": "2026-02-27", "primary_keywords": ["ugc video ads"], "word_count_approx": 3000 },
+    { "slug": "ai-ugc-vs-human-creators", "title": "AI UGC vs Human Creators", "category": "ai-marketing", "status": "published", "generated_at": "2026-02-27", "primary_keywords": ["ai ugc vs human creators"], "word_count_approx": 2500 },
+    { "slug": "ai-video-tools-comparison-2026", "title": "AI Video Tools Comparison 2026", "category": "ai-marketing", "status": "published", "generated_at": "2026-02-27", "primary_keywords": ["ai video tools comparison 2026"], "word_count_approx": 2500 },
+    { "slug": "ai-spokesperson-brand-consistency", "title": "AI Spokesperson Brand Consistency", "category": "ai-marketing", "status": "published", "generated_at": "2026-02-27", "primary_keywords": ["ai spokesperson brand consistency"], "word_count_approx": 2000 },
+    { "slug": "dtc-brands-ugc-strategy", "title": "DTC Brands UGC Strategy", "category": "ecommerce", "status": "published", "generated_at": "2026-02-27", "primary_keywords": ["dtc brands ugc strategy"], "word_count_approx": 2500 },
+    { "slug": "ecommerce-video-marketing-guide", "title": "E-Commerce Video Marketing Guide", "category": "ecommerce", "status": "published", "generated_at": "2026-02-27", "primary_keywords": ["ecommerce video marketing guide"], "word_count_approx": 2500 },
+    { "slug": "future-of-ai-advertising", "title": "Future of AI Advertising", "category": "ai-marketing", "status": "published", "generated_at": "2026-02-27", "primary_keywords": ["future of ai advertising"], "word_count_approx": 2000 },
+    { "slug": "hook-body-cta-framework", "title": "Hook Body CTA Framework", "category": "ugc-video", "status": "published", "generated_at": "2026-02-27", "primary_keywords": ["hook body cta framework"], "word_count_approx": 2500 },
+    { "slug": "meta-ads-video-creative-best-practices", "title": "Meta Ads Video Creative Best Practices", "category": "ecommerce", "status": "published", "generated_at": "2026-02-27", "primary_keywords": ["meta ads video creative best practices"], "word_count_approx": 2500 },
+    { "slug": "product-video-ads-dropshipping", "title": "Product Video Ads Dropshipping", "category": "ecommerce", "status": "published", "generated_at": "2026-02-27", "primary_keywords": ["product video ads dropshipping"], "word_count_approx": 2000 },
+    { "slug": "scaling-ad-creative-production", "title": "Scaling Ad Creative Production", "category": "ecommerce", "status": "published", "generated_at": "2026-02-27", "primary_keywords": ["scaling ad creative production"], "word_count_approx": 2500 },
+    { "slug": "shopify-video-ads-tutorial", "title": "Shopify Video Ads Tutorial", "category": "tutorials", "status": "published", "generated_at": "2026-02-27", "primary_keywords": ["shopify video ads tutorial"], "word_count_approx": 2500 },
+    { "slug": "tiktok-ad-creative-strategy-2026", "title": "TikTok Ad Creative Strategy 2026", "category": "ecommerce", "status": "published", "generated_at": "2026-02-27", "primary_keywords": ["tiktok ad creative strategy 2026"], "word_count_approx": 2500 },
+    { "slug": "ugc-ad-examples-that-convert", "title": "UGC Ad Examples That Convert", "category": "ugc-video", "status": "published", "generated_at": "2026-02-27", "primary_keywords": ["ugc ad examples that convert"], "word_count_approx": 2500 },
+    { "slug": "video-ad-testing-framework", "title": "Video Ad Testing Framework", "category": "ecommerce", "status": "published", "generated_at": "2026-02-27", "primary_keywords": ["video ad testing framework"], "word_count_approx": 2500 }
+  ]
+}

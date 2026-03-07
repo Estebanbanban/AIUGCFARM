@@ -1,0 +1,167 @@
+{
+  "version": "1.0",
+  "generatedAt": "2026-03-07",
+  "source": "seo-research.md competitive analysis + keyword gaps",
+  "topActions": [
+    {
+      "slug": "ai-ugc-facebook-ad-policy",
+      "keyword": "AI generated ads Facebook policy",
+      "score": 90,
+      "opportunityType": "new_content",
+      "category": "ai-marketing",
+      "notes": "Arcads covers this, we don't. High commercial intent — brands worried about compliance."
+    },
+    {
+      "slug": "ugc-video-hook-examples",
+      "keyword": "UGC video hook examples",
+      "score": 88,
+      "opportunityType": "new_content",
+      "category": "ugc-video",
+      "notes": "High search intent, fits our Hook/Body/CTA positioning perfectly."
+    },
+    {
+      "slug": "ai-avatar-comparison-2026",
+      "keyword": "AI avatar video generator comparison 2026",
+      "score": 86,
+      "opportunityType": "new_content",
+      "category": "ai-marketing",
+      "notes": "Arcads vs Creatify vs CineRads. Competitor comparison = high conversion intent."
+    },
+    {
+      "slug": "cost-ugc-creator-vs-ai",
+      "keyword": "UGC creator cost vs AI video",
+      "score": 85,
+      "opportunityType": "new_content",
+      "category": "ecommerce",
+      "notes": "ROI/cost comparison — core selling point of CineRads. High buying intent."
+    },
+    {
+      "slug": "ugc-vs-aigc-comparison",
+      "keyword": "UGC vs AIGC vs AI-UGC difference",
+      "score": 83,
+      "opportunityType": "new_content",
+      "category": "ai-marketing",
+      "notes": "InVideo covers this well. Informational but high volume."
+    },
+    {
+      "slug": "instagram-reels-ads-guide",
+      "keyword": "Instagram Reels ads ecommerce guide 2026",
+      "score": 82,
+      "opportunityType": "new_content",
+      "category": "ecommerce",
+      "notes": "We have TikTok guide, missing Instagram Reels. Clear platform gap."
+    },
+    {
+      "slug": "video-ad-script-writing",
+      "keyword": "how to write a video ad script",
+      "score": 80,
+      "opportunityType": "new_content",
+      "category": "tutorials",
+      "notes": "High educational intent, very relevant to our Hook/Body/CTA framework."
+    },
+    {
+      "slug": "ad-fatigue-prevention",
+      "keyword": "ad fatigue prevention video ads",
+      "score": 78,
+      "opportunityType": "new_content",
+      "category": "ecommerce",
+      "notes": "Predis.ai covers this briefly. Our 27-combo angle is the perfect solution."
+    },
+    {
+      "slug": "first-3-seconds-video-ads",
+      "keyword": "first 3 seconds video ads hook",
+      "score": 77,
+      "opportunityType": "new_content",
+      "category": "ugc-video",
+      "notes": "Deep-dive complementing our hook-body-cta-framework article."
+    },
+    {
+      "slug": "beauty-brand-ugc-ads",
+      "keyword": "beauty brand UGC ads strategy",
+      "score": 75,
+      "opportunityType": "new_content",
+      "category": "ecommerce",
+      "notes": "Vertical-specific. Beauty is biggest DTC segment. No competitors cover it deeply."
+    },
+    {
+      "slug": "tiktok-creative-center-guide",
+      "keyword": "TikTok Creative Center guide 2026",
+      "score": 74,
+      "opportunityType": "new_content",
+      "category": "tutorials",
+      "notes": "Creatify covers this. We have TikTok strategy article but not Creative Center specifically."
+    },
+    {
+      "slug": "ugc-creator-brief-template",
+      "keyword": "UGC creator brief template",
+      "score": 72,
+      "opportunityType": "new_content",
+      "category": "tutorials",
+      "notes": "High practical value. Bridges human UGC and AI UGC use case."
+    },
+    {
+      "slug": "social-proof-video-ads",
+      "keyword": "social proof video ads ecommerce",
+      "score": 70,
+      "opportunityType": "new_content",
+      "category": "ugc-video",
+      "notes": "Testimonials, reviews, UGC — core trust signals in ad creative."
+    },
+    {
+      "slug": "fashion-brand-video-ads",
+      "keyword": "fashion brand video ads strategy",
+      "score": 68,
+      "opportunityType": "new_content",
+      "category": "ecommerce",
+      "notes": "Vertical-specific. Fashion/apparel is 2nd biggest DTC segment."
+    },
+    {
+      "slug": "ugc-content-repurposing",
+      "keyword": "UGC content repurposing ad variations",
+      "score": 66,
+      "opportunityType": "new_content",
+      "category": "ugc-video",
+      "notes": "How to turn 9 segments into 27 combinations — ties directly to CineRads product."
+    },
+    {
+      "slug": "ai-video-ads-performance-benchmarks",
+      "keyword": "AI video ads performance benchmarks 2026",
+      "score": 64,
+      "opportunityType": "new_content",
+      "category": "ai-marketing",
+      "notes": "Data-driven content. Creatify has some stats. High authority/link potential."
+    },
+    {
+      "slug": "cta-video-ads-examples",
+      "keyword": "call to action video ads examples",
+      "score": 62,
+      "opportunityType": "new_content",
+      "category": "ugc-video",
+      "notes": "Complementary to hook examples article. Covers the CTA segment deeply."
+    },
+    {
+      "slug": "ecommerce-ad-creative-testing",
+      "keyword": "ecommerce ad creative testing framework",
+      "score": 60,
+      "opportunityType": "new_content",
+      "category": "ecommerce",
+      "notes": "Different angle than our video-ad-testing-framework which is more general."
+    },
+    {
+      "slug": "food-brand-video-ads",
+      "keyword": "food brand video ads UGC strategy",
+      "score": 58,
+      "opportunityType": "new_content",
+      "category": "ecommerce",
+      "notes": "3rd vertical after beauty and fashion. Food/beverage DTC is growing fast."
+    },
+    {
+      "slug": "ai-ugc-ads-complete-guide-2026",
+      "keyword": "AI UGC ads guide 2026",
+      "score": 55,
+      "opportunityType": "new_content",
+      "category": "ai-marketing",
+      "notes": "Updated evergreen guide specifically for AI-generated UGC. Different from our human UGC guide."
+    }
+  ]
+}

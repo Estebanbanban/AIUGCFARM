@@ -1,0 +1,126 @@
+{
+  "version": "1.0",
+  "generatedAt": "2026-03-07",
+  "briefs": [
+    {
+      "suggestedSlug": "ai-ugc-facebook-ad-policy",
+      "keyword": "AI generated ads Facebook policy",
+      "suggestedTitle": "AI-Generated Video Ads on Facebook: What's Allowed in 2026",
+      "outline": [
+        "Meta's official policy on AI-generated content in ads",
+        "What disclosure requirements exist for AI avatar ads",
+        "Which types of AI video ads get rejected and why",
+        "How to stay compliant: checklist for CineRads-generated ads",
+        "What happens if your AI ad gets flagged"
+      ],
+      "faqSeeds": [
+        "Are AI-generated video ads allowed on Facebook?",
+        "Do I need to disclose that my video ad uses AI?",
+        "Can I use an AI spokesperson in Meta ads?",
+        "Will Meta reject my AI UGC video ad?"
+      ],
+      "internalLinks": ["hook-body-cta-framework", "meta-ads-video-creative-best-practices", "ai-ugc-vs-human-creators"]
+    },
+    {
+      "suggestedSlug": "ugc-video-hook-examples",
+      "keyword": "UGC video hook examples",
+      "suggestedTitle": "25 UGC Video Hook Examples That Stop the Scroll (With Formulas)",
+      "outline": [
+        "Why the first 3 seconds are the only seconds that matter",
+        "The 6 hook formulas that work on TikTok and Meta in 2026",
+        "10 example hooks for beauty and skincare brands",
+        "10 example hooks for apparel and fashion brands",
+        "5 example hooks for supplement and health brands",
+        "How to A/B test hooks using the 3-hook batch approach"
+      ],
+      "faqSeeds": [
+        "What makes a good UGC video hook?",
+        "How long should a UGC video hook be?",
+        "What are the best hook formulas for TikTok ads?",
+        "How many hooks should I test per ad campaign?"
+      ],
+      "internalLinks": ["hook-body-cta-framework", "video-ad-testing-framework", "tiktok-ad-creative-strategy-2026", "ugc-ad-examples-that-convert"]
+    },
+    {
+      "suggestedSlug": "cost-ugc-creator-vs-ai",
+      "keyword": "UGC creator cost vs AI video",
+      "suggestedTitle": "UGC Creator Cost vs AI Video: The Real Numbers for 2026",
+      "outline": [
+        "What a traditional UGC creator actually costs (including hidden costs)",
+        "How AI UGC pricing works: credits, packs, subscriptions",
+        "Full cost comparison: 1 video, 10 videos, 100 videos",
+        "Time cost: creator briefs vs AI generation",
+        "When to use human creators vs AI UGC",
+        "ROI calculator: breaking even on AI UGC"
+      ],
+      "faqSeeds": [
+        "How much does a UGC creator charge per video?",
+        "Is AI UGC cheaper than hiring a creator?",
+        "What is the average cost of a UGC video ad?",
+        "How many credits does it take to generate a video on CineRads?"
+      ],
+      "internalLinks": ["ai-ugc-vs-human-creators", "scaling-ad-creative-production", "ugc-video-ads-complete-guide"]
+    },
+    {
+      "suggestedSlug": "video-ad-script-writing",
+      "keyword": "how to write a video ad script",
+      "suggestedTitle": "How to Write a Video Ad Script (Template + 5 Examples That Converted)",
+      "outline": [
+        "The anatomy of a video ad script: hook, body, CTA",
+        "Script length by platform: TikTok vs Meta vs YouTube",
+        "5 fill-in-the-blank script templates",
+        "5 real-world example scripts with performance context",
+        "Common script mistakes that kill conversions",
+        "How AI script generation works (and when to edit it)"
+      ],
+      "faqSeeds": [
+        "How long should a video ad script be?",
+        "What should I include in a video ad script?",
+        "How do I write a hook for a video ad?",
+        "Can AI write my video ad script?"
+      ],
+      "internalLinks": ["hook-body-cta-framework", "ugc-ad-examples-that-convert", "shopify-video-ads-tutorial"]
+    },
+    {
+      "suggestedSlug": "instagram-reels-ads-guide",
+      "keyword": "Instagram Reels ads ecommerce guide 2026",
+      "suggestedTitle": "Instagram Reels Ads for E-Commerce: The 2026 Playbook",
+      "outline": [
+        "Why Reels ads are now Meta's highest-performing placement",
+        "Reels ad specs: dimensions, length, aspect ratio, file size",
+        "The UGC content style that works on Reels in 2026",
+        "Hook strategies specific to Reels (different from TikTok)",
+        "Reels vs Stories vs Feed: where to put your budget",
+        "How to build a Reels creative testing system"
+      ],
+      "faqSeeds": [
+        "What size should Instagram Reels ads be?",
+        "How long can an Instagram Reels ad be?",
+        "Are Reels ads better than Feed ads for ecommerce?",
+        "How much does it cost to run Instagram Reels ads?"
+      ],
+      "internalLinks": ["meta-ads-video-creative-best-practices", "hook-body-cta-framework", "video-ad-testing-framework", "ugc-video-ads-complete-guide"]
+    },
+    {
+      "suggestedSlug": "ai-avatar-comparison-2026",
+      "keyword": "AI avatar video generator comparison 2026",
+      "suggestedTitle": "Arcads vs Creatify vs CineRads vs HeyGen: AI Avatar Comparison 2026",
+      "outline": [
+        "What to look for in an AI avatar video tool",
+        "Arcads: best for large creator libraries",
+        "Creatify: best for URL-to-video automation",
+        "HeyGen: best for enterprise and multi-language",
+        "CineRads: best for 3x3x3 batch generation and ecommerce",
+        "Pricing comparison across all four tools",
+        "Which tool is right for your budget and use case"
+      ],
+      "faqSeeds": [
+        "Which AI avatar tool is best for ecommerce ads?",
+        "How does CineRads compare to Arcads?",
+        "What is the cheapest AI video ad generator?",
+        "Which AI UGC tool has the most realistic avatars?"
+      ],
+      "internalLinks": ["ai-ugc-vs-human-creators", "ai-video-tools-comparison-2026", "cost-ugc-creator-vs-ai", "ugc-video-ads-complete-guide"]
+    }
+  ]
+}

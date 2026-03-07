@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "updated": "2026-03-07",
+  "outputDir": "frontend/public/blog/",
+  "format": "webp",
+  "style": {
+    "aesthetic": "photorealistic cinematic editorial, DTC/performance marketing feel",
+    "textFont": "Inter Bold or clean sans-serif",
+    "textColor": "white",
+    "textShadow": "subtle drop shadow for legibility",
+    "colorDirection": "bold professional — muted warm tones, clean whites, accent colors"
+  },
+  "pending": [],
+  "completed": []
+}
