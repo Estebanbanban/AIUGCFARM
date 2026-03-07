@@ -17,18 +17,19 @@ export function getCorsHeaders(req: Request): HeadersInit {
   // If ALLOWED_ORIGIN is set, only allow those origins.
   // If unset, allow localhost for development but block arbitrary origins in production.
   let allowOrigin = ""; // deny by default when no explicit list is configured
-  if (allowedOrigins.size > 0) {
+  const isLocalhost =
+    !!requestOrigin &&
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(requestOrigin);
+
+  if (isLocalhost) {
+    // Always allow localhost for local development, even when ALLOWED_ORIGIN is set.
+    allowOrigin = requestOrigin!;
+  } else if (allowedOrigins.size > 0) {
     if (requestOrigin && allowedOrigins.has(requestOrigin)) {
       allowOrigin = requestOrigin;
     } else {
       allowOrigin = [...allowedOrigins][0]!;
     }
-  } else if (
-    requestOrigin &&
-    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(requestOrigin)
-  ) {
-    // Dev-only: reflect localhost origins so credentials work during development
-    allowOrigin = requestOrigin;
   }
 
   return {

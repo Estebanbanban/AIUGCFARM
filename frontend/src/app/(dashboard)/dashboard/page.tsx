@@ -102,8 +102,8 @@ export default function DashboardPage() {
     data: GenerationWithRelations[] | undefined;
     isLoading: boolean;
   };
-  const { data: personas } = usePersonas();
-  const { data: products } = useProducts();
+  const { data: personas, isLoading: personasLoading } = usePersonas();
+  const { data: products, isLoading: productsLoading } = useProducts();
 
   const plan = profile?.plan ?? "free";
   const planConfig = plan !== "free" ? PLANS[plan as keyof typeof PLANS] : null;
@@ -190,6 +190,156 @@ export default function DashboardPage() {
       ? Math.round((creditsRemaining / creditsTotal) * 100)
       : 0;
 
+  // ── Loading state ─────────────────────────────────────────────────────────
+  if (generationsLoading || productsLoading || personasLoading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // ── First-timer view ───────────────────────────────────────────────────────
+  if (videosGenerated === 0) {
+    const firstIncompleteHref = !hasProduct
+      ? "/products"
+      : !hasPersonaWithImage
+        ? "/personas/new"
+        : "/generate";
+
+    const onboardingSteps = [
+      {
+        number: 1,
+        title: "Import Your Products",
+        description: "Add at least one product from your store URL. Takes about 2 minutes.",
+        href: "/products",
+        done: hasProduct,
+      },
+      {
+        number: 2,
+        title: "Create Your AI Persona",
+        description: "Design the AI spokesperson that will star in every video you make.",
+        href: "/personas/new",
+        done: hasPersonaWithImage,
+      },
+      {
+        number: 3,
+        title: "Generate Your First Video",
+        description: "Launch your first AI-powered UGC ad. Usually ready in under 2 minutes.",
+        href: "/generate",
+        done: false,
+      },
+    ];
+
+    return (
+      <div className="flex flex-col gap-6">
+        <FadeInUp>
+          <div className="space-y-1">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+              Welcome to CineRads, {firstName}! 👋
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Let&apos;s create your first UGC video ad in 3 steps.
+            </p>
+          </div>
+        </FadeInUp>
+
+        <FadeInUp delay={0.08}>
+          <div className="flex flex-col gap-3">
+            {onboardingSteps.map((step) => (
+              <Link key={step.number} href={step.href}>
+                <Card
+                  className={
+                    step.done
+                      ? "border-emerald-500/30 bg-emerald-500/5 transition-all hover:border-emerald-500/50"
+                      : "border-border bg-card transition-all hover:border-primary/40 hover:shadow-md"
+                  }
+                >
+                  <CardContent className="flex items-center gap-4 p-4">
+                    <div
+                      className={
+                        "flex size-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold " +
+                        (step.done
+                          ? "bg-emerald-500/15 text-emerald-600"
+                          : "bg-primary/10 text-primary")
+                      }
+                    >
+                      {step.done ? (
+                        <CheckCircle2 className="size-5" />
+                      ) : (
+                        step.number
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className={
+                          "text-sm font-medium " +
+                          (step.done ? "text-muted-foreground line-through" : "text-foreground")
+                        }
+                      >
+                        {step.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{step.description}</p>
+                    </div>
+                    {!step.done && (
+                      <Badge variant="outline" className="shrink-0 border-primary/30 text-primary">
+                        Start
+                      </Badge>
+                    )}
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </FadeInUp>
+
+        <FadeInUp delay={0.16}>
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+            <Button size="lg" asChild className="gap-2">
+              <Link href={firstIncompleteHref}>
+                Start Now →
+              </Link>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+              onClick={() => window.dispatchEvent(new CustomEvent("onboarding:resume"))}
+            >
+              Open Tutorial
+            </Button>
+          </div>
+        </FadeInUp>
+
+        <FadeInUp delay={0.22}>
+          <Card className="border-border bg-card bg-primary/5">
+            <CardContent className="flex flex-col justify-between gap-3 p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">Credits Remaining</p>
+                <CreditCard className="size-4 text-muted-foreground" />
+              </div>
+              <div className="size-2 rounded-full bg-primary" />
+              <p className="font-mono text-3xl font-semibold text-primary">
+                {creditsLoading ? (
+                  <Loader2 className="size-5 animate-spin" />
+                ) : (
+                  isUnlimitedCredits ? "Unlimited" : creditsRemaining
+                )}
+              </p>
+              {!creditsLoading && creditsTotal > 0 && (
+                <Progress
+                  value={creditPercent}
+                  className="h-1.5 bg-muted [&>[data-slot=progress-indicator]]:bg-primary"
+                />
+              )}
+            </CardContent>
+          </Card>
+        </FadeInUp>
+      </div>
+    );
+  }
+
+  // ── Returning user view ────────────────────────────────────────────────────
   return (
     <>
     <div className="flex flex-col gap-6">
@@ -301,7 +451,7 @@ export default function DashboardPage() {
               </div>
               <div className="size-2 rounded-full bg-primary mb-1 mt-3" />
               <p className="font-mono text-3xl font-semibold text-primary">
-                {generationsLoading ? <Loader2 className="size-5 animate-spin" /> : videosGenerated}
+                {videosGenerated}
               </p>
             </CardContent>
           </Card>

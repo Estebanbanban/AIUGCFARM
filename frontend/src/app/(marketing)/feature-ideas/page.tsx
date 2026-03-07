@@ -96,9 +96,9 @@ export default function FeatureIdeasPage() {
             <Link href="/bug-report" className="text-primary hover:underline">
               Bug Report page
             </Link>
-            {" "}or contact us at{" "}
-            <a href="mailto:support@cinerads.com" className="text-primary hover:underline">
-              support@cinerads.com
+            {" "}or visit the{" "}
+            <a href="/bug-report" className="text-primary hover:underline">
+              Bug Report page
             </a>.
           </p>
         </div>

@@ -4,6 +4,9 @@ import { useState } from "react";
 import { Bug, CheckCircle2, Zap } from "lucide-react";
 import Link from "next/link";
 
+const EDGE_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1`;
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
 interface FormState {
   email: string;
   title: string;
@@ -25,26 +28,55 @@ const EMPTY: FormState = {
 export function BugReportForm() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function set(field: keyof FormState) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setForm((f) => ({ ...f, [field]: e.target.value }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const subject = encodeURIComponent(`[Bug] ${form.title}`);
-    const body = encodeURIComponent(
-      `Hi CineRads team,\n\n` +
-      `--- SUMMARY ---\n${form.title}\n\n` +
-      `--- WHAT HAPPENED ---\n${form.what}\n\n` +
-      `--- STEPS TO REPRODUCE ---\n${form.steps || "N/A"}\n\n` +
-      `--- EXPECTED BEHAVIOR ---\n${form.expected || "N/A"}\n\n` +
-      `--- BROWSER / DEVICE ---\n${form.browser || "N/A"}\n\n` +
-      `--- CONTACT EMAIL ---\n${form.email || "Not provided"}\n`
-    );
-    window.open(`mailto:bugs@cinerads.com?subject=${subject}&body=${body}`, "_blank");
-    setSubmitted(true);
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      const res = await fetch(`${EDGE_URL}/submit-feedback`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: ANON_KEY,
+        },
+        body: JSON.stringify({
+          type: "bug",
+          title: form.title,
+          description: form.what,
+          email: form.email || undefined,
+          metadata: {
+            steps: form.steps || undefined,
+            expected: form.expected || undefined,
+            browser: form.browser || undefined,
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        let detail = `Error ${res.status}`;
+        try {
+          const json = await res.json();
+          if (json?.detail) detail = String(json.detail);
+        } catch { /* ignore */ }
+        setError(detail);
+        return;
+      }
+
+      setSubmitted(true);
+    } catch {
+      setError("Failed to send report. Please check your connection and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   if (submitted) {
@@ -55,8 +87,7 @@ export function BugReportForm() {
         </div>
         <h2 className="text-xl font-bold text-foreground">Report sent - thank you!</h2>
         <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
-          Your email client just opened with the pre-filled report. Hit send and we&apos;ll
-          triage within 24 hours.
+          Your report has been sent directly to the CineRads team. We&apos;ll triage within 24 hours.
         </p>
         <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-medium text-primary">
           <Zap className="size-3.5" />
@@ -180,16 +211,23 @@ export function BugReportForm() {
         />
       </div>
 
+      {error && (
+        <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">
+          {error}
+        </p>
+      )}
+
       <button
         type="submit"
-        className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
+        disabled={isSubmitting}
+        className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-sm font-semibold text-white hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
         <Bug className="size-4" />
-        Submit Bug Report
+        {isSubmitting ? "Sending…" : "Submit Bug Report"}
       </button>
 
       <p className="text-center text-xs text-muted-foreground">
-        Clicking submit opens your email client with the report pre-filled. Just hit send.
+        Your report is sent directly to our team.
       </p>
     </form>
   );

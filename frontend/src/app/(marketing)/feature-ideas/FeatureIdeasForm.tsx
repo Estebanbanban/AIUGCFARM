@@ -4,6 +4,9 @@ import { useState } from "react";
 import { Lightbulb, CheckCircle2, Zap } from "lucide-react";
 import Link from "next/link";
 
+const EDGE_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1`;
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
 interface FormState {
   email: string;
   title: string;
@@ -23,25 +26,54 @@ const EMPTY: FormState = {
 export function FeatureIdeasForm() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function set(field: keyof FormState) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setForm((f) => ({ ...f, [field]: e.target.value }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const subject = encodeURIComponent(`[Feature Idea] ${form.title}`);
-    const body = encodeURIComponent(
-      `Hi CineRads team,\n\n` +
-      `--- FEATURE TITLE ---\n${form.title}\n\n` +
-      `--- PROBLEM IT SOLVES ---\n${form.problem}\n\n` +
-      `--- USE CASE / WHO BENEFITS ---\n${form.useCase || "N/A"}\n\n` +
-      `--- ADDITIONAL CONTEXT ---\n${form.context || "N/A"}\n\n` +
-      `--- CONTACT EMAIL ---\n${form.email || "Not provided"}\n`
-    );
-    window.open(`mailto:ideas@cinerads.com?subject=${subject}&body=${body}`, "_blank");
-    setSubmitted(true);
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      const res = await fetch(`${EDGE_URL}/submit-feedback`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: ANON_KEY,
+        },
+        body: JSON.stringify({
+          type: "feature",
+          title: form.title,
+          description: form.problem,
+          email: form.email || undefined,
+          metadata: {
+            use_case: form.useCase || undefined,
+            context: form.context || undefined,
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        let detail = `Error ${res.status}`;
+        try {
+          const json = await res.json();
+          if (json?.detail) detail = String(json.detail);
+        } catch { /* ignore */ }
+        setError(detail);
+        return;
+      }
+
+      setSubmitted(true);
+    } catch {
+      setError("Failed to send idea. Please check your connection and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   if (submitted) {
@@ -52,8 +84,7 @@ export function FeatureIdeasForm() {
         </div>
         <h2 className="text-xl font-bold text-foreground">Idea submitted - thank you!</h2>
         <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
-          Your email client just opened with the pre-filled idea. Hit send and the product
-          team will read it.
+          Your idea has been sent directly to the CineRads product team. We read every submission.
         </p>
         <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-medium text-primary">
           <Zap className="size-3.5" />
@@ -162,16 +193,23 @@ export function FeatureIdeasForm() {
         />
       </div>
 
+      {error && (
+        <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">
+          {error}
+        </p>
+      )}
+
       <button
         type="submit"
-        className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
+        disabled={isSubmitting}
+        className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-sm font-semibold text-white hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
         <Lightbulb className="size-4" />
-        Submit Feature Idea
+        {isSubmitting ? "Sending…" : "Submit Feature Idea"}
       </button>
 
       <p className="text-center text-xs text-muted-foreground">
-        Clicking submit opens your email client with the idea pre-filled. Just hit send.
+        Your idea is sent directly to our team.
       </p>
     </form>
   );
