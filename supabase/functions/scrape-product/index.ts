@@ -329,6 +329,25 @@ async function scrapeGeneric(
 }
 
 // ---------------------------------------------------------------------------
+// Per-product fallback brand summary used when AI generation fails
+// ---------------------------------------------------------------------------
+
+function buildFallbackBrandSummary(product: ProductData): BrandSummary {
+  return {
+    tone: "authentic, direct",
+    demographic: "online shoppers",
+    selling_points: [product.name],
+    tagline: product.name,
+    unique_value_prop: product.description.slice(0, 80),
+    price_positioning: "mid-range",
+    product_category: product.category ?? "general",
+    competitor_positioning: "",
+    customer_pain_points: [],
+    social_proof: "",
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
 
@@ -389,23 +408,34 @@ Deno.serve(async (req: Request) => {
       blockedByRobots = result.blocked_by_robots;
     }
 
-    // Generate brand summary from ALL products (graceful degradation)
-    let brandSummary: BrandSummary | null = null;
+    // Generate brand summary from ALL products (graceful degradation).
+    // If AI generation fails, each product gets a minimal per-product fallback
+    // so that brand_summary is never null in the response or the database.
     let brandSummaryError: string | null = null;
+    let sharedBrandSummary: BrandSummary | null = null;
 
     if (products.length > 0) {
-      brandSummary = await generateBrandSummary(products);
-      if (!brandSummary) {
+      sharedBrandSummary = await generateBrandSummary(products);
+      if (!sharedBrandSummary) {
         brandSummaryError = "Brand summary generation failed or timed out";
+        console.warn(
+          "generateBrandSummary returned null — applying per-product fallback",
+        );
       }
     }
+
+    // Resolve the effective brand summary for each product: shared AI result
+    // when available, otherwise a minimal fallback derived from the product itself.
+    const perProductSummaries: BrandSummary[] = products.map((p) =>
+      sharedBrandSummary ?? buildFallbackBrandSummary(p)
+    );
 
     // Save products as unconfirmed if authenticated (no limit check — limits are
     // enforced later in confirm-products when the user actually confirms a brand).
     let savedIds: (string | null)[] = products.map(() => null);
     if (userId && products.length > 0) {
       const sb = getAdminClient();
-      const rows = products.map((p) => ({
+      const rows = products.map((p, i) => ({
         owner_id: userId,
         store_url: url,
         name: p.name,
@@ -414,7 +444,7 @@ Deno.serve(async (req: Request) => {
         currency: p.currency,
         images: p.images,
         category: p.category,
-        brand_summary: brandSummary,
+        brand_summary: perProductSummaries[i],
         source,
         confirmed: false,
       }));
@@ -432,12 +462,12 @@ Deno.serve(async (req: Request) => {
         data: {
           products: products.map((p, i) => ({
             ...p,
-            brand_summary: brandSummary,
+            brand_summary: perProductSummaries[i],
             id: savedIds[i],
           })),
           source,
           platform,
-          brand_summary: brandSummary,
+          brand_summary: sharedBrandSummary,
           brand_summary_error: brandSummaryError,
           blocked_by_robots: blockedByRobots,
           fallback_available: fallbackAvailable,
