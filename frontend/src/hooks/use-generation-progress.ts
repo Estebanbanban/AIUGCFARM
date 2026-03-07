@@ -1,10 +1,12 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@clerk/nextjs";
 import { callEdge } from "@/lib/api";
 import type { Generation } from "@/types/database";
 
 export function useGenerationProgress(generationId: string) {
+  const { isLoaded, isSignedIn } = useAuth();
   return useQuery<Generation>({
     queryKey: ["generation-progress", generationId],
     queryFn: async () => {
@@ -20,6 +22,6 @@ export function useGenerationProgress(generationId: string) {
         data.status === "completed" || data.status === "failed";
       return done ? false : 5000;
     },
-    enabled: !!generationId,
+    enabled: isLoaded && isSignedIn === true && !!generationId,
   });
 }

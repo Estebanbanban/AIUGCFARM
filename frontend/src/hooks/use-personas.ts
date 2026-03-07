@@ -21,6 +21,7 @@ export function usePersonas() {
 }
 
 export function usePersona(id: string) {
+  const { isLoaded, isSignedIn } = useAuth();
   const queryClient = useQueryClient();
   return useQuery<Persona>({
     queryKey: ["personas", id],
@@ -30,7 +31,7 @@ export function usePersona(id: string) {
       if (!persona) throw new Error("Persona not found");
       return persona;
     },
-    enabled: !!id,
+    enabled: isLoaded && isSignedIn === true && !!id,
     retry: false,
     initialData: () => {
       const personas = queryClient.getQueryData<Persona[]>(["personas"]);
@@ -125,6 +126,7 @@ export type GenerationWithProduct = Generation & {
 };
 
 export function usePersonaGenerations(personaId: string) {
+  const { isLoaded, isSignedIn } = useAuth();
   return useQuery<GenerationWithProduct[]>({
     queryKey: ["persona-generations", personaId],
     queryFn: async () => {
@@ -134,12 +136,13 @@ export function usePersonaGenerations(personaId: string) {
       );
       return res.data;
     },
-    enabled: !!personaId,
+    enabled: isLoaded && isSignedIn === true && !!personaId,
     retry: false,
   });
 }
 
 export function usePersonaMonthlyUsage() {
+  const { isLoaded, isSignedIn } = useAuth();
   return useQuery<{ personas_created: number; month_year: string } | null>({
     queryKey: ["persona-monthly-usage"],
     queryFn: async () => {
@@ -149,6 +152,7 @@ export function usePersonaMonthlyUsage() {
       );
       return res.data;
     },
+    enabled: isLoaded && isSignedIn === true,
     retry: false,
   });
 }

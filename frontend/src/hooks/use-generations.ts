@@ -62,6 +62,7 @@ export function useGenerations() {
 }
 
 export function useGeneration(id: string) {
+  const { isLoaded, isSignedIn } = useAuth();
   const queryClient = useQueryClient();
   return useQuery<Generation>({
     queryKey: ["generations", id],
@@ -74,7 +75,7 @@ export function useGeneration(id: string) {
       if (!gen) throw new Error("Generation not found");
       return gen as Generation;
     },
-    enabled: !!id,
+    enabled: isLoaded && isSignedIn === true && !!id,
     retry: false,
     initialData: () => {
       const gens = queryClient.getQueryData<GenerationWithRelations[]>(["generations"]);
@@ -197,6 +198,7 @@ export function useRegenerateSegment() {
 
 /** Poll generation status (auto-refetches while processing). */
 export function useGenerationStatus(generationId: string | null, stopPolling = false) {
+  const { isLoaded, isSignedIn } = useAuth();
   return useQuery({
     queryKey: ["generation-progress", generationId],
     queryFn: async () => {
@@ -206,7 +208,7 @@ export function useGenerationStatus(generationId: string | null, stopPolling = f
       );
       return res.data;
     },
-    enabled: !!generationId,
+    enabled: isLoaded && isSignedIn === true && !!generationId,
     refetchInterval: (query) => {
       if (stopPolling) return false;
       const data = query.state.data;

@@ -20,6 +20,7 @@ export function useProducts() {
 }
 
 export function useProduct(id: string) {
+  const { isLoaded, isSignedIn } = useAuth();
   const queryClient = useQueryClient();
   return useQuery<Product>({
     queryKey: ["products", id],
@@ -29,7 +30,7 @@ export function useProduct(id: string) {
       if (!product) throw new Error("Product not found");
       return product;
     },
-    enabled: !!id,
+    enabled: isLoaded && isSignedIn === true && !!id,
     retry: false,
     initialData: () => {
       const products = queryClient.getQueryData<Product[]>(["products"]);
@@ -78,6 +79,7 @@ export function useScrapeProduct() {
 }
 
 export function useProductsByBrand(brandId: string | null) {
+  const { isLoaded, isSignedIn } = useAuth();
   return useQuery<Product[]>({
     queryKey: ["products", "brand", brandId],
     queryFn: async () => {
@@ -88,7 +90,7 @@ export function useProductsByBrand(brandId: string | null) {
       );
       return res.data;
     },
-    enabled: !!brandId,
+    enabled: isLoaded && isSignedIn === true && !!brandId,
     retry: false,
   });
 }
