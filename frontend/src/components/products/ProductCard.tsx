@@ -24,6 +24,7 @@ const sourceBadgeStyles: Record<Product['source'], string> = {
   shopify: 'bg-blue-500/10 text-blue-500 dark:text-blue-400',
   generic: 'bg-gray-500/10 text-gray-500 dark:text-gray-400',
   manual: 'bg-green-500/10 text-green-500 dark:text-green-400',
+  saas: 'bg-purple-500/10 text-purple-500 dark:text-purple-400',
 };
 
 interface ProductCardProps {
