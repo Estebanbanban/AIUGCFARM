@@ -157,8 +157,10 @@ async function detectSpeechSegments(
 
 /**
  * Trim a clip to its speech segments and write the result to outputFile.
- * Single segment: one re-encode pass.
- * Multiple segments: re-encode each → internal concat → outputFile.
+ * Uses -c copy (no re-encode) so FFmpeg WASM doesn't hang on libx264.
+ * Cuts are keyframe-aligned (±1 GOP), which is fine for short UGC clips.
+ * Single segment: one copy pass.
+ * Multiple segments: copy each → internal concat → outputFile.
  * Returns all temp file names created (caller passes to cleanupFFmpegFiles).
  */
 async function trimClipToSegments(
@@ -176,7 +178,7 @@ async function trimClipToSegments(
       "-i", inputFile,
       "-ss", seg.start.toFixed(3),
       "-to", seg.end.toFixed(3),
-      "-c:v", "libx264", "-c:a", "aac",
+      "-c", "copy",
       outputFile,
     ], `trim-${inputFile}`);
     created.push(outputFile);
@@ -195,7 +197,7 @@ async function trimClipToSegments(
       "-i", inputFile,
       "-ss", seg.start.toFixed(3),
       "-to", seg.end.toFixed(3),
-      "-c:v", "libx264", "-c:a", "aac",
+      "-c", "copy",
       segFile,
     ], `trim-${inputFile}-seg${i}`);
   }
