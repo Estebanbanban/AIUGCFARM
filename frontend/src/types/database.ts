@@ -127,6 +127,7 @@ export interface GenerationSegments {
   hooks: SegmentVideo[];
   bodies: SegmentVideo[];
   ctas: SegmentVideo[];
+  failed?: string[]; // job keys of segments that failed e.g. ["hook_2", "cta_3"]
 }
 
 /** @deprecated Use SegmentVideo and GenerationSegments instead */
