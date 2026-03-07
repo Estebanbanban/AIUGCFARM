@@ -34,7 +34,7 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} blob: https://js.stripe.com https://*.posthog.com https://*.sentry.io https://datafa.st`,
+              `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isDev ? " 'unsafe-eval'" : ""} blob: https://js.stripe.com https://*.posthog.com https://*.sentry.io https://datafa.st`,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "media-src 'self' blob: https://*.supabase.co https://commondatastorage.googleapis.com",
