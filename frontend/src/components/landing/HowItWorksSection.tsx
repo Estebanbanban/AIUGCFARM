@@ -37,7 +37,7 @@ const steps = [
 
 export function HowItWorksSection() {
   return (
-    <section id="how-it-works" className="bg-background py-20 px-4 sm:px-6">
+    <section id="how-it-works" className="bg-background py-16 px-4 sm:px-6">
       <div className="max-w-5xl mx-auto">
         {/* Heading */}
         <FadeInUp className="text-center mb-12">

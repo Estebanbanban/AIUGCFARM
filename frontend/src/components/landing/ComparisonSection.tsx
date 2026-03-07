@@ -14,10 +14,10 @@ const comparisons = [
 
 export function ComparisonSection() {
   return (
-    <section className="bg-background-secondary py-28 md:py-36 px-4 sm:px-6">
+    <section className="bg-background-secondary py-20 md:py-24 px-4 sm:px-6">
       <div className="max-w-4xl mx-auto">
 
-        <FadeInUp className="text-center mb-16">
+        <FadeInUp className="text-center mb-10">
           <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground mb-4">Why switch</p>
           <h2 className="text-[clamp(2.25rem,4.5vw,3.5rem)] font-semibold tracking-tight">
             What you get with{" "}

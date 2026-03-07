@@ -155,7 +155,7 @@ export default function LandingPage() {
       <HeroSection />
       <VideoCarousel />
       <HowItWorksSection />
-      <ComparisonSection />
+<ComparisonSection />
       <FeaturesSection />
       <MetricsBar />
       <TestimonialSection />
