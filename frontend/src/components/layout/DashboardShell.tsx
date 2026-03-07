@@ -34,7 +34,7 @@ const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Generate", href: "/generate", icon: Film },
   { label: "Personas", href: "/personas", icon: Users },
-  { label: "Brand", href: "/products", icon: Package },
+  { label: "Products", href: "/products", icon: Package },
   { label: "History", href: "/history", icon: Clock },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
@@ -42,7 +42,7 @@ const navItems = [
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/personas": "Personas",
-  "/products": "Brand",
+  "/products": "Products",
   "/generate": "Generate",
   "/history": "History",
   "/settings": "Settings",

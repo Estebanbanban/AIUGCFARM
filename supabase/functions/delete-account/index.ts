@@ -123,7 +123,21 @@ Deno.serve(async (req: Request) => {
     }
 
     // 7. Delete the Clerk user (GDPR compliance)
-    const clerkUserId = profileRow?.clerk_user_id;
+    let clerkUserId = profileRow?.clerk_user_id;
+    if (!clerkUserId) {
+      // Fallback: extract Clerk user ID from JWT if not in profile
+      try {
+        const authHeader = req.headers.get("Authorization") ?? "";
+        const token = authHeader.replace("Bearer ", "");
+        const payloadB64 = token.split(".")[1];
+        if (payloadB64) {
+          const payload = JSON.parse(atob(payloadB64));
+          clerkUserId = payload.sub ?? null;
+        }
+      } catch {
+        console.error("Could not extract Clerk user ID from JWT");
+      }
+    }
     if (clerkUserId) {
       const clerkRes = await fetch(`https://api.clerk.com/v1/users/${clerkUserId}`, {
         method: "DELETE",
@@ -132,9 +146,21 @@ Deno.serve(async (req: Request) => {
         },
       });
       if (!clerkRes.ok) {
-        console.error("Failed to delete Clerk user:", await clerkRes.text());
-        // Don't throw — Supabase data is already deleted, log and continue
+        const clerkErrText = await clerkRes.text();
+        console.error("Failed to delete Clerk user:", clerkErrText);
+        return json(
+          { detail: "Supabase data deleted but Clerk user deletion failed. GDPR issue — manual cleanup required.", error: clerkErrText },
+          cors,
+          500,
+        );
       }
+    } else {
+      console.error("No Clerk user ID available — Clerk user was not deleted. GDPR issue.");
+      return json(
+        { detail: "Supabase data deleted but Clerk user could not be identified for deletion. GDPR issue — manual cleanup required." },
+        cors,
+        500,
+      );
     }
 
     return json({ data: { deleted: true } }, cors);
