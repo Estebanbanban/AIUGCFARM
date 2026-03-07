@@ -131,6 +131,176 @@
         "newlyRanking": [],
         "previousRunDate": "2026-03-07"
       }
+    },
+    {
+      "runId": "2026-03-07T16:31:01.924Z",
+      "date": "2026-03-07",
+      "triggeredBy": "pipeline run",
+      "gscSummary": {
+        "totalPages": 7,
+        "blogPages": 4,
+        "totalImpressions": 85,
+        "totalClicks": 1,
+        "avgPosition": 5.5,
+        "dateRange": {
+          "start": "2025-12-07",
+          "end": "2026-03-07"
+        }
+      },
+      "articleStatus": {
+        "totalArticles": 23,
+        "top3": 0,
+        "page1": 2,
+        "page2": 0,
+        "notRanking": 21,
+        "highOpportunity": 0,
+        "mediumOpportunity": 0,
+        "keywordGaps": 14,
+        "gscDataAvailable": 2
+      },
+      "rankingArticles": [
+        {
+          "slug": "ecommerce-video-marketing-guide",
+          "position": 8.9,
+          "impressions": 38,
+          "clicks": 0,
+          "ctr": 0,
+          "topQuery": "performance video ads for e-commerce brands"
+        },
+        {
+          "slug": "video-ad-testing-framework",
+          "position": 6.2,
+          "impressions": 5,
+          "clicks": 0,
+          "ctr": 0,
+          "topQuery": null
+        }
+      ],
+      "keywordData": {
+        "totalEnriched": 35,
+        "withVolume": 2,
+        "withVolumeViaSeed": 17,
+        "topOpportunity": {
+          "keyword": "tiktok creative center guide 2026",
+          "volume": 12100,
+          "kd": null
+        }
+      },
+      "backlogStatus": {
+        "total": 19,
+        "pending": 19,
+        "inProgress": 0,
+        "written": 0,
+        "published": 0
+      },
+      "deltaFromPrevious": {
+        "impressionsDelta": 0,
+        "clicksDelta": 0,
+        "page1Delta": 0,
+        "notRankingDelta": 8,
+        "newlyRanking": [],
+        "previousRunDate": "2026-03-07"
+      }
+    },
+    {
+      "runId": "2026-03-07T16:33:35.002Z",
+      "date": "2026-03-07",
+      "triggeredBy": "pipeline run",
+      "gscSummary": {
+        "totalPages": 7,
+        "blogPages": 4,
+        "totalImpressions": 85,
+        "totalClicks": 1,
+        "avgPosition": 5.5,
+        "dateRange": {
+          "start": "2025-12-07",
+          "end": "2026-03-07"
+        }
+      },
+      "articleStatus": {
+        "totalArticles": 32,
+        "top3": 0,
+        "page1": 2,
+        "page2": 0,
+        "notRanking": 30,
+        "highOpportunity": 0,
+        "mediumOpportunity": 0,
+        "keywordGaps": 11,
+        "gscDataAvailable": 2
+      },
+      "rankingArticles": [
+        {
+          "slug": "ecommerce-video-marketing-guide",
+          "position": 8.9,
+          "impressions": 38,
+          "clicks": 0,
+          "ctr": 0,
+          "topQuery": "performance video ads for e-commerce brands"
+        },
+        {
+          "slug": "video-ad-testing-framework",
+          "position": 6.2,
+          "impressions": 5,
+          "clicks": 0,
+          "ctr": 0,
+          "topQuery": null
+        }
+      ],
+      "keywordData": {
+        "totalEnriched": 35,
+        "withVolume": 2,
+        "withVolumeViaSeed": 17,
+        "topOpportunity": {
+          "keyword": "tiktok creative center guide 2026",
+          "volume": 12100,
+          "kd": null
+        }
+      },
+      "backlogStatus": {
+        "total": 19,
+        "pending": 19,
+        "inProgress": 0,
+        "written": 0,
+        "published": 0
+      },
+      "deltaFromPrevious": {
+        "impressionsDelta": 0,
+        "clicksDelta": 0,
+        "page1Delta": 0,
+        "notRankingDelta": 9,
+        "newlyRanking": [],
+        "previousRunDate": "2026-03-07"
+      }
+    }
+  ],
+  "snapshots": [
+    {
+      "runAt": "2026-03-07T16:36:37.625Z",
+      "event": "research-mode-batch-2",
+      "articlesAdded": 20,
+      "totalPending": 39,
+      "newSlugs": [
+        "heygen-alternatives-2026",
+        "synthesia-alternatives-2026",
+        "invideo-alternatives-2026",
+        "unboxing-video-ads-ecommerce",
+        "supplement-brand-ugc-ads",
+        "fitness-brand-video-ads",
+        "woocommerce-video-ads",
+        "ai-avatar-video-ads",
+        "ecommerce-video-ad-funnel",
+        "video-ad-script-template",
+        "pet-product-video-ads",
+        "home-goods-video-ads",
+        "tech-accessories-video-ads",
+        "video-ad-cta-examples",
+        "first-3-seconds-video-hook",
+        "ugc-testimonial-video-ads",
+        "winning-ad-creative-formula",
+        "ai-video-ad-script-generator",
+        "youtube-shorts-ads-guide",
+        "video-ads-aspect-ratio-guide"
+      ]
     }
   ]
 }
