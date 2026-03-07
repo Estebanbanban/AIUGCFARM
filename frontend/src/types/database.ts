@@ -48,6 +48,13 @@ export interface BrandSummary {
   tone: string;
   demographic: string;
   selling_points: string[];
+  tagline?: string;
+  unique_value_prop?: string;
+  customer_pain_points?: string[];
+  social_proof?: string;
+  price_positioning?: string;
+  product_category?: string;
+  competitor_positioning?: string;
 }
 
 export interface Product {

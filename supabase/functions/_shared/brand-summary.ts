@@ -1,9 +1,19 @@
 import { callOpenRouter } from "./openrouter.ts";
 
 export interface BrandSummary {
-  tone: string;
-  demographic: string;
-  selling_points: string[];
+  // Original 3
+  tone: string;               // e.g. "bold, confident, direct"
+  demographic: string;        // e.g. "women 25-35 interested in skincare"
+  selling_points: string[];   // 3-5 bullet points
+
+  // New 7
+  tagline: string;                    // short punchy brand tagline (1 sentence)
+  unique_value_prop: string;          // what makes this product uniquely better
+  customer_pain_points: string[];     // 2-4 pains the product solves
+  social_proof: string;               // key credibility signals (reviews, awards, etc.)
+  price_positioning: string;          // "premium", "affordable", "mid-market" + rationale
+  product_category: string;           // e.g. "skincare", "fitness equipment", "SaaS tool"
+  competitor_positioning: string;     // how it differentiates from alternatives
 }
 
 interface ProductLike {
@@ -34,19 +44,30 @@ export async function generateBrandSummary(
         {
           role: "system",
           content:
-            'You are a brand analyst. Given product data, return a JSON object with exactly these keys: "tone" (brand voice tone, 1-2 words), "demographic" (who this product is for, 1 sentence), "selling_points" (array of 3-5 bullet point strings). Return ONLY valid JSON, no markdown.',
+            'You are a brand analyst. Given product data, return a JSON object with exactly these 10 keys:\n' +
+            '- "product_category": the product category (e.g. "skincare", "fitness equipment", "SaaS tool") — identify this first\n' +
+            '- "tone": brand voice tone, 2-4 descriptive words (e.g. "bold, confident, direct")\n' +
+            '- "demographic": who this product is for, 1 sentence (e.g. "women 25-35 interested in skincare")\n' +
+            '- "selling_points": array of 3-5 key selling point strings\n' +
+            '- "tagline": short punchy brand tagline, 1 sentence\n' +
+            '- "unique_value_prop": what makes this product uniquely better than alternatives, 1-2 sentences\n' +
+            '- "customer_pain_points": array of 2-4 strings describing pains this product solves\n' +
+            '- "social_proof": key credibility signals such as reviews, awards, or certifications extracted from the product description; write "Not mentioned" if none are present\n' +
+            '- "price_positioning": infer from the price and context — one of "premium", "mid-market", or "affordable", followed by a brief rationale\n' +
+            '- "competitor_positioning": how this product differentiates itself from alternatives, 1-2 sentences\n' +
+            'Return ONLY valid JSON, no markdown, no code fences.',
         },
         {
           role: "user",
           content: productSummaries,
         },
       ],
-      { maxTokens: 500, timeoutMs: 10000 },
+      { maxTokens: 800, timeoutMs: 15000 },
     );
 
     const parsed = JSON.parse(content);
 
-    // Validate expected shape
+    // Validate required original fields
     if (
       typeof parsed.tone !== "string" ||
       typeof parsed.demographic !== "string" ||
@@ -56,7 +77,21 @@ export async function generateBrandSummary(
       return null;
     }
 
-    return parsed as BrandSummary;
+    // Build result with defaults for any missing new fields
+    const result: BrandSummary = {
+      tone: parsed.tone,
+      demographic: parsed.demographic,
+      selling_points: parsed.selling_points,
+      tagline: typeof parsed.tagline === "string" ? parsed.tagline : "",
+      unique_value_prop: typeof parsed.unique_value_prop === "string" ? parsed.unique_value_prop : "",
+      customer_pain_points: Array.isArray(parsed.customer_pain_points) ? parsed.customer_pain_points : [],
+      social_proof: typeof parsed.social_proof === "string" ? parsed.social_proof : "Not mentioned",
+      price_positioning: typeof parsed.price_positioning === "string" ? parsed.price_positioning : "",
+      product_category: typeof parsed.product_category === "string" ? parsed.product_category : "",
+      competitor_positioning: typeof parsed.competitor_positioning === "string" ? parsed.competitor_positioning : "",
+    };
+
+    return result;
   } catch (e) {
     console.error("Brand summary generation failed:", e);
     return null;
