@@ -1,75 +1,50 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
 import { callEdge } from "@/lib/api";
 import type { Product } from "@/types/database";
-import type { ScrapeResponse, ScrapeResponseData, ConfirmProductsResponse } from "@/types/api";
-import type { CreateProductInput, UpdateProductInput } from "@/schemas/product";
+import type { ScrapeResponse, ConfirmProductsResponse } from "@/types/api";
 
 export function useProducts() {
   return useQuery<Product[]>({
     queryKey: ["products"],
     queryFn: async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("confirmed", true)
-        .order("created_at", { ascending: false });
-      if (error) throw new Error(error.message);
-      return data;
+      const res = await callEdge<{ data: Product[] }>("list-products", { method: "GET" });
+      return res.data;
     },
+    retry: false,
   });
 }
 
 export function useProduct(id: string) {
+  const queryClient = useQueryClient();
   return useQuery<Product>({
     queryKey: ["products", id],
     queryFn: async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("id", id)
-        .single();
-      if (error) throw new Error(error.message);
-      return data;
+      const res = await callEdge<{ data: Product[] }>("list-products", { method: "GET" });
+      const product = res.data.find((p) => p.id === id);
+      if (!product) throw new Error("Product not found");
+      return product;
     },
     enabled: !!id,
-  });
-}
-
-export function useCreateProduct() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (data: CreateProductInput) => {
-      const supabase = createClient();
-      const { data: product, error } = await supabase
-        .from("products")
-        .insert(data)
-        .select()
-        .single();
-      if (error) throw new Error(error.message);
-      return product as Product;
+    retry: false,
+    initialData: () => {
+      const products = queryClient.getQueryData<Product[]>(["products"]);
+      return products?.find((p) => p.id === id);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
+    initialDataUpdatedAt: () =>
+      queryClient.getQueryState(["products"])?.dataUpdatedAt,
   });
 }
 
 export function useUpdateProduct(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: UpdateProductInput) => {
-      const supabase = createClient();
-      const { data: product, error } = await supabase
-        .from("products")
-        .update(data)
-        .eq("id", id)
-        .select()
-        .single();
-      if (error) throw new Error(error.message);
-      return product as Product;
+    mutationFn: async (data: Partial<Product>) => {
+      const res = await callEdge<{ data: Product }>("update-product", {
+        body: { id, ...data },
+      });
+      return res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -82,9 +57,7 @@ export function useDeleteProduct(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const supabase = createClient();
-      const { error } = await supabase.from("products").delete().eq("id", id);
-      if (error) throw new Error(error.message);
+      await callEdge("delete-product", { body: { id } });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
   });
@@ -106,17 +79,14 @@ export function useProductsByBrand(brandId: string | null) {
     queryKey: ["products", "brand", brandId],
     queryFn: async () => {
       if (!brandId) return [];
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("brand_id", brandId)
-        .eq("confirmed", true)
-        .order("created_at", { ascending: false });
-      if (error) throw new Error(error.message);
-      return data;
+      const res = await callEdge<{ data: Product[] }>(
+        `list-products?brand_id=${brandId}`,
+        { method: "GET" }
+      );
+      return res.data;
     },
     enabled: !!brandId,
+    retry: false,
   });
 }
 

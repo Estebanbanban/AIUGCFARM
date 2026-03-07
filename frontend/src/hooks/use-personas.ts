@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
 import { callEdge } from "@/lib/api";
 import { getSignedImageUrl } from "@/lib/storage";
 import type { Persona, Generation } from "@/types/database";
@@ -11,15 +10,10 @@ export function usePersonas() {
   return useQuery<Persona[]>({
     queryKey: ["personas"],
     queryFn: async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("personas")
-        .select("*")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false });
-      if (error) throw new Error(error.message);
-      return data;
+      const res = await callEdge<{ data: Persona[] }>("list-personas", { method: "GET" });
+      return res.data;
     },
+    retry: false,
   });
 }
 
@@ -28,20 +22,13 @@ export function usePersona(id: string) {
   return useQuery<Persona>({
     queryKey: ["personas", id],
     queryFn: async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("personas")
-        .select("*")
-        .eq("id", id)
-        .single();
-      if (error) throw new Error(error.message);
-      return data;
+      const res = await callEdge<{ data: Persona[] }>("list-personas", { method: "GET" });
+      const persona = res.data.find((p) => p.id === id);
+      if (!persona) throw new Error("Persona not found");
+      return persona;
     },
     enabled: !!id,
-    retry: 2,
-    // Seed from the list cache so the detail page renders instantly on
-    // navigation (no loading flash) and never shows "Not found" for a
-    // persona the user just navigated from.
+    retry: false,
     initialData: () => {
       const personas = queryClient.getQueryData<Persona[]>(["personas"]);
       return personas?.find((p) => p.id === id);
@@ -55,14 +42,10 @@ export function useCreatePersona() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: CreatePersonaInput) => {
-      const supabase = createClient();
-      const { data: persona, error } = await supabase
-        .from("personas")
-        .insert(data)
-        .select()
-        .single();
-      if (error) throw new Error(error.message);
-      return persona as Persona;
+      const res = await callEdge<{ data: Persona }>("generate-persona", {
+        body: { ...data, _create_only: true },
+      });
+      return res.data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["personas"] }),
   });
@@ -72,15 +55,10 @@ export function useUpdatePersona(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: Partial<CreatePersonaInput>) => {
-      const supabase = createClient();
-      const { data: persona, error } = await supabase
-        .from("personas")
-        .update(data)
-        .eq("id", id)
-        .select()
-        .single();
-      if (error) throw new Error(error.message);
-      return persona as Persona;
+      const res = await callEdge<{ data: Persona }>("update-persona", {
+        body: { id, ...data },
+      });
+      return res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["personas"] });
@@ -93,12 +71,7 @@ export function useDeletePersona(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("personas")
-        .update({ is_active: false })
-        .eq("id", id);
-      if (error) throw new Error(error.message);
+      await callEdge("delete-persona", { body: { id } });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["personas"] });
@@ -152,16 +125,14 @@ export function usePersonaGenerations(personaId: string) {
   return useQuery<GenerationWithProduct[]>({
     queryKey: ["persona-generations", personaId],
     queryFn: async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("generations")
-        .select("*, products(name)")
-        .eq("persona_id", personaId)
-        .order("created_at", { ascending: false });
-      if (error) throw new Error(error.message);
-      return data as GenerationWithProduct[];
+      const res = await callEdge<{ data: GenerationWithProduct[] }>(
+        `list-generations?persona_id=${personaId}`,
+        { method: "GET" }
+      );
+      return res.data;
     },
     enabled: !!personaId,
+    retry: false,
   });
 }
 
@@ -169,16 +140,13 @@ export function usePersonaMonthlyUsage() {
   return useQuery<{ personas_created: number; month_year: string } | null>({
     queryKey: ["persona-monthly-usage"],
     queryFn: async () => {
-      const supabase = createClient();
-      const now = new Date();
-      const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-      const { data } = await supabase
-        .from("persona_monthly_limits")
-        .select("personas_created, month_year")
-        .eq("month_year", monthYear)
-        .maybeSingle();
-      return data;
+      const res = await callEdge<{ data: { personas_created: number; month_year: string } | null }>(
+        "get-persona-monthly-usage",
+        { method: "GET" }
+      );
+      return res.data;
     },
+    retry: false,
   });
 }
 

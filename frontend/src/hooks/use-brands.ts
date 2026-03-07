@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
 import { callEdge } from "@/lib/api";
 
 export interface Brand {
@@ -21,20 +20,10 @@ export function useBrands() {
   return useQuery<Brand[]>({
     queryKey: ["brands"],
     queryFn: async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("brands")
-        .select("*, products(count)")
-        .order("created_at", { ascending: false });
-      if (error) throw new Error(error.message);
-      return (data as Record<string, unknown>[]).map((b) => ({
-        ...b,
-        product_count:
-          Array.isArray(b.products) && b.products.length > 0
-            ? (b.products as { count: number }[])[0].count
-            : 0,
-      })) as Brand[];
+      const res = await callEdge<{ data: Brand[] }>("list-brands", { method: "GET" });
+      return res.data;
     },
+    retry: false,
   });
 }
 

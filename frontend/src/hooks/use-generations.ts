@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
 import { callEdge } from "@/lib/api";
 import type { Generation } from "@/types/database";
 import type {
@@ -46,31 +45,37 @@ export function useGenerations() {
   return useQuery<GenerationWithRelations[]>({
     queryKey: ["generations"],
     queryFn: async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("generations")
-        .select("*, products(name, images), personas(name, selected_image_url)")
-        .order("created_at", { ascending: false });
-      if (error) throw new Error(error.message);
-      return data as GenerationWithRelations[];
+      const res = await callEdge<{ data: GenerationWithRelations[] }>(
+        "list-generations",
+        { method: "GET" }
+      );
+      return res.data;
     },
+    retry: false,
   });
 }
 
 export function useGeneration(id: string) {
+  const queryClient = useQueryClient();
   return useQuery<Generation>({
     queryKey: ["generations", id],
     queryFn: async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("generations")
-        .select("*")
-        .eq("id", id)
-        .single();
-      if (error) throw new Error(error.message);
-      return data;
+      const res = await callEdge<{ data: GenerationWithRelations[] }>(
+        "list-generations",
+        { method: "GET" }
+      );
+      const gen = res.data.find((g) => g.id === id);
+      if (!gen) throw new Error("Generation not found");
+      return gen as Generation;
     },
     enabled: !!id,
+    retry: false,
+    initialData: () => {
+      const gens = queryClient.getQueryData<GenerationWithRelations[]>(["generations"]);
+      return gens?.find((g) => g.id === id) as Generation | undefined;
+    },
+    initialDataUpdatedAt: () =>
+      queryClient.getQueryState(["generations"])?.dataUpdatedAt,
   });
 }
 
@@ -249,19 +254,18 @@ export function useGenerateSegmentComposite() {
 
 /** Fetch the number of segment regenerations used this calendar month. */
 export function useRegenLimit() {
-  const supabase = createClient();
   return useQuery({
     queryKey: ["regen-limit"],
     queryFn: async () => {
       const month = new Date().toISOString().slice(0, 7);
-      const { data } = await supabase
-        .from("regeneration_limits")
-        .select("regens_used")
-        .eq("month_year", month)
-        .maybeSingle();
-      return data?.regens_used ?? 0;
+      const res = await callEdge<{ data: { regens_used: number } | null }>(
+        `get-regen-limit?month=${month}`,
+        { method: "GET" }
+      );
+      return res.data?.regens_used ?? 0;
     },
     staleTime: 30_000,
+    retry: false,
   });
 }
 
@@ -270,12 +274,7 @@ export function useDeleteGeneration() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (generationId: string) => {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("generations")
-        .delete()
-        .eq("id", generationId);
-      if (error) throw new Error(error.message);
+      await callEdge("delete-generation", { body: { id: generationId } });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["generation-history"] });

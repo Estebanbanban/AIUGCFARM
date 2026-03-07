@@ -6,8 +6,6 @@
  */
 import { getAdminClient } from "./supabase.ts";
 
-const CLERK_JWKS_URL = "https://api.clerk.dev/v1/jwks";
-
 interface JWKSKey {
   kty: string;
   use: string;
@@ -16,18 +14,19 @@ interface JWKSKey {
   e: string;
 }
 
-let cachedJWKS: { keys: JWKSKey[] } | null = null;
-let cacheTime = 0;
+// Cache keyed by JWKS URL to support multiple Clerk instances
+const jwksCache = new Map<string, { keys: JWKSKey[]; fetchedAt: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-async function getJWKS() {
+async function getJWKS(url: string) {
+  const cached = jwksCache.get(url);
   const now = Date.now();
-  if (cachedJWKS && now - cacheTime < CACHE_TTL_MS) return cachedJWKS;
-  const res = await fetch(CLERK_JWKS_URL);
-  if (!res.ok) throw new Error("Failed to fetch Clerk JWKS");
-  cachedJWKS = await res.json();
-  cacheTime = now;
-  return cachedJWKS!;
+  if (cached && now - cached.fetchedAt < CACHE_TTL_MS) return cached;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch Clerk JWKS from ${url}: ${res.status}`);
+  const data = await res.json() as { keys: JWKSKey[] };
+  jwksCache.set(url, { ...data, fetchedAt: now });
+  return data;
 }
 
 function base64urlToBytes(base64url: string): Uint8Array {
@@ -47,7 +46,13 @@ async function verifyClerkJWT(token: string): Promise<string> {
   // Check expiry
   if (payload.exp && Date.now() / 1000 > payload.exp) throw new Error("JWT expired");
 
-  const jwks = await getJWKS();
+  // Derive JWKS URL: env var takes precedence, then issuer from JWT, then fail
+  const jwksUrl =
+    Deno.env.get("CLERK_JWKS_URL") ||
+    (payload.iss ? `${payload.iss}/.well-known/jwks.json` : null);
+  if (!jwksUrl) throw new Error("Cannot determine JWKS URL — set CLERK_JWKS_URL env var");
+
+  const jwks = await getJWKS(jwksUrl);
   const jwk = jwks.keys.find((k) => k.kid === header.kid);
   if (!jwk) throw new Error("No matching JWK found");
 
