@@ -122,6 +122,9 @@ async function enrichKeywords() {
   const overviewMap = new Map();  // keyword -> { searchVolume, cpc, competition, intent, monthlySearches }
   const difficultyMap = new Map(); // keyword -> keywordDifficulty (0-100)
 
+  let overviewFailures = 0;
+  let difficultyFailures = 0;
+
   for (let i = 0; i < lookupList.length; i += BATCH_SIZE) {
     const batch = lookupList.slice(i, i + BATCH_SIZE);
     const batchNum = Math.floor(i / BATCH_SIZE) + 1;
@@ -153,6 +156,7 @@ async function enrichKeywords() {
       console.log(`  Overview batch ${batchNum}: ${items.length} results`);
     } catch (err) {
       console.warn(`  Overview batch ${batchNum} error: ${err.message}`);
+      overviewFailures++;
     }
 
     // --- Bulk Keyword Difficulty ---
@@ -174,7 +178,15 @@ async function enrichKeywords() {
       console.log(`  Difficulty batch ${batchNum}: ${items.length} results`);
     } catch (err) {
       console.warn(`  Difficulty batch ${batchNum} error: ${err.message}`);
+      difficultyFailures++;
     }
+  }
+
+  if (overviewFailures > 0 || difficultyFailures > 0) {
+    throw new Error(
+      `DataForSEO enrichment incomplete: ${overviewFailures} overview batch(es) and ${difficultyFailures} difficulty batch(es) failed. ` +
+      `keyword-data.json was NOT written to prevent downstream auditing on partial data.`
+    );
   }
 
   // 3. Merge — fall back to seed keyword volume when exact phrase has no data
