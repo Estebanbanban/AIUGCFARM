@@ -34,14 +34,40 @@ export async function POST(req: Request) {
     const fullName = [first_name, last_name].filter(Boolean).join(" ") || email?.split("@")[0] || "User";
 
     const supabase = createAdminClient();
-    await supabase.from("profiles").insert({
-      clerk_user_id: clerkUserId,
-      email,
-      full_name: fullName,
-      avatar_url: image_url,
-      plan: "free",
-      credits: 3,
-    });
+    const { error } = await supabase.from("profiles").upsert(
+      {
+        clerk_user_id: clerkUserId,
+        email,
+        full_name: fullName,
+        avatar_url: image_url,
+        plan: "free",
+        credits: 3,
+      },
+      { onConflict: "email", ignoreDuplicates: false }
+    );
+    if (error) {
+      console.error(`[clerk-webhook] user.created upsert failed for clerk_user_id=${clerkUserId}:`, error);
+    }
+  }
+
+  if (evt.type === "user.updated") {
+    const { id: clerkUserId, email_addresses, first_name, last_name, image_url } = evt.data;
+    const email = email_addresses[0]?.email_address;
+    const fullName = [first_name, last_name].filter(Boolean).join(" ") || email?.split("@")[0] || "User";
+
+    const supabase = createAdminClient();
+    const { error } = await supabase.from("profiles").upsert(
+      {
+        clerk_user_id: clerkUserId,
+        email,
+        full_name: fullName,
+        avatar_url: image_url,
+      },
+      { onConflict: "clerk_user_id", ignoreDuplicates: false }
+    );
+    if (error) {
+      console.error(`[clerk-webhook] user.updated upsert failed for clerk_user_id=${clerkUserId}:`, error);
+    }
   }
 
   if (evt.type === "user.deleted") {
