@@ -1503,15 +1503,18 @@ export default function GenerationDetailPage() {
   const allCombos = useMemo(() => {
     if (gen?.mode !== "triple") return [];
     const combos: Array<{ hookIdx: number; bodyIdx: number; ctaIdx: number }> = [];
-    for (let h = 0; h < 3; h++) {
-      for (let b = 0; b < 3; b++) {
-        for (let c = 0; c < 3; c++) {
+    const hooksCount = segments?.hooks?.length ?? 0;
+    const bodiesCount = segments?.bodies?.length ?? 0;
+    const ctasCount = segments?.ctas?.length ?? 0;
+    for (let h = 0; h < hooksCount; h++) {
+      for (let b = 0; b < bodiesCount; b++) {
+        for (let c = 0; c < ctasCount; c++) {
           combos.push({ hookIdx: h, bodyIdx: b, ctaIdx: c });
         }
       }
     }
-    return combos; // 27 combos
-  }, [gen?.mode]);
+    return combos; // up to 27 combos depending on available segments
+  }, [gen?.mode, segments]);
 
   const currentComboIndex = useMemo(() => {
     if (allCombos.length === 0) return -1;
