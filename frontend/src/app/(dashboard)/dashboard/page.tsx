@@ -14,6 +14,7 @@ import {
   Loader2,
   PlayCircle,
   CheckCircle2,
+  X,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatDate } from "@/lib/utils";
@@ -39,7 +40,25 @@ import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import { useRouter } from "next/navigation";
 
 import { useProducts } from "@/hooks/use-products";
+import { callEdge } from "@/lib/api";
 
+
+interface Preset {
+  id: string;
+  name: string;
+  config: {
+    product_id: string;
+    persona_id: string;
+    mode: "single" | "triple";
+    quality: "standard" | "hd";
+    format: "9:16" | "16:9";
+    cta_style: string;
+    language: string;
+    video_provider?: "kling" | "sora";
+  };
+  last_used_at: string | null;
+  created_at: string;
+}
 
 const quickActions = [
   {
@@ -73,6 +92,7 @@ export default function DashboardPage() {
   const wizard = useGenerationWizardStore();
   const { user } = useUser();
   const firstName = user?.firstName || user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] || "there";
+  const [presets, setPresets] = useState<Preset[]>([]);
 
   const { data: credits, isLoading: creditsLoading } = useCredits();
   const { data: profile } = useProfile();
@@ -134,6 +154,24 @@ export default function DashboardPage() {
     });
     router.push("/generate");
   }
+
+  useEffect(() => {
+    callEdge<{ data: Preset[] }>("list-presets").then((res) => {
+      setPresets(res.data ?? []);
+    }).catch(() => {});
+  }, []);
+
+  function handleLoadPreset(preset: Preset) {
+    wizard.loadPreset(preset.config);
+    callEdge("update-preset-used", { body: { preset_id: preset.id } }).catch(() => {});
+    router.push("/generate");
+  }
+
+  function handleDeletePreset(id: string) {
+    setPresets((prev) => prev.filter((p) => p.id !== id));
+    callEdge("delete-preset", { body: { preset_id: id } }).catch(() => {});
+  }
+
 
   const creditPercent = isUnlimitedCredits
     ? 100
@@ -323,6 +361,52 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </FadeInUp>
+
+      {presets.length > 0 && (
+        <FadeInUp delay={0.25}>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">Your Presets</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {presets.map((preset) => (
+                  <div
+                    key={preset.id}
+                    className="flex items-center justify-between rounded-lg border p-3 gap-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{preset.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {preset.config.mode === "triple" ? "Full Campaign" : "Single Ad"} ·{" "}
+                        {preset.config.quality === "hd" ? "HD" : "Standard"} ·{" "}
+                        {preset.config.language.toUpperCase()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => handleLoadPreset(preset)}
+                      >
+                        Generate
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeletePreset(preset.id)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </FadeInUp>
+      )}
 
       <FadeInUp delay={0.3}>
         {draftGenerations.length > 0 && (
