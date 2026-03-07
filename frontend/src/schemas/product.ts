@@ -8,7 +8,7 @@ export const createProductSchema = z.object({
   store_url: z.string().url().optional(),
   images: z.array(z.string().url()).max(10).optional(),
   category: z.string().max(100).optional(),
-  source: z.enum(["shopify", "generic", "manual"]).default("manual"),
+  source: z.enum(["shopify", "generic", "manual", "saas"]).default("manual"),
   confirmed: z.boolean().default(false),
 });
 

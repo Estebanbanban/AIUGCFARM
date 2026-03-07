@@ -8,12 +8,13 @@ import Image from 'next/image';
 import {
   Loader2, Check, User, ImageIcon, X,
   ChevronDown, ChevronUp, Eye, Palette, Clock,
-  Shirt, Watch, Wand2, Cpu, FlaskConical,
+  Shirt, Watch, Wand2, Cpu, FlaskConical, Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
-import { callEdge } from '@/lib/api';
+import { callEdge, callEdgeMultipart } from '@/lib/api';
+import type { UploadPersonaImageResponse } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
@@ -589,7 +590,11 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
   const queryClient = useQueryClient();
   const { data: profile } = useProfile();
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<number>>(new Set());
-  const [createMode, setCreateMode] = useState<'quick' | 'custom'>('quick');
+  const [createMode, setCreateMode] = useState<'quick' | 'custom' | 'upload'>('quick');
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isUploadedPersona, setIsUploadedPersona] = useState(false);
   const [quickDescription, setQuickDescription] = useState('');
   const [isGeneratingQuick, setIsGeneratingQuick] = useState(false);
   const [regenCount, setRegenCount] = useState<number>(0);
@@ -629,6 +634,13 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
 
   // Clean up interval on unmount
   useEffect(() => () => stopSim(), []);
+
+  // Revoke object URL on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
+    };
+  }, [uploadPreviewUrl]);
 
 
   // ── Load regen_count on mount when resuming an existing persona ────────────
@@ -816,6 +828,25 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
     }
   }
 
+  async function handleUpload() {
+    if (!uploadFile || !store.name.trim()) return;
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('name', store.name.trim());
+      formData.append('file', uploadFile);
+      if (store.personaId) formData.append('persona_id', store.personaId);
+      const res = await callEdgeMultipart<UploadPersonaImageResponse>('upload-persona-image', formData);
+      store.setPersonaId(res.data.persona_id);
+      store.setGeneratedImages([res.data.signed_url]);
+      setIsUploadedPersona(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Upload failed');
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
   async function handleSave() {
     if (store.selectedImageIndex === null || !store.personaId) return;
     store.setIsSaving(true);
@@ -892,15 +923,26 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
               />
             </div>
 
-            {/* Quick / Custom mode selector */}
+            {/* Quick / Custom / Upload mode selector */}
             <div className="flex gap-1.5 rounded-xl border border-border bg-muted/50 p-1 mb-4">
-              <button type="button" onClick={() => setCreateMode('quick')} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all', createMode === 'quick' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+              <button type="button" onClick={() => { setCreateMode('quick'); }} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all', createMode === 'quick' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
                 <Wand2 className="size-3.5" />
                 Quick
               </button>
-              <button type="button" onClick={() => setCreateMode('custom')} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all', createMode === 'custom' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+              <button type="button" onClick={() => { setCreateMode('custom'); }} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all', createMode === 'custom' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
                 <Palette className="size-3.5" />
                 Custom
+              </button>
+              <button type="button" onClick={() => {
+                if (createMode !== 'upload' && uploadPreviewUrl) {
+                  URL.revokeObjectURL(uploadPreviewUrl);
+                  setUploadPreviewUrl(null);
+                  setUploadFile(null);
+                }
+                setCreateMode('upload');
+              }} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all', createMode === 'upload' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+                <Upload className="size-3.5" />
+                Upload
               </button>
             </div>
 
@@ -917,6 +959,62 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
                   className="resize-none text-sm"
                 />
                 <p className="text-xs text-muted-foreground">The AI will generate images from your description.</p>
+              </div>
+            )}
+
+            {/* Upload Photo mode */}
+            {createMode === 'upload' && (
+              <div className="flex flex-col gap-3">
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  id="persona-upload-input"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 5 * 1024 * 1024) {
+                      toast.error('File too large. Maximum size is 5MB.');
+                      e.target.value = '';
+                      return;
+                    }
+                    if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
+                    setUploadFile(file);
+                    setUploadPreviewUrl(URL.createObjectURL(file));
+                  }}
+                />
+                {uploadPreviewUrl ? (
+                  <div className="flex flex-col gap-2">
+                    <div className="relative mx-auto aspect-[3/4] w-40 overflow-hidden rounded-xl border border-border">
+                      <img src={uploadPreviewUrl} alt="Upload preview" className="size-full object-cover" />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
+                        setUploadPreviewUrl(null);
+                        setUploadFile(null);
+                        const input = document.getElementById('persona-upload-input') as HTMLInputElement | null;
+                        if (input) input.value = '';
+                      }}
+                      className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                    >
+                      Remove / Change
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById('persona-upload-input')?.click()}
+                    className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-border p-6 text-center transition-colors hover:border-primary/40"
+                  >
+                    <Upload className="size-8 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Click to select a photo</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">Accepted: JPG, PNG, WebP · Max 5MB</p>
+                    </div>
+                  </button>
+                )}
               </div>
             )}
 
@@ -1193,7 +1291,8 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
                         <Button
                           onClick={handleGenerate}
                           variant="outline"
-                          disabled={store.isGenerating || store.isSaving || (profile?.plan === 'free' && regenCount >= 4)}
+                          disabled={store.isGenerating || store.isSaving || isUploadedPersona || (profile?.plan === 'free' && regenCount >= 4)}
+                          title={isUploadedPersona ? 'Cannot regenerate uploaded personas' : undefined}
                           className="w-full"
                         >
                           {store.isGenerating ? (
@@ -1225,19 +1324,30 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
       <div className="sticky bottom-0 z-10 -mx-1 border-t border-border bg-card/95 px-1 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         {store.generatedImages.length === 0 ? (
           <Button
-            onClick={createMode === "quick" ? handleQuickCreate : handleGenerate}
+            onClick={
+              createMode === "upload"
+                ? handleUpload
+                : createMode === "quick"
+                  ? handleQuickCreate
+                  : handleGenerate
+            }
             disabled={
-              createMode === "quick"
-                ? (!quickDescription.trim() || isGeneratingQuick)
-                : store.isGenerating
+              createMode === "upload"
+                ? (!uploadFile || isUploading || !store.name.trim())
+                : createMode === "quick"
+                  ? (!quickDescription.trim() || isGeneratingQuick)
+                  : store.isGenerating
             }
             className="flex w-full items-center justify-center gap-2"
             size="lg"
           >
-            {(isGeneratingQuick || store.isGenerating) && (
+            {(isGeneratingQuick || store.isGenerating || isUploading) && (
               <Loader2 className="size-4 animate-spin" />
             )}
-            {isGeneratingQuick || store.isGenerating ? "Generating…" : "Generate Persona"}
+            {createMode === "upload"
+              ? (isUploading ? "Uploading…" : "Upload Photo")
+              : (isGeneratingQuick || store.isGenerating ? "Generating…" : "Generate Persona")
+            }
           </Button>
         ) : (
           <Button

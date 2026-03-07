@@ -29,6 +29,7 @@ function stripHtml(html: string): string {
 interface ScrapeResultsProps {
   products: Product[];
   brandSummary?: BrandSummary | null;
+  brandId?: string;
   onConfirmed: () => void;
 }
 
@@ -41,6 +42,7 @@ interface EditState {
 export function ScrapeResults({
   products,
   brandSummary,
+  brandId,
   onConfirmed,
 }: ScrapeResultsProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -68,10 +70,15 @@ export function ScrapeResults({
   }
 
   async function handleConfirmAll() {
+    if (!brandId) {
+      toast.error('No brand selected. Please select a brand before confirming.');
+      return;
+    }
     setConfirming(true);
     try {
       await confirmProduct.mutateAsync({
         product_ids: products.map((p) => p.id),
+        brand_id: brandId,
       });
       toast.success('Products confirmed!');
       onConfirmed();
