@@ -2196,7 +2196,7 @@ export default function GenerationDetailPage() {
           {gen?.mode === "triple" && status === "completed" && !batchMode && !comboBannerDismissed && (
             <div className="flex items-start justify-between gap-4 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 mb-2">
               <div className="flex flex-col gap-1">
-                <p className="text-sm font-semibold text-primary">You have 27 possible combinations</p>
+                <p className="text-sm font-semibold text-primary">You have {allCombos.length} possible combinations</p>
                 <p className="text-xs text-muted-foreground">Select segments in each column to preview and export custom video combinations.</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -2404,11 +2404,11 @@ export default function GenerationDetailPage() {
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Estimated time: {formatEstimatedTime(combosToExport.length * 25)}
-                          {combosToExport.length > 27 ? (
+                          {combosToExport.length > 125 ? (
                             <span className="ml-1 text-red-400">
-                              Max 27 combinations
+                              Max 125 combinations
                             </span>
-                          ) : combosToExport.length > 9 && (
+                          ) : combosToExport.length > 27 && (
                             <span className="ml-1 text-amber-400">
                               Large export, stay on this tab
                             </span>
@@ -2432,7 +2432,7 @@ export default function GenerationDetailPage() {
                     <Button
                       size="sm"
                       onClick={() => batchStitch(combosToExport, generationId)}
-                      disabled={combosToExport.length === 0 || isBatching || combosToExport.length > 27}
+                      disabled={combosToExport.length === 0 || isBatching || combosToExport.length > 125}
                     >
                       {isBatching ? (
                         <>

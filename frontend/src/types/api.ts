@@ -89,6 +89,9 @@ export interface CreateGenerationParams {
   composite_image_path: string;
   /** "script" = generate script only (no credit charge); omit for legacy full flow */
   phase?: "script";
+  hooks_count?: number;
+  bodies_count?: number;
+  ctas_count?: number;
 }
 
 /** Request params for approving a script-only generation */
@@ -128,6 +131,9 @@ export interface GenerationProgressResponse {
     segments?: GenerationSegments | null;
     error_message?: string | null;
     completed_at?: string | null;
+    hooks_count?: number;
+    bodies_count?: number;
+    ctas_count?: number;
   };
 }
 

@@ -163,6 +163,9 @@ export interface Generation {
   videos: GenerationSegments | null;
   error_message: string | null;
   external_job_ids: Record<string, string>;
+  hooks_count: number;
+  bodies_count: number;
+  ctas_count: number;
   started_at: string | null;
   completed_at: string | null;
   created_at: string;
