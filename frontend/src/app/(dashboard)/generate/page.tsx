@@ -3091,7 +3091,17 @@ export default function GeneratePage() {
       </Dialog>
 
       {/* Save as Preset dialog */}
-      <Dialog open={presetDialogOpen} onOpenChange={setPresetDialogOpen}>
+      <Dialog
+        open={presetDialogOpen}
+        onOpenChange={(open) => {
+          setPresetDialogOpen(open);
+          if (!open) {
+            setPresetName("");
+            setPresetError(null);
+            setPresetSaving(false);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Save as Preset</DialogTitle>
