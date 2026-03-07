@@ -154,7 +154,7 @@ export default function AboutPage() {
             Start free: no credit card required.
           </p>
           <a
-            href="/signup"
+            href="/sign-up"
             className="mt-6 inline-block rounded-full bg-primary px-8 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             Get started free →

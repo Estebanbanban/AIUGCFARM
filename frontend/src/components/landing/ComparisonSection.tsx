@@ -121,7 +121,7 @@ export function ComparisonSection() {
 
         <FadeInUp delay={0.2} className="mt-14 text-center">
           <Link
-            href="/signup"
+            href="/sign-up"
             className="inline-flex items-center gap-2 rounded-full bg-primary px-7 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-orange-600"
           >
             Try free

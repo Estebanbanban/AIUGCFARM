@@ -157,13 +157,13 @@ export function MarketingHeader() {
             ) : (
               <>
                 <Link
-                  href="/login"
+                  href="/sign-in"
                   className="text-sm text-muted-foreground transition-colors duration-200 hover:text-foreground"
                 >
                   Sign In
                 </Link>
                 <Link
-                  href="/signup"
+                  href="/sign-up"
                   className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors duration-200 hover:bg-primary/90"
                 >
                   Start Free
@@ -268,14 +268,14 @@ export function MarketingHeader() {
                 ) : (
                   <>
                     <Link
-                      href="/login"
+                      href="/sign-in"
                       className="rounded-full border border-border py-3 text-center text-sm text-foreground"
                       onClick={() => setMobileOpen(false)}
                     >
                       Sign In
                     </Link>
                     <Link
-                      href="/signup"
+                      href="/sign-up"
                       className="rounded-full bg-primary py-3 text-center text-sm font-medium text-primary-foreground"
                       onClick={() => setMobileOpen(false)}
                     >

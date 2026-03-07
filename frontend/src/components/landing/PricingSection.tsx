@@ -79,7 +79,7 @@ export function PricingSection() {
   async function handlePlanClick(planKey: PlanTier) {
     trackCtaClicked("pricing", planKey);
     if (!isLoggedIn) {
-      router.push(`/signup?plan=${planKey}${annual ? "&billing=annual" : ""}`);
+      router.push(`/sign-up?plan=${planKey}${annual ? "&billing=annual" : ""}`);
       return;
     }
 

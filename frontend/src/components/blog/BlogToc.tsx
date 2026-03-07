@@ -71,7 +71,7 @@ export function BlogToc() {
             Create your first AI video ad in minutes.
           </p>
           <Button asChild size="sm" className="w-full">
-            <Link href="/signup">
+            <Link href="/sign-up">
               Get Started
               <ArrowRight className="size-3.5" />
             </Link>

@@ -13,7 +13,7 @@ export function BlogCta({
   title = "Ready to create scroll-stopping video ads?",
   description = "Turn any product URL into high-converting UGC video ads in minutes with CineRads.",
   buttonText = "Start Free Trial",
-  buttonHref = "/signup",
+  buttonHref = "/sign-up",
 }: BlogCtaProps) {
   return (
     <div className="my-8 rounded-xl border border-primary/20 bg-primary/5 p-6">

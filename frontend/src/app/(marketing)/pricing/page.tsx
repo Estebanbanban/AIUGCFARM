@@ -108,7 +108,7 @@ export default function PricingPage() {
                   </ul>
 
                   <Link
-                    href="/signup"
+                    href="/sign-up"
                     className={cn(
                       "w-full rounded-full py-2.5 text-center text-sm font-medium transition-all duration-200",
                       isBestValue

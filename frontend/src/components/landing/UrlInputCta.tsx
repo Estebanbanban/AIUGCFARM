@@ -11,7 +11,7 @@ export function UrlInputCta({ location = "hero" }: { location?: "hero" | "final_
     if (url.trim()) {
       trackCtaClicked(location);
       localStorage.setItem("pendingScrapeUrl", url);
-      window.location.href = "/signup";
+      window.location.href = "/sign-up";
     }
   };
 
