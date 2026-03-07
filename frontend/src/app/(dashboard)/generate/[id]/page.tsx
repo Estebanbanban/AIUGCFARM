@@ -478,8 +478,13 @@ function VideoSegmentCard({
       const idx = wordCues.findIndex((w) => t >= w.start && t < w.end);
       setActiveWordIdx(idx);
     }
+    function onEnded() { setActiveWordIdx(-1); }
     el.addEventListener("timeupdate", onTimeUpdate);
-    return () => el.removeEventListener("timeupdate", onTimeUpdate);
+    el.addEventListener("ended", onEnded);
+    return () => {
+      el.removeEventListener("timeupdate", onTimeUpdate);
+      el.removeEventListener("ended", onEnded);
+    };
   }, [captionsOn, wordCues]);
 
   function togglePlay() {
@@ -577,19 +582,23 @@ function VideoSegmentCard({
           </div>
         </div>
 
-        {/* Word-by-word caption overlay */}
-        {captionsOn && wordCues.length > 0 && (
+        {/* Word-by-word caption overlay — shows current page of 8 words */}
+        {captionsOn && wordCues.length > 0 && activeWordIdx >= 0 && (
           <div className="pointer-events-none absolute bottom-5 left-0 right-0 z-30 flex justify-center px-3">
             <div className="max-w-[88%] rounded-lg bg-black/75 px-3 py-2 text-center">
               <p className="text-[15px] font-bold leading-snug tracking-wide">
-                {wordCues.map((w, i) => (
-                  <span
-                    key={i}
-                    className={i === activeWordIdx ? "text-yellow-300" : "text-white"}
-                  >
-                    {w.word}{" "}
-                  </span>
-                ))}
+                {(() => {
+                  const PAGE = 8;
+                  const start = Math.floor(activeWordIdx / PAGE) * PAGE;
+                  return wordCues.slice(start, start + PAGE).map((w, j) => (
+                    <span
+                      key={start + j}
+                      className={start + j === activeWordIdx ? "text-yellow-300" : "text-white"}
+                    >
+                      {w.word}{" "}
+                    </span>
+                  ));
+                })()}
               </p>
             </div>
           </div>
@@ -654,6 +663,7 @@ function VideoSegmentCard({
                 setCaptionsOn((v) => !v);
                 setActiveWordIdx(-1);
               }}
+              aria-label={captionsOn ? "Hide captions" : "Show captions"}
               title={captionsOn ? "Hide captions" : "Show captions"}
             >
               CC
@@ -1061,19 +1071,23 @@ function CombinationPreview({
           </div>
         )}
 
-        {/* Word-by-word caption overlay */}
-        {captionsOn && captionCues.length > 0 && (
+        {/* Word-by-word caption overlay — sequential mode only, current page of 8 words */}
+        {captionsOn && viewMode === "sequential" && captionCues.length > 0 && captionActiveIdx >= 0 && (
           <div className="pointer-events-none absolute bottom-8 left-0 right-0 z-40 flex justify-center px-3">
             <div className="max-w-[88%] rounded-lg bg-black/75 px-3 py-2 text-center">
               <p className="text-[15px] font-bold leading-snug tracking-wide">
-                {captionCues.map((w, i) => (
-                  <span
-                    key={i}
-                    className={i === captionActiveIdx ? "text-yellow-300" : "text-white"}
-                  >
-                    {w.word}{" "}
-                  </span>
-                ))}
+                {(() => {
+                  const PAGE = 8;
+                  const start = Math.floor(captionActiveIdx / PAGE) * PAGE;
+                  return captionCues.slice(start, start + PAGE).map((w, j) => (
+                    <span
+                      key={start + j}
+                      className={start + j === captionActiveIdx ? "text-yellow-300" : "text-white"}
+                    >
+                      {w.word}{" "}
+                    </span>
+                  ));
+                })()}
               </p>
             </div>
           </div>
@@ -1095,11 +1109,12 @@ function CombinationPreview({
             </>
           )}
         </Button>
-        {captionCues.length > 0 && (
+        {captionCues.length > 0 && viewMode === "sequential" && (
           <Button
             variant={captionsOn ? "secondary" : "outline"}
             size="sm"
             onClick={() => { setCaptionsOn((v) => !v); setCaptionActiveIdx(-1); }}
+            aria-label={captionsOn ? "Hide captions" : "Show captions"}
             title={captionsOn ? "Hide captions" : "Show captions"}
           >
             CC
