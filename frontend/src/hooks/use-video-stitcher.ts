@@ -160,76 +160,33 @@ async function detectSpeechSegments(
 }
 
 /**
- * Trim a clip to its speech segments and write the result to outputFile.
- * Uses -c copy (no re-encode) so FFmpeg WASM doesn't hang on libx264.
- * Cuts are keyframe-aligned (±1 GOP), which is fine for short UGC clips.
- * Single segment: one copy pass.
- * Multiple segments: copy each → internal concat → outputFile.
- * Returns all temp file names created (caller passes to cleanupFFmpegFiles).
+ * Detect speech outer bounds and trim clip to outputFile using fast seek.
+ * -ss BEFORE -i = fast seek → output always starts on an I-frame (no broken P/B refs).
+ * Single trim pass, no internal concat → concat of hook/body/cta always works.
+ * Returns [outputFile] for caller to pass to cleanupFFmpegFiles.
  */
-async function trimClipToSegments(
-  ffmpeg: FFmpeg,
-  inputFile: string,
-  segments: Segment[],
-  outputFile: string,
-): Promise<string[]> {
-  const created: string[] = [];
-  console.log(`[stitcher] trimming ${inputFile} to ${segments.length} segment(s)`, segments);
-
-  if (segments.length === 1) {
-    const seg = segments[0];
-    await execOrThrow(ffmpeg, [
-      "-i", inputFile,
-      "-ss", seg.start.toFixed(3),
-      "-to", seg.end.toFixed(3),
-      "-c", "copy",
-      "-reset_timestamps", "1",
-      outputFile,
-    ], `trim-${inputFile}`);
-    created.push(outputFile);
-    return created;
-  }
-
-  const prefix = outputFile.replace(/\.mp4$/, "");
-  const segFiles: string[] = [];
-
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i];
-    const segFile = `${prefix}_s${i}.mp4`;
-    segFiles.push(segFile);
-    created.push(segFile);
-    await execOrThrow(ffmpeg, [
-      "-i", inputFile,
-      "-ss", seg.start.toFixed(3),
-      "-to", seg.end.toFixed(3),
-      "-c", "copy",
-      "-reset_timestamps", "1",
-      segFile,
-    ], `trim-${inputFile}-seg${i}`);
-  }
-
-  const listFile = `${prefix}_list.txt`;
-  created.push(listFile);
-  const manifest = segFiles.map((f) => `file '${f}'`).join("\n") + "\n";
-  await ffmpeg.writeFile(listFile, new TextEncoder().encode(manifest));
-  await execOrThrow(ffmpeg, [
-    "-f", "concat", "-safe", "0",
-    "-i", listFile,
-    "-c", "copy",
-    outputFile,
-  ], `concat-${inputFile}-segments`);
-  created.push(outputFile);
-  return created;
-}
-
-/** Detect speech segments and trim clip to outputFile in one step */
 async function prepareClip(
   ffmpeg: FFmpeg,
   inputFile: string,
   outputFile: string,
 ): Promise<string[]> {
   const segments = await detectSpeechSegments(ffmpeg, inputFile);
-  return trimClipToSegments(ffmpeg, inputFile, segments, outputFile);
+  const start = segments[0].start;
+  const end = segments[segments.length - 1].end;
+  console.log(`[stitcher] trim ${inputFile}: ${start.toFixed(3)}s → ${end.toFixed(3)}s`);
+
+  // -ss before -i = fast seek → I-frame aligned start, no broken P/B-frame refs.
+  // -t duration (not -to) + -avoid_negative_ts make_zero reset DTS to 0 for concat.
+  await execOrThrow(ffmpeg, [
+    "-ss", start.toFixed(3),
+    "-i", inputFile,
+    "-t", (end - start).toFixed(3),
+    "-c", "copy",
+    "-avoid_negative_ts", "make_zero",
+    outputFile,
+  ], `trim-${inputFile}`);
+
+  return [outputFile];
 }
 
 /** Clean up temp files in the FFmpeg virtual FS */
