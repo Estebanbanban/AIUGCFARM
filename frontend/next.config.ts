@@ -39,7 +39,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: blob: https:",
               "media-src 'self' blob: https://*.supabase.co https://commondatastorage.googleapis.com",
               "worker-src blob:",
-              "connect-src 'self' blob: https://*.supabase.co https://*.supabase.in https://api.stripe.com https://*.posthog.com https://*.sentry.io https://datafa.st https://unpkg.com https://*.clerk.accounts.dev https://clerk.cinerads.com https://api.clerk.dev",
+              "connect-src 'self' blob: https://*.supabase.co https://*.supabase.in https://api.stripe.com https://*.posthog.com https://*.sentry.io https://datafa.st https://unpkg.com https://*.clerk.accounts.dev https://clerk.cinerads.com https://api.clerk.dev https://clerk-telemetry.com",
               "frame-src https://js.stripe.com https://hooks.stripe.com https://*.clerk.accounts.dev https://clerk.cinerads.com",
               "font-src 'self' https://*.clerk.accounts.dev https://clerk.cinerads.com",
               "base-uri 'self'",
