@@ -1401,6 +1401,7 @@ export default function GenerationDetailPage() {
 
   // Batch export mode (Story C)
   const [batchMode, setBatchMode] = useState(false);
+  const [comboBannerDismissed, setComboBannerDismissed] = useState(false);
   const [selectedHooks, setSelectedHooks] = useState<Set<number>>(new Set([0]));
   const [selectedBodies, setSelectedBodies] = useState<Set<number>>(new Set([0]));
   const [selectedCtas, setSelectedCtas] = useState<Set<number>>(new Set([0]));
@@ -2020,6 +2021,35 @@ export default function GenerationDetailPage() {
             <p className="text-xs text-muted-foreground">
               Regenerations this month: {regenUsed}/{monthlyLimit}
             </p>
+          )}
+
+          {/* Combination Discovery Banner (triple mode, #145) */}
+          {gen?.mode === "triple" && status === "completed" && !batchMode && !comboBannerDismissed && (
+            <div className="flex items-start justify-between gap-4 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 mb-2">
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-semibold text-primary">You have 27 possible combinations</p>
+                <p className="text-xs text-muted-foreground">Select segments in each column to preview and export custom video combinations.</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setBatchMode(true);
+                    setComboBannerDismissed(true);
+                  }}
+                >
+                  Build Combinations
+                </Button>
+                <button
+                  type="button"
+                  aria-label="Dismiss"
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => setComboBannerDismissed(true)}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
           )}
 
           <div className="grid gap-6 md:grid-cols-3">
