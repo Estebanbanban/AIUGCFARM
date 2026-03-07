@@ -29,6 +29,7 @@ import {
   Settings2,
   FlaskConical,
   Bookmark,
+  Minus,
 } from "lucide-react";
 import { useFirstPurchaseOffer, COUPON_50_OFF_FIRST_VIDEO } from "@/hooks/use-first-purchase-offer";
 import { toast } from "sonner";
@@ -628,14 +629,15 @@ export default function GeneratePage() {
   const userPlan = profile?.plan ?? "free";
   const canUseHD = true; // HD is available to all users with credits
   const canUseAdvanced = ADVANCED_MODE_PLANS.has(userPlan) || profile?.role === "admin";
-  const creditCost =
-    store.quality === "hd"
-      ? store.mode === "single"
-        ? CREDITS_PER_SINGLE_HD
-        : CREDITS_PER_BATCH_HD
-      : store.mode === "single"
-        ? CREDITS_PER_SINGLE
-        : CREDITS_PER_BATCH;
+  const totalSegments =
+    store.mode === "triple"
+      ? store.hooksCount + store.bodiesCount + store.ctasCount
+      : 3; // single: 1 hook + 1 body + 1 cta = 3 segments
+
+  const perSegmentRate =
+    store.quality === "hd" ? 10 / 3 : 5 / 3;
+
+  const creditCost = Math.ceil(totalSegments * perSegmentRate);
 
   const isFirstVideo = profile?.first_video_discount_used === false;
   const effectiveCost = creditCost;
@@ -984,6 +986,9 @@ export default function GeneratePage() {
         cta_style: store.ctaStyle,
         cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
         language: store.language,
+        hooks_count: store.mode === "triple" ? store.hooksCount : 1,
+        bodies_count: store.mode === "triple" ? store.bodiesCount : 1,
+        ctas_count: store.mode === "triple" ? store.ctasCount : 1,
         phase: "script",
       },
       {
@@ -2212,6 +2217,55 @@ export default function GeneratePage() {
                                 <p className="mt-1 text-xs text-muted-foreground">27 combos · pick your best</p>
                               </button>
                             </div>
+                            {store.mode === "triple" && (
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between gap-4">
+                                  {(
+                                    [
+                                      { label: "Hooks", value: store.hooksCount, set: store.setHooksCount },
+                                      { label: "Bodies", value: store.bodiesCount, set: store.setBodiesCount },
+                                      { label: "CTAs", value: store.ctasCount, set: store.setCtasCount },
+                                    ] as const
+                                  ).map(({ label, value, set }) => (
+                                    <div key={label} className="flex flex-1 flex-col items-center gap-1">
+                                      <span className="text-xs text-muted-foreground">{label}</span>
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-7 w-7 p-0"
+                                          onClick={() => set(value - 1)}
+                                          disabled={value <= 1}
+                                          aria-label={`Decrease ${label} count`}
+                                        >
+                                          <Minus className="h-3 w-3" />
+                                        </Button>
+                                        <span className="w-4 text-center text-sm font-medium tabular-nums">{value}</span>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-7 w-7 p-0"
+                                          onClick={() => set(value + 1)}
+                                          disabled={value >= 5}
+                                          aria-label={`Increase ${label} count`}
+                                        >
+                                          <Plus className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                                <p className="text-center text-xs text-muted-foreground">
+                                  <span className="font-medium text-foreground">
+                                    {store.hooksCount} × {store.bodiesCount} × {store.ctasCount} ={" "}
+                                    {store.hooksCount * store.bodiesCount * store.ctasCount}
+                                  </span>{" "}
+                                  possible combinations
+                                </p>
+                              </div>
+                            )}
                           </div>
 
                           <div>

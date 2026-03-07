@@ -1467,6 +1467,13 @@ export default function GenerationDetailPage() {
   const script = gen?.script ?? null;
   const progress = gen?.progress;
 
+  // Parse failed segment job keys into a Set for O(1) lookup
+  // Job key format: "hook_1", "hook_2", "body_1", "cta_3" etc.
+  const failedSegmentKeys = useMemo(
+    () => new Set(segments?.failed ?? []),
+    [segments?.failed]
+  );
+
   // Compute loader info from status and elapsed time (with real segment progress when available)
   const loaderInfo = statusToLoader(status, renderElapsed, progress);
 
@@ -1479,7 +1486,10 @@ export default function GenerationDetailPage() {
           const hookVideo = segments.hooks?.[h];
           const bodyVideo = segments.bodies?.[b];
           const ctaVideo = segments.ctas?.[c];
-          if (hookVideo && bodyVideo && ctaVideo) {
+          if (hookVideo && bodyVideo && ctaVideo
+              && !failedSegmentKeys.has(`hook_${h + 1}`)
+              && !failedSegmentKeys.has(`body_${b + 1}`)
+              && !failedSegmentKeys.has(`cta_${c + 1}`)) {
             combos.push({
               hookUrl: hookVideo.url,
               bodyUrl: bodyVideo.url,
@@ -1491,7 +1501,7 @@ export default function GenerationDetailPage() {
       }
     }
     return combos;
-  }, [batchMode, selectedHooks, selectedBodies, selectedCtas, segments]);
+  }, [batchMode, selectedHooks, selectedBodies, selectedCtas, segments, failedSegmentKeys]);
 
   const allSegmentEntries = useMemo(() => [
     ...(segments?.hooks ?? []).map((v, i) => ({ name: `hooks/hook_${i + 1}.mp4`, url: v.url })),
@@ -1503,15 +1513,18 @@ export default function GenerationDetailPage() {
   const allCombos = useMemo(() => {
     if (gen?.mode !== "triple") return [];
     const combos: Array<{ hookIdx: number; bodyIdx: number; ctaIdx: number }> = [];
-    for (let h = 0; h < 3; h++) {
-      for (let b = 0; b < 3; b++) {
-        for (let c = 0; c < 3; c++) {
+    const hooksCount = segments?.hooks?.length ?? 0;
+    const bodiesCount = segments?.bodies?.length ?? 0;
+    const ctasCount = segments?.ctas?.length ?? 0;
+    for (let h = 0; h < hooksCount; h++) {
+      for (let b = 0; b < bodiesCount; b++) {
+        for (let c = 0; c < ctasCount; c++) {
           combos.push({ hookIdx: h, bodyIdx: b, ctaIdx: c });
         }
       }
     }
-    return combos; // 27 combos
-  }, [gen?.mode]);
+    return combos; // up to 27 combos depending on available segments
+  }, [gen?.mode, segments]);
 
   const currentComboIndex = useMemo(() => {
     if (allCombos.length === 0) return -1;
@@ -2164,11 +2177,26 @@ export default function GenerationDetailPage() {
             </p>
           )}
 
+          {/* Partial failure warning banner */}
+          {segments?.failed && segments.failed.length > 0 && status === "completed" && (
+            <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/30">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <div className="text-sm">
+                <p className="font-medium text-amber-800 dark:text-amber-200">
+                  {segments.failed.length} segment{segments.failed.length > 1 ? "s" : ""} failed to generate
+                </p>
+                <p className="text-amber-700 dark:text-amber-300">
+                  Credits for those segments have been refunded. The remaining combinations are still available.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Combination Discovery Banner (triple mode, #145) */}
           {gen?.mode === "triple" && status === "completed" && !batchMode && !comboBannerDismissed && (
             <div className="flex items-start justify-between gap-4 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 mb-2">
               <div className="flex flex-col gap-1">
-                <p className="text-sm font-semibold text-primary">You have 27 possible combinations</p>
+                <p className="text-sm font-semibold text-primary">You have {allCombos.length} possible combinations</p>
                 <p className="text-xs text-muted-foreground">Select segments in each column to preview and export custom video combinations.</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -2212,26 +2240,32 @@ export default function GenerationDetailPage() {
                 )}
               </div>
               {segments.hooks?.map((video, i) => (
-                <VideoSegmentCard
-                  key={i}
-                  video={video}
-                  label={`Hook ${i + 1}`}
-                  scriptText={script?.hooks?.[i]?.text}
-                  isSelected={batchMode ? selectedHooks.has(i) : selectedHook === i}
-                  onSelect={() => {
-                    if (batchMode) {
-                      toggleBatchSelection(selectedHooks, setSelectedHooks, i);
-                    }
-                    setSelectedHook(i);
-                  }}
-                  onRegenerate={() => handleRegenerateSegment("hook", i + 1)}
-                  isRegenerating={regeneratingKey === `hook_${i + 1}`}
-                  multiSelect={batchMode}
-                  userPlan={userPlan}
-                  canRegenerate={canRegenerate}
-                  regenRemaining={regenRemaining}
-                  monthlyLimit={monthlyLimit}
-                />
+                failedSegmentKeys.has(`hook_${i + 1}`) ? (
+                  <div key={i} className="flex items-center justify-center rounded-xl border border-dashed border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/30">
+                    <p className="text-xs text-red-500">Hook {i + 1} failed</p>
+                  </div>
+                ) : (
+                  <VideoSegmentCard
+                    key={i}
+                    video={video}
+                    label={`Hook ${i + 1}`}
+                    scriptText={script?.hooks?.[i]?.text}
+                    isSelected={batchMode ? selectedHooks.has(i) : selectedHook === i}
+                    onSelect={() => {
+                      if (batchMode) {
+                        toggleBatchSelection(selectedHooks, setSelectedHooks, i);
+                      }
+                      setSelectedHook(i);
+                    }}
+                    onRegenerate={() => handleRegenerateSegment("hook", i + 1)}
+                    isRegenerating={regeneratingKey === `hook_${i + 1}`}
+                    multiSelect={batchMode}
+                    userPlan={userPlan}
+                    canRegenerate={canRegenerate}
+                    regenRemaining={regenRemaining}
+                    monthlyLimit={monthlyLimit}
+                  />
+                )
               ))}
               {(!segments.hooks || segments.hooks.length === 0) && (
                 <div className="flex aspect-[9/16] w-full items-center justify-center rounded-xl border border-dashed border-border">
@@ -2260,26 +2294,32 @@ export default function GenerationDetailPage() {
                 )}
               </div>
               {segments.bodies?.map((video, i) => (
-                <VideoSegmentCard
-                  key={i}
-                  video={video}
-                  label={`Body ${i + 1}`}
-                  scriptText={script?.bodies?.[i]?.text}
-                  isSelected={batchMode ? selectedBodies.has(i) : selectedBody === i}
-                  onSelect={() => {
-                    if (batchMode) {
-                      toggleBatchSelection(selectedBodies, setSelectedBodies, i);
-                    }
-                    setSelectedBody(i);
-                  }}
-                  onRegenerate={() => handleRegenerateSegment("body", i + 1)}
-                  isRegenerating={regeneratingKey === `body_${i + 1}`}
-                  multiSelect={batchMode}
-                  userPlan={userPlan}
-                  canRegenerate={canRegenerate}
-                  regenRemaining={regenRemaining}
-                  monthlyLimit={monthlyLimit}
-                />
+                failedSegmentKeys.has(`body_${i + 1}`) ? (
+                  <div key={i} className="flex items-center justify-center rounded-xl border border-dashed border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/30">
+                    <p className="text-xs text-red-500">Body {i + 1} failed</p>
+                  </div>
+                ) : (
+                  <VideoSegmentCard
+                    key={i}
+                    video={video}
+                    label={`Body ${i + 1}`}
+                    scriptText={script?.bodies?.[i]?.text}
+                    isSelected={batchMode ? selectedBodies.has(i) : selectedBody === i}
+                    onSelect={() => {
+                      if (batchMode) {
+                        toggleBatchSelection(selectedBodies, setSelectedBodies, i);
+                      }
+                      setSelectedBody(i);
+                    }}
+                    onRegenerate={() => handleRegenerateSegment("body", i + 1)}
+                    isRegenerating={regeneratingKey === `body_${i + 1}`}
+                    multiSelect={batchMode}
+                    userPlan={userPlan}
+                    canRegenerate={canRegenerate}
+                    regenRemaining={regenRemaining}
+                    monthlyLimit={monthlyLimit}
+                  />
+                )
               ))}
               {(!segments.bodies || segments.bodies.length === 0) && (
                 <div className="flex aspect-[9/16] w-full items-center justify-center rounded-xl border border-dashed border-border">
@@ -2308,26 +2348,32 @@ export default function GenerationDetailPage() {
                 )}
               </div>
               {segments.ctas?.map((video, i) => (
-                <VideoSegmentCard
-                  key={i}
-                  video={video}
-                  label={`CTA ${i + 1}`}
-                  scriptText={script?.ctas?.[i]?.text}
-                  isSelected={batchMode ? selectedCtas.has(i) : selectedCta === i}
-                  onSelect={() => {
-                    if (batchMode) {
-                      toggleBatchSelection(selectedCtas, setSelectedCtas, i);
-                    }
-                    setSelectedCta(i);
-                  }}
-                  onRegenerate={() => handleRegenerateSegment("cta", i + 1)}
-                  isRegenerating={regeneratingKey === `cta_${i + 1}`}
-                  multiSelect={batchMode}
-                  userPlan={userPlan}
-                  canRegenerate={canRegenerate}
-                  regenRemaining={regenRemaining}
-                  monthlyLimit={monthlyLimit}
-                />
+                failedSegmentKeys.has(`cta_${i + 1}`) ? (
+                  <div key={i} className="flex items-center justify-center rounded-xl border border-dashed border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/30">
+                    <p className="text-xs text-red-500">CTA {i + 1} failed</p>
+                  </div>
+                ) : (
+                  <VideoSegmentCard
+                    key={i}
+                    video={video}
+                    label={`CTA ${i + 1}`}
+                    scriptText={script?.ctas?.[i]?.text}
+                    isSelected={batchMode ? selectedCtas.has(i) : selectedCta === i}
+                    onSelect={() => {
+                      if (batchMode) {
+                        toggleBatchSelection(selectedCtas, setSelectedCtas, i);
+                      }
+                      setSelectedCta(i);
+                    }}
+                    onRegenerate={() => handleRegenerateSegment("cta", i + 1)}
+                    isRegenerating={regeneratingKey === `cta_${i + 1}`}
+                    multiSelect={batchMode}
+                    userPlan={userPlan}
+                    canRegenerate={canRegenerate}
+                    regenRemaining={regenRemaining}
+                    monthlyLimit={monthlyLimit}
+                  />
+                )
               ))}
               {(!segments.ctas || segments.ctas.length === 0) && (
                 <div className="flex aspect-[9/16] w-full items-center justify-center rounded-xl border border-dashed border-border">
@@ -2358,11 +2404,11 @@ export default function GenerationDetailPage() {
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Estimated time: {formatEstimatedTime(combosToExport.length * 25)}
-                          {combosToExport.length > 27 ? (
+                          {combosToExport.length > 125 ? (
                             <span className="ml-1 text-red-400">
-                              Max 27 combinations
+                              Max 125 combinations
                             </span>
-                          ) : combosToExport.length > 9 && (
+                          ) : combosToExport.length > 27 && (
                             <span className="ml-1 text-amber-400">
                               Large export, stay on this tab
                             </span>
@@ -2386,7 +2432,7 @@ export default function GenerationDetailPage() {
                     <Button
                       size="sm"
                       onClick={() => batchStitch(combosToExport, generationId)}
-                      disabled={combosToExport.length === 0 || isBatching || combosToExport.length > 27}
+                      disabled={combosToExport.length === 0 || isBatching || combosToExport.length > 125}
                     >
                       {isBatching ? (
                         <>

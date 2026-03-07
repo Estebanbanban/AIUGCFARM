@@ -34,6 +34,9 @@ interface GenerationInput {
   cta_comment_keyword?: string;
   language?: string;
   advanced_segments?: AdvancedSegmentsInput;
+  hooks_count?: number;
+  bodies_count?: number;
+  ctas_count?: number;
 }
 
 export interface GenerationWithRelations extends Generation {

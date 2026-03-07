@@ -20,7 +20,7 @@ Complete epic and story breakdown for AIUGC. Originally decomposed from PRD v2.0
 
 **Generation Model:** Single mode (1 variant per segment type = 3 segments) or Triple mode (3 variants per segment type = 9 segments). Two-phase flow: script generation (no charge) then user approval (credits debited).
 
-**Credit Model:** 1 credit = $1. Single: 5cr (standard) / 10cr (HD). Triple: 15cr (standard) / 30cr (HD). First video 50% off.
+**Credit Model:** 1 credit = $1. Per segment: 5/3cr (std) / 10/3cr (HD). Single (1+1+1=3 segs): 5cr std / 10cr HD. Triple default (3+3+3=9 segs): 15cr std / 30cr HD. Variable counts 1–5 per slot (Story 13.1): cost = ceil(totalSegments × perSegmentRate). First video 50% off.
 
 **Pricing:** Starter $25/mo (30cr), Growth $80/mo (100cr), Scale $180/mo (250cr). Credit Packs: 10cr/$12, 30cr/$33, 100cr/$95.
 
@@ -39,8 +39,10 @@ Complete epic and story breakdown for AIUGC. Originally decomposed from PRD v2.0
 | 9 | Observability & Platform Health | P1 | Epic 2, 8 | 5 | 🟡 Partial (2/5 Done) |
 | 10 | Automatic Video Variations | P2 | Epic 5, 6 | 4 | 🔲 Planned |
 | 11 | Multi-Segment Silence Removal | P1 | Epic 6 | 1 | 🔲 Planned |
+| 12 | Saved Generation Presets | P1 | Epic 5, 7 | 1 | ✅ Complete |
+| 13 | Custom Segment Counts (Variable Matrix) | P1 | Epic 5, 6, 10 | 1 | ✅ Complete |
 
-**Total: 10 epics, 61 stories**
+**Total: 13 epics, 63 stories**
 
 **Dependency Graph:**
 ```

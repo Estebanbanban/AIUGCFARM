@@ -10,18 +10,6 @@ import { submitSoraJob } from "../_shared/sora.ts";
 import { captureException } from "../_shared/sentry.ts";
 import { ErrorCodes, errorResponse } from "../_shared/errors.ts";
 
-// 1 credit = $1. Kling v2.6 = ~$0.88/single gen → 5cr. Kling v3 = ~$1.76/single → 10cr.
-// Credit costs are fixed. first_video_discount_used tracks the one-time purchase price discount (paywall only).
-const COSTS = {
-  kling: {
-    standard: { single: 5, batch: 15 },
-    hd:       { single: 10, batch: 30 },
-  },
-  sora: {
-    hd: { single: 14, batch: 42 },  // ~40% premium over Kling HD
-  },
-} as const;
-
 // Kling model name per quality tier
 const KLING_MODEL = {
   standard: "kling-v2-6",
@@ -149,15 +137,21 @@ const LANGUAGE_NAMES: Record<string, string> = {
 
 // ── Script generation via OpenRouter ──────────────────────────────────
 
-function buildSystemPrompt(count: number, language: string): string {
-  const plural = count > 1 ? "s" : "";
-  const hookAngles = count > 1
+function buildSystemPrompt(
+  hooksCount: number,
+  bodiesCount: number,
+  ctasCount: number,
+  language: string,
+): string {
+  // Use the maximum count for the plural/angle selectors so they're consistent.
+  const count = Math.max(hooksCount, bodiesCount, ctasCount);
+  const hookAngles = hooksCount > 1
     ? " Each uses a DIFFERENT angle from the SGE framework below."
     : " Use the BEST angle from the SGE framework below for this product.";
-  const bodyAngles = count > 1
+  const bodyAngles = bodiesCount > 1
     ? " Each uses a DIFFERENT structure."
     : " Use whichever structure fits best.";
-  const ctaAngles = count > 1
+  const ctaAngles = ctasCount > 1
     ? " Each uses a DIFFERENT invisible-CTA pattern."
     : " Use the most natural-sounding invisible-CTA pattern.";
 
@@ -192,7 +186,7 @@ SPECIFICITY RULE (NEVER BREAK): Every claim must contain at least one specific n
 
 HOOK FRAMEWORK — 4 Viral SGE Angles:
 
-${count} variant${plural}${hookAngles}
+${hooksCount} variant${hooksCount > 1 ? "s" : ""}${hookAngles}
 The hook must STOP THE SCROLL in the first 2 seconds. Max 2 sentences. No setup.
 
 1. LATE_DISCOVERY ("I wish I'd known about this sooner")
@@ -217,7 +211,7 @@ The hook must STOP THE SCROLL in the first 2 seconds. Max 2 sentences. No setup.
 
 ---
 
-BODY — ${count} variant${plural} | 5–9 seconds each | 12–22 words max${bodyAngles}
+BODY — ${bodiesCount} variant${bodiesCount > 1 ? "s" : ""} | 5–9 seconds each | 12–22 words max${bodyAngles}
 Deliver the payoff fast. Cover: what it does → why it works → one specific proof point.
 At 2.5 words/sec: 5s ≈ 12 words, 7s ≈ 17 words, 9s ≈ 22 words. Stay within limits.
 
@@ -235,7 +229,7 @@ Available body structures:
 
 ---
 
-CTA — ${count} variant${plural} | 2–4 seconds each | 5–10 words max${ctaAngles}
+CTA — ${ctasCount} variant${ctasCount > 1 ? "s" : ""} | 2–4 seconds each | 5–10 words max${ctaAngles}
 
 INVISIBLE CTA RULE (NEVER BREAK): Never say "link in bio", "shop now", "buy now", or any explicit purchase command.
 End with a natural conversational close that makes the viewer WANT to look it up themselves.
@@ -251,11 +245,11 @@ Available invisible-CTA patterns:
 
 ---
 
-Return ONLY valid JSON (exactly ${count} item${plural} per array). Set duration_seconds to match actual word count at 2.5 words/sec:
+Return ONLY valid JSON (exactly ${hooksCount} hook${hooksCount > 1 ? "s" : ""}, ${bodiesCount} bod${bodiesCount > 1 ? "ies" : "y"}, ${ctasCount} CTA${ctasCount > 1 ? "s" : ""}). Set duration_seconds to match actual word count at 2.5 words/sec:
 {
-  "hooks": [{ "text": "...", "duration_seconds": 3, "variant_label": "LATE_DISCOVERY" }${count > 1 ? ", ..." : ""}],
-  "bodies": [{ "text": "...", "duration_seconds": 7, "variant_label": "problem_solution" }${count > 1 ? ", ..." : ""}],
-  "ctas": [{ "text": "...", "duration_seconds": 3, "variant_label": "soft_recommendation" }${count > 1 ? ", ..." : ""}]
+  "hooks": [{ "text": "...", "duration_seconds": 3, "variant_label": "LATE_DISCOVERY" }${hooksCount > 1 ? ", ..." : ""}],
+  "bodies": [{ "text": "...", "duration_seconds": 7, "variant_label": "problem_solution" }${bodiesCount > 1 ? ", ..." : ""}],
+  "ctas": [{ "text": "...", "duration_seconds": 3, "variant_label": "soft_recommendation" }${ctasCount > 1 ? ", ..." : ""}]
 }`;
 
   if (language !== "en") {
@@ -347,8 +341,18 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-/** Validate and normalize the script structure returned by OpenRouter. */
-function validateScript(raw: unknown, expectedCount: number): GeneratedScript {
+/** Validate and normalize the script structure returned by OpenRouter.
+ *  Accepts either a single expectedCount (applied to all three) or separate per-section counts.
+ */
+function validateScript(
+  raw: unknown,
+  expectedHooks: number,
+  expectedBodies?: number,
+  expectedCtas?: number,
+): GeneratedScript {
+  const hooksExp = expectedHooks;
+  const bodiesExp = expectedBodies ?? expectedHooks;
+  const ctasExp = expectedCtas ?? expectedHooks;
   const obj = raw as Record<string, unknown>;
 
   if (
@@ -361,12 +365,12 @@ function validateScript(raw: unknown, expectedCount: number): GeneratedScript {
   }
 
   if (
-    obj.hooks.length !== expectedCount ||
-    obj.bodies.length !== expectedCount ||
-    obj.ctas.length !== expectedCount
+    obj.hooks.length !== hooksExp ||
+    obj.bodies.length !== bodiesExp ||
+    obj.ctas.length !== ctasExp
   ) {
     throw new Error(
-      `Invalid script structure: expected exactly ${expectedCount} hooks, bodies, and ctas`,
+      `Invalid script structure: expected ${hooksExp} hooks, ${bodiesExp} bodies, ${ctasExp} ctas`,
     );
   }
 
@@ -405,16 +409,19 @@ interface GenerateScriptResult {
 
 async function generateScript(
   product: Record<string, unknown>,
-  variantCount: number,
+  hooksCount: number,
+  bodiesCount: number,
+  ctasCount: number,
   language: string,
 ): Promise<GenerateScriptResult> {
+  const totalSegments = hooksCount + bodiesCount + ctasCount;
   const rawContent = await withRetry(() =>
     callOpenRouter(
       [
-        { role: "system", content: buildSystemPrompt(variantCount, language) },
+        { role: "system", content: buildSystemPrompt(hooksCount, bodiesCount, ctasCount, language) },
         { role: "user", content: buildUserPrompt(product, language) },
       ],
-      { maxTokens: variantCount === 1 ? 600 : 1500, timeoutMs: 30000, jsonMode: true },
+      { maxTokens: totalSegments <= 3 ? 600 : 1500, timeoutMs: 30000, jsonMode: true },
     ),
   );
 
@@ -425,7 +432,7 @@ async function generateScript(
   }
 
   const parsed = JSON.parse(cleaned);
-  const scriptRaw = validateScript(parsed, variantCount);
+  const scriptRaw = validateScript(parsed, hooksCount, bodiesCount, ctasCount);
 
   // ── Coherence review pass ───────────────────────────────────────────
   try {
@@ -442,7 +449,7 @@ async function generateScript(
         },
         { role: "user", content: JSON.stringify(scriptRaw) },
       ],
-      { maxTokens: variantCount === 1 ? 800 : 2000, timeoutMs: 30000, jsonMode: true },
+      { maxTokens: totalSegments <= 3 ? 800 : 2000, timeoutMs: 30000, jsonMode: true },
     );
 
     let reviewCleaned = reviewContent.trim();
@@ -470,7 +477,9 @@ async function generateScript(
         bodies: reviewParsed.revised_bodies,
         ctas: reviewParsed.revised_ctas,
       },
-      variantCount,
+      hooksCount,
+      bodiesCount,
+      ctasCount,
     );
 
     return { script: revisedScript, scriptRaw };
@@ -488,9 +497,12 @@ function trimToWords(input: string, maxWords: number): string {
 
 function buildFallbackScript(
   product: Record<string, unknown>,
-  variantCount: number,
+  hooksCount: number,
+  bodiesCount: number,
+  ctasCount: number,
   _language: string,
 ): GeneratedScript {
+  const variantCount = Math.max(hooksCount, bodiesCount, ctasCount);
   const productNameRaw =
     typeof product.name === "string" && product.name.trim().length > 0
       ? product.name.trim()
@@ -528,17 +540,21 @@ function buildFallbackScript(
   const bodies: ScriptSegment[] = [];
   const ctas: ScriptSegment[] = [];
 
-  for (let i = 0; i < variantCount; i++) {
+  for (let i = 0; i < hooksCount; i++) {
     hooks.push({
       text: pick(hookTemplates, i, 10),
       duration_seconds: 3,
       variant_label: i === 0 ? "direct_address" : i === 1 ? "social_proof" : "question",
     });
+  }
+  for (let i = 0; i < bodiesCount; i++) {
     bodies.push({
       text: pick(bodyTemplates, i, 22),
       duration_seconds: 7,
       variant_label: i === 0 ? "value_prop" : i === 1 ? "storytelling" : "problem_solution",
     });
+  }
+  for (let i = 0; i < ctasCount; i++) {
     ctas.push({
       text: pick(ctaTemplates, i, 10),
       duration_seconds: 3,
@@ -551,15 +567,23 @@ function buildFallbackScript(
 
 // ── Shared helpers ────────────────────────────────────────────────────
 
-/** Compute credit cost and variant count from mode/quality/provider. */
-function computeCosts(resolvedMode: string, resolvedQuality: string, provider: "kling" | "sora" = "kling") {
-  const variantCount = resolvedMode === "single" ? 1 : 3;
-  const providerCosts = provider === "sora"
-    ? COSTS.sora[resolvedQuality as keyof typeof COSTS.sora]
-    : COSTS.kling[resolvedQuality as keyof typeof COSTS.kling];
-  const creditCost = resolvedMode === "single" ? providerCosts.single : providerCosts.batch;
+/** Compute credit cost from total segments, quality, and provider.
+ *  Per-segment rates are derived from the 9-segment (3+3+3) batch baseline:
+ *    standard: 15/9 = 5/3 per seg, hd: 30/9 = 10/3, sora: 42/9 = 14/3
+ *  Examples: single (1+1+1=3) std → ceil(3×5/3)=5 ✓; triple (3+3+3=9) std → ceil(9×5/3)=15 ✓
+ */
+function computeCosts(
+  resolvedQuality: string,
+  provider: "kling" | "sora" = "kling",
+  totalSegments: number,
+) {
+  const perSegmentRate =
+    provider === "sora" ? 14 / 3 :
+    resolvedQuality === "hd" ? 10 / 3 :
+    5 / 3;
+  const creditCost = Math.ceil(totalSegments * perSegmentRate);
   const klingModel = KLING_MODEL[resolvedQuality as keyof typeof KLING_MODEL];
-  return { variantCount, creditCost, klingModel };
+  return { creditCost, klingModel };
 }
 
 /** Estimate minimum video duration needed for the given text at ~2.5 words/sec. */
@@ -639,14 +663,17 @@ async function submitAllKlingJobs(
 /** Build a GeneratedScript from advanced segment inputs (strip emotion tags, estimate duration). */
 function buildScriptFromAdvanced(
   advanced: AdvancedSegmentsInput,
-  variantCount: number,
+  hooksCount: number,
+  bodiesCount: number,
+  ctasCount: number,
 ): GeneratedScript {
   const toSegments = (
     segs: AdvancedSegmentInput[],
+    limit: number,
     minDur: number,
     maxDur: number,
   ): ScriptSegment[] =>
-    segs.slice(0, variantCount).map((s) => {
+    segs.slice(0, limit).map((s) => {
       const cleanedText = stripEmotionTags(s.script_text);
       const wordCount = cleanedText.split(/\s+/).filter(Boolean).length;
       const estimated = Math.round(wordCount / 2.5);
@@ -658,9 +685,9 @@ function buildScriptFromAdvanced(
     });
 
   return {
-    hooks: toSegments(advanced.hooks, 2, 4),
-    bodies: toSegments(advanced.bodies, 5, 9),
-    ctas: toSegments(advanced.ctas, 2, 4),
+    hooks: toSegments(advanced.hooks, hooksCount, 2, 4),
+    bodies: toSegments(advanced.bodies, bodiesCount, 5, 9),
+    ctas: toSegments(advanced.ctas, ctasCount, 2, 4),
   };
 }
 
@@ -776,12 +803,17 @@ Deno.serve(async (req: Request) => {
         await sb.from("generations").update({ video_quality: resolvedQuality }).eq("id", generation_id);
       }
 
-      const { variantCount, creditCost, klingModel } = computeCosts(resolvedMode, resolvedQuality, provider);
+      // Read stored segment counts from the generation row (fall back to mode-based defaults).
+      const genHooksCount = Number.isInteger(gen.hooks_count) && gen.hooks_count >= 1 ? gen.hooks_count : (resolvedMode === "single" ? 1 : 3);
+      const genBodiesCount = Number.isInteger(gen.bodies_count) && gen.bodies_count >= 1 ? gen.bodies_count : (resolvedMode === "single" ? 1 : 3);
+      const genCtasCount = Number.isInteger(gen.ctas_count) && gen.ctas_count >= 1 ? gen.ctas_count : (resolvedMode === "single" ? 1 : 3);
+      const genTotalSegments = genHooksCount + genBodiesCount + genCtasCount;
+      const { creditCost, klingModel } = computeCosts(resolvedQuality, provider, genTotalSegments);
 
       // If override_script provided, validate and save
       let finalScript: GeneratedScript;
       if (override_script) {
-        finalScript = validateScript(override_script, variantCount);
+        finalScript = validateScript(override_script, genHooksCount, genBodiesCount, genCtasCount);
         await sb
           .from("generations")
           .update({ script: finalScript })
@@ -809,6 +841,9 @@ Deno.serve(async (req: Request) => {
       const approveIsAdmin = profileData?.role === "admin";
 
       // ── Compute effective cost + check credits ──────────────────
+      // first_video_discount_used is a paywall conversion tracking flag only.
+      // It tracks whether the user has ever approved a generation, so the paywall
+      // can show a "first video" discounted price. No credit reduction is applied here.
       const isFirstVideo = profileData?.first_video_discount_used === false;
       const effectiveCost = creditCost;
 
@@ -987,7 +1022,26 @@ Deno.serve(async (req: Request) => {
       return errorResponse(ErrorCodes.INVALID_INPUT, "Sora only supports HD quality. Please select HD quality to use Sora.", 400, cors);
     }
 
-    const { variantCount, creditCost, klingModel } = computeCosts(resolvedMode, resolvedQuality, provider);
+    // Segment counts (1–5 per slot; single always 1/1/1; triple defaults to 3/3/3)
+    const rawHooks = body.hooks_count;
+    const rawBodies = body.bodies_count;
+    const rawCtas = body.ctas_count;
+
+    const isSingleMode = resolvedMode === "single";
+    const hooksCount = isSingleMode ? 1 : Math.min(5, Math.max(1, Number.isInteger(rawHooks) ? rawHooks : 3));
+    const bodiesCount = isSingleMode ? 1 : Math.min(5, Math.max(1, Number.isInteger(rawBodies) ? rawBodies : 3));
+    const ctasCount = isSingleMode ? 1 : Math.min(5, Math.max(1, Number.isInteger(rawCtas) ? rawCtas : 3));
+
+    // Validate range explicitly (return 400 if user passed an invalid value intentionally)
+    if (!isSingleMode) {
+      const invalid = [rawHooks, rawBodies, rawCtas].filter(v => v !== undefined && (!Number.isInteger(v) || v < 1 || v > 5));
+      if (invalid.length > 0) {
+        return json({ detail: "hooks_count, bodies_count, ctas_count must each be integers between 1 and 5" }, cors, 400);
+      }
+    }
+
+    const totalSegments = hooksCount + bodiesCount + ctasCount;
+    const { creditCost, klingModel } = computeCosts(resolvedQuality, provider, totalSegments);
 
     // ── 1b. Fetch profile for plan-based validation ────────────────
     const { data: planProfile } = await sb
@@ -1089,6 +1143,9 @@ Deno.serve(async (req: Request) => {
           video_quality: resolvedQuality,
           composite_image_url: composite_image_path,
           language: resolvedLanguage,
+          hooks_count: hooksCount,
+          bodies_count: bodiesCount,
+          ctas_count: ctasCount,
           status: "awaiting_approval",
           started_at: new Date().toISOString(),
         })
@@ -1106,7 +1163,7 @@ Deno.serve(async (req: Request) => {
 
       try {
         // ── Generate script (with coherence review) ─────────────────
-        const generated = await generateScript(product, variantCount, resolvedLanguage);
+        const generated = await generateScript(product, hooksCount, bodiesCount, ctasCount, resolvedLanguage);
         script = generated.script;
         scriptRaw = generated.scriptRaw;
       } catch (scriptErr) {
@@ -1115,7 +1172,7 @@ Deno.serve(async (req: Request) => {
         const errMsg = scriptErr instanceof Error ? scriptErr.message : String(scriptErr);
         console.error("generate-video script-only error, using fallback:", errMsg);
         usedFallback = true;
-        script = buildFallbackScript(product, variantCount, resolvedLanguage);
+        script = buildFallbackScript(product, hooksCount, bodiesCount, ctasCount, resolvedLanguage);
         scriptRaw = script;
       }
 

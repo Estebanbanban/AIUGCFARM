@@ -26,6 +26,7 @@ interface StoredVideos {
   hooks: StoredSegmentVideo[];
   bodies: StoredSegmentVideo[];
   ctas: StoredSegmentVideo[];
+  failed?: string[]; // job keys that failed e.g. ["hook_2", "cta_3"]
 }
 
 interface ResponseSegmentVideo {
@@ -222,6 +223,9 @@ Deno.serve(async (req: Request) => {
           composite_image_url: compositeImageUrl,
           segments,
           completed_at: gen.completed_at,
+          hooks_count: gen.hooks_count ?? 3,
+          bodies_count: gen.bodies_count ?? 3,
+          ctas_count: gen.ctas_count ?? 3,
         },
       }, cors);
     }
@@ -281,7 +285,7 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      let anyFailed = false;
+      const failedSegments: string[] = [];
       let failedMessage = "";
 
       // Get the script for looking up variant_label and duration
@@ -302,7 +306,10 @@ Deno.serve(async (req: Request) => {
       // Process poll results — download & upload completed videos in parallel
       const downloadTasks: Promise<void>[] = [];
 
-      for (const pollResult of pollResults) {
+      for (let i = 0; i < pollResults.length; i++) {
+        const pollResult = pollResults[i];
+        const pendingJobKey = pendingJobKeys[i];
+
         if (pollResult.status === "rejected") {
           // Distinguish permanent 4xx errors from transient ones
           const errMsg = pollResult.reason instanceof Error ? pollResult.reason.message : String(pollResult.reason);
@@ -313,14 +320,13 @@ Deno.serve(async (req: Request) => {
           const permanentBodyPatterns = /INVALID_IMAGE|content.?policy|NSFW|MODERATION|banned|blocked/i;
           const isPermanent = isPermanentHttp || permanentBodyPatterns.test(errMsg);
           if (isPermanent) {
-            anyFailed = true;
+            failedSegments.push(pendingJobKey);
             // Use a generic message — don't expose raw API error details to client
             failedMessage = httpStatus >= 400 && httpStatus < 500
               ? "Video generation was rejected (content policy or invalid input). Please try a different image or script."
               : "Video generation failed. Please try again.";
-            break;
           }
-          // Transient: treat as still-in-progress
+          // Transient or permanent: treat as still-in-progress or failed, do not break
           continue;
         }
         const { jobKey, klingResult } = pollResult.value;
@@ -369,14 +375,14 @@ Deno.serve(async (req: Request) => {
               completedKeys.add(jobKey);
             })().catch((dlErr) => {
               console.error(`Video download/upload failed for ${jobKey}:`, dlErr);
-              anyFailed = true;
+              failedSegments.push(jobKey);
               failedMessage = "Failed to save one or more video segments. Please try again.";
             })
           );
         } else if (klingResult.status === "failed") {
           const errMsg = klingResult.error_message || "";
           const permanentContentPatterns = /INVALID_IMAGE|content.?policy|NSFW|MODERATION|banned|blocked/i;
-          anyFailed = true;
+          failedSegments.push(jobKey);
           // Don't expose raw API error details — log internally, show generic message
           console.error(`Kling segment ${jobKey} failed:`, errMsg);
           failedMessage = permanentContentPatterns.test(errMsg)
@@ -389,76 +395,116 @@ Deno.serve(async (req: Request) => {
 
       const completedCount = completedKeys.size;
       const totalCount = jobKeys.length;
+      const failedCount = failedSegments.length;
 
       // Check if all jobs have a final status (completed or failed)
-      const allJobsResolved = completedCount === totalCount || anyFailed;
+      const allJobsResolved = completedCount + failedCount === totalCount;
 
-      if (anyFailed) {
-        // Mark as failed and refund credits
-        await sb
-          .from("generations")
-          .update({
-            status: "failed",
-            videos: storedVideos,
-            error_message: failedMessage || "One or more video segments failed",
-          })
-          .eq("id", generationId);
-
-        // Refund credits based on the latest debit for this generation.
-        // This correctly handles both initial generation failures and 1-credit segment regenerations.
+      if (failedCount > 0 && allJobsResolved) {
         const quality = (gen.video_quality ?? "standard") as keyof typeof COSTS;
         const fallbackCost = gen.mode === "single"
           ? COSTS[quality].single
           : COSTS[quality].batch;
         const latestDebitAmount = await getLatestGenerationDebitAmount(sb, userId, generationId);
-        const refundAmount = latestDebitAmount ?? fallbackCost;
-        try {
-          await refundCredits(userId, refundAmount, generationId);
-          console.log(`Credits refunded: ${refundAmount} → user ${userId} for generation ${generationId}`);
 
-          // If this was a discounted first-video attempt that failed, restore eligibility.
-          if (refundAmount > 1) {
-            const { data: profile } = await sb
-              .from("profiles")
-              .select("first_video_discount_used")
-              .eq("id", userId)
-              .maybeSingle();
+        if (failedCount === totalCount) {
+          // ALL segments failed — full failure, full refund (existing behavior)
+          await sb
+            .from("generations")
+            .update({
+              status: "failed",
+              videos: storedVideos,
+              error_message: failedMessage || "All video segments failed to generate.",
+            })
+            .eq("id", generationId);
 
-            if (profile?.first_video_discount_used) {
-              const { count: completedCount } = await sb
-                .from("generations")
-                .select("id", { count: "exact", head: true })
-                .eq("owner_id", userId)
-                .eq("status", "completed");
+          const refundAmount = latestDebitAmount ?? fallbackCost;
+          try {
+            await refundCredits(userId, refundAmount, generationId);
+            console.log(`Credits refunded: ${refundAmount} → user ${userId} for generation ${generationId}`);
 
-              if ((completedCount ?? 0) === 0) {
-                await sb
-                  .from("profiles")
-                  .update({ first_video_discount_used: false })
-                  .eq("id", userId);
+            // If this was a discounted first-video attempt that failed, restore eligibility.
+            if (refundAmount > 1) {
+              const { data: profile } = await sb
+                .from("profiles")
+                .select("first_video_discount_used")
+                .eq("id", userId)
+                .maybeSingle();
+
+              if (profile?.first_video_discount_used) {
+                const { count: completedGenerationsCount } = await sb
+                  .from("generations")
+                  .select("id", { count: "exact", head: true })
+                  .eq("owner_id", userId)
+                  .eq("status", "completed");
+
+                if ((completedGenerationsCount ?? 0) === 0) {
+                  await sb
+                    .from("profiles")
+                    .update({ first_video_discount_used: false })
+                    .eq("id", userId);
+                }
+              }
+            }
+          } catch (refundErr) {
+            // Log prominently — user loses credits if this fails
+            console.error(`CRITICAL: Credit refund failed for generation ${generationId} (user ${userId}, ${refundAmount} credits):`, refundErr);
+            await sb.from("generations")
+              .update({ error_message: `${failedMessage || "Generation failed"} | REFUND FAILED: ${refundErr instanceof Error ? refundErr.message : String(refundErr)}` })
+              .eq("id", generationId);
+          }
+
+          return json({
+            data: {
+              generation_id: generationId,
+              status: "failed",
+              mode: gen.mode,
+              script: gen.script,
+              composite_image_url: compositeImageUrl,
+              error_message: failedMessage || "All video segments failed to generate.",
+              progress: { completed: completedCount, total: totalCount },
+            },
+          }, cors);
+        } else {
+          // PARTIAL failure — some segments succeeded; mark completed with failed list
+          storedVideos.failed = failedSegments;
+          const partialErrorMsg = `${failedCount} of ${totalCount} segment(s) failed to generate. Credits refunded for failed segments.`;
+
+          await sb
+            .from("generations")
+            .update({
+              status: "completed",
+              videos: storedVideos,
+              completed_at: new Date().toISOString(),
+              error_message: partialErrorMsg,
+            })
+            .eq("id", generationId);
+
+          // Proportional refund for failed segments only
+          if (latestDebitAmount && latestDebitAmount > 0) {
+            const proportionalRefund = Math.round((failedCount / totalCount) * latestDebitAmount);
+            if (proportionalRefund > 0) {
+              try {
+                await refundCredits(userId, proportionalRefund, generationId);
+                console.log(`Partial credits refunded: ${proportionalRefund} of ${latestDebitAmount} → user ${userId} for generation ${generationId} (${failedCount}/${totalCount} segments failed)`);
+              } catch (refundErr) {
+                console.error(`CRITICAL: Partial credit refund failed for generation ${generationId} (user ${userId}, ${proportionalRefund} credits):`, refundErr);
               }
             }
           }
-        } catch (refundErr) {
-          // Log prominently — user loses credits if this fails
-          console.error(`CRITICAL: Credit refund failed for generation ${generationId} (user ${userId}, ${refundAmount} credits):`, refundErr);
-          // Update the generation error_message to include refund failure so it's traceable
-          await sb.from("generations")
-            .update({ error_message: `${failedMessage || "Generation failed"} | REFUND FAILED: ${refundErr instanceof Error ? refundErr.message : String(refundErr)}` })
-            .eq("id", generationId);
-        }
 
-        return json({
-          data: {
-            generation_id: generationId,
-            status: "failed",
-            mode: gen.mode,
-            script: gen.script,
-            composite_image_url: compositeImageUrl,
-            error_message: failedMessage || "One or more video segments failed",
-            progress: { completed: completedCount, total: totalCount },
-          },
-        }, cors);
+          return json({
+            data: {
+              generation_id: generationId,
+              status: "completed",
+              mode: gen.mode,
+              script: gen.script,
+              composite_image_url: compositeImageUrl,
+              error_message: partialErrorMsg,
+              progress: { completed: completedCount, total: totalCount },
+            },
+          }, cors);
+        }
       }
 
       if (allJobsResolved && completedCount === totalCount) {
@@ -508,6 +554,9 @@ Deno.serve(async (req: Request) => {
             composite_image_url: compositeImageUrl,
             segments,
             progress: { completed: completedCount, total: totalCount },
+            hooks_count: gen.hooks_count ?? 3,
+            bodies_count: gen.bodies_count ?? 3,
+            ctas_count: gen.ctas_count ?? 3,
           },
         }, cors);
       }
