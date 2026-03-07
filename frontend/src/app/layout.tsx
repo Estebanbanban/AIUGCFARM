@@ -10,6 +10,7 @@ import { PostHogProvider } from "@/components/providers/posthog-provider";
 import { CookieBanner } from "@/components/layout/CookieBanner";
 import { ClerkProvider } from "@clerk/nextjs";
 
+
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
@@ -57,7 +58,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans min-h-screen bg-background text-foreground antialiased`}>
-        <ClerkProvider>
+        <ClerkProvider
+          signInUrl="/sign-in"
+          signUpUrl="/sign-up"
+          afterSignInUrl="/dashboard"
+          afterSignUpUrl="/dashboard"
+        >
           <NextTopLoader color="hsl(var(--primary))" showSpinner={false} height={3} />
           <Script
             src="https://datafa.st/js/script.js"
