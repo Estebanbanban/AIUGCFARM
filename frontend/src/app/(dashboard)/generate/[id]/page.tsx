@@ -2050,10 +2050,8 @@ export default function GenerationDetailPage() {
                   onSelect={() => {
                     if (batchMode) {
                       toggleBatchSelection(selectedHooks, setSelectedHooks, i);
-                      setSelectedHook(i);
-                    } else {
-                      setSelectedHook(i);
                     }
+                    setSelectedHook(i);
                   }}
                   onRegenerate={() => handleRegenerateSegment("hook", i + 1)}
                   isRegenerating={regeneratingKey === `hook_${i + 1}`}
@@ -2100,10 +2098,8 @@ export default function GenerationDetailPage() {
                   onSelect={() => {
                     if (batchMode) {
                       toggleBatchSelection(selectedBodies, setSelectedBodies, i);
-                      setSelectedBody(i);
-                    } else {
-                      setSelectedBody(i);
                     }
+                    setSelectedBody(i);
                   }}
                   onRegenerate={() => handleRegenerateSegment("body", i + 1)}
                   isRegenerating={regeneratingKey === `body_${i + 1}`}
@@ -2150,10 +2146,8 @@ export default function GenerationDetailPage() {
                   onSelect={() => {
                     if (batchMode) {
                       toggleBatchSelection(selectedCtas, setSelectedCtas, i);
-                      setSelectedCta(i);
-                    } else {
-                      setSelectedCta(i);
                     }
+                    setSelectedCta(i);
                   }}
                   onRegenerate={() => handleRegenerateSegment("cta", i + 1)}
                   isRegenerating={regeneratingKey === `cta_${i + 1}`}
