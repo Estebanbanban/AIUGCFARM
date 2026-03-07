@@ -105,14 +105,36 @@ Deno.serve(async (req: Request) => {
       sb.from("audit_logs").delete().eq("owner_id", userId),
     ]);
 
-    // 4. Delete profile (should cascade from auth.users, but be explicit)
+    // 4. Fetch clerk_user_id before deleting profile
+    const { data: profileRow } = await sb
+      .from("profiles")
+      .select("clerk_user_id")
+      .eq("id", userId)
+      .maybeSingle();
+
+    // 5. Delete profile (should cascade from auth.users, but be explicit)
     await sb.from("profiles").delete().eq("id", userId);
 
-    // 5. Delete the auth user (requires service role)
+    // 6. Delete the auth user (requires service role)
     const { error: authErr } = await sb.auth.admin.deleteUser(userId);
     if (authErr) {
       console.error("Auth user deletion failed:", authErr);
       // Data is already gone, log the error but return success
+    }
+
+    // 7. Delete the Clerk user (GDPR compliance)
+    const clerkUserId = profileRow?.clerk_user_id;
+    if (clerkUserId) {
+      const clerkRes = await fetch(`https://api.clerk.com/v1/users/${clerkUserId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${Deno.env.get("CLERK_SECRET_KEY")}`,
+        },
+      });
+      if (!clerkRes.ok) {
+        console.error("Failed to delete Clerk user:", await clerkRes.text());
+        // Don't throw — Supabase data is already deleted, log and continue
+      }
     }
 
     return json({ data: { deleted: true } }, cors);

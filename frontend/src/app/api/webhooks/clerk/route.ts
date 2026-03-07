@@ -44,5 +44,16 @@ export async function POST(req: Request) {
     });
   }
 
+  if (evt.type === "user.deleted") {
+    const { id: clerkUserId } = evt.data;
+    // Safety net: clean up any remaining profile for this Clerk user.
+    // In normal flow, delete-account already removed this row, but this
+    // handles manual deletions done directly in the Clerk dashboard.
+    if (clerkUserId) {
+      const supabase = createAdminClient();
+      await supabase.from("profiles").delete().eq("clerk_user_id", clerkUserId);
+    }
+  }
+
   return new Response("OK", { status: 200 });
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -190,6 +191,7 @@ function BrandCard({
 /* -------------------------------------------------------------------------- */
 
 export default function ProductsPage() {
+  const searchParams = useSearchParams();
   const { data: brands, isLoading: brandsLoading, error: brandsError } = useBrands();
   const { data: profile } = useProfile();
   const createBrand = useCreateBrand();
@@ -239,6 +241,18 @@ export default function ProductsPage() {
       setSelectedBrandId(null);
     }
   }, [selectedBrandId, selectedBrand, brandsLoading]);
+
+  // Pre-fill import URL from query param (e.g. coming from landing CTA post-signup)
+  useEffect(() => {
+    const urlParam = searchParams.get('importUrl');
+    if (!urlParam || brandsLoading) return;
+    setImportUrl(urlParam);
+    setShowImport(true);
+    // If there's at least one brand, select it so the import can proceed directly
+    if (brands && brands.length > 0 && !selectedBrandId) {
+      setSelectedBrandId(brands[0].id);
+    }
+  }, [searchParams, brandsLoading, brands]);
 
   async function handleCreateBrand() {
     if (!newBrandName.trim()) return;

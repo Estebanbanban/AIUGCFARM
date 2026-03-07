@@ -156,6 +156,14 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
+    const pendingUrl = localStorage.getItem("pendingScrapeUrl");
+    if (pendingUrl) {
+      localStorage.removeItem("pendingScrapeUrl");
+      router.push(`/products?importUrl=${encodeURIComponent(pendingUrl)}`);
+    }
+  }, []);
+
+  useEffect(() => {
     callEdge<{ data: Preset[] }>("list-presets").then((res) => {
       setPresets(res.data ?? []);
     }).catch(() => {});
