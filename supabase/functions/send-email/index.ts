@@ -23,34 +23,29 @@ const HOOK_SECRET = Deno.env.get("SEND_EMAIL_HOOK_SECRET");
  */
 async function verifyHookSignature(req: Request, body: string): Promise<boolean> {
   if (!HOOK_SECRET) {
-    console.error("SEND_EMAIL_HOOK_SECRET is not configured — rejecting hook call");
+    console.error("SEND_EMAIL_HOOK_SECRET is not set");
     return false;
   }
 
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader) return false;
+  if (!authHeader?.startsWith("v1,")) return false;
 
-  const [version, signature] = authHeader.split(",");
-  if (version !== "v1" || !signature) return false;
+  const signature = authHeader.slice(3);
 
-  // Secret format: "v1,whsec_<base64>"  -  extract the base64 part after "whsec_"
-  const secretPart = HOOK_SECRET.replace(/^v1,whsec_/, "").replace(/^whsec_/, "");
-  const keyBytes = Uint8Array.from(atob(secretPart), (c) => c.charCodeAt(0));
-
-  const cryptoKey = await crypto.subtle.importKey(
-    "raw",
-    keyBytes,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["verify"]
-  );
-
-  const signatureBytes = new Uint8Array(
-    signature.match(/.{1,2}/g)!.map((b) => parseInt(b, 16))
-  );
-  const bodyBytes = new TextEncoder().encode(body);
-
-  return crypto.subtle.verify("HMAC", cryptoKey, signatureBytes, bodyBytes);
+  try {
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(HOOK_SECRET),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"],
+    );
+    const sigBytes = new Uint8Array(signature.match(/.{1,2}/g)!.map((b) => parseInt(b, 16)));
+    return await crypto.subtle.verify("HMAC", key, sigBytes, new TextEncoder().encode(body));
+  } catch (e) {
+    console.error("verifyHookSignature error:", e);
+    return false;
+  }
 }
 
 interface AuthHookPayload {
