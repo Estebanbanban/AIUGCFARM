@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { useUser } from "@clerk/nextjs";
 import {
   Video,
   CreditCard,
@@ -71,7 +71,8 @@ const quickActions = [
 export default function DashboardPage() {
   const router = useRouter();
   const wizard = useGenerationWizardStore();
-  const [firstName, setFirstName] = useState("there");
+  const { user } = useUser();
+  const firstName = user?.firstName || user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] || "there";
 
   const { data: credits, isLoading: creditsLoading } = useCredits();
   const { data: profile } = useProfile();
@@ -133,17 +134,6 @@ export default function DashboardPage() {
     });
     router.push("/generate");
   }
-
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }: { data: { user: { user_metadata?: Record<string, string>; email?: string } | null } }) => {
-      if (user?.user_metadata?.full_name) {
-        setFirstName(user.user_metadata.full_name.split(" ")[0]);
-      } else if (user?.email) {
-        setFirstName(user.email.split("@")[0]);
-      }
-    });
-  }, []);
 
   const creditPercent = isUnlimitedCredits
     ? 100
