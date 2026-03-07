@@ -28,6 +28,7 @@ import {
   ChevronRight,
   Settings2,
   FlaskConical,
+  Bookmark,
 } from "lucide-react";
 import { useFirstPurchaseOffer, COUPON_50_OFF_FIRST_VIDEO } from "@/hooks/use-first-purchase-offer";
 import { toast } from "sonner";
@@ -59,6 +60,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
@@ -399,6 +401,12 @@ export default function GeneratePage() {
 
   // Tracks config changed after auto-fired script
   const [scriptConfigChanged, setScriptConfigChanged] = useState(false);
+
+  // Save as Preset dialog state
+  const [presetDialogOpen, setPresetDialogOpen] = useState(false);
+  const [presetName, setPresetName] = useState("");
+  const [presetSaving, setPresetSaving] = useState(false);
+  const [presetError, setPresetError] = useState<string | null>(null);
 
   // Brand summary editable state (synced from selected product)
   const [brandSummary, setBrandSummary] = useState<BrandSummary | null>(null);
@@ -1183,6 +1191,38 @@ export default function GeneratePage() {
       },
       onError: (err) => { toast.error(err.message || "Failed to start checkout"); },
     });
+  }
+
+  async function handleSavePreset() {
+    if (!presetName.trim()) return;
+    setPresetSaving(true);
+    setPresetError(null);
+    try {
+      await callEdge("create-preset", {
+        body: {
+          name: presetName.trim(),
+          config: {
+            product_id: store.productId,
+            persona_id: store.personaId,
+            mode: store.mode,
+            quality: store.quality,
+            format: store.format,
+            cta_style: store.ctaStyle,
+            cta_comment_keyword: store.ctaCommentKeyword || undefined,
+            language: store.language,
+            video_provider: store.videoProvider,
+          },
+        },
+      });
+      setPresetDialogOpen(false);
+      setPresetName("");
+      toast.success("Preset saved");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to save preset";
+      setPresetError(msg);
+    } finally {
+      setPresetSaving(false);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -2062,9 +2102,22 @@ export default function GeneratePage() {
 
                   <div className="min-w-0 space-y-5">
                     <div className="rounded-xl border border-border bg-background p-4 sm:p-5">
-                      <div className="mb-4">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">A. Video Setup</p>
-                        <p className="mt-1 text-sm text-muted-foreground">Configure mode, quality, and script controls.</p>
+                      <div className="mb-4 flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">A. Video Setup</p>
+                          <p className="mt-1 text-sm text-muted-foreground">Configure mode, quality, and script controls.</p>
+                        </div>
+                        {store.step >= 4 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="shrink-0 gap-1.5 text-muted-foreground"
+                            onClick={() => setPresetDialogOpen(true)}
+                          >
+                            <Bookmark className="size-3.5" />
+                            Save as preset
+                          </Button>
+                        )}
                       </div>
 
                       <div className="flex rounded-lg border border-border bg-muted/40 p-1">
@@ -3034,6 +3087,42 @@ export default function GeneratePage() {
               No commitment on packs · Cancel subscriptions anytime
             </p>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Save as Preset dialog */}
+      <Dialog open={presetDialogOpen} onOpenChange={setPresetDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Save as Preset</DialogTitle>
+            <DialogDescription>
+              Save your current product, persona, and settings for quick access later.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="preset-name">Preset name</Label>
+              <Input
+                id="preset-name"
+                placeholder="e.g. Brand A — Triple HD"
+                value={presetName}
+                onChange={(e) => setPresetName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSavePreset()}
+                maxLength={60}
+              />
+            </div>
+            {presetError && (
+              <p className="text-sm text-destructive">{presetError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPresetDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSavePreset} disabled={presetSaving || !presetName.trim()}>
+              {presetSaving ? "Saving..." : "Save preset"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
