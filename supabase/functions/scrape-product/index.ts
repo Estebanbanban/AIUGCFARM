@@ -26,7 +26,7 @@ interface ProductData {
   currency: string;
   images: string[];
   category: string | null;
-  source: "shopify" | "generic";
+  source: "shopify" | "generic" | "saas";
 }
 
 // ---------------------------------------------------------------------------
@@ -242,19 +242,179 @@ function parseJsonLd(html: string): ProductData[] {
 }
 
 // ---------------------------------------------------------------------------
-// Generic scraper  -  JSON-LD first, OG tags fallback
+// SaaS detection heuristic  -  requires 3+ signals to reduce false positives
+// ---------------------------------------------------------------------------
+
+function detectSaaS(html: string): boolean {
+  const lower = html.toLowerCase();
+  let score = 0;
+
+  if (/pricing|plans?\b/.test(lower)) score++;
+  if (/free trial|start for free|try for free/.test(lower)) score++;
+  if (/\bdashboard\b|\bapi\b/.test(lower)) score++;
+  if (!/<meta[^>]+property="og:price/i.test(html)) score++;
+  if (!/"priceCurrency"|"price"\s*:\s*"\d/.test(html)) score++;
+  if (!(/([$£€]\s*\d{1,6}(?:[.,]\d{2})?)/.test(html))) score++;
+
+  return score >= 3;
+}
+
+// ---------------------------------------------------------------------------
+// SaaS multi-page scraper
+// ---------------------------------------------------------------------------
+
+const SAAS_SUB_PATHS = ["/pricing", "/features", "/product", "/solutions", "/about"];
+
+async function scrapeSaaS(
+  url: string,
+  origin: string,
+  landingHtml: string,
+  signal: AbortSignal,
+): Promise<ProductData> {
+  const titleMatch = landingHtml.match(/<title[^>]*>([^<]+)<\/title>/i);
+  const ogTitleMatch = landingHtml.match(
+    /<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i,
+  );
+  const name = (ogTitleMatch?.[1] || titleMatch?.[1] || "Unknown Service").trim();
+
+  const images: string[] = [];
+  const ogImageMatch = landingHtml.match(
+    /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i,
+  );
+  if (ogImageMatch) images.push(ogImageMatch[1]);
+
+  // Collect candidate sub-page URLs from landing HTML links — SSRF-safe
+  const originUrl = new URL(origin);
+  const candidateUrls: string[] = [];
+  for (const m of landingHtml.matchAll(/href="([^"]+)"/gi)) {
+    const href = m[1];
+    let resolved: URL;
+    try {
+      resolved = new URL(href, origin);
+    } catch {
+      continue;
+    }
+    // SSRF guard: only same-origin links
+    if (resolved.origin !== originUrl.origin) continue;
+    const pathname = resolved.pathname.replace(/\/$/, "").toLowerCase();
+    if (SAAS_SUB_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
+      candidateUrls.push(resolved.toString());
+    }
+  }
+
+  // Deduplicate, check robots.txt per path, cap at 3
+  const seen = new Set<string>();
+  const allowedUrls: string[] = [];
+  for (const cu of candidateUrls) {
+    if (seen.has(cu)) continue;
+    seen.add(cu);
+    const pathname = new URL(cu).pathname;
+    const robotsOk = await isAllowedByRobots(origin, pathname);
+    if (robotsOk) allowedUrls.push(cu);
+    if (allowedUrls.length >= 3) break;
+  }
+
+  // Fetch sub-pages in parallel with per-page 3s timeout
+  const subPageTexts: string[] = [stripHtml(landingHtml)];
+  if (allowedUrls.length > 0) {
+    const results = await Promise.allSettled(
+      allowedUrls.map(async (subUrl) => {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 3_000);
+        try {
+          const res = await safeFetch(subUrl, {
+            headers: BROWSER_HEADERS,
+            signal: ctrl.signal,
+          });
+          if (!res.ok) return "";
+          const subHtml = await res.text();
+          return stripHtml(subHtml);
+        } catch {
+          return "";
+        } finally {
+          clearTimeout(timer);
+        }
+      }),
+    );
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value) subPageTexts.push(r.value);
+    }
+  }
+
+  // Concatenate corpus — cap at 3000 chars
+  const corpus = subPageTexts.join(" ").replace(/\s+/g, " ").trim().slice(0, 3000);
+
+  // Extract monthly price from corpus
+  const priceMatch = corpus.match(/\$(\d+(?:\.\d{2})?)\s*(?:\/\s*mo(?:nth)?|per month)/i);
+  const price = priceMatch ? parseFloat(priceMatch[1]) : null;
+
+  if (signal.aborted) throw new Error("SaaS scrape timed out");
+
+  return {
+    name,
+    description: corpus.slice(0, 800),
+    price,
+    currency: "USD",
+    images,
+    category: null,
+    source: "saas",
+  };
+}
+
+// ---------------------------------------------------------------------------
+// OG tag fallback helper
+// ---------------------------------------------------------------------------
+
+function ogTagFallback(html: string): ProductData {
+  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  const ogTitleMatch = html.match(
+    /<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i,
+  );
+  const name = ogTitleMatch?.[1] || titleMatch?.[1] || "Unknown Product";
+
+  const ogDescMatch = html.match(
+    /<meta[^>]+property="og:description"[^>]+content="([^"]+)"/i,
+  );
+  const metaDescMatch = html.match(
+    /<meta[^>]+name="description"[^>]+content="([^"]+)"/i,
+  );
+  const description = ogDescMatch?.[1] || metaDescMatch?.[1] || "";
+
+  const images: string[] = [];
+  const ogImageMatch = html.match(
+    /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i,
+  );
+  if (ogImageMatch) images.push(ogImageMatch[1]);
+
+  const priceMatch = html.match(
+    /(?:price|amount)[^>]*>[\s$\u00a3\u20ac]*(\d+[.,]\d{2})/i,
+  );
+
+  return {
+    name: name.trim(),
+    description: description.trim(),
+    price: priceMatch ? parseFloat(priceMatch[1].replace(",", ".")) : null,
+    currency: "USD",
+    images,
+    category: null,
+    source: "generic",
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Generic scraper  -  JSON-LD first, SaaS detection, OG tags fallback
 // ---------------------------------------------------------------------------
 
 async function scrapeGeneric(
   url: string,
   origin: string,
-): Promise<{ products: ProductData[]; blocked_by_robots: boolean }> {
+): Promise<{ products: ProductData[]; blocked_by_robots: boolean; platform: "generic" | "saas" }> {
   const parsedUrl = new URL(url);
 
   // Check robots.txt before fetching
   const allowed = await isAllowedByRobots(origin, parsedUrl.pathname);
   if (!allowed) {
-    return { products: [], blocked_by_robots: true };
+    return { products: [], blocked_by_robots: true, platform: "generic" };
   }
 
   const res = await safeFetch(url, {
@@ -282,49 +442,32 @@ async function scrapeGeneric(
   // Try JSON-LD first
   const jsonLdProducts = parseJsonLd(html);
   if (jsonLdProducts.length > 0) {
-    return { products: jsonLdProducts, blocked_by_robots: false };
+    return { products: jsonLdProducts, blocked_by_robots: false, platform: "generic" };
+  }
+
+  // SaaS detection: run multi-page crawl if it looks like a SaaS site
+  if (detectSaaS(html)) {
+    const saasController = new AbortController();
+    const saasTimer = setTimeout(() => saasController.abort(), 25_000);
+    let result: ProductData;
+    let detectedPlatform: "generic" | "saas" = "saas";
+    try {
+      result = await scrapeSaaS(url, origin, html, saasController.signal);
+    } catch {
+      // Timeout or error — fall back to OG-tag scrape
+      result = ogTagFallback(html);
+      detectedPlatform = "generic";
+    } finally {
+      clearTimeout(saasTimer);
+    }
+    return { products: [result], blocked_by_robots: false, platform: detectedPlatform };
   }
 
   // Fallback: OG tags / meta tags
-  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  const ogTitleMatch = html.match(
-    /<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i,
-  );
-  const name = ogTitleMatch?.[1] || titleMatch?.[1] || "Unknown Product";
-
-  const ogDescMatch = html.match(
-    /<meta[^>]+property="og:description"[^>]+content="([^"]+)"/i,
-  );
-  const metaDescMatch = html.match(
-    /<meta[^>]+name="description"[^>]+content="([^"]+)"/i,
-  );
-  const description = ogDescMatch?.[1] || metaDescMatch?.[1] || "";
-
-  const images: string[] = [];
-  const ogImageMatch = html.match(
-    /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i,
-  );
-  if (ogImageMatch) images.push(ogImageMatch[1]);
-
-  const priceMatch = html.match(
-    /(?:price|amount)[^>]*>[\s$\u00a3\u20ac]*(\d+[.,]\d{2})/i,
-  );
-
   return {
-    products: [
-      {
-        name: name.trim(),
-        description: description.trim(),
-        price: priceMatch
-          ? parseFloat(priceMatch[1].replace(",", "."))
-          : null,
-        currency: "USD",
-        images,
-        category: null,
-        source: "generic",
-      },
-    ],
+    products: [ogTagFallback(html)],
     blocked_by_robots: false,
+    platform: "generic",
   };
 }
 
@@ -367,8 +510,8 @@ Deno.serve(async (req: Request) => {
     const origin = parsed.origin;
 
     let products: ProductData[] = [];
-    let source: "shopify" | "generic" = "shopify";
-    let platform: "shopify" | "generic" = "shopify";
+    let source: "shopify" | "generic" | "saas" = "shopify";
+    let platform: "shopify" | "generic" | "saas" = "shopify";
     let blockedByRobots = false;
     let fallbackAvailable = false;
 
@@ -380,13 +523,13 @@ Deno.serve(async (req: Request) => {
       source = "shopify";
       platform = "shopify";
     } else {
-      // Fall back to generic scraping
-      source = "generic";
-      platform = "generic";
+      // Fall back to generic/SaaS scraping
       fallbackAvailable = true;
       const result = await scrapeGeneric(url, origin);
       products = result.products;
       blockedByRobots = result.blocked_by_robots;
+      platform = result.platform;
+      source = result.platform; // source matches platform for generic/saas
     }
 
     // Generate brand summary from ALL products (graceful degradation)

@@ -21,7 +21,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Only allow safe fields
-    const allowed = ["name", "description", "images", "brand_id"] as const;
+    const allowed = ["name", "description", "price", "currency", "images", "brand_id"] as const;
     const updates: Record<string, unknown> = {};
     for (const key of allowed) {
       if (key in fields) updates[key] = fields[key];

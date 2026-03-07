@@ -55,6 +55,7 @@ import {
 import { useProfile, BRAND_LIMITS, PRODUCTS_PER_BRAND_LIMITS } from '@/hooks/use-profile';
 import { ProductCard } from '@/components/products/ProductCard';
 import { ManualUploadForm } from '@/components/products/ManualUploadForm';
+import { ScrapeResults } from '@/components/products/ScrapeResults';
 import Link from 'next/link';
 import { isExternalUrl, getSignedImageUrls } from '@/lib/storage';
 import type { Product, BrandSummary } from '@/types/database';
@@ -234,6 +235,8 @@ export default function ProductsPage() {
   const [scrapedProducts, setScrapedProducts] = useState<Product[]>([]);
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   const [showCandidates, setShowCandidates] = useState(false);
+  const [scrapedPlatform, setScrapedPlatform] = useState<string | null>(null);
+  const [scrapedBrandSummary, setScrapedBrandSummary] = useState<BrandSummary | null>(null);
 
   // If selected brand disappears (deleted), go back
   useEffect(() => {
@@ -326,6 +329,8 @@ export default function ProductsPage() {
       }
       setScrapedProducts(candidates);
       setSelectedProductIds(new Set(candidates.map((p) => p.id)));
+      setScrapedPlatform(result.platform ?? result.source ?? null);
+      setScrapedBrandSummary(result.brand_summary as BrandSummary | null ?? null);
       setShowCandidates(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to scrape URL';
@@ -366,7 +371,22 @@ export default function ProductsPage() {
       setScrapedProducts([]);
       setImportUrl('');
       setScrapeError(null);
+      setScrapedPlatform(null);
+      setScrapedBrandSummary(null);
     }
+  }
+
+  function handleConfirmCompleted() {
+    setShowImport(false);
+    setShowCandidates(false);
+    setScrapedProducts([]);
+    setSelectedProductIds(new Set());
+    setImportUrl('');
+    setScrapeError(null);
+    setScrapedPlatform(null);
+    setScrapedBrandSummary(null);
+    queryClient.invalidateQueries({ queryKey: ['products', 'brand', selectedBrandId] });
+    queryClient.invalidateQueries({ queryKey: ['brands'] });
   }
 
   const showBrandList = selectedBrandId === null;
@@ -588,7 +608,16 @@ export default function ProductsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          {showCandidates && scrapedProducts.length > 0 ? (
+          {showCandidates && scrapedProducts.length > 0 && scrapedPlatform === 'saas' ? (
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+              <ScrapeResults
+                products={scrapedProducts}
+                brandSummary={scrapedBrandSummary}
+                brandId={selectedBrandId ?? undefined}
+                onConfirmed={handleConfirmCompleted}
+              />
+            </div>
+          ) : showCandidates && scrapedProducts.length > 0 ? (
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <div className={`text-sm ${isOverSelection || isAtLimit ? 'text-red-400' : 'text-muted-foreground'}`}>
                 {selectedProductIds.size} selected

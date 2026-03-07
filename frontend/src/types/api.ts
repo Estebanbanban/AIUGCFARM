@@ -22,19 +22,28 @@ export interface ScrapeProduct {
   currency: string;
   images: string[];
   category: string | null;
-  source: "shopify" | "generic";
+  source: "shopify" | "generic" | "saas";
   brand_summary: Record<string, unknown> | null;
   id: string | null;
 }
 
 export interface ScrapeResponseData {
   products: ScrapeProduct[];
-  source: "shopify" | "generic";
-  platform: "shopify" | "generic";
+  source: "shopify" | "generic" | "saas";
+  platform: "shopify" | "generic" | "saas";
   brand_summary: { tone: string; demographic: string; selling_points: string[] } | null;
   brand_summary_error?: string;
   blocked_by_robots?: boolean;
   fallback_available?: boolean;
+}
+
+export interface UploadPersonaImageResponse {
+  data: {
+    persona_id: string;
+    storage_path: string;
+    signed_url: string;
+    generated_images: string[];
+  };
 }
 
 export interface ScrapeResponse {

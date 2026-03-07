@@ -69,7 +69,7 @@ export interface Product {
   category: string | null;
   images: string[];
   brand_summary: BrandSummary | null;
-  source: "shopify" | "generic" | "manual";
+  source: "shopify" | "generic" | "manual" | "saas";
   confirmed: boolean;
   created_at: string;
   updated_at: string;
