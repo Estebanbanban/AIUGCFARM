@@ -21,13 +21,17 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "preset_id is required" }, cors, 400);
     }
 
-    const { error } = await sb
+    const { data: updated, error } = await sb
       .from("generation_presets")
       .update({ last_used_at: new Date().toISOString() })
       .eq("id", preset_id)
-      .eq("owner_id", userId);
+      .eq("owner_id", userId)
+      .select("id");
 
     if (error) throw new Error(error.message);
+    if (!updated || updated.length === 0) {
+      return json({ detail: "Preset not found" }, cors, 404);
+    }
 
     return json({ data: { updated: true } }, cors);
   } catch (e: unknown) {
