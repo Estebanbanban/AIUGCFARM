@@ -183,6 +183,7 @@ async function trimClipToSegments(
       "-ss", seg.start.toFixed(3),
       "-to", seg.end.toFixed(3),
       "-c", "copy",
+      "-reset_timestamps", "1",
       outputFile,
     ], `trim-${inputFile}`);
     created.push(outputFile);
@@ -202,6 +203,7 @@ async function trimClipToSegments(
       "-ss", seg.start.toFixed(3),
       "-to", seg.end.toFixed(3),
       "-c", "copy",
+      "-reset_timestamps", "1",
       segFile,
     ], `trim-${inputFile}-seg${i}`);
   }
