@@ -61,7 +61,7 @@ const STEPS = [
   },
   {
     key: "persona" as const,
-    label: "Persona",
+    label: "AI Creator",
     title: "Create your AI creator",
     description: "Create your AI spokesperson. Customize look, style & vibe. They'll star in every video you make. (~5 min)",
     icon: User,
@@ -215,7 +215,7 @@ export function OnboardingOverlay() {
   };
 
   const handlePersonaComplete = () => {
-    toast.success("Persona created!");
+    toast.success("AI Creator created!");
     if (!hasCompletedGeneration) {
       setView("step-video");
     } else {
@@ -1001,8 +1001,8 @@ function PersonaView({
           <CheckCircle2 className="size-8 text-emerald-500" />
         </motion.div>
         <div className="text-center">
-          <p className="text-base font-semibold text-foreground">Persona ready!</p>
-          <p className="text-sm text-muted-foreground">Your AI spokesperson is all set...</p>
+          <p className="text-base font-semibold text-foreground">AI Creator ready!</p>
+          <p className="text-sm text-muted-foreground">Your AI Creator is all set...</p>
         </div>
       </div>
     );

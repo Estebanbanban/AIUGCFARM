@@ -69,7 +69,7 @@ const quickActions = [
     icon: Package,
   },
   {
-    title: "Create Persona",
+    title: "Create AI Creator",
     description: "Set the look and voice for your AI creator.",
     href: "/personas/new",
     icon: UserPlus,
@@ -218,8 +218,8 @@ export default function DashboardPage() {
       },
       {
         number: 2,
-        title: "Create Your AI Persona",
-        description: "Design the AI spokesperson that will star in every video you make.",
+        title: "Create Your AI Creator",
+        description: "Design the AI Creator that will star in every video you make.",
         href: "/personas/new",
         done: hasPersonaWithImage,
       },
@@ -489,7 +489,7 @@ export default function DashboardPage() {
           <Card className="border-border bg-card bg-primary/5 h-full">
             <CardContent className="flex flex-col justify-between h-full p-5">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">Active Personas</p>
+                <p className="text-sm text-muted-foreground">AI Creators</p>
                 <Users className="size-4 text-muted-foreground" />
               </div>
               <div className="size-2 rounded-full bg-primary mb-1 mt-3" />
