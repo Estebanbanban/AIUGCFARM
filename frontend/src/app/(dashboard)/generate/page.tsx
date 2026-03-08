@@ -100,18 +100,6 @@ import { callEdge, EdgeError } from "@/lib/api";
 import type { GenerateSegmentScriptResponse, AdvancedSegmentsInput } from "@/types/api";
 import type { AdvancedSegmentConfig, AdvancedSegmentsConfig } from "@/types/database";
 
-const LANGUAGE_OPTIONS = [
-  { code: "en", native: "English"   },
-  { code: "es", native: "Español"   },
-  { code: "fr", native: "Français"  },
-  { code: "de", native: "Deutsch"   },
-  { code: "it", native: "Italiano"  },
-  { code: "pt", native: "Português" },
-  { code: "ja", native: "日本語"     },
-  { code: "zh", native: "中文"       },
-  { code: "ar", native: "العربية"   },
-  { code: "ru", native: "Русский"   },
-] as const;
 
 const CTA_STYLE_OPTIONS = [
   {
@@ -2348,33 +2336,6 @@ export default function GeneratePage() {
                             </div>
                           </div>
 
-                          <div>
-                            <p className="mb-2 text-sm font-medium">Script language</p>
-                            <div className="flex flex-wrap gap-2">
-                              {LANGUAGE_OPTIONS.map((lang) => (
-                                <button
-                                  key={lang.code}
-                                  type="button"
-                                  onClick={() => {
-                                    store.setLanguage(lang.code);
-                                    setScriptConfigChanged(true);
-                                    debouncedRegenScript();
-                                  }}
-                                  className={cn(
-                                    "rounded-lg border px-3 py-1.5 text-sm transition-all",
-                                    store.language === lang.code
-                                      ? "border-primary bg-primary/5 font-medium text-primary"
-                                      : "border-border text-muted-foreground hover:border-muted-foreground/40",
-                                  )}
-                                >
-                                  {lang.native}
-                                </button>
-                              ))}
-                            </div>
-                            <p className="mt-2 text-xs text-muted-foreground">
-                              Audio is rendered in English by the AI model. Script language affects the on-screen text only.
-                            </p>
-                          </div>
 
                           <Collapsible open={ctaOpen} onOpenChange={setCtaOpen}>
                             <CollapsibleTrigger asChild>
