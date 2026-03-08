@@ -1321,8 +1321,8 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
 
       </div>
 
-      <div className="sticky bottom-0 z-10 -mx-1 border-t border-border bg-card/95 px-1 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-        {store.generatedImages.length === 0 ? (
+      {store.generatedImages.length === 0 && (
+        <div className="sticky bottom-0 z-10 -mx-1 border-t border-border bg-card/95 px-1 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
           <Button
             onClick={
               createMode === "upload"
@@ -1349,27 +1349,8 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
               : (isGeneratingQuick || store.isGenerating ? "Generating…" : "Generate Persona")
             }
           </Button>
-        ) : (
-          <Button
-            onClick={handleSave}
-            disabled={store.selectedImageIndex === null || !store.personaId || store.isSaving}
-            className="w-full"
-            size="lg"
-          >
-            {store.isSaving ? (
-              <span className="flex items-center justify-center gap-2">
-                <Loader2 className="size-4 animate-spin" />
-                Saving…
-              </span>
-            ) : (
-              <>
-                <Check className="size-4" />
-                Use This Persona
-              </>
-            )}
-          </Button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
