@@ -308,30 +308,32 @@ export function OnboardingOverlay() {
   if (showProductPicker) {
     return (
       <Dialog open={showProductPicker} onOpenChange={(open) => { if (!open) setShowProductPicker(false); }}>
-        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+        <DialogContent className="sm:max-w-2xl" showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>Which product are you promoting?</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-2 pt-1">
+          <div className="grid grid-cols-3 gap-2 pt-1 sm:grid-cols-4 max-h-[60vh] overflow-y-auto pr-1">
             {(products ?? []).map((product) => (
               <button
                 key={product.id}
                 onClick={() => handleProductPickerSelect(product.id)}
-                className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 text-left transition-all hover:border-primary/50 hover:bg-primary/5"
+                className="group overflow-hidden rounded-xl border border-border bg-card text-left transition-all hover:border-primary/60 hover:bg-primary/5"
               >
-                {product.images?.[0] ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={product.images[0]}
-                    alt={product.name}
-                    className="size-10 shrink-0 rounded-lg object-cover"
-                  />
-                ) : (
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <Package className="size-5 text-muted-foreground" />
-                  </div>
-                )}
-                <p className="text-sm font-medium text-foreground line-clamp-2">
+                <div className="aspect-square w-full overflow-hidden bg-muted">
+                  {product.images?.[0] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={product.images[0]}
+                      alt={product.name}
+                      className="size-full object-cover transition-transform duration-200 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex size-full items-center justify-center">
+                      <Package className="size-6 text-muted-foreground/50" />
+                    </div>
+                  )}
+                </div>
+                <p className="truncate px-2 py-1.5 text-xs font-medium leading-snug">
                   {product.name}
                 </p>
               </button>
