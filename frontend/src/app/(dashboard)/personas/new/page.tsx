@@ -502,7 +502,7 @@ function TextCard({
 const GENERATING_MESSAGES = [
   "Analyzing your selections...",
   "Building facial features...",
-  "Styling your persona...",
+  "Styling your AI Creator...",
   "Adding finishing details...",
   "Almost ready...",
 ];
@@ -536,7 +536,7 @@ function NewPersonaPageInner() {
     if (!profile || isRegeneration) return;
     const isAdmin = profile.role === "admin";
     if (!isAdmin && monthlyUsed >= monthlyLimit) {
-      toast.error("You've reached your monthly persona limit. Upgrade or wait for reset.");
+      toast.error("You've reached your monthly AI Creator limit. Upgrade or wait for reset.");
       router.push("/personas");
     }
   }, [profile, monthlyUsed, monthlyLimit, isRegeneration, router]);
@@ -597,7 +597,7 @@ function NewPersonaPageInner() {
     if (!store.name.trim()) return;
     store.setIsGenerating(true);
     setImageLoadErrors(new Set());
-    toast.info("Generating persona images...");
+    toast.info("Generating AI Creator images...");
 
     try {
       const attributes = {
@@ -630,13 +630,13 @@ function NewPersonaPageInner() {
       const displayUrls = result.data.generated_image_urls ?? result.data.generated_images;
       store.setPersonaId(result.data.id);
       store.setGeneratedImages(displayUrls);
-      toast.success(`${displayUrls.length} persona images generated!`);
+      toast.success(`${displayUrls.length} AI Creator images generated!`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to generate persona";
       // If the stored personaId is stale/deleted, reset it so next attempt creates a new persona
       if (message.includes("Persona not found") && store.personaId) {
         store.setPersonaId(null);
-        toast.error("Previous persona session expired. Please try again.");
+        toast.error("Previous AI Creator session expired. Please try again.");
       } else {
         toast.error(message);
       }
@@ -656,7 +656,7 @@ function NewPersonaPageInner() {
           image_index: store.selectedImageIndex,
         },
       });
-      toast.success("Persona saved!");
+      toast.success("AI Creator saved!");
       router.push(returnTo?.startsWith("/") ? returnTo : "/personas");
       store.reset();
     } catch (error) {
@@ -692,7 +692,7 @@ function NewPersonaPageInner() {
       store.setPersonaId(result.data.id);
       store.setGeneratedImages(displayUrls);
       queryClient.invalidateQueries({ queryKey: ["personas"] });
-      toast.success("Persona generated! Select your favorite image below.");
+      toast.success("AI Creator generated! Select your favorite image below.");
       setCreateMode("custom");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to generate persona";
@@ -712,7 +712,7 @@ function NewPersonaPageInner() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Create Persona</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Create AI Creator</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
             Build your AI avatar from scratch.
           </p>
@@ -725,10 +725,10 @@ function NewPersonaPageInner() {
           <AlertCircle className="size-4 shrink-0 text-amber-600 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
-              Free plan: 1 persona slot
+              Free plan: 1 AI Creator slot
             </p>
             <p className="text-xs text-amber-600/80 dark:text-amber-500/80 mt-0.5">
-              Choose carefully. You can customize it later, but you can only create 1 persona on the free plan.
+              Choose carefully. You can customize it later, but you can only create 1 AI Creator on the free plan.
             </p>
           </div>
         </div>
@@ -771,7 +771,7 @@ function NewPersonaPageInner() {
         <div className="flex flex-col gap-4">
           {/* Name input */}
           <div className="flex flex-col gap-2">
-            <Label htmlFor="quick-persona-name">Persona name</Label>
+            <Label htmlFor="quick-persona-name">AI Creator name</Label>
             <Input
               id="quick-persona-name"
               placeholder="e.g. Sophia, Alex, Maya..."
@@ -781,7 +781,7 @@ function NewPersonaPageInner() {
           </div>
           {/* Description */}
           <div className="flex flex-col gap-2">
-            <Label htmlFor="quick-description">Describe your persona</Label>
+            <Label htmlFor="quick-description">Describe your AI Creator</Label>
             <Textarea
               id="quick-description"
               placeholder="e.g. A 28-year-old Black woman with natural curly hair, casual but stylish, gym lifestyle, friendly and energetic"
@@ -804,17 +804,17 @@ function NewPersonaPageInner() {
             {isGeneratingQuick ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
-                Generating persona...
+                Generating AI Creator...
               </>
             ) : (
               <>
-                Generate Persona
+                Generate AI Creator
               </>
             )}
           </Button>
           {isAtPersonaLimit && (
             <p className="text-xs text-destructive text-center">
-              You have reached your monthly persona limit. Upgrade or wait for reset.
+              You have reached your monthly AI Creator limit. Upgrade or wait for reset.
             </p>
           )}
         </div>
@@ -839,7 +839,7 @@ function NewPersonaPageInner() {
             {/* Name */}
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Persona Name
+                AI Creator Name
               </Label>
               <Input
                 id="persona-name"
@@ -1017,7 +1017,7 @@ function NewPersonaPageInner() {
               <div className="rounded-xl border border-primary/20 bg-card p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <Wand2 className="size-4 animate-pulse text-primary" />
-                  <p className="text-sm font-semibold text-foreground">Generating Persona...</p>
+                  <p className="text-sm font-semibold text-foreground">Generating AI Creator...</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   {[0, 1, 2, 3].map((i) => (
@@ -1048,7 +1048,7 @@ function NewPersonaPageInner() {
             {/* Attribute summary (before generating) */}
             {store.generatedImages.length === 0 && !store.isGenerating && (
               <div className="rounded-xl border border-border bg-card p-4">
-                <p className="mb-3 text-sm font-semibold text-foreground">Persona Preview</p>
+                <p className="mb-3 text-sm font-semibold text-foreground">AI Creator Preview</p>
                 <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-primary/10">
                   <User className="size-6 text-primary" />
                 </div>
@@ -1094,7 +1094,7 @@ function NewPersonaPageInner() {
                     </p>
                   </div>
                 )}
-                <p className="mb-3 text-sm font-semibold text-foreground">Choose Your Persona</p>
+                <p className="mb-3 text-sm font-semibold text-foreground">Choose Your AI Creator</p>
                 <div className="grid grid-cols-2 gap-3">
                   {store.generatedImages.map((url, index) => (
                     <button
@@ -1115,7 +1115,7 @@ function NewPersonaPageInner() {
                       ) : (
                         <Image
                           src={url}
-                          alt={`Persona option ${index + 1}`}
+                          alt={`AI Creator option ${index + 1}`}
                           fill
                           className="object-cover"
                           sizes="(max-width: 768px) 50vw, 320px"
@@ -1147,11 +1147,11 @@ function NewPersonaPageInner() {
                   {store.isGenerating ? (
                     <>
                       <Loader2 className="size-4 animate-spin" />
-                      Generating Persona...
+                      Generating AI Creator...
                     </>
                   ) : (
                     <>
-                      Generate Persona
+                      Generate AI Creator
                     </>
                   )}
                 </Button>

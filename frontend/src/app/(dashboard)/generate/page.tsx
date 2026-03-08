@@ -307,9 +307,9 @@ function BrandIntelligenceRow({
 }
 
 const PLAN_BENEFITS: Record<PlanTier, string[]> = {
-  starter: ["Rendering queue", "Watermark-free exports", "Commercial use license", "Standard support"],
-  growth: ["Fast rendering priority", "Watermark-free exports", "Commercial use license", "Priority support"],
-  scale: ["Highest rendering priority", "Watermark-free exports", "Commercial use license", "Dedicated manager", "Custom API limits"],
+  starter: ["~5 videos/month included", "Watermark-free exports", "Commercial use license", "Email support"],
+  growth: ["~12 videos/month included", "Priority rendering (2× faster)", "Watermark-free exports", "Priority support"],
+  scale: ["~30 videos/month included", "Fastest rendering priority", "Watermark-free exports", "Dedicated account manager"],
 };
 
 const VIDEO_GEN_STEPS = [
@@ -606,8 +606,8 @@ export default function GeneratePage() {
 
   // Cycling progress messages while composites generate
   const COMPOSITE_MESSAGES = [
-    "Placing your persona in the scene...",
-    "Compositing product and persona...",
+    "Placing your AI Creator in the scene...",
+    "Compositing product and AI Creator...",
     "Rendering lighting and style...",
     "Finalising preview images...",
     "Almost ready...",
@@ -795,7 +795,7 @@ export default function GeneratePage() {
       setPickerPersona(null);
       setPickerOptions([]);
       setPickerSelectedImageIndex(null);
-      toast.success("Persona selected. Generating scene previews...");
+      toast.success("AI Creator selected. Generating scene previews...");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to save persona image";
       toast.error(message);
@@ -1348,14 +1348,14 @@ export default function GeneratePage() {
 
   const paywallHeadline =
     videosGenerated === 0
-      ? "Create your first UGC ad in seconds."
+      ? "Your AI Creator is staged. Generate your first video now."
       : videosGenerated === 1
       ? "It works. Now scale your production."
       : "Scale your ad production.";
 
   const paywallSublineStatic =
     videosGenerated === 0
-      ? "AI writes the script, composites your persona, and renders the video. No filming needed."
+      ? "Traditional UGC costs $150–$500 per video. Yours: a fraction of that — ready in minutes, not weeks."
       : null;
 
   function handlePaywallClose(open: boolean) {
@@ -1796,7 +1796,7 @@ export default function GeneratePage() {
                     <span className="text-foreground truncate max-w-[200px] sm:max-w-none">{selectedPersona.name}</span>
                   </span>
                 ) : (
-                  "AI Spokesperson"
+                  "AI Creator"
                 )}
               </span>
             </div>
@@ -1925,7 +1925,7 @@ export default function GeneratePage() {
                               <Plus className="size-6 text-muted-foreground" />
                             </div>
                             <div className="text-center">
-                              <p className="text-sm font-medium">New Persona</p>
+                              <p className="text-sm font-medium">New AI Creator</p>
                               {atLimit && (
                                 <p className="mt-0.5 text-xs text-muted-foreground">
                                   {personaLimit}/{personaLimit} used · upgrade to add more
@@ -1943,11 +1943,11 @@ export default function GeneratePage() {
                   <CardContent className="flex flex-col items-center gap-3 py-10">
                     <User className="size-8 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
-                      No personas yet. Create one first before generating a video.
+                      No AI Creators yet. Create one first before generating a video.
                     </p>
                     <Button asChild variant="outline" size="sm">
                       <Link href="/personas/new?returnTo=/generate">
-                        Create your first persona →
+                        Create your first AI Creator →
                       </Link>
                     </Button>
                   </CardContent>
@@ -1984,7 +1984,7 @@ export default function GeneratePage() {
                 </button>
               </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-2.5 py-1">
-                <span className="text-muted-foreground">Persona</span>
+                <span className="text-muted-foreground">AI Creator</span>
                 <span className="max-w-[150px] truncate font-medium text-foreground">
                   {selectedPersona?.name ?? "Not selected"}
                 </span>
@@ -2882,7 +2882,7 @@ export default function GeneratePage() {
       >
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Choose your persona portrait</DialogTitle>
+            <DialogTitle>Choose your AI Creator portrait</DialogTitle>
             <DialogDescription>
               Pick one portrait to continue. You can go back to persona editing if needed.
             </DialogDescription>
@@ -3228,7 +3228,7 @@ export default function GeneratePage() {
       {/* ── Persona limit paywall dialog ─────────────────────────────── */}
       <Dialog open={showPersonaLimitPaywall} onOpenChange={setShowPersonaLimitPaywall}>
         <DialogContent className="sm:max-w-4xl p-0 overflow-hidden max-h-[92vh] flex flex-col">
-          <DialogTitle className="sr-only">Upgrade to create more personas</DialogTitle>
+          <DialogTitle className="sr-only">Upgrade to create more AI Creators</DialogTitle>
 
           {offer.isActive && (
             <div className="bg-primary text-primary-foreground px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm font-medium shrink-0">
@@ -3249,15 +3249,15 @@ export default function GeneratePage() {
                 <User className="size-7 text-primary" />
               </div>
               <h2 className="text-2xl font-bold tracking-tight">
-                {offer.isActive ? "Unlock More Personas (up to 50% off)" : "Unlock More Personas"}
+                {offer.isActive ? "Unlock More AI Creators (up to 50% off)" : "Unlock More AI Creators"}
               </h2>
               <p className="mt-2 text-muted-foreground max-w-md mx-auto">
                 {(() => {
                   const plan = profile?.plan as PlanTier | undefined;
                   const personaLimit = plan && PLANS[plan] ? PLANS[plan].personas : 1;
                   return plan
-                    ? `Your ${PLANS[plan as PlanTier]?.name ?? "current"} plan is limited to ${personaLimit} persona${personaLimit !== 1 ? "s" : ""}. Upgrade to create more.`
-                    : "The free plan is limited to 1 persona. Upgrade to create more.";
+                    ? `Your ${PLANS[plan as PlanTier]?.name ?? "current"} plan is limited to ${personaLimit} AI Creator${personaLimit !== 1 ? "s" : ""}. Upgrade to create more.`
+                    : "The free plan is limited to 1 AI Creator. Upgrade to create more.";
                 })()}
               </p>
             </div>
@@ -3298,7 +3298,7 @@ export default function GeneratePage() {
                             <span className="text-xs text-muted-foreground">/mo</span>
                           </div>
                           <p className="mt-1 text-xs text-orange-500 font-medium">
-                            Up to {plan.personas} persona{(plan.personas as number) !== 1 ? "s" : ""}
+                            Up to {plan.personas} AI Creator{(plan.personas as number) !== 1 ? "s" : ""}
                           </p>
                         </div>
                         <Button
@@ -3347,7 +3347,7 @@ export default function GeneratePage() {
           <DialogHeader>
             <DialogTitle>Save as Preset</DialogTitle>
             <DialogDescription>
-              Save your current product, persona, and settings for quick access later.
+              Save your current product, AI Creator, and settings for quick access later.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
