@@ -21,14 +21,15 @@ Deno.serve(async (req: Request) => {
     const sb = getAdminClient();
 
     // Per-user daily limit for composite image generations
-    const { data: profile } = await sb
-      .from("profiles")
-      .select("plan, role")
-      .eq("id", userId)
-      .single();
+    const [{ data: profile }, { data: balance }] = await Promise.all([
+      sb.from("profiles").select("plan, role").eq("id", userId).single(),
+      sb.from("credit_balances").select("remaining").eq("owner_id", userId).maybeSingle(),
+    ]);
     const userPlan = profile?.plan ?? "free";
     const isAdmin = profile?.role === "admin";
-    const dailyLimit = isAdmin ? Infinity : userPlan === "free" ? 10 : 50;
+    const hasCredits = (balance?.remaining ?? 0) > 0;
+    // Admin: unlimited. Paid plan or any purchased credits: 50/day. Pure free: 10/day.
+    const dailyLimit = isAdmin ? Infinity : (userPlan !== "free" || hasCredits) ? 50 : 10;
 
     if (isFinite(dailyLimit)) {
       const todayStart = new Date();
