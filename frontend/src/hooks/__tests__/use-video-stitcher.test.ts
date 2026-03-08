@@ -24,22 +24,23 @@ describe("getSpeechSegments", () => {
   });
 
   it("cuts leading silence", () => {
-    // 1s leading silence → first candidate {0, 0.2} discarded (<0.3s), cursor=0.8
-    // final segment {0.8, 8} → 7.2s → kept
-    expect(getSpeechSegments(makeLog(8, [[0, 1.0]]), 8)).toEqual([{ start: 0.8, end: 8 }]);
+    // 1s leading silence, TRANSITION_BUFFER=0.15 → cursor = 1.0 - 0.15 = 0.85
+    // first candidate {0, 0.15} discarded (<MIN_SEGMENT_DURATION), final segment {0.85, 8} kept
+    expect(getSpeechSegments(makeLog(8, [[0, 1.0]]), 8)).toEqual([{ start: 0.85, end: 8 }]);
   });
 
   it("cuts trailing silence (no silence_end)", () => {
-    // trailing silence starts at 6.5, no end → {6.5, 8.0} = 1.5s → cut
-    // segment {0, 6.7} → kept; final {7.8, 8.0} = 0.2s → discarded
-    expect(getSpeechSegments(makeLog(8, [[6.5, null]]), 8)).toEqual([{ start: 0, end: 6.7 }]);
+    // trailing silence starts at 6.5, TRANSITION_BUFFER=0.15 → segEnd = 6.5 + 0.15 = 6.65
+    // segment {0, 6.65} kept; final candidate {6.65+, 8} discarded
+    expect(getSpeechSegments(makeLog(8, [[6.5, null]]), 8)).toEqual([{ start: 0, end: 6.65 }]);
   });
 
   it("cuts middle silence and returns two segments", () => {
+    // TRANSITION_BUFFER=0.15: leading silence [0,1] → cursor=0.85; middle silence [5,7] → segEnd=5.15, cursor=6.85
     const result = getSpeechSegments(makeLog(8, [[0, 1.0], [5.0, 7.0]]), 8);
     expect(result).toEqual([
-      { start: 0.8, end: 5.2 },
-      { start: 6.8, end: 8 },
+      { start: 0.85, end: 5.15 },
+      { start: 6.85, end: 8 },
     ]);
   });
 

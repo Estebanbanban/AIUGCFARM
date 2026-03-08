@@ -182,19 +182,19 @@ describe("generation-wizard store", () => {
       expect(useGenerationWizardStore.getState().advancedMode).toBe(true);
     });
 
-    it("clears advancedSegments when disabling", () => {
+    it("preserves advancedSegments when disabling (cleared by setMode instead)", () => {
+      // setAdvancedMode intentionally does NOT clear advancedSegments on disable —
+      // segments are preserved so toggling back on restores previous work.
+      // advancedSegments is cleared by setMode when the generation mode changes.
       const store = useGenerationWizardStore.getState();
       store.setAdvancedMode(true);
-      store.setAdvancedSegments({
-        hooks: [],
-        bodies: [],
-        ctas: [],
-      });
+      const segments = { hooks: [], bodies: [], ctas: [] };
+      store.setAdvancedSegments(segments);
       useGenerationWizardStore.getState().setAdvancedMode(false);
 
       const state = useGenerationWizardStore.getState();
       expect(state.advancedMode).toBe(false);
-      expect(state.advancedSegments).toBeNull();
+      expect(state.advancedSegments).toEqual(segments); // preserved, not cleared
     });
   });
 
