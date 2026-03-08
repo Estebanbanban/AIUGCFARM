@@ -35,9 +35,19 @@ export interface FirstPurchaseOffer {
   markUsed: () => void;
 }
 
+function readOfferFromStorage(): { isActive: boolean; secondsLeft: number } {
+  if (typeof window === "undefined") return { isActive: false, secondsLeft: 0 };
+  if (localStorage.getItem(OFFER_KEY_USED) === "true") return { isActive: false, secondsLeft: 0 };
+  const startedAtRaw = localStorage.getItem(OFFER_KEY_STARTED);
+  if (!startedAtRaw) return { isActive: false, secondsLeft: 0 };
+  const remaining = OFFER_DURATION_MS - (Date.now() - parseInt(startedAtRaw, 10));
+  if (remaining <= 0) return { isActive: false, secondsLeft: 0 };
+  return { isActive: true, secondsLeft: Math.ceil(remaining / 1000) };
+}
+
 export function useFirstPurchaseOffer(): FirstPurchaseOffer {
-  const [secondsLeft, setSecondsLeft] = useState(0);
-  const [isActive, setIsActive] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(() => readOfferFromStorage().secondsLeft);
+  const [isActive, setIsActive] = useState(() => readOfferFromStorage().isActive);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const computeState = useCallback(() => {

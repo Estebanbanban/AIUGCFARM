@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -441,6 +441,16 @@ export default function GeneratePage() {
   const checkout = useCheckout();
   const buyCredits = useBuyCredits();
   const offer = useFirstPurchaseOffer();
+
+  // Ensure offer activates before the browser paints when any paywall opens.
+  // useLayoutEffect fires synchronously after DOM mutation but before paint,
+  // so discounted prices are visible on the very first frame.
+  useLayoutEffect(() => {
+    if (showPaywall || showPersonaLimitPaywall) {
+      offer.startOffer();
+    }
+  }, [showPaywall, showPersonaLimitPaywall]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const { data: generations } = useGenerations();
   const previewContextKey = useMemo(() => {
     if (!store.productId || !store.personaId || !store.format) return null;
