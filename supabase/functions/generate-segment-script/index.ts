@@ -170,11 +170,20 @@ function buildUserPrompt(
   const productCategory = (brandSummary?.product_category as string | undefined) ?? (product.category as string | undefined) ?? "";
   const competitorPositioning = (brandSummary?.competitor_positioning as string | undefined) ?? "";
 
+  // ── Variant-index rotation: force different types per variant ────────
+  const hookTypes = ['LATE_DISCOVERY', 'PRICE_SHOCK', 'SPECIFICITY_LEAD', 'EVERYONE_KNOWS_BUT_YOU'];
+  const bodyTypes = ['problem_solution', 'demo_tease', 'story_beat', 'social_proof_stack'];
+  const ctaTypes = ['soft_recommendation', 'gatekeeping_release', 'specific_qualifier', 'social_nudge', 'curiosity_close'];
+
+  const assignedHookType = hookTypes[variantIndex % hookTypes.length];
+  const assignedBodyType = bodyTypes[variantIndex % bodyTypes.length];
+  const assignedCtaType = ctaTypes[variantIndex % ctaTypes.length];
+
   // ── Category-aware angle shortlist ───────────────────────────────────
   const [angle1, angle2] = getCategoryAngles(productCategory);
   const categoryBlock = productCategory
-    ? `RECOMMENDED HOOK ANGLES for ${productCategory}: ${angle1}, ${angle2}. Choose the best one for this specific product — these are recommendations, not hard constraints.`
-    : `RECOMMENDED HOOK ANGLES: LATE_DISCOVERY, SPECIFICITY_LEAD. Choose the best one for this specific product.`;
+    ? `CONTEXT for ${productCategory}: commonly effective angles are ${angle1} and ${angle2} — use this as flavor context only. Your assigned hook type below overrides this.`
+    : `CONTEXT: commonly effective angles are LATE_DISCOVERY and SPECIFICITY_LEAD — use as flavor context only. Your assigned hook type below overrides this.`;
 
   // ── Optional brand fields (only include if present) ──────────────────
   const optionalLines: string[] = [];
@@ -196,19 +205,37 @@ Current script context (for reference only — do NOT copy or repeat):
   if (segmentType === "hook") {
     segmentInstruction = `Regenerate ONLY the hook. Keep the body and CTA context in mind so the new hook flows naturally into them.
 Apply the SGE hook framework. REQUIRED: include at least one specific number, timeframe, or named feature.
-Variant ${variantIndex + 1}: use a DIFFERENT angle than the current hook above.
-${categoryBlock}`;
+ASSIGNED HOOK TYPE (MANDATORY — do NOT deviate): ${assignedHookType}
+${categoryBlock}
+
+CRITICAL SPECIFICITY RULE: Never use vague phrases ("struggling", "discovered", "found this platform").
+Use concrete, specific language that sounds like a real person's genuine experience.
+Bad: "I spent months struggling to get ready for consulting interviews until I discovered this platform"
+Good: "I bombed my first McKinsey case interview. Six weeks later I got the offer — this is what changed"
+Ground the hook in a specific, relatable moment. No generic discovery stories.`;
   } else if (segmentType === "body") {
+    const hookContinuationRule = currentHook
+      ? `The hook just said: "${currentHook}". Your body MUST continue this exact moment naturally — do NOT restate the problem or re-introduce the product. Jump straight to the payoff.\n`
+      : "";
     segmentInstruction = `Regenerate ONLY the body. Keep the hook and CTA context in mind — the body must continue naturally from the hook and lead into the CTA.
-Body must be 2–4 sentences, 12–22 words, 5–9 seconds at 2.5 words/sec.
+${hookContinuationRule}Body must be 2–4 sentences, 12–22 words, 5–9 seconds at 2.5 words/sec.
 Do NOT restate the hook's problem. Deliver proof, specific benefit, or social evidence.
 Must contain at least one specific number, timeframe, or named ingredient/feature.
-Variant ${variantIndex + 1}: use a DIFFERENT body structure than the most obvious one.`;
+ASSIGNED BODY STRUCTURE (MANDATORY — do NOT deviate): ${assignedBodyType}
+
+CRITICAL: State what the product MECHANICALLY does, not just outcomes.
+Avoid vague percentage improvements. Use specific mechanisms.
+Bad: "After using Road to Offer for 4 weeks, I improved my case interview skills by 60%"
+Good: "The AI breaks down every response in real-time — structuring gaps, filler words, answer depth. It's like having a McKinsey partner critique every answer instantly"`;
   } else {
     segmentInstruction = `Regenerate ONLY the CTA. Keep the hook and body context in mind — the CTA must close naturally.
 One sentence. 5–10 words. 2–4 seconds.
 INVISIBLE CTA RULE: No "buy now", no "link in bio", no "shop now". Use an invisible close that makes viewers want to seek it out themselves.
-Variant ${variantIndex + 1}: use a DIFFERENT invisible-CTA pattern.`;
+ASSIGNED CTA PATTERN (MANDATORY — do NOT deviate): ${assignedCtaType}
+
+CRITICAL: Sound like someone genuinely closing a conversation, NOT an ad.
+The viewer must not realize this is promotional until after they've looked it up.
+Never use: "link in bio", "check it out", "buy now", any explicit call-to-action language.`;
 
     if (ctaStyle && ctaStyle !== "auto") {
       segmentInstruction += `\nCTA style constraint: ${ctaStyle}`;

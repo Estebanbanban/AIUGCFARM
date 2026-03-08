@@ -224,9 +224,9 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
       setAdvancedMode: (enabled) =>
         set((state) => {
           state.advancedMode = enabled;
-          if (!enabled) {
-            state.advancedSegments = null;
-          }
+          // Don't clear advancedSegments here — preserve them so switching
+          // Easy→Advanced→Easy→Advanced doesn't regenerate scripts.
+          // advancedSegments is cleared by setMode when the mode (single/triple) changes.
         }),
       setAdvancedSegments: (segments) =>
         set((state) => {
