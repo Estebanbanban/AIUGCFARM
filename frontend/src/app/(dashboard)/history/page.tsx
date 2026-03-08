@@ -15,6 +15,7 @@ import {
   RefreshCw,
   FileText,
   Trash2,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
@@ -77,7 +78,7 @@ function HistoryThumbnail({
     return () => { cancelled = true; };
   }, [compositeUrl, productPath, useFallback]);
 
-  if (!src) return null;
+  if (!src) return <User className="size-5 text-muted-foreground" />;
   return (
     <img
       src={src}

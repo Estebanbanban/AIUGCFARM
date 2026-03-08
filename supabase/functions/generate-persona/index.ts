@@ -737,7 +737,7 @@ Deno.serve(async (req: Request) => {
         .update({
           name,
           attributes: attributesToSave,
-          generated_images: storagePaths,
+          generated_images: [...existingGeneratedImages, ...storagePaths],
           selected_image_url: null,
           regen_count: existingRegenCount + 1,
         })
@@ -752,7 +752,7 @@ Deno.serve(async (req: Request) => {
           .update({
             name,
             attributes: attributesToSave,
-            generated_images: storagePaths,
+            generated_images: [...existingGeneratedImages, ...storagePaths],
             selected_image_url: null,
           })
           .eq("id", persona_id)

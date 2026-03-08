@@ -7,18 +7,7 @@ export function useLeaveGuard(isDirty: boolean) {
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const router = useRouter();
 
-  // 1. Browser close / refresh: native browser dialog
-  useEffect(() => {
-    if (!isDirty) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [isDirty]);
-
-  // 2. In-app navigation: intercept <Link> clicks via capture-phase listener
+  // In-app navigation: intercept <Link> clicks via capture-phase listener
   useEffect(() => {
     if (!isDirty) return;
     const handler = (e: MouseEvent) => {

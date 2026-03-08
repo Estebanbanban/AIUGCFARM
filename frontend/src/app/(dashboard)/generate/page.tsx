@@ -322,7 +322,7 @@ export default function GeneratePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const store = useGenerationWizardStore();
-  const isDirty = !!(store.productId || store.personaId || store.pendingScript);
+  const isDirty = !!(store.productId || store.personaId || store.pendingScript || store.compositeImagePath || store.selectedProductImages.length > 0);
   const { showDialog: showLeaveDialog, confirmLeave, cancelLeave } = useLeaveGuard(isDirty);
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallTab, setPaywallTab] = useState<"single" | "subscription">("single");
@@ -3383,7 +3383,7 @@ export default function GeneratePage() {
               <div>
                 <DialogTitle className="text-lg font-semibold">Leave this page?</DialogTitle>
                 <DialogDescription className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
-                  Your progress is <span className="font-medium text-foreground">auto-saved</span>. Come back anytime to pick up where you left off, or find your draft in History.
+                  Your progress is <span className="font-medium text-foreground">auto-saved</span> — including your scene preview. Come back anytime to pick up where you left off without regenerating.
                 </DialogDescription>
               </div>
             </div>
