@@ -82,6 +82,7 @@ import {
 } from "@/hooks/use-generations";
 import { useCheckout, useBuyCredits } from "@/hooks/use-checkout";
 import { useProfile, ADVANCED_MODE_PLANS } from "@/hooks/use-profile";
+import { useLeaveGuard } from "@/hooks/use-leave-guard";
 import { ManualUploadForm } from "@/components/products/ManualUploadForm";
 import { ScrapeResults } from "@/components/products/ScrapeResults";
 import {
@@ -323,6 +324,8 @@ export default function GeneratePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const store = useGenerationWizardStore();
+  const isDirty = !!(store.productId || store.personaId || store.pendingScript);
+  const { showDialog: showLeaveDialog, confirmLeave, cancelLeave } = useLeaveGuard(isDirty);
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallTab, setPaywallTab] = useState<"single" | "subscription">("single");
 
@@ -754,7 +757,7 @@ export default function GeneratePage() {
           .from("persona-images")
           .createSignedUrls(pathItems.map((p) => p.path), 3600);
         if (data) {
-          data.forEach((item, i) => {
+          data.forEach((item: { signedUrl?: string | null }, i: number) => {
             if (item.signedUrl) {
               signedItems.push({ imageIndex: pathItems[i].imageIndex, signedUrl: item.signedUrl });
             }
@@ -3313,6 +3316,34 @@ export default function GeneratePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Leave guard dialog */}
+      {showLeaveDialog && (
+        <Dialog open={showLeaveDialog} onOpenChange={(open) => { if (!open) cancelLeave(); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Quitter la page ?</DialogTitle>
+              <DialogDescription>
+                Votre progression est automatiquement sauvegardée. Vous pourrez reprendre depuis là où vous vous êtes arrêté en revenant sur cette page, ou retrouver votre script dans l&apos;historique.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-col gap-2 sm:flex-row">
+              <Button variant="outline" onClick={cancelLeave} className="sm:order-first">
+                Rester sur la page
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => { store.reset(); confirmLeave(); }}
+              >
+                Effacer et quitter
+              </Button>
+              <Button onClick={confirmLeave}>
+                Sauvegarder et quitter
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
