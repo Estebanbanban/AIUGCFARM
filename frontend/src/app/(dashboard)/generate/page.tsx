@@ -2647,14 +2647,6 @@ export default function GeneratePage() {
                 </div>
 
                 <div className="sticky bottom-4 z-20 rounded-xl border border-border bg-background/95 px-4 py-3 shadow-lg backdrop-blur">
-                  {!hasEnoughCredits && !creditsLoading && (
-                    <div className="mb-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                      You need {creditCost} credits to generate — you have {creditsRemaining}.{" "}
-                      <button className="ml-2 underline" onClick={() => setShowPaywall(true)}>
-                        Get credits
-                      </button>
-                    </div>
-                  )}
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">
@@ -2668,7 +2660,7 @@ export default function GeneratePage() {
                     <div className="w-full sm:w-auto">
                       <Button
                         onClick={handleApproveAndGenerate}
-                        disabled={!store.pendingScript || approveAndGenerate.isPending || creditsLoading || (!creditsLoading && !hasEnoughCredits)}
+                        disabled={!store.pendingScript || approveAndGenerate.isPending || creditsLoading}
                         size="lg"
                         className="w-full sm:min-w-[220px]"
                       >
