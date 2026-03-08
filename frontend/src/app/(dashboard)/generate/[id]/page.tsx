@@ -802,6 +802,12 @@ function CombinationPreview({
   const autoStitchTriggered = useRef(false);
   // Skip the "reset on selection change" effect on the very first mount
   const hasMounted = useRef(false);
+  // Tracks the comboKey active when stitch() was called — prevents stale-closure cache writes
+  const stitchingForKey = useRef<string>("");
+  // Set true when user triggers a manual stitch — cancels background pre-stitching
+  const cancelPreStitch = useRef(false);
+  // Set true on unmount — stops the background pre-stitch loop and prevents state updates
+  const unmountedRef = useRef(false);
 
   // Toast on Download Pack failure
   useEffect(() => {
@@ -819,6 +825,15 @@ function CombinationPreview({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stitchStatus]);
 
+  // Cleanup: revoke all cached blob URLs and stop background pre-stitch on unmount
+  useEffect(() => {
+    return () => {
+      unmountedRef.current = true;
+      stitchCache.current.forEach(url => URL.revokeObjectURL(url));
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Auto-stitch when all segments are available and autoStitch is enabled
   useEffect(() => {
     if (
@@ -829,16 +844,20 @@ function CombinationPreview({
       stitchStatus === "idle" &&
       !autoStitchTriggered.current
     ) {
+      // Skip if already cached — selection-change effect will restore it
+      if (stitchCache.current.has(comboKey)) return;
       autoStitchTriggered.current = true;
+      stitchingForKey.current = comboKey;
       stitch(hookVideo.url, bodyVideo.url, ctaVideo.url);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStitch, hookVideo?.url, bodyVideo?.url, ctaVideo?.url, stitchStatus]);
 
-  // Save completed stitch to cache and update displayedStitchedUrl
+  // Save completed stitch to cache using the key captured at stitch() call time
+  // (not the current comboKey — prevents stale-closure writes under the wrong key)
   useEffect(() => {
-    if (stitchedUrl && comboKey) {
-      stitchCache.current.set(comboKey, stitchedUrl);
+    if (stitchedUrl && stitchingForKey.current) {
+      stitchCache.current.set(stitchingForKey.current, stitchedUrl);
       setDisplayedStitchedUrl(stitchedUrl);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -878,11 +897,19 @@ function CombinationPreview({
     setPreStitchProgress({ done: 0, total: totalToCache });
 
     isPreStitching.current = true;
+    cancelPreStitch.current = false;
 
     // Process the queue sequentially using the non-hook stitchToBlob to avoid
     // interfering with the React state of the main useVideoStitcher hook
     import("@/hooks/use-video-stitcher").then(({ stitchToBlob }) => {
       async function processNext() {
+        // Stop if component unmounted or user triggered a manual stitch
+        if (unmountedRef.current || cancelPreStitch.current) {
+          isPreStitching.current = false;
+          setPreStitchProgress(null);
+          cancelPreStitch.current = false;
+          return;
+        }
         const item = preStitchQueue.current.shift();
         if (!item) {
           isPreStitching.current = false;
@@ -899,8 +926,11 @@ function CombinationPreview({
         }
         try {
           const blob = await stitchToBlob(item.hookUrl, item.bodyUrl, item.ctaUrl);
-          const url = URL.createObjectURL(blob);
-          stitchCache.current.set(item.key, url);
+          // Only cache if we weren't cancelled mid-stitch
+          if (!unmountedRef.current && !cancelPreStitch.current) {
+            const url = URL.createObjectURL(blob);
+            stitchCache.current.set(item.key, url);
+          }
         } catch {
           // Background failures are silent — user can still manually stitch
         }
@@ -988,8 +1018,10 @@ function CombinationPreview({
     // Check cache before resetting: if we have a result for this combo, restore it
     if (stitchCache.current.has(comboKey)) {
       const cached = stitchCache.current.get(comboKey)!;
+      // Set autoStitchTriggered BEFORE calling reset() + setDisplayedStitchedUrl
+      // so the auto-stitch effect (which also fires on combo change) sees it as true
+      autoStitchTriggered.current = true;
       setDisplayedStitchedUrl(cached);
-      autoStitchTriggered.current = true; // prevent re-stitching
       setViewMode("stitched");
       // Reset the hook state to idle without destroying the cached URL
       reset();
@@ -1011,11 +1043,21 @@ function CombinationPreview({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stitchStatus, stitchedUrl]);
 
-  // Effective stitched URL: prefer the live hook result (freshest), fall back to cached/displayed
-  const effectiveStitchedUrl = stitchedUrl ?? displayedStitchedUrl;
+  // Effective stitched URL: prefer displayedStitchedUrl (set synchronously on cache HIT)
+  // over stitchedUrl which may be stale from a previous combo until reset() clears it
+  const effectiveStitchedUrl = displayedStitchedUrl ?? stitchedUrl;
 
   function handleStitch() {
     if (!hookVideo || !bodyVideo || !ctaVideo) return;
+    // Cancel any running background pre-stitch so it releases the FFmpeg mutex
+    cancelPreStitch.current = true;
+    preStitchQueue.current = [];
+    // Invalidate the existing cache entry for this combo so stale URL is not shown
+    const oldCached = stitchCache.current.get(comboKey);
+    if (oldCached) URL.revokeObjectURL(oldCached);
+    stitchCache.current.delete(comboKey);
+    setDisplayedStitchedUrl(null);
+    stitchingForKey.current = comboKey;
     stitch(hookVideo.url, bodyVideo.url, ctaVideo.url);
   }
 
