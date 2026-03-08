@@ -1223,7 +1223,7 @@ Deno.serve(async (req: Request) => {
     console.error("generate-video error:", e);
     return errorResponse(
       ErrorCodes.INTERNAL_ERROR,
-      "Something went wrong generating your content. Please try again.",
+      `Internal error: ${msg}`,
       500,
       cors,
     );
