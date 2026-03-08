@@ -71,7 +71,7 @@ import { VideoGenerationAnimation } from "@/components/landing/VideoGenerationAn
 import { useProducts, useScrapeProduct } from "@/hooks/use-products";
 import { isExternalUrl, getSignedImageUrl, getSignedImageUrls } from "@/lib/storage";
 import { usePersonas, resolvePersonaImageUrl, useSelectPersonaImage } from "@/hooks/use-personas";
-import type { Persona, Product, BrandSummary, ScriptSegment } from "@/types/database";
+import type { Persona, Product, BrandSummary, ScriptSegment, GenerationScript } from "@/types/database";
 import { useCredits } from "@/hooks/use-credits";
 import {
   useEditCompositeImage,
@@ -327,19 +327,27 @@ export default function GeneratePage() {
   const [paywallTab, setPaywallTab] = useState<"single" | "subscription">("single");
 
   // Validate persisted pendingGenerationId against DB on mount.
+  // Also restores the script from DB if pendingScript was somehow lost (e.g., localStorage
+  // cleared, version migration, or network error on a previous visit that wiped the script).
   useEffect(() => {
-    if (!store.pendingGenerationId) return;
+    const genId = store.pendingGenerationId;
+    if (!genId) return;
     const supabase = createClient();
     supabase
       .from("generations")
-      .select("status")
-      .eq("id", store.pendingGenerationId)
+      .select("status, script")
+      .eq("id", genId)
       .maybeSingle()
-      .then(({ data }: { data: { status: string } | null }) => {
+      .then(({ data, error }: { data: { status: string; script: GenerationScript | null } | null; error: unknown }) => {
+        // Network / RLS error — keep existing state, do NOT clear the script.
+        if (error) return;
         if (!data || data.status !== "awaiting_approval") {
           store.clearPendingScript();
           // Reset to section 3 (step 4) if we were on old step 5
           if (store.step >= 5) store.setStep(4);
+        } else if (!store.pendingScript && data.script) {
+          // Script was lost from localStorage (version bump, cache clear, etc.) — restore from DB.
+          store.setPendingScript(genId, data.script, store.creditsToCharge ?? 0);
         }
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -918,9 +926,10 @@ export default function GeneratePage() {
     setShowPreviewEditor(false);
     const path = compositeImages[idx].path;
     store.setCompositeImagePath(path);
-    // If switching to a different image after a script was already generated, clear it
-    // so the user knows they need to click "Generate Script" again.
-    if (idx !== selectedCompositeIdx && store.pendingScript) {
+    // If the user MANUALLY switches to a different image after a script was already generated,
+    // clear it so they know to regenerate. Do NOT clear when auto-selecting on restore
+    // (selectedCompositeIdx === null means it's an initial/restore selection, not a manual switch).
+    if (idx !== selectedCompositeIdx && selectedCompositeIdx !== null && store.pendingScript) {
       store.clearPendingScript();
       setScriptConfigChanged(false);
     }
