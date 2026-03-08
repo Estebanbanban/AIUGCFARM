@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -15,6 +15,7 @@ import {
   Trash2,
   Lock,
   AlertCircle,
+  ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -237,6 +238,8 @@ export default function ProductsPage() {
   const [showCandidates, setShowCandidates] = useState(false);
   const [scrapedPlatform, setScrapedPlatform] = useState<string | null>(null);
   const [scrapedBrandSummary, setScrapedBrandSummary] = useState<BrandSummary | null>(null);
+  const candidatesScrollRef = useRef<HTMLDivElement>(null);
+  const [showScrollArrow, setShowScrollArrow] = useState(false);
 
   // If selected brand disappears (deleted), go back
   useEffect(() => {
@@ -244,6 +247,16 @@ export default function ProductsPage() {
       setSelectedBrandId(null);
     }
   }, [selectedBrandId, selectedBrand, brandsLoading]);
+
+  // Track scroll position in candidates list to show/hide down arrow
+  useEffect(() => {
+    const el = candidatesScrollRef.current;
+    if (!el) return;
+    const check = () => setShowScrollArrow(el.scrollHeight - el.scrollTop - el.clientHeight > 40);
+    check();
+    el.addEventListener('scroll', check, { passive: true });
+    return () => el.removeEventListener('scroll', check);
+  }, [showCandidates, scrapedProducts]);
 
   // Pre-fill import URL from query param (e.g. coming from landing CTA post-signup)
   useEffect(() => {
@@ -618,7 +631,8 @@ export default function ProductsPage() {
               />
             </div>
           ) : showCandidates && scrapedProducts.length > 0 ? (
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+            <div className="relative flex min-h-0 flex-1 flex-col">
+            <div ref={candidatesScrollRef} className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <div className={`text-sm ${isOverSelection || isAtLimit ? 'text-red-400' : 'text-muted-foreground'}`}>
                 {selectedProductIds.size} selected
                 {!isAdmin && PRODUCTS_PER_BRAND_LIMITS[plan] !== Infinity && (
@@ -663,6 +677,16 @@ export default function ProductsPage() {
                   {confirmProduct.isPending ? <Loader2 className="size-4 animate-spin" /> : `Confirm ${selectedProductIds.size} Product${selectedProductIds.size !== 1 ? 's' : ''}`}
                 </Button>
               </div>
+            </div>
+            {showScrollArrow && (
+              <button
+                onClick={() => candidatesScrollRef.current?.scrollTo({ top: candidatesScrollRef.current.scrollHeight, behavior: 'smooth' })}
+                className="absolute bottom-14 right-3 z-10 flex size-7 items-center justify-center rounded-full border border-border bg-background shadow-md hover:bg-muted transition-colors"
+                aria-label="Scroll to bottom"
+              >
+                <ChevronDown className="size-4 text-muted-foreground" />
+              </button>
+            )}
             </div>
           ) : (
             <Tabs defaultValue="import-url" className="w-full">
