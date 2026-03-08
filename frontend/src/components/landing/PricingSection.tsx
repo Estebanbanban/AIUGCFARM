@@ -71,12 +71,12 @@ export function PricingSection() {
   const { isSignedIn } = useAuth();
   const offer = useFirstPurchaseOffer();
 
-  // Auto-start the offer for signed-in users visiting pricing.
+  // Auto-start the offer for any visitor to the pricing page.
   // startOffer() is idempotent: no-op if already started or used.
   useEffect(() => {
-    if (isSignedIn) offer.startOffer();
+    offer.startOffer();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSignedIn]);
+  }, []);
 
   async function handlePlanClick(planKey: PlanTier) {
     trackCtaClicked("pricing", planKey);
