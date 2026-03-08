@@ -829,11 +829,11 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
   }
 
   async function handleUpload() {
-    if (!uploadFile || !store.name.trim()) return;
+    if (!uploadFile) return;
     setIsUploading(true);
     try {
       const formData = new FormData();
-      formData.append('name', store.name.trim());
+      formData.append('name', store.name.trim() || 'My Persona');
       formData.append('file', uploadFile);
       if (store.personaId) formData.append('persona_id', store.personaId);
       const res = await callEdgeMultipart<UploadPersonaImageResponse>('upload-persona-image', formData);
@@ -1333,7 +1333,7 @@ export function PersonaBuilderInline({ onSaved, onCancel, onGenerationStarted }:
             }
             disabled={
               createMode === "upload"
-                ? (!uploadFile || isUploading || !store.name.trim())
+                ? (!uploadFile || isUploading)
                 : createMode === "quick"
                   ? (!quickDescription.trim() || isGeneratingQuick)
                   : store.isGenerating
