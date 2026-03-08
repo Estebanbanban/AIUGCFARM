@@ -143,10 +143,14 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
         set((state) => {
           state.productId = id;
           state.selectedProductImages = [];
+          // Clear stale advanced segments — they were generated for the previous product
+          state.advancedSegments = null;
         }),
       setPersonaId: (id) =>
         set((state) => {
           state.personaId = id;
+          // Clear stale advanced segments — they were generated for the previous persona
+          state.advancedSegments = null;
         }),
       setMode: (mode) =>
         set((state) => {

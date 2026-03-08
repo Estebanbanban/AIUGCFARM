@@ -1151,8 +1151,43 @@ export default function GeneratePage() {
 
   async function handleInitializeAdvancedSegments() {
     if (!store.productId || !store.personaId) return;
+    if (!store.compositeImagePath) {
+      toast.error("Scene preview is still loading, please wait a moment.");
+      return;
+    }
 
     setIsInitializingAdvanced(true);
+
+    // If no pendingScript yet, generate it first — needed for approve-and-generate.
+    if (!store.pendingScript) {
+      try {
+        const result = await generateScript.mutateAsync({
+          product_id: store.productId,
+          persona_id: store.personaId,
+          mode: store.mode,
+          quality: store.quality,
+          composite_image_path: store.compositeImagePath,
+          cta_style: store.ctaStyle,
+          cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
+          language: store.language,
+          hooks_count: store.mode === "triple" ? store.hooksCount : 1,
+          bodies_count: store.mode === "triple" ? store.bodiesCount : 1,
+          ctas_count: store.mode === "triple" ? store.ctasCount : 1,
+          phase: "script",
+        });
+        if (result.script) {
+          store.setPendingScript(result.generation_id, result.script, result.credits_to_charge ?? effectiveCost);
+        } else {
+          toast.error("Script generation failed. Please try again.");
+          setIsInitializingAdvanced(false);
+          return;
+        }
+      } catch {
+        toast.error("Failed to generate base script. Please try again.");
+        setIsInitializingAdvanced(false);
+        return;
+      }
+    }
     const variantCount = store.mode === "single" ? 1 : 3;
     const segTypes = ["hook", "body", "cta"] as const;
 
