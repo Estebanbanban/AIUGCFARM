@@ -312,30 +312,30 @@ export function OnboardingOverlay() {
           <DialogHeader>
             <DialogTitle>Which product are you promoting?</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-3 max-h-[65vh] overflow-y-auto pr-1">
+          <div className="grid grid-cols-2 gap-3 pt-1 max-h-[65vh] overflow-y-auto pr-1">
             {(products ?? []).map((product) => (
               <button
                 key={product.id}
                 onClick={() => handleProductPickerSelect(product.id)}
                 className="group overflow-hidden rounded-xl border border-border bg-card text-left transition-all hover:border-primary/60 hover:shadow-md"
               >
-                {/* Image — portrait ratio, neutral bg so white-bg products stand out */}
-                <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted/60">
+                {/* Image — square, neutral bg so products are clearly visible */}
+                <div className="relative aspect-square w-full overflow-hidden bg-white">
                   {product.images?.[0] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={product.images[0]}
                       alt={product.name}
-                      className="size-full object-contain p-2 transition-transform duration-200 group-hover:scale-105"
+                      className="size-full object-contain p-3 transition-transform duration-200 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="flex size-full items-center justify-center">
-                      <Package className="size-8 text-muted-foreground/40" />
+                    <div className="flex size-full items-center justify-center bg-muted/40">
+                      <Package className="size-10 text-muted-foreground/40" />
                     </div>
                   )}
                 </div>
-                {/* Name — 2 lines max so it's always readable */}
-                <div className="border-t border-border/50 px-3 py-2">
+                {/* Name */}
+                <div className="border-t border-border/50 bg-muted/20 px-3 py-2.5">
                   <p className="line-clamp-2 text-xs font-medium leading-snug text-foreground">
                     {product.name}
                   </p>
