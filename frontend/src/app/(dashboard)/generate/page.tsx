@@ -84,6 +84,7 @@ import {
 import { useCheckout, useBuyCredits } from "@/hooks/use-checkout";
 import { useProfile, ADVANCED_MODE_PLANS } from "@/hooks/use-profile";
 import { useLeaveGuard } from "@/hooks/use-leave-guard";
+import { useCompositeCache } from "@/hooks/use-composite-cache";
 import { ManualUploadForm } from "@/components/products/ManualUploadForm";
 import { ScrapeResults } from "@/components/products/ScrapeResults";
 import {
@@ -455,6 +456,15 @@ export default function GeneratePage() {
   }, [showPaywall, showPersonaLimitPaywall]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: generations } = useGenerations();
+
+  // DB-backed composite cache — persistent fallback for when localStorage is empty
+  // (Stripe redirect, mobile browser cache clear, new device, etc.)
+  const { data: dbCompositeCache } = useCompositeCache(
+    store.productId,
+    store.personaId,
+    store.format,
+  );
+
   const previewContextKey = useMemo(() => {
     if (!store.productId || !store.personaId || !store.format) return null;
     const refs =
@@ -554,6 +564,17 @@ export default function GeneratePage() {
     store.setCompositePreviewCache,
     store.setCompositeImagePath,
   ]);
+
+  // DB → localStorage sync: when the DB cache loads and the local cache is empty,
+  // populate it so the restore effect above can sign & display the images.
+  // This is the key fix for Stripe redirects and mobile localStorage clears.
+  useEffect(() => {
+    if (!dbCompositeCache?.paths?.length || !previewContextKey) return;
+    const localPaths = store.compositePreviewCache[previewContextKey] ?? [];
+    if (localPaths.length === 0) {
+      store.setCompositePreviewCache(previewContextKey, dbCompositeCache.paths);
+    }
+  }, [dbCompositeCache, previewContextKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Restore advanced segment custom image signed URLs after page navigation.
   // imagePath is persisted but imageSignedUrl expires — re-sign on mount.
