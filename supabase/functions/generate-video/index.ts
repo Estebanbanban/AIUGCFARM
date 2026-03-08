@@ -9,6 +9,8 @@ import { submitKlingJob } from "../_shared/kling.ts";
 import { submitSoraJob } from "../_shared/sora.ts";
 import { captureException } from "../_shared/sentry.ts";
 import { ErrorCodes, errorResponse } from "../_shared/errors.ts";
+import { generateCompositeFromImages } from "../_shared/nanobanana.ts";
+import type { ProductReferenceContext } from "../_shared/nanobanana.ts";
 
 // Kling model name per quality tier
 const KLING_MODEL = {
@@ -590,17 +592,42 @@ function computeCosts(
 function estimateDuration(text: string): number {
   const words = text.trim().split(/\s+/).length;
   const seconds = Math.ceil(words / 2.5);
-  return seconds <= 5 ? 5 : 10;
+  return Math.max(3, Math.min(15, seconds));
 }
 
-/** Submit Kling or Sora jobs for all script segments and return job IDs map + actual model used. */
+/** Per-segment-type signed image URLs for Kling/Sora job submission.
+ *  When pose variants are used, each type gets its own URL; otherwise all three point to the same URL.
+ */
+interface SegmentTypeImageUrls {
+  hook: string;
+  body: string;
+  cta: string;
+}
+
+/** Per-segment-type image_tail URLs for Seamless Mode.
+ *  Hook's tail = body composite, Body's tail = CTA composite, CTA has no tail.
+ */
+interface SeamlessTailUrls {
+  hook: string; // = body composite URL
+  body: string; // = cta composite URL
+  cta: null;
+}
+
+/** Submit Kling or Sora jobs for all script segments and return job IDs map + actual model used.
+ *  @param segmentImageUrls - Per-type image URLs. When pose variants were generated, each segment
+ *    type uses a different composite; otherwise all types share the same URL.
+ *  @param seamlessTailUrls - When seamless mode is enabled, provides the next-segment composite
+ *    URL as image_tail for each Kling job (Kling-only, kling-v3 HD tier). All jobs still submit
+ *    in parallel — no sequential dependency.
+ */
 async function submitAllKlingJobs(
   script: GeneratedScript,
-  signedImageUrl: string,
+  segmentImageUrls: SegmentTypeImageUrls,
   klingModel: string,
   provider: "kling" | "sora" = "kling",
-  compositeImageBlob?: Blob,
+  compositeImageBlobs?: { hook: Blob; body: Blob; cta: Blob } | Blob,
   language = "en",
+  seamlessTailUrls?: SeamlessTailUrls,
 ): Promise<{ jobIds: Record<string, string>; modelUsed: string }> {
   const jobEntries: Array<[string, string]> = [];
   const jobModels: string[] = [];
@@ -614,19 +641,49 @@ async function submitAllKlingJobs(
       const langName = language !== "en" ? (LANGUAGE_NAMES[language] ?? null) : null;
       const speakingHint = langName ? `, speaking ${langName}` : "";
       const prompt = `A UGC creator speaking directly to camera${speakingHint}, saying: "${segment.text}" Natural, authentic talking-head style, casual handheld selfie aesthetic.`;
-      const textDuration = estimateDuration(segment.text);
-      const scriptDuration = segment.duration_seconds <= 5 ? 5 : 10;
-      const duration = Math.max(textDuration, scriptDuration);
+      const segmentKind = SEG_KEY[segType]; // "hook" | "body" | "cta"
+      let duration: number;
+      if (klingModel === "kling-v2-6") {
+        // kling-v2-6 (standard tier): supports 5s and 10s only
+        if (segmentKind === "hook" || segmentKind === "cta") {
+          duration = 5;
+        } else {
+          const wordCount = segment.text.trim().split(/\s+/).filter(Boolean).length;
+          duration = wordCount / 2.5 <= 5 ? 5 : 10;
+        }
+      } else {
+        // kling-v3 (hd/premium tier): supports any integer 3–15s
+        if (segmentKind === "hook" || segmentKind === "cta") {
+          duration = 3;
+        } else {
+          const wordCount = segment.text.trim().split(/\s+/).filter(Boolean).length;
+          duration = Math.max(3, Math.min(10, Math.ceil(wordCount / 2.5)));
+        }
+      }
+
+      // Pick the signed URL for this segment type
+      const signedImageUrl = segmentImageUrls[segmentKind];
 
       if (provider === "sora") {
-        if (!compositeImageBlob) throw new Error("compositeImageBlob required for Sora provider");
+        // Resolve the correct blob for this segment type
+        const blob: Blob | undefined = compositeImageBlobs instanceof Blob
+          ? compositeImageBlobs
+          : compositeImageBlobs?.[segmentKind];
+        if (!blob) throw new Error("compositeImageBlob required for Sora provider");
         return withRetry(() =>
-          submitSoraJob({ composite_image_blob: compositeImageBlob, prompt, duration })
+          submitSoraJob({ composite_image_blob: blob, prompt, duration })
         ).then((result) => {
           jobModels.push(result.model_name);
           return [jobKey, result.job_id] as [string, string];
         });
       }
+
+      // Seamless Mode: pass the next segment's composite as image_tail.
+      // hook → image_tail = body; body → image_tail = cta; cta → no tail.
+      // image_tail requires image to also be set (already satisfied by image_url).
+      const imageTailUrl = seamlessTailUrls
+        ? (seamlessTailUrls[segmentKind] ?? undefined)
+        : undefined;
 
       return withRetry(() =>
         submitKlingJob({
@@ -636,6 +693,7 @@ async function submitAllKlingJobs(
           mode: "pro",
           sound: "on",
           model_name: klingModel,
+          image_tail_url: imageTailUrl ?? undefined,
         })
       ).then((result) => {
         if (result.model_name) jobModels.push(result.model_name);
@@ -691,6 +749,94 @@ function buildScriptFromAdvanced(
   };
 }
 
+// ── Pose-variant composite image helpers ──────────────────────────────
+
+/** Storage structure for 3 pose-variant composite images (one per segment type). */
+interface PoseVariantCompositePaths {
+  hook: string;
+  body: string;
+  cta: string;
+}
+
+/** Detect whether a composite_image_url column value is pose-variant JSON or a plain path. */
+function parsePoseVariantPaths(raw: string): PoseVariantCompositePaths | null {
+  if (!raw.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (
+      typeof parsed.hook === "string" &&
+      typeof parsed.body === "string" &&
+      typeof parsed.cta === "string"
+    ) {
+      return { hook: parsed.hook, body: parsed.body, cta: parsed.cta };
+    }
+  } catch {
+    // Not JSON — treat as plain path
+  }
+  return null;
+}
+
+const MAX_PRODUCT_REFERENCE_IMAGES_GV = 4;
+
+/**
+ * Generate 3 pose-variant composite images (hook/body/CTA) in parallel.
+ * Uploads each to storage and returns their storage paths as a JSON string
+ * suitable for storing in the composite_image_url column.
+ */
+async function generatePoseVariantComposites(
+  sb: ReturnType<typeof getAdminClient>,
+  userId: string,
+  personaSignedUrl: string,
+  resolvedProductImageUrls: string[],
+  productContext: ProductReferenceContext,
+  scenePrompt: string | undefined,
+  format: "9:16" | "16:9",
+): Promise<string> {
+  // Variant 1 = hook pose, 2 = body pose, 3 = CTA pose
+  // Each appends only a pose suffix to the existing prompt — nothing else changes.
+  const [hookComposite, bodyComposite, ctaComposite] = await Promise.all(
+    ([1, 2, 3] as const).map((variant) =>
+      withRetry(
+        () => generateCompositeFromImages(
+          personaSignedUrl,
+          resolvedProductImageUrls,
+          productContext,
+          scenePrompt,
+          format,
+          variant,
+        ),
+        5,
+        1000,
+      )
+    ),
+  );
+
+  // Upload all 3 in parallel
+  const uploadVariant = async (composite: { data: Uint8Array; mimeType: string }, label: string) => {
+    const ext = composite.mimeType.includes("png") ? "png" : "jpg";
+    const storagePath = `${userId}/segment/${crypto.randomUUID()}-${label}.${ext}`;
+    const { error: uploadErr } = await sb.storage
+      .from("composite-images")
+      .upload(storagePath, composite.data, {
+        contentType: composite.mimeType,
+        upsert: false,
+      });
+    if (uploadErr) {
+      throw new Error(`Composite upload failed (${label}): ${uploadErr.message}`);
+    }
+    return storagePath;
+  };
+
+  const [hookPath, bodyPath, ctaPath] = await Promise.all([
+    uploadVariant(hookComposite, "hook"),
+    uploadVariant(bodyComposite, "body"),
+    uploadVariant(ctaComposite, "cta"),
+  ]);
+
+  const paths: PoseVariantCompositePaths = { hook: hookPath, body: bodyPath, cta: ctaPath };
+  return JSON.stringify(paths);
+}
+
 // ── Main handler ─────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -706,8 +852,10 @@ Deno.serve(async (req: Request) => {
     const sb = getAdminClient();
 
     const body = await req.json();
-    const { phase, generation_id, override_script, video_provider, video_quality: quality_override } = body;
+    const { phase, generation_id, override_script, advanced_segments: rawAdvancedSegments, video_provider, video_quality: quality_override, seamless_mode } = body;
     const provider = (video_provider === "sora" ? "sora" : "kling") as "kling" | "sora";
+    // Seamless Mode: only effective for Kling HD (kling-v3). image_tail is confirmed on kling-v3.
+    const requestedSeamlessMode = seamless_mode === true;
     const VALID_LANGUAGES = new Set(["en","es","fr","de","it","pt","ja","zh","ar","ru"]);
 
     // ══════════════════════════════════════════════════════════════════
@@ -822,6 +970,25 @@ Deno.serve(async (req: Request) => {
         finalScript = gen.script as GeneratedScript;
       }
 
+      // Advanced mode: override finalScript with user-customised segment text.
+      // rawAdvancedSegments is sent by the frontend when the user has configured
+      // Advanced Mode; buildScriptFromAdvanced converts their segment configs into
+      // the GeneratedScript format used by submitAllKlingJobs and the result page.
+      if (rawAdvancedSegments) {
+        const advancedScript = buildScriptFromAdvanced(
+          rawAdvancedSegments as AdvancedSegmentsInput,
+          genHooksCount,
+          genBodiesCount,
+          genCtasCount,
+        );
+        finalScript = advancedScript;
+        // Persist to DB so the generation result page shows the correct scripts
+        await sb
+          .from("generations")
+          .update({ script: advancedScript })
+          .eq("id", generation_id);
+      }
+
       if (!finalScript) {
         // Unlock: revert status so user can retry
         await sb
@@ -895,35 +1062,98 @@ Deno.serve(async (req: Request) => {
           .update({ status: "submitting_jobs" })
           .eq("id", generation_id);
 
-        const compositePath = gen.composite_image_url as string;
+        const compositeRaw = gen.composite_image_url as string;
 
-        // ── Generate signed URL for composite image ────────────────
-        const { data: klingCompositeUrl, error: klingUrlErr } = await sb.storage
-          .from("composite-images")
-          .createSignedUrl(compositePath, 7200);
+        // ── Resolve per-segment-type signed URLs ────────────────────
+        // composite_image_url may be either:
+        //   (a) a plain storage path (legacy single composite)
+        //   (b) a JSON object {"hook":path,"body":path,"cta":path} (pose-variant composites)
+        const poseVariantPaths = parsePoseVariantPaths(compositeRaw);
 
-        if (klingUrlErr || !klingCompositeUrl?.signedUrl) {
-          throw new Error(
-            `Failed to generate signed URL for composite image: ${klingUrlErr?.message}`,
-          );
+        let segmentImageUrls: SegmentTypeImageUrls;
+        let compositeImageBlobs: { hook: Blob; body: Blob; cta: Blob } | Blob | undefined;
+
+        if (poseVariantPaths) {
+          // Sign all 3 paths in parallel
+          const [hookSigned, bodySigned, ctaSigned] = await Promise.all([
+            sb.storage.from("composite-images").createSignedUrl(poseVariantPaths.hook, 7200),
+            sb.storage.from("composite-images").createSignedUrl(poseVariantPaths.body, 7200),
+            sb.storage.from("composite-images").createSignedUrl(poseVariantPaths.cta, 7200),
+          ]);
+          if (!hookSigned.data?.signedUrl || !bodySigned.data?.signedUrl || !ctaSigned.data?.signedUrl) {
+            throw new Error("Failed to generate signed URLs for pose-variant composite images");
+          }
+          segmentImageUrls = {
+            hook: hookSigned.data.signedUrl,
+            body: bodySigned.data.signedUrl,
+            cta: ctaSigned.data.signedUrl,
+          };
+
+          // Download blobs for Sora (requires per-segment file upload)
+          if (provider === "sora") {
+            const [hookRes, bodyRes, ctaRes] = await Promise.all([
+              fetch(segmentImageUrls.hook),
+              fetch(segmentImageUrls.body),
+              fetch(segmentImageUrls.cta),
+            ]);
+            if (!hookRes.ok || !bodyRes.ok || !ctaRes.ok) {
+              throw new Error("Failed to download one or more pose-variant composite images for Sora");
+            }
+            const [hookBlob, bodyBlob, ctaBlob] = await Promise.all([
+              hookRes.blob(), bodyRes.blob(), ctaRes.blob(),
+            ]);
+            compositeImageBlobs = { hook: hookBlob, body: bodyBlob, cta: ctaBlob };
+          }
+        } else {
+          // Legacy single composite path
+          const { data: klingCompositeUrl, error: klingUrlErr } = await sb.storage
+            .from("composite-images")
+            .createSignedUrl(compositeRaw, 7200);
+          if (klingUrlErr || !klingCompositeUrl?.signedUrl) {
+            throw new Error(
+              `Failed to generate signed URL for composite image: ${klingUrlErr?.message}`,
+            );
+          }
+          segmentImageUrls = {
+            hook: klingCompositeUrl.signedUrl,
+            body: klingCompositeUrl.signedUrl,
+            cta: klingCompositeUrl.signedUrl,
+          };
+
+          // Download blob for Sora
+          if (provider === "sora") {
+            const imgRes = await fetch(klingCompositeUrl.signedUrl);
+            if (!imgRes.ok) throw new Error(`Failed to download composite image for Sora: HTTP ${imgRes.status}`);
+            compositeImageBlobs = await imgRes.blob();
+          }
         }
 
-        // ── Download image blob if using Sora (requires file upload) ──
-        let compositeImageBlob: Blob | undefined;
-        if (provider === "sora") {
-          const imgRes = await fetch(klingCompositeUrl.signedUrl);
-          if (!imgRes.ok) throw new Error(`Failed to download composite image for Sora: HTTP ${imgRes.status}`);
-          compositeImageBlob = await imgRes.blob();
+        // ── Build seamless tail URLs (Seamless Mode, Kling HD only) ─
+        // Seamless Mode chains each clip's ending pose to the next clip's starting pose
+        // via Kling's image_tail parameter. All 3 clips still submit in parallel.
+        //   hook clip:  image_tail = body composite URL  (ends transitioning toward body pose)
+        //   body clip:  image_tail = cta composite URL   (ends transitioning toward CTA pose)
+        //   cta clip:   no image_tail
+        // Only works when pose-variant composites are available (poseVariantPaths !== null).
+        // Seamless Mode is silently skipped for Sora provider (no image_tail support).
+        let seamlessTailUrls: SeamlessTailUrls | undefined;
+        if (requestedSeamlessMode && provider === "kling" && klingModel === "kling-v3" && poseVariantPaths) {
+          seamlessTailUrls = {
+            hook: segmentImageUrls.body,  // hook ends → body start pose
+            body: segmentImageUrls.cta,   // body ends → cta start pose
+            cta: null,                    // cta has no successor
+          };
         }
 
         // ── Submit video jobs ─────────────────────────────────────
         const { jobIds, modelUsed } = await submitAllKlingJobs(
           finalScript,
-          klingCompositeUrl.signedUrl,
+          segmentImageUrls,
           klingModel,
           provider,
-          compositeImageBlob,
+          compositeImageBlobs,
           approvedLanguage,
+          seamlessTailUrls,
         );
 
         // ── Update generation with job IDs and provider ───────────
@@ -1132,6 +1362,98 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      // ── Prepare pose-variant composite generation inputs ──────────
+      // Sign persona image and product images needed for the 3 pose-variant composites.
+      // These will be generated in parallel with the script to save wall-clock time.
+      const buildCompositeVariantsAsync = async (): Promise<string> => {
+        // Sign persona image (10 min)
+        const { data: personaSignedUrlData, error: personaSignedUrlErr } = await sb
+          .storage
+          .from("persona-images")
+          .createSignedUrl(persona.selected_image_url, 600);
+        if (personaSignedUrlErr || !personaSignedUrlData?.signedUrl) {
+          throw new Error(`Failed to sign persona image URL: ${personaSignedUrlErr?.message}`);
+        }
+        const personaSignedUrl = personaSignedUrlData.signedUrl;
+
+        // Product image URLs
+        const productImagePaths = ((product.images as string[]) ?? [])
+          .filter((img: unknown) => typeof img === "string" && (img as string).trim().length > 0)
+          .slice(0, MAX_PRODUCT_REFERENCE_IMAGES_GV) as string[];
+        if (productImagePaths.length === 0) {
+          throw new Error("Product has no images available for pose-variant generation");
+        }
+
+        const httpUrls = productImagePaths.filter((p) => p.startsWith("http"));
+        const storagePaths = productImagePaths.filter((p) => !p.startsWith("http"));
+        let signedStorageUrls: string[] = [];
+        if (storagePaths.length > 0) {
+          const { data: batchSigned, error: batchErr } = await sb
+            .storage
+            .from("product-images")
+            .createSignedUrls(storagePaths, 600);
+          if (batchErr || !batchSigned) {
+            throw new Error(`Failed to batch sign product image URLs: ${batchErr?.message}`);
+          }
+          signedStorageUrls = batchSigned.map((s: { signedUrl: string }) => s.signedUrl);
+        }
+        const resolvedProductImageUrls = [...httpUrls, ...signedStorageUrls];
+
+        const productContext: ProductReferenceContext = {
+          name: typeof product.name === "string" ? product.name : undefined,
+          description: typeof product.description === "string" ? product.description : undefined,
+          category: typeof product.category === "string" ? product.category : undefined,
+          price: typeof product.price === "number" ? product.price : undefined,
+          currency: typeof product.currency === "string" ? product.currency : undefined,
+        };
+
+        const scenePrompt = (persona.attributes as Record<string, unknown>)?.scene_prompt as string | undefined;
+        const aspectRatio = (body.format === "16:9" ? "16:9" : "9:16") as "9:16" | "16:9";
+
+        return await generatePoseVariantComposites(
+          sb,
+          userId,
+          personaSignedUrl,
+          resolvedProductImageUrls,
+          productContext,
+          scenePrompt,
+          aspectRatio,
+        );
+      };
+
+      // ── Run script generation + pose-variant composites in parallel ──
+      const [scriptResult, compositeResult] = await Promise.allSettled([
+        generateScript(product, hooksCount, bodiesCount, ctasCount, resolvedLanguage),
+        buildCompositeVariantsAsync(),
+      ]);
+
+      // Resolve script (with fallback)
+      let script: GeneratedScript;
+      let scriptRaw: GeneratedScript;
+      let usedFallback = false;
+
+      if (scriptResult.status === "fulfilled") {
+        script = scriptResult.value.script;
+        scriptRaw = scriptResult.value.scriptRaw;
+      } else {
+        captureException(scriptResult.reason);
+        const errMsg = scriptResult.reason instanceof Error ? scriptResult.reason.message : String(scriptResult.reason);
+        console.error("generate-video script-only error, using fallback:", errMsg);
+        usedFallback = true;
+        script = buildFallbackScript(product, hooksCount, bodiesCount, ctasCount, resolvedLanguage);
+        scriptRaw = script;
+      }
+
+      // Resolve composite storage value (with fallback to preview path)
+      let compositeStorageValue: string;
+      if (compositeResult.status === "fulfilled") {
+        compositeStorageValue = compositeResult.value;
+      } else {
+        captureException(compositeResult.reason);
+        console.error("generate-video pose-variant composite generation failed, falling back to preview path:", compositeResult.reason instanceof Error ? compositeResult.reason.message : compositeResult.reason);
+        compositeStorageValue = composite_image_path;
+      }
+
       // ── Create generation record with awaiting_approval status ───
       const { data: generation, error: genErr } = await sb
         .from("generations")
@@ -1141,7 +1463,7 @@ Deno.serve(async (req: Request) => {
           persona_id,
           mode: resolvedMode,
           video_quality: resolvedQuality,
-          composite_image_url: composite_image_path,
+          composite_image_url: compositeStorageValue,
           language: resolvedLanguage,
           hooks_count: hooksCount,
           bodies_count: bodiesCount,
@@ -1156,25 +1478,6 @@ Deno.serve(async (req: Request) => {
       }
 
       const generationId = generation.id;
-
-      let script: GeneratedScript;
-      let scriptRaw: GeneratedScript;
-      let usedFallback = false;
-
-      try {
-        // ── Generate script (with coherence review) ─────────────────
-        const generated = await generateScript(product, hooksCount, bodiesCount, ctasCount, resolvedLanguage);
-        script = generated.script;
-        scriptRaw = generated.scriptRaw;
-      } catch (scriptErr) {
-        // Fallback instead of failing with 500 so users can still review/edit.
-        captureException(scriptErr);
-        const errMsg = scriptErr instanceof Error ? scriptErr.message : String(scriptErr);
-        console.error("generate-video script-only error, using fallback:", errMsg);
-        usedFallback = true;
-        script = buildFallbackScript(product, hooksCount, bodiesCount, ctasCount, resolvedLanguage);
-        scriptRaw = script;
-      }
 
       // ── Save script to generation record ────────────────────────
       const { error: updateErr } = await sb
