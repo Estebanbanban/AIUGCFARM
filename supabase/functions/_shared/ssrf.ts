@@ -114,7 +114,9 @@ export async function validateUrl(url: string): Promise<URL> {
   try {
     parsed = new URL(url);
   } catch {
-    throw new Error("Malformed URL");
+    throw new Error(
+      `Invalid URL — expected format: https://your-store.myshopify.com (must start with http:// or https://)`
+    );
   }
 
   if (!["http:", "https:"].includes(parsed.protocol)) {
