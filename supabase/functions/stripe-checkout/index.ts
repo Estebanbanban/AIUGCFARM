@@ -127,6 +127,32 @@ Deno.serve(async (req: Request) => {
       stripeCustomerId = customer.id;
     }
 
+    // Auto-apply promo codes server-side when none sent by client.
+    // Promo IDs are Stripe Promotion Code objects (promo_...) with per-customer redemption limits
+    // configured in the Stripe Dashboard — so passing them always is safe: Stripe enforces the rules.
+    if (!validatedPromoCode && !validatedCoupon) {
+      const AUTO_PROMOS: Record<string, string> = {
+        starter:       "promo_1T5Xb9DofGNcXNHKgaXOtdxQ", // 50% off Starter subscription
+        growth:        "promo_1T5XZZDofGNcXNHKRrssNcdE", // 30% off Growth/Scale subscription
+        scale:         "promo_1T5XZZDofGNcXNHKRrssNcdE", // 30% off Growth/Scale subscription
+        single_standard: "promo_1T7tW2DofGNcXNHKHTRW79iU", // 50% off single video
+        single_hd:       "promo_1T7tW2DofGNcXNHKHTRW79iU", // 50% off single video
+      };
+      const autoPromoId = plan ? AUTO_PROMOS[plan] : (pack ? AUTO_PROMOS[pack] : undefined);
+      if (autoPromoId) {
+        try {
+          const promoCode = await stripe.promotionCodes.retrieve(autoPromoId);
+          if (promoCode.active && promoCode.coupon?.valid) {
+            validatedPromoCode = autoPromoId;
+          } else {
+            console.warn(`stripe-checkout: auto-promo "${autoPromoId}" is inactive or expired — falling back to allow_promotion_codes.`);
+          }
+        } catch (e) {
+          console.warn(`stripe-checkout: could not retrieve auto-promo "${autoPromoId}" — falling back to allow_promotion_codes.`, e instanceof Error ? e.message : String(e));
+        }
+      }
+    }
+
     // Auto-apply plan discount for credit pack purchases (uses profile already fetched above)
     if (pack && !validatedCoupon) {
       const userPlan = profile.plan as string | undefined;
