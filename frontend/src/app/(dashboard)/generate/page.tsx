@@ -2055,7 +2055,7 @@ export default function GeneratePage() {
                                       }
                                     }}
                                     className={cn(
-                                      "relative size-16 rounded-lg overflow-hidden border-2 transition-all shrink-0",
+                                      "relative size-24 rounded-lg overflow-hidden border-2 transition-all shrink-0",
                                       isSelected ? "border-primary ring-1 ring-primary/30" : "border-border opacity-50 hover:opacity-75"
                                     )}
                                   >
@@ -2074,7 +2074,7 @@ export default function GeneratePage() {
                                 <button
                                   type="button"
                                   onClick={() => setShowAllRefImages(true)}
-                                  className="size-16 rounded-lg border-2 border-dashed border-border flex items-center justify-center text-xs text-muted-foreground hover:border-muted-foreground/40 shrink-0"
+                                  className="size-24 rounded-lg border-2 border-dashed border-border flex items-center justify-center text-xs text-muted-foreground hover:border-muted-foreground/40 shrink-0"
                                 >
                                   +{selectedProduct.images.length - 4}
                                 </button>
@@ -2174,18 +2174,6 @@ export default function GeneratePage() {
                               </div>
                             ))}
                           </div>
-                        )}
-
-                        {!generateComposites.isPending && compositeImages.length === 0 && (
-                          <Button
-                            variant="outline"
-                            onClick={() => handleGenerateComposites()}
-                            disabled={!store.productId || !store.personaId || !store.format}
-                            className="w-full"
-                          >
-                            <ImageIcon className="size-4" />
-                            Generate Scene Preview
-                          </Button>
                         )}
 
                         {/* Quick Edit */}
