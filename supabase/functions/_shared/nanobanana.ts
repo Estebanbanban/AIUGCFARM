@@ -1,8 +1,11 @@
 /**
  * NanoBanana (Google Gemini image generation) helper.
  *
- * NanoBanana 2 = gemini-2.5-flash-image            (primary  — stable)
- * NanoBanana 1 = gemini-3.1-flash-image-preview    (fallback — newer but slower)
+ * Model routing (per Google's official naming):
+ *   Persona generation  → NanoBanana 2 = gemini-3.1-flash-image-preview  (newer, better portrait realism)
+ *   Composite + Edit    → NanoBanana   = gemini-2.5-flash-image           (cheaper, sufficient for scene composition)
+ *   NanoBanana Pro      = gemini-3-pro-image-preview                      (not used — ~3x cost)
+ *
  * API key env:  NANOBANANA_API_KEY (Google Gemini API key)
  * API docs:     https://ai.google.dev/gemini-api/docs/image-generation
  */
@@ -19,12 +22,10 @@ function uint8ArrayToBase64(buf: Uint8Array): string {
 
 const GEMINI_API_KEY = Deno.env.get("NANOBANANA_API_KEY");
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
-// NanoBanana 2 = primary model — gemini-2.5-flash-image (stable, replaces deprecated gemini-2.0-flash-preview-image-generation)
-const GEMINI_MODEL_V2 = "gemini-2.5-flash-image";
-// NanoBanana 1 = fallback — gemini-3.1-flash-image-preview (newer, heavier, needs longer timeout)
-const GEMINI_MODEL_V1 = "gemini-3.1-flash-image-preview";
-// Keep the existing export alias pointing to v2 (composite/edit functions use it directly)
-const GEMINI_MODEL = GEMINI_MODEL_V2;
+// NanoBanana 2 — persona generation (higher quality portraits, ~$0.067/image at 1K)
+const GEMINI_MODEL_PERSONA = "gemini-3.1-flash-image-preview";
+// NanoBanana (original) — composite + edit generation (cheaper, sufficient for scene composition, ~$0.039/image)
+const GEMINI_MODEL_COMPOSITE = "gemini-2.5-flash-image";
 // Keep individual calls below worker timeout budget to avoid WORKER_LIMIT cascades.
 const GEMINI_REQUEST_TIMEOUT_MS = 75_000;
 
@@ -85,32 +86,15 @@ async function generateSingleImage(prompt: string, model: string): Promise<Gener
 }
 
 /**
- * Generate one image, trying NanoBanana 2 (v2) first and falling back to
- * NanoBanana 1 (v1) if v2 fails. This ensures the user always gets a persona
- * image even when the primary model is unavailable or returns an error.
- */
-async function generateSingleImageWithFallback(prompt: string): Promise<GeneratedImage> {
-  try {
-    return await generateSingleImage(prompt, GEMINI_MODEL_V2);
-  } catch (errV2) {
-    console.warn(
-      `[nanobanana] NanoBanana 2 (${GEMINI_MODEL_V2}) failed, falling back to NanoBanana 1 (${GEMINI_MODEL_V1}):`,
-      errV2 instanceof Error ? errV2.message : errV2,
-    );
-    return await generateSingleImage(prompt, GEMINI_MODEL_V1);
-  }
-}
-
-/**
  * Generate `count` images from a text prompt (used for persona generation).
- * Tries NanoBanana 2 first; automatically falls back to NanoBanana 1 per image if v2 fails.
+ * Uses NanoBanana 2 (gemini-3.1-flash-image-preview) for higher portrait realism.
  * Returns raw image buffers — caller uploads to storage.
  */
 export async function generateImagesFromPrompt(
   prompt: string,
   count = 4,
 ): Promise<GeneratedImage[]> {
-  return Promise.all(Array.from({ length: count }, () => generateSingleImageWithFallback(prompt)));
+  return Promise.all(Array.from({ length: count }, () => generateSingleImage(prompt, GEMINI_MODEL_PERSONA)));
 }
 
 /** Pose variant suffixes appended to the composite prompt — one per segment type.
@@ -197,7 +181,7 @@ export async function generateCompositeFromImages(
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GEMINI_REQUEST_TIMEOUT_MS);
-  const res = await fetch(endpoint(GEMINI_MODEL), {
+  const res = await fetch(endpoint(GEMINI_MODEL_COMPOSITE), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -268,7 +252,7 @@ export async function editCompositeFromReference(
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GEMINI_REQUEST_TIMEOUT_MS);
-  const res = await fetch(endpoint(GEMINI_MODEL), {
+  const res = await fetch(endpoint(GEMINI_MODEL_COMPOSITE), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
