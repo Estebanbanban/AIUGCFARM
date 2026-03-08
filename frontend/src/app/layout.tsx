@@ -9,7 +9,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
 import { CookieBanner } from "@/components/layout/CookieBanner";
 import { ClerkProvider } from "@clerk/nextjs";
-import { PromoBanner } from "@/components/promo/PromoBanner";
+import { OfferCountdownBanner } from "@/components/offers/OfferCountdownBanner";
 
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -65,7 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           signInFallbackRedirectUrl="/dashboard"
           signUpFallbackRedirectUrl="/dashboard"
         >
-          <PromoBanner />
+          <OfferCountdownBanner />
           <NextTopLoader color="hsl(var(--primary))" showSpinner={false} height={3} />
           <Script
             src="https://datafa.st/js/script.js"
