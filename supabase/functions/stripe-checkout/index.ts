@@ -191,7 +191,7 @@ Deno.serve(async (req: Request) => {
         mode: "payment",
         line_items: [{ price: priceId, quantity: 1 }],
         success_url: packSuccessUrl,
-        cancel_url: `${FRONTEND_URL}/settings/billing?checkout=cancelled`,
+        cancel_url: `${FRONTEND_URL}${safeReturnPath ?? "/generate"}?checkout=cancelled`,
         metadata: {
           supabase_user_id: userId,
           pack,
@@ -230,7 +230,7 @@ Deno.serve(async (req: Request) => {
       mode: "subscription",
       line_items: [{ price: resolvedPriceId, quantity: 1 }],
       success_url: `${FRONTEND_URL}${safeReturnPath ?? "/dashboard"}?checkout=success&plan=${plan}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${FRONTEND_URL}/pricing?checkout=canceled`,
+      cancel_url: `${FRONTEND_URL}${safeReturnPath ?? "/generate"}?checkout=cancelled`,
       subscription_data: {
         metadata: { supabase_user_id: userId, plan, billing: billing ?? "monthly" },
       },
