@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
@@ -82,9 +83,12 @@ const STEPS = [
 
 export function OnboardingOverlay() {
   const router = useRouter();
+  const { isLoaded: authLoaded } = useAuth();
   const [view, setView] = useState<WizardView>("checklist");
   const [skipped, setSkipped] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  // Track whether we've done the first stable skip-state read
+  const skipInitialized = useRef(false);
   const [showProductPicker, setShowProductPicker] = useState(false);
 
   const { data: products, isLoading: productsLoading } = useProducts();
@@ -113,18 +117,28 @@ export function OnboardingOverlay() {
     setHasActiveWizardSession(!!(compositeImagePath || pendingScript || pendingGenerationId));
   }, []);
 
-  // Read skip state from localStorage (client-only, avoids SSR mismatch).
-  // If the user has zero progress (brand new or after a data wipe), always
-  // reset the skip flag so onboarding shows regardless of prior localStorage state.
+  // Read skip state from localStorage only once auth has loaded and data is stable.
+  // IMPORTANT: Never read/write skip state while isLoading=true — a mid-flight
+  // refetch (e.g. after scraping) would incorrectly close the modal.
+  // Also guard against Clerk not yet loaded: before that, queries are disabled
+  // so hasProduct/hasPersona/hasGeneration are all false even for existing users.
   useEffect(() => {
-    if (!isLoading && !hasProduct && !hasPersonaWithImage && !hasCompletedGeneration) {
+    if (!authLoaded || isLoading) {
+      // Still mark hydrated so the loading skeleton can render
+      if (authLoaded) setHydrated(true);
+      return;
+    }
+    if (!hasProduct && !hasPersonaWithImage && !hasCompletedGeneration) {
+      // Truly new user (or all data wiped) — always show onboarding fresh
       localStorage.removeItem(SKIP_KEY);
       setSkipped(false);
-    } else {
+    } else if (!skipInitialized.current) {
+      // First stable read for a returning user — respect their saved preference
       setSkipped(localStorage.getItem(SKIP_KEY) === "true");
     }
+    skipInitialized.current = true;
     setHydrated(true);
-  }, [isLoading, hasProduct, hasPersonaWithImage, hasCompletedGeneration]);
+  }, [authLoaded, isLoading, hasProduct, hasPersonaWithImage, hasCompletedGeneration]);
 
   // Re-register the resume handler whenever onboarding state changes so the
   // closure always reads up-to-date completion flags rather than stale ones.

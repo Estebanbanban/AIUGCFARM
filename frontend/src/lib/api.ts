@@ -59,9 +59,14 @@ async function fetchWithTimeout(
 }
 
 async function getEdgeAccessToken(): Promise<string> {
-  const token = await (window as any).Clerk?.session?.getToken();
-  if (!token) throw new Error("Authentication required. Please sign in again.");
-  return token;
+  // Retry with backoff: Clerk session may not be populated immediately even
+  // when isSignedIn === true (race condition during hydration).
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const token = await (window as any).Clerk?.session?.getToken();
+    if (token) return token;
+    if (attempt < 3) await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+  }
+  throw new Error("Authentication required. Please sign in again.");
 }
 
 export async function callEdge<T>(

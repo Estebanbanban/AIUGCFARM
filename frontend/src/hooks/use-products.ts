@@ -68,13 +68,14 @@ export function useDeleteProduct(id: string) {
 }
 
 export function useScrapeProduct() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: { url: string }) => {
       const res = await callEdge<ScrapeResponse>("scrape-product", { body: data });
       return res.data;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
+    // No invalidation here: scraping returns candidates only, it does NOT
+    // write confirmed products to the DB. Only confirm-products does that.
+    // Invalidating here was causing the onboarding modal to close mid-flow.
   });
 }
 

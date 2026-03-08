@@ -34,19 +34,32 @@ export async function POST(req: Request) {
     const fullName = [first_name, last_name].filter(Boolean).join(" ") || email?.split("@")[0] || "User";
 
     const supabase = createAdminClient();
-    const { error } = await supabase.from("profiles").upsert(
-      {
+
+    // Check if a profile already exists for this email (pre-migration user)
+    const { data: existing } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (existing) {
+      // Pre-migration user: only link clerk_user_id — never overwrite plan/credits
+      const { error } = await supabase
+        .from("profiles")
+        .update({ clerk_user_id: clerkUserId, full_name: fullName, avatar_url: image_url })
+        .eq("id", existing.id);
+      if (error) console.error(`[clerk-webhook] user.created update failed for ${email}:`, error);
+    } else {
+      // Brand new user: insert with defaults
+      const { error } = await supabase.from("profiles").insert({
         clerk_user_id: clerkUserId,
         email,
         full_name: fullName,
         avatar_url: image_url,
         plan: "free",
         credits: 3,
-      },
-      { onConflict: "email", ignoreDuplicates: false }
-    );
-    if (error) {
-      console.error(`[clerk-webhook] user.created upsert failed for clerk_user_id=${clerkUserId}:`, error);
+      });
+      if (error) console.error(`[clerk-webhook] user.created insert failed for ${email}:`, error);
     }
   }
 

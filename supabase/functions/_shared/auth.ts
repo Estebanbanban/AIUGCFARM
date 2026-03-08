@@ -107,9 +107,11 @@ export async function requireUserId(req: Request): Promise<string> {
   // Profile not found by clerk_user_id — attempt lazy backfill.
   // This handles existing users whose profiles pre-date the Clerk migration
   // (their clerk_user_id column is null but their profile exists by email).
-  console.warn("Profile not found by clerk_user_id, attempting lazy backfill for:", clerkUserId);
+  console.warn("[auth] Profile not found by clerk_user_id:", clerkUserId, "— attempting lazy backfill");
   const clerkSecretKey = Deno.env.get("CLERK_SECRET_KEY");
-  if (clerkSecretKey) {
+  if (!clerkSecretKey) {
+    console.error("[auth] CLERK_SECRET_KEY not set in Supabase secrets — backfill impossible for clerk_user_id:", clerkUserId);
+  } else {
     try {
       const clerkRes = await fetch(`https://api.clerk.com/v1/users/${clerkUserId}`, {
         headers: { Authorization: `Bearer ${clerkSecretKey}` },
@@ -118,31 +120,44 @@ export async function requireUserId(req: Request): Promise<string> {
         const clerkUser = await clerkRes.json() as { email_addresses?: Array<{ email_address: string }> };
         const email = clerkUser.email_addresses?.[0]?.email_address;
         if (email) {
-          // Find existing profile by email (pre-migration profile with null clerk_user_id)
+          // Find existing profile by email — no IS NULL constraint so we also
+          // fix profiles whose clerk_user_id was set to a stale/wrong value.
           const { data: existingProfile } = await adminClient
             .from("profiles")
-            .select("id")
+            .select("id, clerk_user_id")
             .eq("email", email)
-            .is("clerk_user_id", null)
             .maybeSingle();
 
           if (existingProfile) {
-            // Backfill the clerk_user_id so future lookups succeed instantly
+            // Link (or re-link) the clerk_user_id
             await adminClient
               .from("profiles")
               .update({ clerk_user_id: clerkUserId })
               .eq("id", existingProfile.id);
-            console.log("Backfilled clerk_user_id for profile:", existingProfile.id);
+            console.log("[auth] Linked clerk_user_id for profile:", existingProfile.id, "prev:", existingProfile.clerk_user_id ?? "null");
             return existingProfile.id;
           }
+
+          // No profile by email — create a minimal one so the user can proceed
+          console.warn("[auth] No profile by email, creating new for Clerk user:", clerkUserId);
+          const { data: newProfile, error: insertErr } = await adminClient
+            .from("profiles")
+            .insert({ clerk_user_id: clerkUserId, email, plan: "free", credits: 3 })
+            .select("id")
+            .single();
+          if (!insertErr && newProfile) {
+            console.log("[auth] Created new profile:", newProfile.id);
+            return newProfile.id;
+          }
+          console.error("[auth] Failed to create profile:", insertErr);
         }
       }
     } catch (backfillErr) {
-      console.error("Lazy backfill failed:", backfillErr);
+      console.error("[auth] Lazy backfill failed:", backfillErr);
     }
   }
 
-  console.error("Profile not found for Clerk user:", clerkUserId, error);
+  console.error("[auth] Profile not found for Clerk user:", clerkUserId, error);
   throw new Error("Unauthorized");
 }
 

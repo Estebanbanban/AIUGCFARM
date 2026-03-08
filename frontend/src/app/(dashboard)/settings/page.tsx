@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { callEdge } from "@/lib/api";
 import { toast } from "sonner";
-import { ArrowRight, CreditCard, User, Lock, AlertTriangle } from "lucide-react";
+import { ArrowRight, CreditCard, User, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -166,29 +166,25 @@ export default function SettingsPage() {
 
       <Separator />
 
-      {/* Danger Zone */}
-      <Card className="border-red-500/20 bg-red-500/5">
-        <CardHeader>
-          <CardTitle className="text-base text-red-400">Danger Zone</CardTitle>
-          <CardDescription>
-            Irreversible actions. Proceed with caution.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Delete Account</p>
-              <p className="text-xs text-muted-foreground">
-                Permanently delete your account and all associated data.
-              </p>
-            </div>
-            <Button variant="destructive" size="sm" onClick={() => setShowDeleteDialog(true)}>
-              <AlertTriangle className="size-4" />
-              Delete Account
-            </Button>
+      {/* Delete Account */}
+      <div className="rounded-xl border border-border/50 px-5 py-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium">Delete account</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Permanently deletes your account and all associated data. This cannot be undone.
+            </p>
           </div>
-        </CardContent>
-      </Card>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setShowDeleteDialog(true)}
+          >
+            Delete account
+          </Button>
+        </div>
+      </div>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
