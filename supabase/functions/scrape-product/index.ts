@@ -8,6 +8,8 @@ import { generateBrandSummary, BrandSummary } from "../_shared/brand-summary.ts"
 
 function stripHtml(html: string): string {
   return html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
     .replace(/<[^>]*>/g, " ")
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
@@ -272,10 +274,12 @@ async function scrapeSaaS(
   signal: AbortSignal,
 ): Promise<ProductData> {
   const titleMatch = landingHtml.match(/<title[^>]*>([^<]+)<\/title>/i);
-  const ogTitleMatch = landingHtml.match(
-    /<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i,
-  );
-  const name = (ogTitleMatch?.[1] || titleMatch?.[1] || "Unknown Service").trim();
+  const ogTitleMatch =
+    landingHtml.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i) ??
+    landingHtml.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:title"/i);
+  const rawName = ogTitleMatch?.[1] || titleMatch?.[1] || "Unknown Service";
+  // Strip site suffix (e.g. "Product | Site Name" → "Product")
+  const name = rawName.replace(/\s*[|\-–—]\s*.+$/, "").trim() || rawName.trim();
 
   const images: string[] = [];
   const ogImageMatch = landingHtml.match(
@@ -367,10 +371,11 @@ async function scrapeSaaS(
 
 function ogTagFallback(html: string): ProductData {
   const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  const ogTitleMatch = html.match(
-    /<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i,
-  );
-  const name = ogTitleMatch?.[1] || titleMatch?.[1] || "Unknown Product";
+  const ogTitleMatch =
+    html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i) ??
+    html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:title"/i);
+  const rawName = ogTitleMatch?.[1] || titleMatch?.[1] || "Unknown Product";
+  const name = rawName.replace(/\s*[|\-–—]\s*.+$/, "").trim() || rawName.trim();
 
   const ogDescMatch = html.match(
     /<meta[^>]+property="og:description"[^>]+content="([^"]+)"/i,
