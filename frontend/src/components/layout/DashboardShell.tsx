@@ -19,6 +19,7 @@ import {
 import { useClerk } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { useProfile } from "@/hooks/use-profile";
+import { useCredits } from "@/hooks/use-credits";
 import { useProducts } from "@/hooks/use-products";
 import { usePersonas } from "@/hooks/use-personas";
 import { useGenerations } from "@/hooks/use-generations";
@@ -64,6 +65,7 @@ function SidebarContent({
 }) {
   const { signOut } = useClerk();
   const { data: profile } = useProfile();
+  const { data: credits, isLoading: creditsLoading } = useCredits();
   const { data: products } = useProducts();
   const { data: personas } = usePersonas();
   const { data: generations } = useGenerations();
@@ -162,7 +164,12 @@ function SidebarContent({
 
       <div className="border-t border-sidebar-border px-4 py-4">
         {collapsed ? (
-          <div className="flex justify-center">
+          <div className="flex flex-col items-center gap-2">
+            {!creditsLoading && credits && (
+              <span className="text-[10px] font-medium tabular-nums text-muted-foreground" title="Credits remaining">
+                {credits.is_unlimited ? "∞" : credits.remaining}
+              </span>
+            )}
             <button
               onClick={handleSignOut}
               className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
@@ -172,15 +179,22 @@ function SidebarContent({
             </button>
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-2">
-            <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
-            <button
-              onClick={handleSignOut}
-              className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
-              aria-label="Sign out"
-            >
-              <LogOut className="size-4" />
-            </button>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
+              <button
+                onClick={handleSignOut}
+                className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
+                aria-label="Sign out"
+              >
+                <LogOut className="size-4" />
+              </button>
+            </div>
+            {!creditsLoading && credits && (
+              <span className="text-xs text-muted-foreground">
+                {credits.is_unlimited ? "Unlimited" : credits.remaining} credits
+              </span>
+            )}
           </div>
         )}
       </div>

@@ -46,8 +46,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { useGenerationStatus, useRegenerateSegment, useRegenLimit, useApproveAndGenerate } from "@/hooks/use-generations";
-import { useProfile } from "@/hooks/use-profile";
+import { useGenerationStatus, useRegenerateSegment, useApproveAndGenerate } from "@/hooks/use-generations";
+import { useCredits } from "@/hooks/use-credits";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { GenerationStatus, ScriptSegment, SegmentVideo } from "@/types/database";
 import { generateSrt, buildWordCues, type WordCue } from "@/lib/srt";
@@ -445,10 +445,7 @@ function VideoSegmentCard({
   onRegenerate,
   isRegenerating,
   multiSelect = false,
-  userPlan = "free",
-  canRegenerate = false,
   regenRemaining = 0,
-  monthlyLimit = 0,
   scriptText,
 }: {
   video: SegmentVideo;
@@ -458,10 +455,7 @@ function VideoSegmentCard({
   onRegenerate: () => void;
   isRegenerating: boolean;
   multiSelect?: boolean;
-  userPlan?: string;
-  canRegenerate?: boolean;
   regenRemaining?: number;
-  monthlyLimit?: number;
   scriptText?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -661,7 +655,7 @@ function VideoSegmentCard({
                   variant="ghost"
                   size="icon"
                   className="size-8 shrink-0"
-                  disabled={isRegenerating || !canRegenerate}
+                  disabled={isRegenerating || regenRemaining === 0}
                   onClick={(e) => {
                     e.stopPropagation();
                     onRegenerate();
@@ -676,11 +670,9 @@ function VideoSegmentCard({
               </TooltipTrigger>
               <TooltipContent>
                 <p>
-                  {userPlan === "free"
-                    ? "Upgrade to regenerate"
-                    : regenRemaining === 0
-                      ? `Monthly limit reached (${monthlyLimit}/${monthlyLimit})`
-                      : `Regenerate (1 credit) · ${regenRemaining} regens left`}
+                  {regenRemaining === 0
+                    ? "No credits remaining"
+                    : `Regenerate (1 credit) · ${regenRemaining} regens left`}
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -1374,16 +1366,9 @@ export default function GenerationDetailPage() {
   } = useGenerationStatus(generationId, isStale);
   const regenerateSegment = useRegenerateSegment();
   const approveAndGenerate = useApproveAndGenerate();
-  const { data: profile } = useProfile();
-  const userPlan = profile?.plan ?? "free";
 
-  const PLAN_REGEN_LIMITS: Record<string, number> = {
-    free: 0, starter: 10, growth: 20, scale: 50,
-  };
-  const { data: regenUsed = 0, refetch: refetchRegenLimit } = useRegenLimit();
-  const monthlyLimit = PLAN_REGEN_LIMITS[userPlan] ?? 0;
-  const regenRemaining = Math.max(0, monthlyLimit - regenUsed);
-  const canRegenerate = userPlan !== "free" && regenRemaining > 0;
+  const { data: creditInfo } = useCredits();
+  const hasCredits = (creditInfo?.remaining ?? 0) > 0;
 
   // Script collapsible state
   const [scriptExpanded, setScriptExpanded] = useState(true);
@@ -1659,7 +1644,6 @@ export default function GenerationDetailPage() {
         `Regenerating ${segmentType.toUpperCase()} ${variation}. 1 credit used.`,
       );
       refetch();
-      refetchRegenLimit();
     } catch (err) {
       toast.error(
         sanitizeMsg(err instanceof Error ? err.message : "Failed to regenerate segment."),
@@ -2121,6 +2105,71 @@ export default function GenerationDetailPage() {
       {/* ---------------------------------------------------------------- */}
       {isComplete && segments && (
         <>
+          {/* ============================================================ */}
+          {/*  Full Ad Preview — auto-stitched on load                      */}
+          {/* ============================================================ */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-foreground">
+                    Full Ad Preview
+                  </CardTitle>
+                  <Badge variant="secondary" className="bg-primary/10 text-primary text-xs">
+                    Hook + Body + CTA
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    Hook {selectedHook + 1} + Body {selectedBody + 1} + CTA {selectedCta + 1}
+                  </p>
+                  {gen?.mode === "triple" && allCombos.length > 0 && (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        disabled={currentComboIndex === -1}
+                        onClick={() => goToCombo((currentComboIndex - 1 + allCombos.length) % allCombos.length)}
+                        aria-label="Previous combination"
+                      >
+                        <ChevronLeft className="h-3 w-3" />
+                      </Button>
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {currentComboIndex === -1 ? `? / ${allCombos.length}` : `${currentComboIndex + 1} / ${allCombos.length}`}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        disabled={currentComboIndex === -1}
+                        onClick={() => goToCombo((currentComboIndex + 1) % allCombos.length)}
+                        aria-label="Next combination"
+                      >
+                        <ChevronRight className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <CombinationPreview
+                hookVideo={segments.hooks?.[selectedHook]}
+                bodyVideo={segments.bodies?.[selectedBody]}
+                ctaVideo={segments.ctas?.[selectedCta]}
+                generationId={generationId}
+                allSegmentEntries={allSegmentEntries}
+                hookScript={script?.hooks?.[selectedHook]}
+                bodyScript={script?.bodies?.[selectedBody]}
+                ctaScript={script?.ctas?.[selectedCta]}
+                autoStitch={true}
+              />
+            </CardContent>
+          </Card>
+
+          <Separator />
+
           {/* Download all + Batch Export toggle */}
           <div className="flex items-center justify-between">
             <div>
@@ -2170,12 +2219,6 @@ export default function GenerationDetailPage() {
               </Button>
             </div>
           </div>
-
-          {userPlan !== "free" && (
-            <p className="text-xs text-muted-foreground">
-              Regenerations this month: {regenUsed}/{monthlyLimit}
-            </p>
-          )}
 
           {/* Partial failure warning banner */}
           {segments?.failed && segments.failed.length > 0 && status === "completed" && (
@@ -2260,10 +2303,7 @@ export default function GenerationDetailPage() {
                     onRegenerate={() => handleRegenerateSegment("hook", i + 1)}
                     isRegenerating={regeneratingKey === `hook_${i + 1}`}
                     multiSelect={batchMode}
-                    userPlan={userPlan}
-                    canRegenerate={canRegenerate}
-                    regenRemaining={regenRemaining}
-                    monthlyLimit={monthlyLimit}
+                    regenRemaining={hasCredits ? (creditInfo?.remaining ?? 0) : 0}
                   />
                 )
               ))}
@@ -2314,10 +2354,7 @@ export default function GenerationDetailPage() {
                     onRegenerate={() => handleRegenerateSegment("body", i + 1)}
                     isRegenerating={regeneratingKey === `body_${i + 1}`}
                     multiSelect={batchMode}
-                    userPlan={userPlan}
-                    canRegenerate={canRegenerate}
-                    regenRemaining={regenRemaining}
-                    monthlyLimit={monthlyLimit}
+                    regenRemaining={hasCredits ? (creditInfo?.remaining ?? 0) : 0}
                   />
                 )
               ))}
@@ -2368,10 +2405,7 @@ export default function GenerationDetailPage() {
                     onRegenerate={() => handleRegenerateSegment("cta", i + 1)}
                     isRegenerating={regeneratingKey === `cta_${i + 1}`}
                     multiSelect={batchMode}
-                    userPlan={userPlan}
-                    canRegenerate={canRegenerate}
-                    regenRemaining={regenRemaining}
-                    monthlyLimit={monthlyLimit}
+                    regenRemaining={hasCredits ? (creditInfo?.remaining ?? 0) : 0}
                   />
                 )
               ))}
@@ -2480,66 +2514,6 @@ export default function GenerationDetailPage() {
               </div>
             </div>
           )}
-
-          {/* ============================================================ */}
-          {/*  2. Combination Preview - simplified                            */}
-          {/* ============================================================ */}
-          <Separator />
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-foreground">
-                  Combination Preview
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  <p className="text-xs text-muted-foreground">
-                    Hook {selectedHook + 1} + Body {selectedBody + 1} + CTA {selectedCta + 1}
-                  </p>
-                  {gen?.mode === "triple" && allCombos.length > 0 && (
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-6 w-6 p-0"
-                        disabled={currentComboIndex === -1}
-                        onClick={() => goToCombo((currentComboIndex - 1 + allCombos.length) % allCombos.length)}
-                        aria-label="Previous combination"
-                      >
-                        <ChevronLeft className="h-3 w-3" />
-                      </Button>
-                      <span className="text-xs text-muted-foreground tabular-nums">
-                        {currentComboIndex === -1 ? `? / ${allCombos.length}` : `${currentComboIndex + 1} / ${allCombos.length}`}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-6 w-6 p-0"
-                        disabled={currentComboIndex === -1}
-                        onClick={() => goToCombo((currentComboIndex + 1) % allCombos.length)}
-                        aria-label="Next combination"
-                      >
-                        <ChevronRight className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <CombinationPreview
-                hookVideo={segments.hooks?.[selectedHook]}
-                bodyVideo={segments.bodies?.[selectedBody]}
-                ctaVideo={segments.ctas?.[selectedCta]}
-                generationId={generationId}
-                allSegmentEntries={allSegmentEntries}
-                hookScript={script?.hooks?.[selectedHook]}
-                bodyScript={script?.bodies?.[selectedBody]}
-                ctaScript={script?.ctas?.[selectedCta]}
-                autoStitch={gen?.mode === "single"}
-              />
-            </CardContent>
-          </Card>
 
           {/* ============================================================ */}
           {/*  3. Composite Image + Generated Script - combined card        */}

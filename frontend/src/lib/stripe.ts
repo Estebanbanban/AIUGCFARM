@@ -115,13 +115,13 @@ export type CreditPackKey = keyof typeof CREDIT_PACKS;
 
 export const SINGLE_VIDEO_PACKS = {
   single_standard: {
-    name: "Single Video · Standard",
+    name: "Single Video · Budget",
     credits: CREDITS_PER_SINGLE,       // 5
     price: CREDITS_PER_SINGLE,         // $5
     quality: "standard" as const,
   },
   single_hd: {
-    name: "Single Video · HD",
+    name: "Single Video · Premium",
     credits: CREDITS_PER_SINGLE_HD,    // 10
     price: CREDITS_PER_SINGLE_HD,      // $10
     quality: "hd" as const,

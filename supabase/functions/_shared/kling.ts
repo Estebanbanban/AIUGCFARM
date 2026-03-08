@@ -55,10 +55,10 @@ async function generateKlingToken(): Promise<string> {
 
 /**
  * Submit a video generation job to Kling AI.
- * image2video endpoint infers aspect ratio from the input image  -  no aspect_ratio param.
+ * Always passes aspect_ratio "9:16" for UGC portrait format.
  *
- * @param model_name - "kling-v2-6" (standard, $0.042/s) or "kling-v3" (hd, $0.084/s).
- *                     Defaults to "kling-v2-6".
+ * @param model_name - "kling-v3" supports any integer duration 3–15s.
+ *                     Defaults to "kling-v3".
  */
 export async function submitKlingJob(params: {
   image_url: string;
@@ -67,14 +67,33 @@ export async function submitKlingJob(params: {
   mode?: "pro" | "std";
   sound?: "on" | "off";
   model_name?: string;
+  /** When provided, the generated clip will end transitioning toward this image pose.
+   *  Requires `image` to also be set (per Kling docs). Used for Seamless Mode. */
+  image_tail_url?: string;
 }): Promise<KlingSubmitResult> {
   const token = await generateKlingToken();
-  const requestedModel = params.model_name || "kling-v2-6";
+  const requestedModel = params.model_name || "kling-v3";
   const requestedMode = params.mode || "pro";
   const requestedSound = params.sound || (requestedMode === "pro" ? "on" : "off");
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15_000);
+
+  const requestBody: Record<string, unknown> = {
+    model_name: requestedModel,
+    image: params.image_url,
+    prompt: params.script,
+    duration: String(params.duration),
+    mode: requestedMode,
+    sound: requestedSound,
+    aspect_ratio: "9:16",
+  };
+
+  // image_tail requires image to also be set (both are present here).
+  // Only include when explicitly provided — null/undefined means no tail.
+  if (params.image_tail_url) {
+    requestBody.image_tail = params.image_tail_url;
+  }
 
   let res: Response;
   try {
@@ -84,14 +103,7 @@ export async function submitKlingJob(params: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        model_name: requestedModel,
-        image: params.image_url,
-        prompt: params.script,
-        duration: String(params.duration),
-        mode: requestedMode,
-        sound: requestedSound,
-      }),
+      body: JSON.stringify(requestBody),
       signal: controller.signal,
     });
   } catch (err) {

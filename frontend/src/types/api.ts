@@ -111,6 +111,10 @@ export interface ApproveGenerationParams {
   video_provider?: "kling" | "sora";
   /** Override quality stored on the generation record (e.g. user switched standard → HD before approving). */
   video_quality?: "standard" | "hd";
+  /** Seamless Mode: chain each clip's ending pose to the next clip's starting pose via Kling's
+   *  image_tail parameter. Only effective for HD quality (kling-v3). All clips still generate
+   *  in parallel — no extra latency. */
+  seamless_mode?: boolean;
 }
 
 /** Response from generate-video Edge Function */

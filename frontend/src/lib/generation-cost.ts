@@ -32,8 +32,17 @@ function normalizeModel(model: string | null | undefined): KlingModel | null {
   return null;
 }
 
-function billedSeconds(durationSeconds: number): number {
-  return durationSeconds <= 5 ? 5 : 10;
+/**
+ * Returns the number of seconds to bill for a given clip duration.
+ * Kling v2.6 bills in two fixed tiers (≤5s → 5s, >5s → 10s).
+ * Kling v3 bills per actual second, so no snapping is applied.
+ */
+function billedSeconds(durationSeconds: number, model: KlingModel | null = null): number {
+  if (model === "kling-v2-6") {
+    return durationSeconds <= 5 ? 5 : 10;
+  }
+  // kling-v3 / kling-v3-0: bill actual duration
+  return durationSeconds;
 }
 
 export function calculateGenerationCost(
@@ -51,8 +60,9 @@ export function calculateGenerationCost(
     ...(videos?.ctas ?? []).map((v) => v.duration),
   ].filter((d) => typeof d === "number" && d > 0);
 
+  const effectiveModel = normalizedModel ?? normalizeModel(MODEL_BY_QUALITY[resolvedQuality]);
   const rawSeconds = allDurations.reduce((sum, d) => sum + d, 0);
-  const totalBilledSeconds = allDurations.reduce((sum, d) => sum + billedSeconds(d), 0);
+  const totalBilledSeconds = allDurations.reduce((sum, d) => sum + billedSeconds(d, effectiveModel), 0);
   const usdPerSecond = normalizedModel
     ? USD_PER_SECOND_BY_MODEL[normalizedModel]
     : USD_PER_SECOND_BY_QUALITY[resolvedQuality];

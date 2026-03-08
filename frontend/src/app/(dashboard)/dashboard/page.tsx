@@ -541,7 +541,7 @@ export default function DashboardPage() {
                       <p className="truncate text-sm font-medium">{preset.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {preset.config.mode === "triple" ? "Full Campaign" : "Single Ad"} ·{" "}
-                        {preset.config.quality === "hd" ? "HD" : "Standard"} ·{" "}
+                        {preset.config.quality === "hd" ? "Premium" : "Budget"} ·{" "}
                         {preset.config.language.toUpperCase()}
                       </p>
                     </div>

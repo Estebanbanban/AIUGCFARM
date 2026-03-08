@@ -114,19 +114,23 @@ describe("calculateGenerationCost", () => {
     });
 
     it("calculates cost for HD generation", () => {
-      // 3 segments at 5s each = 15 billed seconds * $0.084/s
+      // kling-v3 (HD) bills actual seconds: 4+5+3=12s * $0.084/s
       const segments = makeSegments([4], [5], [3]);
       const result = calculateGenerationCost(segments, "hd", null);
-      expect(result.totalBilledSeconds).toBe(15);
+      expect(result.totalBilledSeconds).toBe(12);
       expect(result.usdPerSecond).toBe(0.084);
-      expect(result.totalCostUsd).toBeCloseTo(1.26, 2);
+      expect(result.totalCostUsd).toBeCloseTo(1.008, 2);
     });
 
-    it("HD costs exactly 2x standard", () => {
+    it("HD costs more per second but bills actual duration (no 5/10 snap)", () => {
+      // standard (kling-v2-6): 5+5+5=15 billed × $0.042 = $0.63
+      // hd (kling-v3): 4+5+3=12 billed × $0.084 = $1.008
       const segments = makeSegments([4], [5], [3]);
       const stdResult = calculateGenerationCost(segments, "standard", null);
       const hdResult = calculateGenerationCost(segments, "hd", null);
-      expect(hdResult.totalCostUsd).toBeCloseTo(stdResult.totalCostUsd * 2, 2);
+      expect(stdResult.totalBilledSeconds).toBe(15);
+      expect(hdResult.totalBilledSeconds).toBe(12);
+      expect(hdResult.usdPerSecond).toBeCloseTo(stdResult.usdPerSecond * 2, 5);
     });
 
     it("calculates cost for triple generation (9 segments)", () => {

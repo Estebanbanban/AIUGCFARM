@@ -4,6 +4,7 @@ import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
 import { withRetry } from "../_shared/retry.ts";
 import { generateCompositeFromImages } from "../_shared/nanobanana.ts";
+import type { ProductReferenceContext } from "../_shared/nanobanana.ts";
 
 const MAX_PRODUCT_REFERENCE_IMAGES = 4;
 
@@ -19,7 +20,11 @@ Deno.serve(async (req: Request) => {
     const userId = await requireUserId(req);
     const sb = getAdminClient();
 
-    const { product_id, persona_id, format = "9:16", custom_scene_prompt } = await req.json();
+    const { product_id, persona_id, format = "9:16", custom_scene_prompt, pose_variant } = await req.json();
+
+    // pose_variant: optional 1 | 2 | 3 — only the body pose hint varies; nothing else changes
+    const resolvedPoseVariant: 1 | 2 | 3 | undefined =
+      pose_variant === 1 || pose_variant === 2 || pose_variant === 3 ? pose_variant : undefined;
 
     if (!product_id) return json({ detail: "product_id is required" }, cors, 400);
     if (!persona_id) return json({ detail: "persona_id is required" }, cors, 400);
@@ -83,20 +88,23 @@ Deno.serve(async (req: Request) => {
     const scenePrompt = custom_scene_prompt ||
       ((persona.attributes as Record<string, unknown>)?.scene_prompt as string | undefined);
 
-    // Generate one composite image
+    const productContext: ProductReferenceContext = {
+      name: typeof product.name === "string" ? product.name : undefined,
+      description: typeof product.description === "string" ? product.description : undefined,
+      category: typeof product.category === "string" ? product.category : undefined,
+      price: typeof product.price === "number" ? product.price : undefined,
+      currency: typeof product.currency === "string" ? product.currency : undefined,
+    };
+
+    // Generate one composite image (with optional pose variant)
     const composite = await withRetry(
       () => generateCompositeFromImages(
         personaSignedUrl,
         resolvedProductImageUrls,
-        {
-          name: typeof product.name === "string" ? product.name : undefined,
-          description: typeof product.description === "string" ? product.description : undefined,
-          category: typeof product.category === "string" ? product.category : undefined,
-          price: typeof product.price === "number" ? product.price : undefined,
-          currency: typeof product.currency === "string" ? product.currency : undefined,
-        },
+        productContext,
         scenePrompt,
         format as "9:16" | "16:9",
+        resolvedPoseVariant,
       ),
       5,
       1000,

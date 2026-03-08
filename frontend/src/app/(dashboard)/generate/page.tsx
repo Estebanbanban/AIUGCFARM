@@ -308,7 +308,7 @@ function useResolvedPersonaImages(personas: Persona[] | undefined) {
 }
 
 const PLAN_BENEFITS: Record<PlanTier, string[]> = {
-  starter: ["Standard rendering queue", "Watermark-free exports", "Commercial use license", "Standard support"],
+  starter: ["Rendering queue", "Watermark-free exports", "Commercial use license", "Standard support"],
   growth: ["Fast rendering priority", "Watermark-free exports", "Commercial use license", "Priority support"],
   scale: ["Highest rendering priority", "Watermark-free exports", "Commercial use license", "Dedicated manager", "Custom API limits"],
 };
@@ -1120,6 +1120,7 @@ export default function GeneratePage() {
         advanced_segments: advancedSegments,
         video_provider: store.videoProvider,
         video_quality: store.quality,
+        seamless_mode: store.seamlessMode,
       },
       {
         onSuccess: () => {
@@ -2368,8 +2369,8 @@ export default function GeneratePage() {
                                     : "border-border hover:border-muted-foreground/30",
                                 )}
                               >
-                                <p className="text-sm font-semibold">Standard</p>
-                                <p className="mt-0.5 text-xs text-muted-foreground">Kling 2.6 · Faster, great for testing</p>
+                                <p className="text-sm font-semibold">Budget</p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">kling-v2-6 · 720p · Fixed 5/10/5s</p>
                               </button>
                               <button
                                 type="button"
@@ -2386,11 +2387,45 @@ export default function GeneratePage() {
                                     : "border-border hover:border-muted-foreground/30",
                                 )}
                               >
-                                <p className="text-sm font-semibold">High Quality</p>
-                                <p className="mt-0.5 text-xs text-muted-foreground">Best quality · final ads</p>
+                                <p className="text-sm font-semibold">Premium</p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">kling-v3 · 1080p · Flexible duration · Seamless mode</p>
                               </button>
                             </div>
                           </div>
+
+                          {/* Seamless Mode toggle — HD only (kling-v3 image_tail) */}
+                          {store.quality === "hd" && store.videoProvider === "kling" && (
+                            <button
+                              type="button"
+                              onClick={() => store.setSeamlessMode(!store.seamlessMode)}
+                              className={cn(
+                                "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition-all",
+                                store.seamlessMode
+                                  ? "border-primary bg-primary/5"
+                                  : "border-border hover:border-muted-foreground/30",
+                              )}
+                            >
+                              <div>
+                                <p className="text-sm font-semibold">Seamless transitions</p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                  Each clip flows into the next for visual continuity
+                                </p>
+                              </div>
+                              <div
+                                className={cn(
+                                  "ml-3 flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors",
+                                  store.seamlessMode ? "bg-primary" : "bg-muted",
+                                )}
+                              >
+                                <span
+                                  className={cn(
+                                    "h-4 w-4 rounded-full bg-white shadow transition-transform",
+                                    store.seamlessMode ? "translate-x-4" : "translate-x-0.5",
+                                  )}
+                                />
+                              </div>
+                            </button>
+                          )}
 
                           <Collapsible open={ctaOpen} onOpenChange={setCtaOpen}>
                             <CollapsibleTrigger asChild>
@@ -2882,7 +2917,7 @@ export default function GeneratePage() {
                   )}
                 >
                   <>
-                    {store.quality === "hd" ? "1 HD Video" : "1 Standard Video"}
+                    {store.quality === "hd" ? "1 Premium Video" : "1 Budget Video"}
                     {isFirstVideo && (
                       <span className="ml-1 sm:ml-2 text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
                         -50%
@@ -2932,11 +2967,11 @@ export default function GeneratePage() {
                           </div>
                           {store.quality === "hd" ? (
                             <div>
-                              <span className="font-semibold text-foreground">Kling 3.0 · HD</span>
+                              <span className="font-semibold text-foreground">Kling 3.0 · Premium</span>
                               <span className="ml-2 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Best Quality</span>
                             </div>
                           ) : (
-                            <span className="font-semibold text-foreground">Kling 2.6 · Standard</span>
+                            <span className="font-semibold text-foreground">Kling 2.6 · Budget</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
@@ -2955,7 +2990,7 @@ export default function GeneratePage() {
                     </div>
                     {store.quality === "standard" && (
                       <p className="text-xs text-muted-foreground mt-2 text-center">
-                        Want HD instead?{" "}
+                        Want Premium instead?{" "}
                         <button
                           type="button"
                           className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"

@@ -393,7 +393,7 @@ export default function BillingPage() {
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="size-3.5 shrink-0 text-primary" strokeWidth={2.5} />
-                    {videosStandard} standard or {videosHd} HD videos
+                    {videosStandard} Budget or {videosHd} Premium videos
                   </li>
                   {tripleStandard > 0 && (
                     <li className="flex items-center gap-2">
@@ -439,7 +439,7 @@ export default function BillingPage() {
               <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10">
                 <Film className="size-4 text-primary" />
               </div>
-              <span className="text-sm font-semibold">Standard</span>
+              <span className="text-sm font-semibold">Budget</span>
             </div>
             <p className="text-xs leading-relaxed text-muted-foreground">
               <span className="font-semibold text-primary">5 credits</span> = 1 complete ad
@@ -453,10 +453,10 @@ export default function BillingPage() {
               <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10">
                 <Zap className="size-4 text-primary" />
               </div>
-              <span className="text-sm font-semibold">HD</span>
+              <span className="text-sm font-semibold">Premium</span>
             </div>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              <span className="font-semibold text-primary">10 credits</span> = 1 complete HD ad
+              <span className="font-semibold text-primary">10 credits</span> = 1 complete Premium ad
               rendered with Kling v3 for sharper, more cinematic results.
             </p>
           </div>
@@ -486,7 +486,7 @@ export default function BillingPage() {
             TikTok, Reels, and Shorts. Find your winning creative in days, not weeks.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {["15 cr → 27 combos", "$0.56/combo (standard)", "vs $5/single video"].map((tag) => (
+            {["15 cr → 27 combos", "$0.56/combo (Budget)", "vs $5/single video"].map((tag) => (
               <span key={tag} className="rounded-md border border-primary/20 bg-card px-2.5 py-1 text-xs text-muted-foreground">
                 {tag}
               </span>
