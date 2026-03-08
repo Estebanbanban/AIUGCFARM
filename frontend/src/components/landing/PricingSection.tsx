@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 import { Check, Loader2, Shield, RefreshCw, Star } from "lucide-react";
 import { toast } from "sonner";
 import { ScaleIn, FadeInUp } from "@/lib/motion";
-import { createClient } from "@/lib/supabase/client";
 import { callEdge } from "@/lib/api";
 import { PLANS } from "@/lib/stripe";
 import type { PlanTier } from "@/lib/stripe";
@@ -65,20 +65,13 @@ const plans = (Object.keys(PLANS) as PlanTier[]).map((key) => ({
 
 export function PricingSection() {
   const [annual, setAnnual] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState<PlanTier | null>(null);
   const router = useRouter();
-
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }: { data: { session: unknown } }) => {
-      setIsLoggedIn(!!session);
-    });
-  }, []);
+  const { isSignedIn } = useAuth();
 
   async function handlePlanClick(planKey: PlanTier) {
     trackCtaClicked("pricing", planKey);
-    if (!isLoggedIn) {
+    if (!isSignedIn) {
       router.push(`/sign-up?plan=${planKey}${annual ? "&billing=annual" : ""}`);
       return;
     }

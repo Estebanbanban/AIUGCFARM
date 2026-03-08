@@ -1,11 +1,9 @@
 import { PricingSection } from "@/components/landing/PricingSection";
 import { Check, X, Film, Zap, Layers } from "lucide-react";
-import Link from "next/link";
 import type { Metadata } from "next";
 import { CREDIT_PACKS } from "@/lib/stripe";
 import type { CreditPackKey } from "@/lib/stripe";
-import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
+import { CreditPackCard } from "@/components/pricing/CreditPackCard";
 
 export const metadata: Metadata = {
   title: "Pricing, CineRads",
@@ -55,72 +53,17 @@ export default function PricingPage() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => {
-              const isBestValue = "badge" in pack && pack.badge === "Best value";
-              const videosStandard = Math.floor(pack.credits / 5);
-              const videosHd = Math.floor(pack.credits / 10);
-              const tripleStandard = Math.floor(pack.credits / 15);
-              const combosTriple = tripleStandard * 27;
-
-              return (
-                <div
-                  key={key}
-                  className={cn(
-                    "flex flex-col rounded-2xl border p-5 transition-all duration-200",
-                    isBestValue
-                      ? "border-primary/40 bg-card shadow-[0_0_30px_rgba(249,115,22,0.06)]"
-                      : "border-border bg-card hover:border-primary/30"
-                  )}
-                >
-                  <div className="mb-3 flex items-center gap-2">
-                    <h3 className="font-semibold text-foreground">{pack.name}</h3>
-                    {"badge" in pack && pack.badge && (
-                      <Badge variant="secondary" className={cn("text-xs", isBestValue && "bg-primary/10 text-primary")}>
-                        {pack.badge}
-                      </Badge>
-                    )}
-                  </div>
-
-                  <div className="mb-1 flex items-baseline gap-1">
-                    <span className="text-3xl font-bold text-foreground">${pack.price}</span>
-                  </div>
-                  <p className="mb-4 text-xs text-primary">${pack.pricePerCredit}/credit</p>
-
-                  <ul className="mb-5 flex flex-1 flex-col gap-2 text-sm text-muted-foreground">
-                    <li className="flex items-center gap-2">
-                      <Check className="size-3.5 shrink-0 text-primary" strokeWidth={2.5} />
-                      <strong className="text-foreground">{pack.credits} credits</strong>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <Check className="size-3.5 shrink-0 text-primary" strokeWidth={2.5} />
-                      {videosStandard} standard or {videosHd} HD videos
-                    </li>
-                    {tripleStandard > 0 && (
-                      <li className="flex items-center gap-2">
-                        <Check className="size-3.5 shrink-0 text-emerald-400" strokeWidth={2.5} />
-                        <span>{tripleStandard} Triple batch{tripleStandard > 1 ? "es" : ""} = <strong className="text-foreground">{combosTriple} ad combos</strong></span>
-                      </li>
-                    )}
-                    <li className="flex items-center gap-2">
-                      <Check className="size-3.5 shrink-0 text-primary" strokeWidth={2.5} />
-                      Never expire
-                    </li>
-                  </ul>
-
-                  <Link
-                    href="/sign-up"
-                    className={cn(
-                      "w-full rounded-full py-2.5 text-center text-sm font-medium transition-all duration-200",
-                      isBestValue
-                        ? "bg-primary text-white hover:bg-orange-600"
-                        : "border border-border text-foreground hover:border-primary/40"
-                    )}
-                  >
-                    Buy Now
-                  </Link>
-                </div>
-              );
-            })}
+            {(Object.entries(CREDIT_PACKS) as [CreditPackKey, (typeof CREDIT_PACKS)[CreditPackKey]][]).map(([key, pack]) => (
+              <CreditPackCard
+                key={key}
+                packKey={key}
+                pack={pack}
+                videosStandard={Math.floor(pack.credits / 5)}
+                videosHd={Math.floor(pack.credits / 10)}
+                tripleStandard={Math.floor(pack.credits / 15)}
+                combosTriple={Math.floor(pack.credits / 15) * 27}
+              />
+            ))}
           </div>
         </div>
       </section>
