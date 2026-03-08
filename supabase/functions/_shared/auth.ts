@@ -142,7 +142,7 @@ export async function requireUserId(req: Request): Promise<string> {
           console.warn("[auth] No profile by email, creating new for Clerk user:", clerkUserId);
           const { data: newProfile, error: insertErr } = await adminClient
             .from("profiles")
-            .insert({ clerk_user_id: clerkUserId, email, plan: "free", credits: 3 })
+            .insert({ clerk_user_id: clerkUserId, email, plan: "free" })
             .select("id")
             .single();
           if (!insertErr && newProfile) {
