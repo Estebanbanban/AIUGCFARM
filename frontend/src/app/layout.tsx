@@ -59,13 +59,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans min-h-screen bg-background text-foreground antialiased`}>
-        <PromoBanner />
         <ClerkProvider
           signInUrl="/sign-in"
           signUpUrl="/sign-up"
           signInFallbackRedirectUrl="/dashboard"
           signUpFallbackRedirectUrl="/dashboard"
         >
+          <PromoBanner />
           <NextTopLoader color="hsl(var(--primary))" showSpinner={false} height={3} />
           <Script
             src="https://datafa.st/js/script.js"
