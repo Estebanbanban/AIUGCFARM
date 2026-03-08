@@ -346,7 +346,7 @@ export default function GeneratePage() {
       .from("generations")
       .select("status")
       .eq("id", store.pendingGenerationId)
-      .single()
+      .maybeSingle()
       .then(({ data }: { data: { status: string } | null }) => {
         if (!data || data.status !== "awaiting_approval") {
           store.clearPendingScript();
@@ -422,6 +422,8 @@ export default function GeneratePage() {
   const lastPreviewContextKeyRef = useRef<string | null>(null);
   // Cancellation token for auto-fired script generation
   const scriptAutoFireToken = useRef(0);
+  // Tracks whether we've already restored advanced segment signed URLs this session
+  const advancedImagesRestoredRef = useRef(false);
   // Debounce timer for auto-regen on settings change
   const scriptRegenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -551,6 +553,40 @@ export default function GeneratePage() {
     store.setCompositePreviewCache,
     store.setCompositeImagePath,
   ]);
+
+  // Restore advanced segment custom image signed URLs after page navigation.
+  // imagePath is persisted but imageSignedUrl expires — re-sign on mount.
+  useEffect(() => {
+    if (advancedImagesRestoredRef.current) return;
+    if (!store.advancedMode || !store.advancedSegments) return;
+
+    const toReSign: Array<{ type: "hooks" | "bodies" | "ctas"; index: number; path: string }> = [];
+    (["hooks", "bodies", "ctas"] as const).forEach((type) => {
+      store.advancedSegments![type].forEach((seg, index) => {
+        if (seg.imagePath) {
+          toReSign.push({ type, index, path: seg.imagePath });
+        }
+      });
+    });
+
+    advancedImagesRestoredRef.current = true;
+    if (toReSign.length === 0) return;
+
+    const paths = toReSign.map((s) => s.path);
+    getSignedImageUrls("composite-images", paths, 3600)
+      .then((signedUrls) => {
+        toReSign.forEach(({ type, index }, i) => {
+          const signedUrl = signedUrls[i];
+          if (typeof signedUrl === "string" && signedUrl.startsWith("https://")) {
+            store.updateAdvancedSegment(type, index, { imageSignedUrl: signedUrl });
+          }
+        });
+      })
+      .catch(() => {
+        // Silent failure — images fall back to main composite
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.advancedMode, store.advancedSegments]);
 
   // Auto-fire composites when arriving at Section 3 (step >= 4) after restore check.
   useEffect(() => {
@@ -2935,9 +2971,9 @@ export default function GeneratePage() {
                     {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
                       const isGrowth = key === "growth";
                       const isStarter = key === "starter";
-                      const discountedMonthly = offer.isActive
-                        ? (isStarter ? offer.discountedStarterPrice(plan.price) : offer.discountedPrice(plan.price))
-                        : plan.price;
+                      const discountedMonthly = isStarter
+                        ? offer.discountedStarterPrice(plan.price)
+                        : offer.discountedPrice(plan.price);
                       const discountLabel = isStarter ? "-50%" : "-30%";
                       return (
                         <div
@@ -2969,12 +3005,10 @@ export default function GeneratePage() {
                               </span>
                               <span className="text-muted-foreground font-medium mb-1">/mo</span>
                             </div>
-                            {offer.isActive && (
-                              <div className="flex items-center gap-2 text-sm font-medium">
-                                <span className="line-through text-muted-foreground">${plan.price}/mo</span>
-                                <span className="text-primary bg-primary/10 px-2 py-0.5 rounded-md text-xs font-bold">{discountLabel}</span>
-                              </div>
-                            )}
+                            <div className="flex items-center gap-2 text-sm font-medium">
+                              <span className="line-through text-muted-foreground">${plan.price}/mo</span>
+                              <span className="text-primary bg-primary/10 px-2 py-0.5 rounded-md text-xs font-bold">{discountLabel}</span>
+                            </div>
                             <div className="mt-3 inline-flex bg-muted border border-border text-muted-foreground text-xs font-bold px-3 py-1.5 rounded-lg">
                               ≈ ${(discountedMonthly / (Math.floor(plan.credits / CREDITS_PER_BATCH) * 27)).toFixed(2)}/video
                             </div>
@@ -3093,9 +3127,9 @@ export default function GeneratePage() {
                   {(Object.entries(PLANS) as [PlanTier, (typeof PLANS)[PlanTier]][]).map(([key, plan]) => {
                     const isGrowth = key === "growth";
                     const isStarter = key === "starter";
-                    const discountedMonthly = offer.isActive
-                      ? (isStarter ? offer.discountedStarterPrice(plan.price) : offer.discountedPrice(plan.price))
-                      : plan.price;
+                    const discountedMonthly = isStarter
+                      ? offer.discountedStarterPrice(plan.price)
+                      : offer.discountedPrice(plan.price);
                     const isCurrentPlan = currentPlan === key;
                     const isDowngrade = plan.personas <= currentLimit && !isCurrentPlan;
                     const isDisabled = checkout.isPending || isCurrentPlan || isDowngrade;
@@ -3117,7 +3151,7 @@ export default function GeneratePage() {
                           <p className="font-semibold text-base">{plan.name}</p>
                           <div className="mt-1 flex items-baseline gap-1">
                             <span className="text-2xl font-bold">${discountedMonthly}</span>
-                            {offer.isActive && <span className="text-sm text-muted-foreground line-through">${plan.price}</span>}
+                            <span className="text-sm text-muted-foreground line-through">${plan.price}</span>
                             <span className="text-xs text-muted-foreground">/mo</span>
                           </div>
                           <p className="mt-1 text-xs text-orange-500 font-medium">

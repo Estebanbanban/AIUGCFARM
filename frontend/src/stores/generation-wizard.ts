@@ -319,7 +319,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
         return localStorage;
       }),
       // Don't persist action functions (Zustand handles this automatically)
-      // Explicitly skip advancedSegments - large, session-specific
+      // advancedSegments is persisted; imageSignedUrl fields are re-signed on restore (expire ~2h)
       partialize: (state) => ({
         step: state.step,
         productId: state.productId,
@@ -337,13 +337,13 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
         creditsToCharge: state.creditsToCharge,
         compositePreviewCache: state.compositePreviewCache,
         advancedMode: state.advancedMode,
+        advancedSegments: state.advancedSegments,
         videoProvider: state.videoProvider,
         hooksCount: state.hooksCount,
         bodiesCount: state.bodiesCount,
         ctasCount: state.ctasCount,
-        // advancedSegments intentionally excluded - complex, per-session
       }),
-      version: 1,
+      version: 2,
     },
   ),
 );

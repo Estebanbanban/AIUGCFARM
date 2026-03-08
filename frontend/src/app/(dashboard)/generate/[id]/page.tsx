@@ -1570,7 +1570,7 @@ export default function GenerationDetailPage() {
         .from("generations")
         .select("products(name), personas(name)")
         .eq("id", generationId)
-        .single()
+        .maybeSingle()
         .then(({ data }: { data: { products: { name: string } | null; personas: { name: string } | null } | null }) => {
           if (data?.products?.name) setProductName(data.products.name);
           if (data?.personas?.name) setPersonaName(data.personas.name);
