@@ -475,11 +475,17 @@ export default function GeneratePage() {
         if (!cancelled) setPreviewRestoreReady(true);
         return;
       }
-      const cachedPaths = store.compositePreviewCache[previewContextKey] ?? [];
+      // Filter out pose-variant JSON paths (e.g. {"hook":...}) — they're not
+      // valid storage paths and will return 400 from the signing endpoint.
+      const isValidPath = (p: string) => typeof p === "string" && !p.startsWith("{");
+      const cachedPaths = (store.compositePreviewCache[previewContextKey] ?? []).filter(isValidPath);
       const fallbackPath =
-        !contextChanged && typeof store.compositeImagePath === "string"
+        !contextChanged && typeof store.compositeImagePath === "string" && isValidPath(store.compositeImagePath)
           ? store.compositeImagePath
           : null;
+      if (!fallbackPath && store.compositeImagePath?.startsWith("{")) {
+        store.setCompositeImagePath(null); // clear stale JSON path from localStorage
+      }
       const pathsToRestore = cachedPaths.length > 0
         ? cachedPaths
         : fallbackPath
