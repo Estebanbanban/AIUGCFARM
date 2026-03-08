@@ -23,27 +23,30 @@ Deno.serve(async (req: Request) => {
     // Per-user daily limit for composite image generations
     const { data: profile } = await sb
       .from("profiles")
-      .select("plan")
+      .select("plan, role")
       .eq("id", userId)
       .single();
     const userPlan = profile?.plan ?? "free";
-    const dailyLimit = userPlan === "free" ? 10 : 50;
+    const isAdmin = profile?.role === "admin";
+    const dailyLimit = isAdmin ? Infinity : userPlan === "free" ? 10 : 50;
 
-    const todayStart = new Date();
-    todayStart.setUTCHours(0, 0, 0, 0);
-    const { count: todayCount } = await sb
-      .from("credit_ledger")
-      .select("id", { count: "exact", head: true })
-      .eq("owner_id", userId)
-      .eq("reason", "composite_generation")
-      .gte("created_at", todayStart.toISOString());
+    if (isFinite(dailyLimit)) {
+      const todayStart = new Date();
+      todayStart.setUTCHours(0, 0, 0, 0);
+      const { count: todayCount } = await sb
+        .from("credit_ledger")
+        .select("id", { count: "exact", head: true })
+        .eq("owner_id", userId)
+        .eq("reason", "composite_generation")
+        .gte("created_at", todayStart.toISOString());
 
-    if ((todayCount ?? 0) >= dailyLimit) {
-      return json(
-        { detail: `Daily composite generation limit reached (${dailyLimit}/day). Try again tomorrow.` },
-        cors,
-        429,
-      );
+      if ((todayCount ?? 0) >= dailyLimit) {
+        return json(
+          { detail: `Daily composite generation limit reached (${dailyLimit}/day). Try again tomorrow.` },
+          cors,
+          429,
+        );
+      }
     }
 
     const { product_id, persona_id, format = "9:16", selected_images } = await req.json();
