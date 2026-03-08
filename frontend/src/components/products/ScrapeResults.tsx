@@ -70,15 +70,11 @@ export function ScrapeResults({
   }
 
   async function handleConfirmAll() {
-    if (!brandId) {
-      toast.error('No brand selected. Please select a brand before confirming.');
-      return;
-    }
     setConfirming(true);
     try {
       await confirmProduct.mutateAsync({
         product_ids: products.map((p) => p.id),
-        brand_id: brandId,
+        ...(brandId ? { brand_id: brandId } : {}),
       });
       toast.success('Products confirmed!');
       onConfirmed();

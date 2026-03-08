@@ -310,19 +310,6 @@ export default function ProductsPage() {
 
   async function handleScrape() {
     if (!importUrl.trim()) return;
-
-    // Ensure a brand is selected — auto-select the first one if needed
-    let activeBrandId = selectedBrandId;
-    if (!activeBrandId) {
-      const firstBrand = brands?.[0];
-      if (!firstBrand) {
-        setScrapeError('Create a brand first before importing products.');
-        return;
-      }
-      setSelectedBrandId(firstBrand.id);
-      activeBrandId = firstBrand.id;
-    }
-
     setScrapeError(null);
     setScrapedProducts([]);
     setSelectedProductIds(new Set());
@@ -357,6 +344,8 @@ export default function ProductsPage() {
       setSelectedProductIds(new Set(candidates.map((p) => p.id)));
       setScrapedPlatform(result.platform ?? result.source ?? null);
       setScrapedBrandSummary(result.brand_summary as BrandSummary | null ?? null);
+      // Auto-select first brand if none is active (e.g. onboarding / query-param flow)
+      if (!selectedBrandId && brands?.[0]) setSelectedBrandId(brands[0].id);
       setShowCandidates(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to scrape URL';
@@ -366,14 +355,13 @@ export default function ProductsPage() {
   }
 
   async function handleConfirmProducts() {
-    if (!selectedBrand) return;
     const selectedIds = [...selectedProductIds];
     if (selectedIds.length === 0) return;
 
     try {
       await confirmProduct.mutateAsync({
         product_ids: selectedIds,
-        brand_id: selectedBrand.id,
+        ...(selectedBrand ? { brand_id: selectedBrand.id } : {}),
       });
       toast.success(`${selectedIds.length} product${selectedIds.length !== 1 ? 's' : ''} imported!`);
       setShowImport(false);
