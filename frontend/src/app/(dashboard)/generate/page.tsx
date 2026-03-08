@@ -1408,7 +1408,7 @@ export default function GeneratePage() {
             size="sm"
             variant="outline"
             className="shrink-0 border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push(`/generate/${orphanedDraft.id}`)}
           >
             Review &amp; Approve
           </Button>
