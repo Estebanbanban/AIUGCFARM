@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
 import { CookieBanner } from "@/components/layout/CookieBanner";
 import { ClerkProvider } from "@clerk/nextjs";
+import { PromoBanner } from "@/components/promo/PromoBanner";
 
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -58,6 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans min-h-screen bg-background text-foreground antialiased`}>
+        <PromoBanner />
         <ClerkProvider
           signInUrl="/sign-in"
           signUpUrl="/sign-up"
