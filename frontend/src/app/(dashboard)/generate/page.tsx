@@ -1447,68 +1447,60 @@ export default function GeneratePage() {
                   </Tabs>
                 )
               ) : confirmedProducts.length > 0 ? (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
                   {confirmedProducts.map((product) => (
-                    <div key={product.id} className="relative">
+                    <div key={product.id} className="group relative">
                       <button
                         onClick={() => store.setProductId(product.id)}
-                        className="w-full text-left"
+                        className="w-full"
                       >
-                        <Card
+                        <div
                           className={cn(
-                            "h-full transition-all",
+                            "overflow-hidden rounded-xl border transition-all",
                             store.productId === product.id
-                              ? "border-primary ring-1 ring-primary/30"
-                              : "hover:border-muted-foreground/30",
+                              ? "border-primary ring-2 ring-primary/40"
+                              : "border-border hover:border-muted-foreground/40",
                           )}
                         >
-                          <CardContent className="flex flex-col gap-3 p-5">
-                            <div className="flex aspect-video items-center justify-center rounded-lg bg-muted">
-                              {productImageMap[product.id] ? (
-                                <img
-                                  src={productImageMap[product.id]!}
-                                  alt={product.name}
-                                  className="size-full rounded-lg object-cover"
-                                  loading="lazy"
-                                  decoding="async"
-                                />
-                              ) : (
-                                <ImageIcon className="size-8 text-muted-foreground" />
-                              )}
-                            </div>
-                            <div>
-                              <h3 className="font-medium">{product.name}</h3>
-                              {product.price && (
-                                <p className="mt-1 font-mono text-sm font-semibold">
-                                  {product.currency === "USD" ? "$" : product.currency}
-                                  {product.price}
-                                </p>
-                              )}
-                            </div>
-                            {store.productId === product.id && (
-                              <div className="flex items-center gap-1.5 text-xs text-primary">
-                                <Check className="size-3.5" />
-                                Selected
+                          {/* Square image */}
+                          <div className="relative aspect-square w-full overflow-hidden bg-muted">
+                            {productImageMap[product.id] ? (
+                              <img
+                                src={productImageMap[product.id]!}
+                                alt={product.name}
+                                className="size-full object-cover transition-transform duration-200 group-hover:scale-105"
+                                loading="lazy"
+                                decoding="async"
+                              />
+                            ) : (
+                              <div className="flex size-full items-center justify-center">
+                                <ImageIcon className="size-6 text-muted-foreground/50" />
                               </div>
                             )}
-                          </CardContent>
-                        </Card>
+                            {/* Selected checkmark */}
+                            {store.productId === product.id && (
+                              <div className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-primary shadow">
+                                <Check className="size-3 text-primary-foreground" />
+                              </div>
+                            )}
+                          </div>
+                          {/* Title */}
+                          <div className="px-2 py-1.5">
+                            <p className="truncate text-xs font-medium leading-snug">
+                              {product.name}
+                            </p>
+                          </div>
+                        </div>
                       </button>
-                      <Button
-                        asChild
-                        size="icon"
-                        variant="secondary"
-                        className="absolute right-3 top-3 size-8 rounded-full"
+                      {/* Edit — visible on hover */}
+                      <Link
+                        href={`/products/${product.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        title="Edit product"
+                        className="absolute left-1.5 top-1.5 hidden size-6 items-center justify-center rounded-full bg-background/80 backdrop-blur shadow border border-border group-hover:flex"
                       >
-                        <Link
-                          href={`/products/${product.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          aria-label={`Edit ${product.name}`}
-                          title="Edit product details and images"
-                        >
-                          <Pencil className="size-3.5" />
-                        </Link>
-                      </Button>
+                        <Pencil className="size-3 text-muted-foreground" />
+                      </Link>
                     </div>
                   ))}
                 </div>
