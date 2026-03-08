@@ -747,6 +747,7 @@ function CombinationPreview({
   bodyScript,
   ctaScript,
   autoStitch = false,
+  allCombos = [],
 }: {
   hookVideo: SegmentVideo | undefined;
   bodyVideo: SegmentVideo | undefined;
@@ -757,6 +758,7 @@ function CombinationPreview({
   bodyScript?: ScriptSegment;
   ctaScript?: ScriptSegment;
   autoStitch?: boolean;
+  allCombos?: Array<{ hookIdx: number; bodyIdx: number; ctaIdx: number }>;
 }) {
   const hookRef = useRef<HTMLVideoElement>(null);
   const bodyRef = useRef<HTMLVideoElement>(null);
@@ -773,6 +775,20 @@ function CombinationPreview({
 
   const { stitch, reset, status: stitchStatus, progress: stitchProgress, stitchedUrl, error: stitchError } =
     useVideoStitcher();
+
+  // ── Stitch URL cache ──────────────────────────────────────────────────────
+  // Blob URLs keyed by "hookUrl|bodyUrl|ctaUrl" — persist across combo switches
+  const stitchCache = useRef<Map<string, string>>(new Map());
+  // The URL actually shown in the player (may come from cache or from the hook)
+  const [displayedStitchedUrl, setDisplayedStitchedUrl] = useState<string | null>(null);
+
+  // Stable combo key for the currently selected videos
+  const comboKey = `${hookVideo?.url ?? ""}|${bodyVideo?.url ?? ""}|${ctaVideo?.url ?? ""}`;
+
+  // ── Background pre-stitch queue ───────────────────────────────────────────
+  const preStitchQueue = useRef<Array<{ key: string; hookUrl: string; bodyUrl: string; ctaUrl: string }>>([]);
+  const isPreStitching = useRef(false);
+  const [preStitchProgress, setPreStitchProgress] = useState<{ done: number; total: number } | null>(null);
 
   const {
     downloadZip: downloadPackZip,
@@ -818,6 +834,87 @@ function CombinationPreview({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStitch, hookVideo?.url, bodyVideo?.url, ctaVideo?.url, stitchStatus]);
+
+  // Save completed stitch to cache and update displayedStitchedUrl
+  useEffect(() => {
+    if (stitchedUrl && comboKey) {
+      stitchCache.current.set(comboKey, stitchedUrl);
+      setDisplayedStitchedUrl(stitchedUrl);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stitchedUrl]);
+
+  // Kick off background pre-stitch of remaining combos after a stitch completes
+  useEffect(() => {
+    if (stitchStatus !== "done" || isPreStitching.current) return;
+    if (!allCombos.length || !allSegmentEntries.length) return;
+
+    // Rebuild the queue: all combos not yet cached, skipping current combo
+    // We need the URL arrays from allSegmentEntries — reconstruct them
+    const hookUrls = allSegmentEntries.filter(e => e.name.startsWith("hooks/")).map(e => e.url);
+    const bodyUrls = allSegmentEntries.filter(e => e.name.startsWith("bodies/")).map(e => e.url);
+    const ctaUrls  = allSegmentEntries.filter(e => e.name.startsWith("ctas/")).map(e => e.url);
+
+    const uncached = allCombos
+      .map(c => {
+        const hUrl = hookUrls[c.hookIdx];
+        const bUrl = bodyUrls[c.bodyIdx];
+        const cUrl = ctaUrls[c.ctaIdx];
+        if (!hUrl || !bUrl || !cUrl) return null;
+        const key = `${hUrl}|${bUrl}|${cUrl}`;
+        return { key, hookUrl: hUrl, bodyUrl: bUrl, ctaUrl: cUrl };
+      })
+      .filter((item): item is { key: string; hookUrl: string; bodyUrl: string; ctaUrl: string } =>
+        item !== null && !stitchCache.current.has(item.key)
+      );
+
+    if (uncached.length === 0) {
+      setPreStitchProgress(null);
+      return;
+    }
+
+    preStitchQueue.current = uncached;
+    const totalToCache = uncached.length;
+    setPreStitchProgress({ done: 0, total: totalToCache });
+
+    isPreStitching.current = true;
+
+    // Process the queue sequentially using the non-hook stitchToBlob to avoid
+    // interfering with the React state of the main useVideoStitcher hook
+    import("@/hooks/use-video-stitcher").then(({ stitchToBlob }) => {
+      async function processNext() {
+        const item = preStitchQueue.current.shift();
+        if (!item) {
+          isPreStitching.current = false;
+          setPreStitchProgress(null);
+          return;
+        }
+        // Skip if it got cached while we were waiting (user manually stitched it)
+        if (stitchCache.current.has(item.key)) {
+          setPreStitchProgress(prev =>
+            prev ? { done: prev.done + 1, total: prev.total } : null
+          );
+          processNext();
+          return;
+        }
+        try {
+          const blob = await stitchToBlob(item.hookUrl, item.bodyUrl, item.ctaUrl);
+          const url = URL.createObjectURL(blob);
+          stitchCache.current.set(item.key, url);
+        } catch {
+          // Background failures are silent — user can still manually stitch
+        }
+        setPreStitchProgress(prev => {
+          if (!prev) return null;
+          const done = prev.done + 1;
+          return done >= prev.total ? null : { done, total: prev.total };
+        });
+        processNext();
+      }
+      processNext();
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stitchStatus]);
 
   const isStitching =
     stitchStatus !== "idle" &&
@@ -887,9 +984,21 @@ function CombinationPreview({
       return;
     }
     stopAll();
-    reset();
-    setViewMode("sequential");
-    autoStitchTriggered.current = false;
+
+    // Check cache before resetting: if we have a result for this combo, restore it
+    if (stitchCache.current.has(comboKey)) {
+      const cached = stitchCache.current.get(comboKey)!;
+      setDisplayedStitchedUrl(cached);
+      autoStitchTriggered.current = true; // prevent re-stitching
+      setViewMode("stitched");
+      // Reset the hook state to idle without destroying the cached URL
+      reset();
+    } else {
+      setDisplayedStitchedUrl(null);
+      reset();
+      setViewMode("sequential");
+      autoStitchTriggered.current = false;
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hookVideo?.url, bodyVideo?.url, ctaVideo?.url]);
 
@@ -902,16 +1011,19 @@ function CombinationPreview({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stitchStatus, stitchedUrl]);
 
+  // Effective stitched URL: prefer the live hook result (freshest), fall back to cached/displayed
+  const effectiveStitchedUrl = stitchedUrl ?? displayedStitchedUrl;
+
   function handleStitch() {
     if (!hookVideo || !bodyVideo || !ctaVideo) return;
     stitch(hookVideo.url, bodyVideo.url, ctaVideo.url);
   }
 
   function handleDownloadStitched() {
-    if (!stitchedUrl) return;
+    if (!effectiveStitchedUrl) return;
     trackVideoDownloaded("stitched");
     const a = document.createElement("a");
-    a.href = stitchedUrl;
+    a.href = effectiveStitchedUrl;
     a.download = `${generationId}_stitched.mp4`;
     a.style.display = "none";
     document.body.appendChild(a);
@@ -920,7 +1032,7 @@ function CombinationPreview({
   }
 
   function handleDownloadPack() {
-    if (!stitchedUrl || !hookVideo || !bodyVideo || !ctaVideo || isPackZipping) return;
+    if (!effectiveStitchedUrl || !hookVideo || !bodyVideo || !ctaVideo || isPackZipping) return;
     trackVideoDownloaded("pack");
     // Derive combo label from selected video URLs for filename
     const h = allSegmentEntries.filter(e => e.name.startsWith("hooks/")).findIndex(e => e.url === hookVideo.url);
@@ -932,7 +1044,7 @@ function CombinationPreview({
     const comboLabel = `hook${hi}-body${bi}-cta${ci}`;
     downloadPackZip(
       [
-        { name: `stitched/${comboLabel}.mp4`, url: stitchedUrl },
+        { name: `stitched/${comboLabel}.mp4`, url: effectiveStitchedUrl },
         ...allSegmentEntries,
       ],
       `cinerades-${generationId.slice(0, 8)}-pack.zip`,
@@ -1019,12 +1131,12 @@ function CombinationPreview({
     <div className="flex flex-col items-center gap-3">
       <div className="relative aspect-[9/16] w-full max-w-xs overflow-hidden rounded-xl bg-black dark:bg-black">
 
-        {/* ── Stitched single video (shown after stitching) ── */}
-        {viewMode === "stitched" && stitchedUrl && (
+        {/* ── Stitched single video (shown after stitching or when restored from cache) ── */}
+        {viewMode === "stitched" && effectiveStitchedUrl && (
           <>
             <video
               ref={stitchedRef}
-              src={stitchedUrl}
+              src={effectiveStitchedUrl}
               className="absolute inset-0 z-10 size-full object-contain"
               playsInline
               onEnded={() => setIsPlaying(false)}
@@ -1183,6 +1295,13 @@ function CombinationPreview({
         )}
       </div>
 
+      {/* ── Pre-stitch background progress indicator ── */}
+      {preStitchProgress && (
+        <p className="text-xs text-muted-foreground">
+          Pre-stitching combos… {preStitchProgress.done}/{preStitchProgress.total}
+        </p>
+      )}
+
       {/* ── Stitch bar ── */}
       <div className={`w-full rounded-lg border px-4 py-3 ${stitchStatus === "error" ? "border-red-500/50 bg-red-500/5" : "border-border bg-muted/40"}`}>
         <div className="flex items-center justify-between gap-3">
@@ -1196,7 +1315,7 @@ function CombinationPreview({
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            {stitchStatus === "done" && stitchedUrl ? (
+            {effectiveStitchedUrl && !isStitching ? (
               <>
                 <Button size="sm" onClick={handleDownloadStitched}>
                   <Download className="size-3.5" />
@@ -2164,6 +2283,7 @@ export default function GenerationDetailPage() {
                 bodyScript={script?.bodies?.[selectedBody]}
                 ctaScript={script?.ctas?.[selectedCta]}
                 autoStitch={true}
+                allCombos={allCombos}
               />
             </CardContent>
           </Card>
