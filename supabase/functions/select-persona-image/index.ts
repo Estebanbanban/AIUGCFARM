@@ -72,42 +72,21 @@ Deno.serve(async (req: Request) => {
     const isFirstSelection = !persona.selected_image_url;
     const selectionCount = (persona.image_selection_count as number) ?? 0;
 
-    if (!isAdmin) {
-      if (isFirstSelection) {
-        // ── Monthly creation quota ──────────────────────────────────────────
-        const now = new Date();
-        const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-        const monthLimit = PERSONAS_PER_MONTH_LIMITS[plan] ?? 1;
-
-        const { data: monthRow } = await sb
-          .from("persona_monthly_limits")
-          .select("personas_created")
-          .eq("owner_id", userId)
-          .eq("month_year", monthYear)
-          .maybeSingle();
-
-        const used = monthRow?.personas_created ?? 0;
-        if (used >= monthLimit) {
-          return json(
-            { detail: `Monthly persona limit reached (${monthLimit}) for your ${plan} plan. Resets next month.` },
-            cors,
-            403,
-          );
-        }
-      } else {
-        // ── Per-persona image change limit ──────────────────────────────────
-        const changeLimit = PERSONA_IMAGE_CHANGE_LIMITS[plan] ?? 0;
-        if (changeLimit !== Infinity && selectionCount >= changeLimit) {
-          return json(
-            {
-              detail: changeLimit === 0
-                ? `Free plan personas cannot have their image changed after the initial selection. Upgrade to change persona images.`
-                : `Image change limit reached (${changeLimit}) for this persona on your ${plan} plan.`,
-            },
-            cors,
-            403,
-          );
-        }
+    if (!isAdmin && !isFirstSelection) {
+      // ── Per-persona image change limit (re-selections only) ─────────────
+      // Monthly quota is enforced at persona creation time in generate-persona,
+      // not here, so we only gate re-selections.
+      const changeLimit = PERSONA_IMAGE_CHANGE_LIMITS[plan] ?? 0;
+      if (changeLimit !== Infinity && selectionCount >= changeLimit) {
+        return json(
+          {
+            detail: changeLimit === 0
+              ? `Free plan personas cannot have their image changed after the initial selection. Upgrade to change persona images.`
+              : `Image change limit reached (${changeLimit}) for this persona on your ${plan} plan.`,
+          },
+          cors,
+          403,
+        );
       }
     }
 
@@ -133,33 +112,6 @@ Deno.serve(async (req: Request) => {
       .eq("owner_id", userId);
 
     if (updateErr) throw new Error(`Update failed: ${updateErr.message}`);
-
-    // Increment monthly persona creation counter (first selection only).
-    if (!isAdmin && isFirstSelection) {
-      const now = new Date();
-      const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-
-      const { error: insertErr } = await sb
-        .from("persona_monthly_limits")
-        .insert({ owner_id: userId, month_year: monthYear, personas_created: 1 })
-        .select();
-
-      if (insertErr && insertErr.code === "23505") {
-        // Row exists — increment it.
-        const { data: cur } = await sb
-          .from("persona_monthly_limits")
-          .select("id, personas_created")
-          .eq("owner_id", userId)
-          .eq("month_year", monthYear)
-          .single();
-        if (cur) {
-          await sb
-            .from("persona_monthly_limits")
-            .update({ personas_created: cur.personas_created + 1 })
-            .eq("id", cur.id);
-        }
-      }
-    }
 
     // Return a fresh signed URL for immediate display.
     const { data: signedData } = await sb.storage

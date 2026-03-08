@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Users, User, Trash2, Loader2, Lock } from "lucide-react";
+import { Plus, Users, User, Trash2, Loader2, Lock, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -198,6 +198,7 @@ export default function PersonasPage() {
           {personas!.map((persona) => {
             const resolvedUrl = imageMap[persona.id];
             const attrs = persona.attributes;
+            const isIncomplete = !persona.selected_image_url && (persona.generated_images?.length ?? 0) > 0;
 
             return (
               <Link key={persona.id} href={`/personas/${persona.id}`} className="block h-full">
@@ -218,6 +219,11 @@ export default function PersonasPage() {
                       ) : (
                         <User className="size-10 text-muted-foreground" />
                       )}
+                      {isIncomplete && (
+                        <div className="absolute bottom-0 right-0 flex size-7 items-center justify-center rounded-full bg-amber-500 ring-2 ring-background">
+                          <ImageIcon className="size-3.5 text-white" />
+                        </div>
+                      )}
                     </div>
 
                     {/* Name & Info */}
@@ -225,9 +231,15 @@ export default function PersonasPage() {
                       <h3 className="text-lg font-semibold">
                         {persona.name}
                       </h3>
-                      <p className="mt-0.5 text-sm text-muted-foreground">
-                        {attrs.gender} / {attrs.age}
-                      </p>
+                      {isIncomplete ? (
+                        <p className="mt-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                          Choose portrait in Generate →
+                        </p>
+                      ) : (
+                        <p className="mt-0.5 text-sm text-muted-foreground">
+                          {attrs.gender} / {attrs.age}
+                        </p>
+                      )}
                     </div>
 
                     {/* Attribute Badges */}

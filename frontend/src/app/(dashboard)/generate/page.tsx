@@ -736,21 +736,40 @@ export default function GeneratePage() {
 
     try {
       const limited = generatedPaths.slice(0, 4);
-      const resolved = await Promise.all(
-        limited.map(async (path, imageIndex) => {
-          const signedUrl = await resolvePersonaImageUrl(path);
-          return signedUrl ? { imageIndex, signedUrl } : null;
-        }),
-      );
-      const options = resolved.filter(
-        (item): item is { imageIndex: number; signedUrl: string } => item !== null,
-      );
-      setPickerOptions(options);
-      if (options.length === 0) {
-        toast.error("Couldn't load generated portraits. Please try again.");
+      // Separate external URLs (already signed) from storage paths (need batch signing)
+      const externalItems: { imageIndex: number; signedUrl: string }[] = [];
+      const pathItems: { imageIndex: number; path: string }[] = [];
+      limited.forEach((img, imageIndex) => {
+        if (img.startsWith("http")) {
+          externalItems.push({ imageIndex, signedUrl: img });
+        } else {
+          pathItems.push({ imageIndex, path: img });
+        }
+      });
+
+      let signedItems: { imageIndex: number; signedUrl: string }[] = [...externalItems];
+      if (pathItems.length > 0) {
+        const supabase = createClient();
+        const { data } = await supabase.storage
+          .from("persona-images")
+          .createSignedUrls(pathItems.map((p) => p.path), 3600);
+        if (data) {
+          data.forEach((item, i) => {
+            if (item.signedUrl) {
+              signedItems.push({ imageIndex: pathItems[i].imageIndex, signedUrl: item.signedUrl });
+            }
+          });
+        }
+      }
+
+      // Sort by original imageIndex to preserve display order
+      signedItems.sort((a, b) => a.imageIndex - b.imageIndex);
+      setPickerOptions(signedItems);
+      if (signedItems.length === 0) {
+        toast.error("Couldn't load portrait images. Go to Personas to reconfigure.");
       }
     } catch {
-      toast.error("Couldn't load generated portraits. Please try again.");
+      toast.error("Couldn't load portrait images. Please try again.");
     } finally {
       setPickerLoading(false);
     }
@@ -1844,6 +1863,7 @@ export default function GeneratePage() {
                                       className="size-full rounded-full object-cover"
                                       loading="lazy"
                                       decoding="async"
+                                      onError={(e) => { e.currentTarget.style.display = "none"; }}
                                     />
                                   ) : (
                                     <User className="size-8 text-muted-foreground" />
