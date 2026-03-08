@@ -85,22 +85,17 @@ async function resolveAndValidate(hostname: string): Promise<void> {
     Deno.resolveDns(hostname, "AAAA"),
   ]);
 
-  // Fail closed: if either DNS query fails, block the request entirely.
-  // This prevents DNS rebinding attacks where resolution succeeds at check
-  // time but the TTL expires before the TCP connection is made.
+  // A (IPv4) must succeed — a real public domain always has at least one A record.
   if (ipv4Result.status === "rejected") {
     throw new Error(
-      `DNS resolution failed for hostname: ${(ipv4Result.reason as Error).message ?? ipv4Result.reason}`,
-    );
-  }
-  if (ipv6Result.status === "rejected") {
-    throw new Error(
-      `DNS resolution failed for hostname: ${(ipv6Result.reason as Error).message ?? ipv6Result.reason}`,
+      `Could not resolve hostname — check that the URL is correct and the site is accessible.`,
     );
   }
 
+  // AAAA (IPv6) is optional — many legitimate domains have no IPv6 records.
+  // Only use IPv6 results when the lookup succeeded.
   ipv4s = ipv4Result.value;
-  ipv6s = ipv6Result.value;
+  ipv6s = ipv6Result.status === "fulfilled" ? ipv6Result.value : [];
 
   for (const ip of [...ipv4s, ...ipv6s]) {
     if (isPrivateIp(ip)) {
