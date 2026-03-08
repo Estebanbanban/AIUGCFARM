@@ -1231,7 +1231,7 @@ Deno.serve(async (req: Request) => {
     // New generation: either phase="script" (script-only) or default
     // ══════════════════════════════════════════════════════════════════
 
-    const { product_id, persona_id, mode, quality, composite_image_path, advanced_segments, language = "en" } = body as {
+    const { product_id, persona_id, mode, quality, composite_image_path, advanced_segments, language = "en", format: rawFormat, cta_style } = body as {
       product_id: string;
       persona_id: string;
       mode?: string;
@@ -1239,9 +1239,12 @@ Deno.serve(async (req: Request) => {
       composite_image_path: string;
       advanced_segments?: AdvancedSegmentsInput;
       language?: string;
+      format?: string;
+      cta_style?: string;
     };
 
     const resolvedLanguage = VALID_LANGUAGES.has(language) ? language : "en";
+    const resolvedFormat = rawFormat === "16:9" ? "16:9" : "9:16";
 
     if (!product_id) return errorResponse(ErrorCodes.INVALID_INPUT, "product_id is required", 400, cors);
     if (!persona_id) return errorResponse(ErrorCodes.INVALID_INPUT, "persona_id is required", 400, cors);
@@ -1482,6 +1485,9 @@ Deno.serve(async (req: Request) => {
           video_quality: resolvedQuality,
           composite_image_url: compositeStorageValue,
           language: resolvedLanguage,
+          video_provider: provider,
+          format: resolvedFormat,
+          cta_style: cta_style ?? null,
           hooks_count: hooksCount,
           bodies_count: bodiesCount,
           ctas_count: ctasCount,

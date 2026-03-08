@@ -85,6 +85,7 @@ import { useCheckout, useBuyCredits } from "@/hooks/use-checkout";
 import { useProfile, ADVANCED_MODE_PLANS } from "@/hooks/use-profile";
 import { useLeaveGuard } from "@/hooks/use-leave-guard";
 import { useCompositeCache } from "@/hooks/use-composite-cache";
+import { useLastPendingGeneration } from "@/hooks/use-last-pending-generation";
 import { ManualUploadForm } from "@/components/products/ManualUploadForm";
 import { ScrapeResults } from "@/components/products/ScrapeResults";
 import {
@@ -456,6 +457,47 @@ export default function GeneratePage() {
   }, [showPaywall, showPersonaLimitPaywall]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: generations } = useGenerations();
+  const { data: lastPendingGeneration } = useLastPendingGeneration();
+
+  // Auto-restore full wizard state from DB when localStorage has been cleared.
+  // This handles the Stripe redirect scenario on mobile where localStorage is wiped
+  // but the generation record (with product_id, persona_id, script, etc.) still exists in DB.
+  // Only runs when the user has NO active wizard state.
+  useEffect(() => {
+    if (store.pendingGenerationId || store.productId) return; // active session — don't overwrite
+    if (!lastPendingGeneration) return;
+    if (compositeImages.length > 0) return; // user already has active previews
+
+    const gen = lastPendingGeneration;
+    const script = gen.script;
+    if (!script) return;
+
+    // Restore core wizard state via resumeFromGeneration
+    store.resumeFromGeneration({
+      generationId: gen.id,
+      script,
+      creditsToCharge: gen.credits_to_charge ?? 0,
+      productId: gen.product_id,
+      personaId: gen.persona_id,
+      mode: gen.mode,
+      quality: gen.video_quality,
+    });
+
+    // Restore extended fields (added by backend task #1 — nullable for older records)
+    if (gen.format === "9:16" || gen.format === "16:9") {
+      store.setFormat(gen.format);
+    }
+    if (gen.cta_style) {
+      store.setCtaStyle(gen.cta_style as Parameters<typeof store.setCtaStyle>[0]);
+    }
+    if (gen.language) {
+      store.setLanguage(gen.language);
+    }
+    if (gen.video_provider === "kling" || gen.video_provider === "sora") {
+      store.setVideoProvider(gen.video_provider);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastPendingGeneration]);
 
   // DB-backed composite cache — persistent fallback for when localStorage is empty
   // (Stripe redirect, mobile browser cache clear, new device, etc.)
