@@ -1155,16 +1155,48 @@ export default function GeneratePage() {
 
   async function handleSwitchToAdvanced() {
     store.setAdvancedMode(true);
-    // Auto-initialize if no segments yet
-    if (!store.advancedSegments && !isInitializingAdvanced) {
-      await handleInitializeAdvancedSegments();
-    }
+    // Don't auto-initialize — user must click "Generate Scripts"
   }
 
   async function handleInitializeAdvancedSegments() {
     if (!store.productId || !store.personaId) return;
+    if (!store.compositeImagePath) {
+      toast.error("Scene preview is still loading, please wait a moment.");
+      return;
+    }
 
     setIsInitializingAdvanced(true);
+
+    // If no pendingScript yet, generate it first — needed for approve-and-generate.
+    if (!store.pendingScript) {
+      try {
+        const result = await generateScript.mutateAsync({
+          product_id: store.productId,
+          persona_id: store.personaId,
+          mode: store.mode,
+          quality: store.quality,
+          composite_image_path: store.compositeImagePath,
+          cta_style: store.ctaStyle,
+          cta_comment_keyword: requiresCommentKeyword ? commentKeyword : undefined,
+          language: store.language,
+          hooks_count: store.mode === "triple" ? store.hooksCount : 1,
+          bodies_count: store.mode === "triple" ? store.bodiesCount : 1,
+          ctas_count: store.mode === "triple" ? store.ctasCount : 1,
+          phase: "script",
+        });
+        if (result.script) {
+          store.setPendingScript(result.generation_id, result.script, result.credits_to_charge ?? effectiveCost);
+        } else {
+          toast.error("Script generation failed. Please try again.");
+          setIsInitializingAdvanced(false);
+          return;
+        }
+      } catch {
+        toast.error("Failed to generate base script. Please try again.");
+        setIsInitializingAdvanced(false);
+        return;
+      }
+    }
     const variantCount = store.mode === "single" ? 1 : 3;
     const segTypes = ["hook", "body", "cta"] as const;
 
@@ -1968,7 +2000,11 @@ export default function GeneratePage() {
 
             {videoLoaderStep < 0 && (
               <>
-                <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+                <div className={cn(
+                  "lg:grid gap-5",
+                  store.advancedMode ? "grid-cols-1" : "lg:grid-cols-[320px_minmax(0,1fr)]"
+                )}>
+                  {!store.advancedMode && (
                   <div className="space-y-4 self-start lg:sticky lg:top-24">
                     <div className="rounded-xl border border-border bg-background p-4">
                       <div className="mb-3 flex items-start justify-between gap-3">
@@ -2139,6 +2175,7 @@ export default function GeneratePage() {
                       </div>
                     )}
                   </div>
+                  )}
 
                   <div className="min-w-0 space-y-5">
                     <div className="rounded-xl border border-border bg-background p-4 sm:p-5">
@@ -2345,7 +2382,6 @@ export default function GeneratePage() {
                             </div>
                           </div>
 
-
                           <Collapsible open={ctaOpen} onOpenChange={setCtaOpen}>
                             <CollapsibleTrigger asChild>
                               <button
@@ -2481,11 +2517,18 @@ export default function GeneratePage() {
                               />
                             </>
                           ) : (
-                            <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-10">
-                              <Settings2 className="size-8 text-muted-foreground" />
-                              <p className="text-sm text-muted-foreground">Advanced segments failed to generate.</p>
-                              <Button variant="outline" size="sm" onClick={handleInitializeAdvancedSegments}>
-                                Retry
+                            <div className="rounded-xl border border-border bg-card p-6 space-y-3">
+                              <div>
+                                <h3 className="font-semibold text-base">Configure your advanced scripts</h3>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  Set your campaign options above (quality, number of variants), then generate scripts to customize each segment individually.
+                                </p>
+                              </div>
+                              <Button
+                                onClick={handleInitializeAdvancedSegments}
+                                disabled={!store.productId || !store.personaId}
+                              >
+                                Generate Scripts
                               </Button>
                             </div>
                           )}
@@ -2493,6 +2536,7 @@ export default function GeneratePage() {
                       )}
                     </div>
 
+                    {!store.advancedMode && (
                     <div className="rounded-xl border border-border bg-background p-4 sm:p-5">
                       <div className="mb-4 flex items-start justify-between gap-3">
                         <div>
@@ -2659,6 +2703,7 @@ export default function GeneratePage() {
                         </div>
                       )}
                     </div>
+                    )}
                   </div>
                 </div>
 

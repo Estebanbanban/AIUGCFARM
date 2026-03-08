@@ -13,6 +13,8 @@ import {
   Plus,
   Users,
   Package,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useClerk } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
@@ -52,9 +54,13 @@ const pageTitles: Record<string, string> = {
 function SidebarContent({
   pathname,
   onNavigate,
+  collapsed,
+  onToggleCollapse,
 }: {
   pathname: string;
   onNavigate?: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }) {
   const { signOut } = useClerk();
   const { data: profile } = useProfile();
@@ -75,9 +81,13 @@ function SidebarContent({
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex h-16 items-center px-6">
+      <div className={cn("flex h-16 items-center", collapsed ? "justify-center px-0" : "px-6")}>
         <Link href="/" onClick={onNavigate}>
-          <Logo variant="full" size="sm" theme="auto" />
+          {collapsed ? (
+            <Logo variant="icon" size="sm" theme="auto" />
+          ) : (
+            <Logo variant="full" size="sm" theme="auto" />
+          )}
         </Link>
       </div>
 
@@ -100,21 +110,23 @@ function SidebarContent({
               key={item.href}
               href={item.href}
               onClick={onNavigate}
+              title={collapsed ? item.label : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                "flex items-center rounded-lg border py-2 text-sm font-medium transition-colors",
+                collapsed ? "px-0 justify-center" : "gap-3 px-3",
                 isActive
                   ? "border-border bg-sidebar-accent text-foreground"
                   : "border-transparent text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground"
               )}
             >
               <item.icon className="size-4 shrink-0" />
-              {item.label}
+              {!collapsed && item.label}
             </Link>
           );
         })}
       </nav>
 
-      {!allOnboardingDone && (
+      {!allOnboardingDone && !collapsed && (
         <div className="px-3 pb-3">
           <button
             onClick={() => {
@@ -131,17 +143,46 @@ function SidebarContent({
         </div>
       )}
 
+      {onToggleCollapse && (
+        <button
+          onClick={onToggleCollapse}
+          className="w-full flex justify-center py-2 text-muted-foreground hover:text-foreground transition-colors"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {collapsed ? (
+            <ChevronRight className="size-4" />
+          ) : (
+            <span className="flex items-center gap-2 px-3 text-xs">
+              <ChevronLeft className="size-4" />
+              Collapse
+            </span>
+          )}
+        </button>
+      )}
+
       <div className="border-t border-sidebar-border px-4 py-4">
-        <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
-          <button
-            onClick={handleSignOut}
-            className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
-            aria-label="Sign out"
-          >
-            <LogOut className="size-4" />
-          </button>
-        </div>
+        {collapsed ? (
+          <div className="flex justify-center">
+            <button
+              onClick={handleSignOut}
+              className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
+              aria-label="Sign out"
+            >
+              <LogOut className="size-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate text-xs text-muted-foreground">{userEmail}</span>
+            <button
+              onClick={handleSignOut}
+              className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
+              aria-label="Sign out"
+            >
+              <LogOut className="size-4" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -159,14 +200,37 @@ function getPageTitle(pathname: string): string {
 export function DashboardShell({ children, className }: { children: React.ReactNode; className?: string }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [userManualOverride, setUserManualOverride] = useState(false);
   const pageTitle = getPageTitle(pathname);
   useGenerationNotifications();
 
+  useEffect(() => {
+    if (pathname.startsWith('/generate') && !userManualOverride) {
+      setSidebarCollapsed(true);
+    } else if (!pathname.startsWith('/generate') && !userManualOverride) {
+      setSidebarCollapsed(false);
+    }
+  }, [pathname, userManualOverride]);
+
+  function handleToggleCollapse() {
+    setSidebarCollapsed((c) => !c);
+    setUserManualOverride(true);
+  }
 
   return (
     <div className={cn("flex flex-1 min-h-0 overflow-hidden bg-background text-foreground", className)}>
-      <aside className="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar lg:flex lg:flex-col">
-        <SidebarContent pathname={pathname} />
+      <aside
+        className={cn(
+          "hidden shrink-0 border-r border-sidebar-border bg-sidebar lg:flex lg:flex-col transition-all duration-200",
+          sidebarCollapsed ? "w-14" : "w-64"
+        )}
+      >
+        <SidebarContent
+          pathname={pathname}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={handleToggleCollapse}
+        />
       </aside>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
