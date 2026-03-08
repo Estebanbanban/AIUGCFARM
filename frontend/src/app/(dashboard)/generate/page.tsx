@@ -2947,18 +2947,26 @@ export default function GeneratePage() {
                             <p className="text-muted-foreground text-sm font-medium">{plan.credits} credits / mo</p>
                           </div>
                           <div className="mb-6">
+                            {offer.isActive && (
+                              <div className="mb-3 flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md px-2 py-1 w-fit">
+                                <Clock className="size-3 shrink-0" />
+                                <span>Expires in {offer.timeDisplay}</span>
+                              </div>
+                            )}
                             <div className="flex items-end gap-2 mb-1">
                               <span className="text-4xl font-extrabold text-foreground tracking-tighter">
                                 ${discountedMonthly}
                               </span>
                               <span className="text-muted-foreground font-medium mb-1">/mo</span>
                             </div>
-                            <div className="flex items-center gap-2 text-sm font-medium">
-                              <span className="line-through text-muted-foreground">${plan.price}/mo</span>
-                              <span className="text-primary bg-primary/10 px-2 py-0.5 rounded-md text-xs font-bold">{discountLabel}</span>
-                            </div>
+                            {offer.isActive && (
+                              <div className="flex items-center gap-2 text-sm font-medium">
+                                <span className="line-through text-muted-foreground">${plan.price}/mo</span>
+                                <span className="text-primary bg-primary/10 px-2 py-0.5 rounded-md text-xs font-bold">{discountLabel}</span>
+                              </div>
+                            )}
                             <div className="mt-3 inline-flex bg-muted border border-border text-muted-foreground text-xs font-bold px-3 py-1.5 rounded-lg">
-                              ≈ ${(plan.price / (plan.credits / CREDITS_PER_SINGLE)).toFixed(2)}/video
+                              ≈ ${(discountedMonthly / (Math.floor(plan.credits / CREDITS_PER_BATCH) * 27)).toFixed(2)}/video
                             </div>
                           </div>
                           <ul className="space-y-3 mb-8 flex-grow">
