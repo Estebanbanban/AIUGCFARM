@@ -24,6 +24,18 @@ export function CheckoutSuccessHandler() {
   const isOnGeneratePage = pathname?.startsWith("/generate");
   const approveAndGenerate = useApproveAndGenerate();
 
+  // Handle cancelled checkout — clean URL and show a gentle nudge
+  useEffect(() => {
+    if (searchParams.get("checkout") !== "cancelled") return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("checkout");
+    router.replace(`${pathname}${params.size ? `?${params}` : ""}`, { scroll: false });
+    toast("No worries — your progress is saved. Come back whenever you're ready.", {
+      duration: 6000,
+      icon: "💾",
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const checkout = searchParams.get("checkout");
     if (checkout !== "success") return;
