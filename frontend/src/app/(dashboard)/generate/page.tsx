@@ -3386,27 +3386,39 @@ export default function GeneratePage() {
       {/* Leave guard dialog */}
       {showLeaveDialog && (
         <Dialog open={showLeaveDialog} onOpenChange={(open) => { if (!open) cancelLeave(); }}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Quitter la page ?</DialogTitle>
-              <DialogDescription>
-                Votre progression est automatiquement sauvegardée. Vous pourrez reprendre depuis là où vous vous êtes arrêté en revenant sur cette page, ou retrouver votre script dans l&apos;historique.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="flex-col gap-2 sm:flex-row">
-              <Button variant="outline" onClick={cancelLeave} className="sm:order-first">
-                Rester sur la page
+          <DialogContent className="max-w-sm gap-0 p-0 overflow-hidden">
+            {/* Icon header */}
+            <div className="flex flex-col items-center gap-3 px-6 pt-8 pb-5 text-center">
+              <div className="flex size-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/60">
+                <Bookmark className="size-6 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-semibold">Leave this page?</DialogTitle>
+                <DialogDescription className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
+                  Your progress is <span className="font-medium text-foreground">auto-saved</span>. Come back anytime to pick up where you left off, or find your draft in History.
+                </DialogDescription>
+              </div>
+            </div>
+            {/* Actions */}
+            <div className="flex flex-col gap-2 border-t border-border bg-muted/30 px-6 py-4">
+              <Button onClick={confirmLeave} className="w-full">
+                Save & Leave
               </Button>
               <Button
-                variant="destructive"
+                variant="outline"
+                className="w-full text-destructive hover:text-destructive hover:bg-destructive/5 border-destructive/20"
                 onClick={() => { store.reset(); confirmLeave(); }}
               >
-                Effacer et quitter
+                Discard & Leave
               </Button>
-              <Button onClick={confirmLeave}>
-                Sauvegarder et quitter
-              </Button>
-            </DialogFooter>
+              <button
+                type="button"
+                onClick={cancelLeave}
+                className="w-full py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Stay on page
+              </button>
+            </div>
           </DialogContent>
         </Dialog>
       )}

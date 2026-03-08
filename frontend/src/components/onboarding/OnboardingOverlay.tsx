@@ -6,7 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePersonas, useGeneratePersonaImages, useSelectPersonaImage } from "@/hooks/use-personas";
-import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
+import { isExternalUrl, getSignedImageUrl, getSignedImageUrls } from "@/lib/storage";
 import { useGenerations } from "@/hooks/use-generations";
 import { useProducts, useScrapeProduct } from "@/hooks/use-products";
 import { PersonaBuilderInline } from "@/components/personas/PersonaBuilderInline";
@@ -94,6 +94,33 @@ export function OnboardingOverlay() {
   const { data: products, isLoading: productsLoading } = useProducts();
   const { data: personas, isLoading: personasLoading } = usePersonas();
   const { data: generations, isLoading: generationsLoading } = useGenerations();
+
+  // Resolve signed URLs for product images in the picker modal
+  const [productImageMap, setProductImageMap] = useState<Record<string, string | null>>({});
+  useEffect(() => {
+    if (!products || products.length === 0) return;
+    let cancelled = false;
+    async function resolve() {
+      const result: Record<string, string | null> = {};
+      const toSign: { id: string; path: string }[] = [];
+      for (const p of products!) {
+        const raw = p.images?.[0];
+        if (!raw) { result[p.id] = null; }
+        else if (isExternalUrl(raw)) { result[p.id] = raw; }
+        else { result[p.id] = null; toSign.push({ id: p.id, path: raw }); }
+      }
+      if (!cancelled) setProductImageMap({ ...result });
+      if (toSign.length > 0) {
+        const signed = await getSignedImageUrls("product-images", toSign.map(x => x.path));
+        if (!cancelled) {
+          signed.forEach((url, i) => { result[toSign[i].id] = url; });
+          setProductImageMap({ ...result });
+        }
+      }
+    }
+    resolve();
+    return () => { cancelled = true; };
+  }, [products]);
 
   const hasProduct = (products?.length ?? 0) > 0;
   const hasPersonaWithImage = (personas ?? []).some(
@@ -321,13 +348,16 @@ export function OnboardingOverlay() {
               >
                 {/* Image — square, neutral bg so products are clearly visible */}
                 <div className="relative aspect-square w-full overflow-hidden bg-white">
-                  {product.images?.[0] ? (
+                  {productImageMap[product.id] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={product.images[0]}
+                      src={productImageMap[product.id]!}
                       alt={product.name}
                       className="size-full object-contain p-3 transition-transform duration-200 group-hover:scale-105"
                     />
+                  ) : product.images?.[0] && productImageMap[product.id] === undefined ? (
+                    // Signing in progress — show shimmer
+                    <div className="size-full bg-muted animate-pulse" />
                   ) : (
                     <div className="flex size-full items-center justify-center bg-muted/40">
                       <Package className="size-10 text-muted-foreground/40" />
