@@ -1282,7 +1282,7 @@ export default function GeneratePage() {
 
   async function handleCheckout(plan: PlanTier) {
     const couponId = offer.getSubscriptionCoupon(plan);
-    checkout.mutate({ plan, couponId }, {
+    checkout.mutate({ plan, couponId, return_path: "/generate" }, {
       onSuccess: (url) => {
         trackCheckoutStarted(plan);
         if (couponId) offer.markUsed();
@@ -1296,7 +1296,7 @@ export default function GeneratePage() {
     const isSingleVideo = pack === "single_standard" || pack === "single_hd";
     // Single videos: -50% during promo window. Credit packs: never discounted.
     const couponId = isSingleVideo && offer.isActive ? COUPON_50_OFF_FIRST_VIDEO : undefined;
-    buyCredits.mutate({ pack, couponId, generation_id: store.pendingGenerationId ?? undefined }, {
+    buyCredits.mutate({ pack, couponId, generation_id: store.pendingGenerationId ?? undefined, return_path: "/generate" }, {
       onSuccess: (url) => {
         if (pack in { pack_10: 1, pack_30: 1, pack_100: 1 }) {
           trackCreditsPurchased(pack as CreditPackKey);
