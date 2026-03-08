@@ -335,40 +335,40 @@ export function OnboardingOverlay() {
   if (showProductPicker) {
     return (
       <Dialog open={showProductPicker} onOpenChange={(open) => { if (!open) setShowProductPicker(false); }}>
-        <DialogContent className="sm:max-w-2xl" showCloseButton={false}>
+        <DialogContent className="sm:max-w-3xl" showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>Which product are you promoting?</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3 pt-1 max-h-[65vh] overflow-y-auto pr-1">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 pt-1 max-h-[65vh] overflow-y-auto pr-1">
             {(products ?? []).map((product) => (
               <button
                 key={product.id}
                 onClick={() => handleProductPickerSelect(product.id)}
-                className="group overflow-hidden rounded-xl border border-border bg-card text-left transition-all hover:border-primary/60 hover:shadow-md"
+                className="group w-full text-left"
               >
-                {/* Image — square, neutral bg so products are clearly visible */}
-                <div className="relative aspect-square w-full overflow-hidden bg-white">
-                  {productImageMap[product.id] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={productImageMap[product.id]!}
-                      alt={product.name}
-                      className="size-full object-contain p-3 transition-transform duration-200 group-hover:scale-105"
-                    />
-                  ) : product.images?.[0] && productImageMap[product.id] === undefined ? (
-                    // Signing in progress — show shimmer
-                    <div className="size-full bg-muted animate-pulse" />
-                  ) : (
-                    <div className="flex size-full items-center justify-center bg-muted/40">
-                      <Package className="size-10 text-muted-foreground/40" />
-                    </div>
-                  )}
-                </div>
-                {/* Name */}
-                <div className="border-t border-border/50 bg-muted/20 px-3 py-2.5">
-                  <p className="line-clamp-2 text-xs font-medium leading-snug text-foreground">
-                    {product.name}
-                  </p>
+                <div className="overflow-hidden rounded-xl border border-border transition-all hover:border-primary/60 hover:shadow-md">
+                  {/* Square image */}
+                  <div className="relative aspect-square w-full overflow-hidden bg-muted">
+                    {productImageMap[product.id] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={productImageMap[product.id]!}
+                        alt={product.name}
+                        className="size-full object-cover transition-transform duration-200 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex size-full items-center justify-center">
+                        <Package className="size-6 text-muted-foreground/50" />
+                      </div>
+                    )}
+                  </div>
+                  {/* Name */}
+                  <div className="px-2 py-1.5">
+                    <p className="truncate text-xs font-medium leading-snug">
+                      {product.name}
+                    </p>
+                  </div>
                 </div>
               </button>
             ))}
