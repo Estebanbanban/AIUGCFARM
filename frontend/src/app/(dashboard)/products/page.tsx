@@ -310,6 +310,19 @@ export default function ProductsPage() {
 
   async function handleScrape() {
     if (!importUrl.trim()) return;
+
+    // Ensure a brand is selected — auto-select the first one if needed
+    let activeBrandId = selectedBrandId;
+    if (!activeBrandId) {
+      const firstBrand = brands?.[0];
+      if (!firstBrand) {
+        setScrapeError('Create a brand first before importing products.');
+        return;
+      }
+      setSelectedBrandId(firstBrand.id);
+      activeBrandId = firstBrand.id;
+    }
+
     setScrapeError(null);
     setScrapedProducts([]);
     setSelectedProductIds(new Set());
