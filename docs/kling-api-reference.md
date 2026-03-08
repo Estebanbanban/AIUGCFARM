@@ -1,130 +1,112 @@
 # Kling AI 3.0 API Reference
 
-> Compiled from official Kling AI documentation (Feb 2026).
-> Generated videos/images are cleared after 30 days  -  must be downloaded to R2 immediately.
+> Source: Official Kling AI Series 3.0 Model API Specification (updated 2026-03-08).
+> Generated videos/images are cleared after 30 days — must be downloaded/saved promptly.
+> **This is the source of truth for all Kling integration work. Do not rely on training data.**
 
 ---
 
-## Authentication
+## Changelog (from official docs)
 
-- **Header:** `Authorization: Bearer {JWT_TOKEN}`
-- **Base URLs:**
-  - Singapore: `https://api-singapore.klingai.com`
-  - Global: Check Kling developer portal for regional endpoints
-- **Content-Type:** `application/json`
-
----
-
-## Models Available
-
-### Video Models
-
-| Model ID | Type | Duration | Modes |
-|---|---|---|---|
-| `kling-v3` | Text-to-Video, Image-to-Video | 3-15s | std, pro |
-| `kling-v3-omni` | Omni (unified endpoint) | 3-15s | std, pro |
-| `kling-video-o1` | Text-to-Video, Image-to-Video | 3-10s (5s/10s only) | std, pro |
-
-### Image Models
-
-| Model ID | Resolutions |
-|---|---|
-| `kling-v3` | 1K, 2K |
-| `kling-v3-omni` | 1K, 2K, 4K |
-| `kling-image-o1` | 1K, 2K |
+- **[2026.2.10]** Text-to-Video and Image-to-Video support intelligent shot segmentation (`"multi_shot": "intelligence"`)
+- **[2026.2.5]** Advanced element supports binding voice
+- **[2026.2.3]** Billing refinement for voice; mutual exclusion between reference video and native audio on kling-v3-omni; element creation restrictions
+- **[2026.2.2]** New document
 
 ---
 
-## Video Generation Endpoints
+## Model Capability Map
 
-### Image-to-Video  -  Create Task
+### Video Generation
 
-**Our primary endpoint for UGC video generation (POV image → video segments)**
+| Model | Mode | Duration | Notes |
+|-------|------|----------|-------|
+| **kling-v3** | std / pro | **3s–15s** | image2video: start frame only OR start+end frame (image_tail) |
+| **kling-v3-omni** | std / pro | **3s–15s** | start+end frame, element control, reference video |
+| **kling-video-o1** | std / pro | 5s or 10s ONLY | No flexible duration |
 
+### Image Generation
+
+| Model | Resolution | Notes |
+|-------|-----------|-------|
+| kling-v3-omni | 1K/2K/4K | |
+| kling-v3 | 1K/2K | |
+| kling-image-o1 | 1K/2K | |
+
+---
+
+## CRITICAL: Duration Support
+
+**kling-v3** and **kling-v3-omni** support any integer duration 3–15 seconds:
 ```
-POST /v1/videos/image2video
-```
-
-**Request Body:**
-
-| Parameter | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `model_name` | string | Optional | `kling-v1` | Model. Use `kling-v3` for our pipeline |
-| `image` | string | Optional | null | Start frame image (Base64 or URL). Max 10MB, min 300px sides, aspect ratio 1:2.5 to 2.5:1 |
-| `image_tail` | string | Optional | null | End frame image. Same constraints as `image`. Cannot coexist with camera_control |
-| `prompt` | string | Optional | null | Positive text prompt. Max 2500 chars. Required when `multi_shot=false` |
-| `negative_prompt` | string | Optional | null | Negative prompt. Max 2500 chars |
-| `multi_shot` | boolean | Optional | false | Enable multi-shot generation. When true, `prompt` is ignored |
-| `shot_type` | string | Optional | null | `customize` or `intelligence`. Required when `multi_shot=true` |
-| `multi_prompt` | array | Optional | null | Storyboard definitions (max 6 shots). Required when `multi_shot=true` AND `shot_type=customize` |
-| `element_list` | array | Optional | null | Reference elements by ID. Max 3 elements. Mutually exclusive with `voice_list` |
-| `voice_list` | array | Optional | null | Voice IDs for speech. Max 2 voices. Mutually exclusive with `element_list` |
-| `sound` | string | Optional | `off` | Generate native audio. `on` or `off`. Only v2.6+ models |
-| `cfg_scale` | float | Optional | 0.5 | Prompt adherence [0-1]. Only kling-v1.x |
-| `mode` | string | Optional | `std` | `std` (720p) or `pro` (1080p) |
-| `duration` | string | Optional | `5` | Video length in seconds. Enum: `3,4,5,6,7,8,9,10,11,12,13,14,15` |
-| `watermark_info` | object | Optional | null | `{"enabled": true/false}` |
-| `callback_url` | string | Optional | null | Webhook URL for task status changes |
-| `external_task_id` | string | Optional | null | Custom task ID (must be unique per account) |
-
-**Multi-prompt structure:**
-
-```json
-{
-  "multi_prompt": [
-    { "index": 1, "prompt": "Scene description...", "duration": "5" },
-    { "index": 2, "prompt": "Next scene...", "duration": "5" }
-  ]
-}
+Duration enum: 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
 ```
 
-- Max 6 storyboards, min 1
-- Max 512 chars per storyboard prompt
-- Each duration >= 1s, sum must equal total `duration`
+**kling-video-o1** is limited to 5s and 10s only.
 
-**Response:**
+For this project, always use **kling-v3** (std) or **kling-v3** (pro) — never kling-v2-6 or kling-video-o1.
 
+---
+
+## Image to Video — Create Task
+
+**POST** `/v1/videos/image2video`
+
+### Key Parameters
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| model_name | string | Optional | kling-v1 | Use `kling-v3` for this project |
+| image | string | Optional* | null | Start frame image (URL or base64, no data: prefix) |
+| image_tail | string | Optional* | null | **End frame control** — enables seamless segment chaining |
+| prompt | string | Optional | null | Script text / motion directive |
+| negative_prompt | string | Optional | null | |
+| mode | string | Optional | std | `std` (720p) or `pro` (1080p) |
+| duration | string | Optional | 5 | **3–15** for kling-v3 |
+| sound | string | Optional | off | `on` or `off` |
+| aspect_ratio | string | Auto-detected | — | `9:16` for UGC |
+| callback_url | string | Optional | — | Webhook on status change |
+| external_task_id | string | Optional | — | Unique per user account |
+
+*At least one of `image` or `image_tail` must be provided.
+
+### image_tail Constraints
+- Requires `image` (start frame) to also be set — end frame alone is not supported
+- Cannot be used together with `dynamic_masks`, `static_mask`, or `camera_control`
+- Enables **seamless chaining**: extract last frame of segment N → use as `image` for segment N+1
+
+### Image Requirements
+- Formats: `.jpg`, `.jpeg`, `.png`
+- Max size: 10MB
+- Min dimensions: 300px × 300px
+- Aspect ratio: between 1:2.5 and 2.5:1
+
+### Response
 ```json
 {
   "code": 0,
-  "message": "string",
-  "request_id": "string",
   "data": {
     "task_id": "string",
-    "task_status": "submitted | processing | succeed | failed",
-    "task_info": { "external_task_id": "string" },
-    "created_at": 1722769557708,
-    "updated_at": 1722769557708
+    "task_status": "submitted | processing | succeed | failed"
   }
 }
 ```
 
 ---
 
-### Image-to-Video  -  Query Task
+## Image to Video — Query Task (Single)
 
-```
-GET /v1/videos/image2video/{task_id}
-```
+**GET** `/v1/videos/image2video/{task_id}`
 
-Or query by custom ID: `GET /v1/videos/image2video/{external_task_id}`
-
-**Response (on success):**
-
+### Response
 ```json
 {
   "code": 0,
-  "message": "string",
-  "request_id": "string",
   "data": {
     "task_id": "string",
     "task_status": "submitted | processing | succeed | failed",
     "task_status_msg": "string",
-    "task_info": { "external_task_id": "string" },
-    "watermark_info": { "enabled": false },
     "final_unit_deduction": "string",
-    "created_at": 1722769557708,
-    "updated_at": 1722769557708,
     "task_result": {
       "videos": [
         {
@@ -141,287 +123,101 @@ Or query by custom ID: `GET /v1/videos/image2video/{external_task_id}`
 
 ---
 
-### Image-to-Video  -  Query Task List
+## Text to Video — Create Task
 
-```
-GET /v1/videos/image2video?pageNum=1&pageSize=30
-```
+**POST** `/v1/videos/text2video`
 
----
-
-### Text-to-Video  -  Create Task
-
-```
-POST /v1/videos/text2video
-```
-
-Same parameters as Image-to-Video EXCEPT:
-- No `image` / `image_tail` parameters
-- `aspect_ratio` defaults to `16:9` (enum: `16:9`, `9:16`, `1:1`)
-- `prompt` is the primary input
+Same parameters as image2video minus `image`/`image_tail`. Supports `multi_shot` with `multi_prompt`.
 
 ---
 
-### Text-to-Video  -  Query Task
+## Omni-Video — Create Task
 
-```
-GET /v1/videos/text2video/{task_id}
-```
+**POST** `/v1/videos/omni-video`
 
-Same response format as Image-to-Video query.
-
----
-
-### Omni-Video  -  Create Task (Unified Endpoint)
-
-```
-POST /v1/videos/omni-video
-```
-
-**Additional parameters vs standard endpoints:**
-
-| Parameter | Type | Description |
-|---|---|---|
-| `image_list` | array | Multiple reference images. `[{"image_url": "...", "type": "first_frame|end_frame"}]` |
-| `element_list` | array | Elements by ID. `[{"element_id": long}]` |
-| `video_list` | array | Reference video. `[{"video_url": "...", "refer_type": "base|feature", "keep_original_sound": "yes|no"}]` |
-| `aspect_ratio` | string | Required when no first-frame reference. `16:9`, `9:16`, `1:1` |
-
-**Image list constraints:**
-- With reference video: images + elements <= 4
-- Without reference video: images + elements <= 7
-- End frame not supported with > 2 images
-
-**Video list constraints:**
-- Only .mp4/.mov, 3-10s duration, 720-2160px, 24-60fps
-- Max 1 video, max 200MB
-- When reference video present, `sound` must be `off`
-
----
-
-## Image Generation Endpoints
-
-### Omni-Image  -  Create Task
-
-```
-POST /v1/images/omni-image
-```
-
-| Parameter | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `model_name` | string | Optional | `kling-image-o1` | `kling-image-o1` or `kling-v3-omni` |
-| `prompt` | string | Required | null | Text prompt. Max 2500 chars. Use `<<<image_1>>>` to reference images |
-| `image_list` | array | Optional | null | `[{"image": "url_or_base64"}]`. Images + elements <= 10 |
-| `element_list` | array | Optional | null | `[{"element_id": long}]` |
-| `resolution` | string | Optional | `1k` | `1k`, `2k`, `4k` |
-| `result_type` | string | Optional | `single` | `single` or `series` |
-| `n` | int | Optional | 1 | Number of images [1-9] |
-| `series_amount` | int | Optional | 4 | Images in series [2-9] |
-| `aspect_ratio` | string | Optional | `auto` | `16:9`, `9:16`, `1:1`, `4:3`, `3:4`, `3:2`, `2:3`, `21:9`, `auto` |
-| `callback_url` | string | Optional | null | Webhook URL |
-| `external_task_id` | string | Optional | null | Custom task ID |
-
-### Standard Image  -  Create Task
-
-```
-POST /v1/images/generations
-```
-
-Same as Omni-Image but with `image` (single string) instead of `image_list`, and `negative_prompt` support.
-
----
-
-## Element Library Endpoints
-
-### Create Element
-
-```
-POST /v1/general/advanced-custom-elements
-```
-
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `element_name` | string | Required | Max 20 chars |
-| `element_description` | string | Required | Max 100 chars |
-| `reference_type` | string | Required | `video_refer` (Video Character) or `image_refer` (Multi-Image) |
-| `element_image_list` | object | Conditional | Required when `image_refer`. Contains `frontal_image` + `refer_images` (1-3 additional) |
-| `element_video_list` | object | Conditional | Required when `video_refer`. Single video, .mp4/.mov, 1080p, 3-8s, 16:9 or 9:16, max 200MB |
-| `element_voice_id` | string | Optional | Bind existing voice to element. Only video elements |
-| `tag_list` | array | Optional | Tags: `o_101`-`o_108` (Hottest, Character, Animal, Item, Costume, Scene, Effect, Others) |
-| `callback_url` | string | Optional | Webhook URL |
-| `external_task_id` | string | Optional | Custom ID |
-
-### Query Element
-
-```
-GET /v1/general/advanced-custom-elements/{task_id}
-GET /v1/general/advanced-custom-elements?pageNum=1&pageSize=30
-```
-
-### Query Preset Elements
-
-```
-GET /v1/general/advanced-presets-elements?pageNum=1&pageSize=30
-```
-
-### Delete Element
-
-```
-POST /v1/general/delete-elements
-Body: { "element_id": "string" }
-```
-
----
-
-## Task Status Values
-
-| Status | Description |
-|---|---|
-| `submitted` | Task created, queued |
-| `processing` | Actively generating |
-| `succeed` | Complete  -  video URL available |
-| `failed` | Error  -  check `task_status_msg` |
+Supports everything kling-v3 does plus `video_list` (reference video), multi-image elements.
 
 ---
 
 ## Pricing (Prepaid Resource Packs)
 
-### Kling V3.0 Video
+All prices are **per second** of video duration.
 
-| Configuration | Units/sec | $/sec |
-|---|---|---|
-| Std, no audio | 0.6 | $0.084 |
-| Std, with audio (no voice control) | 0.9 | $0.126 |
-| Std, with audio + voice control | 1.1 | $0.154 |
-| Pro, no audio | 0.8 | $0.112 |
-| Pro, with audio (no voice control) | 1.2 | $0.168 |
-| Pro, with audio + voice control | 1.4 | $0.196 |
+| Model + Mode | Audio | Cost/sec (units) | Cost/sec (USD) |
+|-------------|-------|-----------------|----------------|
+| kling-v3 std | no audio | 0.6 units | $0.084 |
+| kling-v3 std | with audio (no voice ctrl) | 0.9 units | $0.126 |
+| kling-v3 std | with audio + voice ctrl | 1.1 units | $0.154 |
+| kling-v3 pro | no audio | 0.8 units | $0.112 |
+| kling-v3 pro | with audio (no voice ctrl) | 1.2 units | $0.168 |
+| kling-v3 pro | with audio + voice ctrl | 1.4 units | $0.196 |
 
-### Kling V3.0 Omni Video
-
-| Configuration | Units/sec | $/sec |
-|---|---|---|
-| Std, no video input, no audio | 0.6 | $0.084 |
-| Std, no video input, with audio | 0.8 | $0.112 |
-| Std, with video input, no audio | 0.9 | $0.126 |
-| Std, with video input, with audio | 1.1 | $0.154 |
-| Pro, no video input, no audio | 0.8 | $0.112 |
-| Pro, no video input, with audio | 1.0 | $0.14 |
-| Pro, with video input, no audio | 1.2 | $0.168 |
-| Pro, with video input, with audio | 1.4 | $0.196 |
-
-### Kling V3.0 Images
-
-| Resolution | Units | Price |
-|---|---|---|
-| 1K / 2K | 8 | $0.028 |
-| 4K (Omni only) | 16 | $0.056 |
-
-### Cost Estimate per UGC Generation (our pipeline)
-
-Assuming pro mode, no audio, image-to-video:
-- Hook segment (5s): 5 × $0.112 = **$0.56**
-- Body segment (10s): 10 × $0.112 = **$1.12**
-- CTA segment (5s): 5 × $0.112 = **$0.56**
-- **Total per variant: ~$2.24**
-- **Total per generation (4 variants): ~$8.96**
-
-With std mode:
-- Hook (5s): $0.42, Body (10s): $0.84, CTA (5s): $0.42
-- **Total per variant: ~$1.68**
-- **Total per generation (4 variants): ~$6.72**
+**Example costs for UGC segments (kling-v3 std, no audio):**
+- 3s hook = 1.8 units / $0.252
+- 3s CTA = 1.8 units / $0.252
+- 5s body = 3.0 units / $0.420
+- 7s body = 4.2 units / $0.588
 
 ---
 
-## Callback/Webhook Protocol
+## UGC Segment Duration Strategy
 
-Configure via `callback_url` parameter on task creation.
-
-```json
-{
-  "webhook_config": {
-    "endpoint": "https://your-domain.com/webhooks/kling",
-    "secret": "your_webhook_secret"
-  }
-}
-```
-
-Server sends notification on task status changes (submitted → processing → succeed/failed).
+Per product spec:
+- **Hook**: fixed 3 seconds
+- **CTA**: fixed 3 seconds
+- **Body**: dynamic, based on word count at ~2.5 words/sec, minimum 3s, maximum 10s
+  - Formula: `Math.max(3, Math.min(10, Math.ceil(wordCount / 2.5)))`
 
 ---
 
-## Key Constraints for Our Pipeline
+## Seamless Segment Chaining (Option D)
 
-1. **Lip sync degrades after ~10s** → Generate segments independently (Hook, Body, CTA)
-2. **Image constraints:** Max 10MB, min 300px, aspect ratio 1:2.5 to 2.5:1
-3. **Video output cleared after 30 days** → Must download to R2 immediately on `succeed`
-4. **Multi-shot available:** Can generate up to 6 storyboards in one task (3-15s total)
-5. **Element system:** Can create persistent character elements for consistent persona across generations
-6. **No audio generation on reference video tasks** → Sound must be `off` when using video input
-7. **Duration flexibility:** 3-15s in 1-second increments on kling-v3
+`image_tail` on `/v1/videos/image2video` (kling-v3 only) enables end-frame control.
+
+**Chaining pattern for Hook → Body → CTA:**
+1. Generate Hook with composite image as `image` (start frame)
+2. Extract last frame of Hook video (FFmpeg: `ffmpeg -sseof -0.1 -i hook.mp4 -frames:v 1 last_frame.jpg`)
+3. Generate Body with composite image as `image`, Hook last frame as `image_tail`... OR use Hook last frame as `image` for natural continuation
+4. Repeat for CTA using Body last frame
+
+> Note: This makes generation sequential (not parallel). Use as "seamless mode" — premium option.
 
 ---
 
-## Architecture Implications
+## Authentication
 
-### Model Decision: V2.6 std (720p) for MVP
+JWT (HS256), 30-minute expiry. Generated server-side from `KLING_ACCESS_KEY` + `KLING_SECRET_KEY`.
 
-**Why V2.6 over V3:**
-- V2.6 std is **50% cheaper** per second ($0.042/s vs $0.084/s)
-- At 720p, quality difference is minimal for UGC-style social ads
-- Enables healthy margins (62-74%) without enterprise pricing negotiation
-- V3 can be offered as a premium feature later
+---
 
-**Why NOT multi-shot:**
-- Our product model is **modular segments**  -  users generate hooks, bodies, CTAs independently
-- Users mix and match segments to create N×N×N video combinations
-- Multi-shot would lock segments into a single video, destroying the combinatorial value
-- Individual segments allow per-segment retry on failure
-- FFmpeg stitching is needed anyway for on-demand combo assembly
+## Element Library API
 
-### Modular Segment Pipeline
+### Create Element
+**POST** `/v1/general/advanced-custom-elements`
 
-Each segment is generated as an independent Kling image-to-video task:
-1. **Hook segments** (3-5s): Short attention-grabbers
-2. **Body segments** (5-10s): Product benefits / social proof
-3. **CTA segments** (3-5s): Urgency-driven close
+- `reference_type`: `video_refer` (Video Character Elements) or `image_refer` (Multi-Image Elements)
+- Video elements support voice binding; require 1080p video 3–8s, 16:9 or 9:16
 
-Each uses the same POV image (persona + product) as the start frame.
-FFmpeg stitches user-selected combos on-demand (free  -  no Kling cost).
+### Query Element (Single)
+**GET** `/v1/general/advanced-custom-elements/{id}`
 
-### Element Library for Persona Consistency
+### Query Elements (List)
+**GET** `/v1/general/advanced-custom-elements`
 
-Instead of passing the persona reference image every time, we can:
-1. Create a Kling Element from the NanoBanana-generated persona image
-2. Reference the `element_id` in all future video generations
-3. This may improve persona consistency across videos
+### Query Preset Elements
+**GET** `/v1/general/advanced-presets-elements`
 
-### Callback vs Polling
+### Delete Element
+**POST** `/v1/general/delete-elements`
+Body: `{ "element_id": "string" }`
 
-Kling supports `callback_url`  -  use this with Inngest to avoid polling:
-1. Create Kling task with `callback_url` pointing to our worker
-2. Inngest `step.waitForEvent()` waits for webhook
-3. On callback, Inngest continues pipeline
+---
 
-This is more efficient than polling every 10s.
+## Notes for AIUGC Integration
 
-### V2.6 API Endpoint Usage
-
-For our pipeline, we use the **legacy image-to-video endpoint** (not omni-video):
-
-```
-POST /v1/videos/image2video
-{
-  "model_name": "kling-v2-6",
-  "image": "<POV_image_url>",
-  "prompt": "<segment_script>",
-  "mode": "std",
-  "duration": "5",          // or "10" for body segments
-  "aspect_ratio": "9:16",
-  "callback_url": "<worker_webhook>",
-  "external_task_id": "<segment_uuid>"
-}
-```
-
-Note: `kling-v2-6` does NOT support `multi_shot`, `sound`, `voice_list`, or `element_list`.
-These are V3+ features we may adopt later.
+1. **Always use `kling-v3`** for both std and pro modes — supports flexible 3–15s duration
+2. **Never use `kling-v2-6`** — limited to 5s/10s only, outdated
+3. **sound: "on"** adds ~50% cost per second — evaluate if worth it vs post-processing TTS
+4. **image_tail** is available on kling-v3 for end-frame control (enables seamless chaining)
+5. **9:16 aspect ratio** is the UGC format — always pass explicitly
+6. Videos expire after 30 days — download to Supabase Storage immediately after generation

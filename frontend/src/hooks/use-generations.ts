@@ -193,6 +193,10 @@ export function useRegenerateSegment() {
       });
       queryClient.invalidateQueries({ queryKey: ["generations"] });
     },
+    onError: () => {
+      // Refresh credits even on error - debit may have been attempted then refunded
+      queryClient.invalidateQueries({ queryKey: ["credits"] });
+    },
   });
 }
 

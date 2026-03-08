@@ -79,23 +79,23 @@ const PLAN_PERKS: Record<PlanTier, { icon: React.ElementType; headline: string; 
 const PACK_PERKS: Record<CreditPackKey | SingleVideoPackKey, { headline: string; sub: string; highlight: string; bullets: string[] }> = {
   single_standard: {
     headline: "Your video is on its way. 🎬",
-    sub: "5 credits loaded. Enough for one complete standard video (Hook → Body → CTA). Hit generate and you're done.",
-    highlight: "5 credits added · 1 standard video ready",
+    sub: "5 credits loaded. Enough for one complete Budget video (Hook → Body → CTA). Hit generate and you're done.",
+    highlight: "5 credits added · 1 Budget video ready",
     bullets: [
-      "1 complete standard video (Hook → Body → CTA)",
+      "1 complete Budget video (Hook → Body → CTA)",
       "AI-written script, scene, and voiceover",
       "720p MP4 export, ready for any platform",
       "No watermarks, yours to keep",
     ],
   },
   single_hd: {
-    headline: "HD video incoming. 🎬",
-    sub: "10 credits loaded. Enough for one complete HD video (Hook → Body → CTA). Higher res, sharper results.",
-    highlight: "10 credits added · 1 HD video ready",
+    headline: "Premium video incoming. 🎬",
+    sub: "10 credits loaded. Enough for one complete Premium video (Hook → Body → CTA). Higher res, sharper results.",
+    highlight: "10 credits added · 1 Premium video ready",
     bullets: [
-      "1 complete HD video (Hook → Body → CTA)",
+      "1 complete Premium video (Hook → Body → CTA)",
       "AI-written script, scene, and voiceover",
-      "1080p HD MP4 export for premium placements",
+      "1080p MP4 export for premium placements",
       "No watermarks, yours to keep",
     ],
   },
@@ -104,8 +104,8 @@ const PACK_PERKS: Record<CreditPackKey | SingleVideoPackKey, { headline: string;
     sub: "Your 10 credits are ready to use right now. That's 2 complete video ads. Go test your first hook.",
     highlight: "10 credits added to your account",
     bullets: [
-      "2 standard videos (Hook → Body → CTA)",
-      "Or 1 HD video for premium placements",
+      "2 Budget videos (Hook → Body → CTA)",
+      "Or 1 Premium video for top placements",
       "Full AI script generation included",
       "MP4 download, no watermarks",
     ],
@@ -115,7 +115,7 @@ const PACK_PERKS: Record<CreditPackKey | SingleVideoPackKey, { headline: string;
     sub: "Your Creator Pack is active. That's enough to test 6 complete ad variations and find your winner.",
     highlight: "30 credits added to your account",
     bullets: [
-      "6 standard videos (or 3 HD)",
+      "6 Budget videos (or 3 Premium)",
       "Enough to A/B test hooks and find what converts",
       "Full AI script + scene generation",
       "MP4 downloads ready when each job completes",
@@ -126,7 +126,7 @@ const PACK_PERKS: Record<CreditPackKey | SingleVideoPackKey, { headline: string;
     sub: "Pro Pack loaded. That's 20 complete video ads on demand, more than most agencies produce in a month.",
     highlight: "100 credits added to your account",
     bullets: [
-      "20 standard videos (or 10 HD)",
+      "20 Budget videos (or 10 Premium)",
       "Full campaign worth of creative variation",
       "Test every hook angle and CTA style",
       "MP4 downloads, no watermarks, no limits",

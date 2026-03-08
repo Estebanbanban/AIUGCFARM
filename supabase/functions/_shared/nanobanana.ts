@@ -113,10 +113,23 @@ export async function generateImagesFromPrompt(
   return Promise.all(Array.from({ length: count }, () => generateSingleImageWithFallback(prompt)));
 }
 
+/** Pose variant suffixes appended to the composite prompt — one per segment type.
+ *  Only the hand/body position hint varies; nothing else (angle, crop, product, expression) changes.
+ */
+export const POSE_VARIANT_SUFFIXES: Record<1 | 2 | 3, string> = {
+  1: ", person standing naturally with arms relaxed at sides",
+  2: ", person with one hand in a natural mid-conversation gesture, slight hand movement",
+  3: ", person with subtle confident posture, hands in a natural resting position slightly forward",
+};
+
 /**
  * Generate a composite image (persona + product) for video generation.
  * Downloads persona + product reference images, sends to Gemini as multimodal input.
  * Returns raw image buffer.
+ *
+ * @param poseVariant - Optional 1, 2, or 3. When provided, appends the matching pose suffix
+ *   to the prompt so each segment type starts from a slightly different body pose.
+ *   No other aspect of the image changes (no angle, crop, product, expression change).
  */
 export async function generateCompositeFromImages(
   personImageUrl: string,
@@ -124,6 +137,7 @@ export async function generateCompositeFromImages(
   productContext?: ProductReferenceContext,
   scenePrompt?: string,
   aspectRatio: "9:16" | "16:9" = "9:16",
+  poseVariant?: 1 | 2 | 3,
 ): Promise<GeneratedImage> {
   if (!Array.isArray(productImageUrls) || productImageUrls.length === 0) {
     throw new Error("At least one product reference image is required");
@@ -175,9 +189,11 @@ export async function generateCompositeFromImages(
   const multiImageInstruction =
     "Use all provided product reference images to preserve exact product packaging, color, materials, shape, logo placement, and label details.";
 
+  const poseSuffix = poseVariant ? POSE_VARIANT_SUFFIXES[poseVariant] : "";
+
   const compositePrompt = scenePrompt
-    ? `${framingRule} ${multiImageInstruction} ${productContextPrompt} ${scenePrompt} The person is filming themselves POV-style (arm extended, front-camera angle, slight wide-angle distortion), naturally holding and showcasing the product which is clearly visible in frame. iPhone selfie aesthetic, talking-to-camera energy. ${formatHint}`
-    : `${framingRule} ${multiImageInstruction} ${productContextPrompt} UGC phone selfie: extreme close-up POV, front-camera angle, arm extended at selfie distance, slight wide-angle distortion. The person looks directly into the lens while naturally holding the product near their upper chest — the product is clearly visible in frame. Natural window lighting, authentic imperfections, talking-to-camera energy. ${formatHint}`;
+    ? `${framingRule} ${multiImageInstruction} ${productContextPrompt} ${scenePrompt} The person is filming themselves POV-style (arm extended, front-camera angle, slight wide-angle distortion), naturally holding and showcasing the product which is clearly visible in frame. iPhone selfie aesthetic, talking-to-camera energy. ${formatHint}${poseSuffix}`
+    : `${framingRule} ${multiImageInstruction} ${productContextPrompt} UGC phone selfie: extreme close-up POV, front-camera angle, arm extended at selfie distance, slight wide-angle distortion. The person looks directly into the lens while naturally holding the product near their upper chest — the product is clearly visible in frame. Natural window lighting, authentic imperfections, talking-to-camera energy. ${formatHint}${poseSuffix}`;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GEMINI_REQUEST_TIMEOUT_MS);

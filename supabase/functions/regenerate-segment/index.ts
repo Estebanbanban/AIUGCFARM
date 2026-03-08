@@ -57,8 +57,15 @@ function isStoredVideos(value: unknown): value is StoredVideos {
   return Array.isArray(v.hooks) && Array.isArray(v.bodies) && Array.isArray(v.ctas);
 }
 
-function clampKlingDuration(seconds: number): number {
-  return seconds <= 5 ? 5 : 10;
+function clampKlingDuration(segmentType: SegmentType, modelName: string, text: string): number {
+  const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+  if (modelName === "kling-v3") {
+    if (segmentType === "hook" || segmentType === "cta") return 3;
+    return Math.max(3, Math.min(10, Math.ceil(wordCount / 2.5)));
+  }
+  // kling-v2-6 (and any other model — fall back to v2-6 behaviour)
+  if (segmentType === "hook" || segmentType === "cta") return 5;
+  return wordCount / 2.5 <= 5 ? 5 : 10;
 }
 
 Deno.serve(async (req: Request) => {
@@ -142,16 +149,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Plan-based monthly regeneration limits
-    const PLAN_REGEN_LIMITS: Record<string, number> = {
-      free: 0, starter: 10, growth: 20, scale: 50,
-    };
-
-    const { data: planProfile } = await sb
-      .from("profiles").select("plan").eq("id", userId).single();
-    const userPlan = (planProfile?.plan as string) ?? "free";
-    const monthLimit = PLAN_REGEN_LIMITS[userPlan] ?? 0;
-
     const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
     const { data: limitRow } = await sb
       .from("regeneration_limits")
@@ -161,13 +158,6 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     const regenCount = limitRow?.regens_used ?? 0;
-    if (regenCount >= monthLimit) {
-      return json(
-        { detail: `Monthly regeneration limit reached (${monthLimit}/${monthLimit}). Resets next month.` },
-        cors,
-        403,
-      );
-    }
 
     // Dynamic credit cost: 2 for HD, 1 for standard
     const resolvedQuality = quality || (generation.video_quality as string) || "standard";
@@ -185,7 +175,13 @@ Deno.serve(async (req: Request) => {
     await debitCredits(userId, creditCost, generation.id);
 
     try {
-      let compositeSignedUrl = generation.composite_image_url as string;
+      let compositePath = generation.composite_image_url as string;
+      if (compositePath?.startsWith("{")) {
+        const variants = JSON.parse(compositePath) as { hook: string; body: string; cta: string };
+        compositePath = variants[segmentType] ?? Object.values(variants)[0];
+      }
+
+      let compositeSignedUrl = compositePath;
       if (!compositeSignedUrl.startsWith("http")) {
         const { data: signedData, error: signedErr } = await sb.storage
           .from("composite-images")
@@ -198,9 +194,9 @@ Deno.serve(async (req: Request) => {
         compositeSignedUrl = signedData.signedUrl;
       }
 
-      const quality = (generation.video_quality ?? "standard") as "standard" | "hd";
+      const resolvedQuality = (generation.video_quality ?? "standard") as "standard" | "hd";
       const modelName = (generation.kling_model as string | null)
-        ?? KLING_MODEL[quality]
+        ?? KLING_MODEL[resolvedQuality]
         ?? KLING_MODEL.standard;
 
       const generationLanguage = (generation.language as string | null) ?? "en";
@@ -210,7 +206,7 @@ Deno.serve(async (req: Request) => {
         submitKlingJob({
           image_url: compositeSignedUrl,
           script: `A UGC creator speaking directly to camera${speakingHint}, saying: "${segment.text}" Natural, authentic talking-head style, casual handheld selfie aesthetic.`,
-          duration: clampKlingDuration(segment.duration_seconds ?? 5),
+          duration: clampKlingDuration(segmentType, modelName, segment.text ?? ""),
           mode: "pro",
           sound: "on",
           model_name: modelName,

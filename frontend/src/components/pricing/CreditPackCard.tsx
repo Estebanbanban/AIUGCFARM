@@ -87,7 +87,7 @@ export function CreditPackCard({
         </li>
         <li className="flex items-center gap-2">
           <Check className="size-3.5 shrink-0 text-primary" strokeWidth={2.5} />
-          {videosStandard} standard or {videosHd} HD videos
+          {videosStandard} Budget or {videosHd} Premium videos
         </li>
         {tripleStandard > 0 && (
           <li className="flex items-center gap-2">

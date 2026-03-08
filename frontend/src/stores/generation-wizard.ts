@@ -58,6 +58,8 @@ interface GenerationWizardState {
   ctasCount: number;
   // Video provider (HD only)
   videoProvider: "kling" | "sora";
+  // Seamless Mode (HD/kling-v3 only): chains each clip's ending pose to the next via image_tail
+  seamlessMode: boolean;
   // Actions
   setStep: (step: number) => void;
   setProductId: (id: string) => void;
@@ -92,6 +94,7 @@ interface GenerationWizardState {
   setBodiesCount: (n: number) => void;
   setCtasCount: (n: number) => void;
   setVideoProvider: (provider: "kling" | "sora") => void;
+  setSeamlessMode: (enabled: boolean) => void;
   updateAdvancedSegment: (
     type: "hooks" | "bodies" | "ctas",
     index: number,
@@ -135,6 +138,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
       bodiesCount: 3,
       ctasCount: 3,
       videoProvider: "kling",
+      seamlessMode: false,
       setStep: (step) =>
         set((state) => {
           state.step = step;
@@ -163,6 +167,10 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
       setQuality: (quality) =>
         set((state) => {
           state.quality = quality;
+          // Seamless Mode requires HD — reset when switching to standard
+          if (quality !== "hd") {
+            state.seamlessMode = false;
+          }
         }),
       setFormat: (format) =>
         set((state) => {
@@ -242,6 +250,13 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
       setVideoProvider: (provider) =>
         set((state) => {
           state.videoProvider = provider;
+          if (provider !== "kling") {
+            state.seamlessMode = false;
+          }
+        }),
+      setSeamlessMode: (enabled) =>
+        set((state) => {
+          state.seamlessMode = enabled;
         }),
       updateAdvancedSegment: (type, index, patch) =>
         set((state) => {
@@ -273,6 +288,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
           creditsToCharge: null,
           advancedMode: false,
           advancedSegments: null,
+          seamlessMode: false,
         }),
       resumeFromGeneration: ({ generationId, script, creditsToCharge, productId, personaId, mode, quality }) =>
         set((state) => {
@@ -306,6 +322,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
           advancedMode: false,
           advancedSegments: null,
           videoProvider: "kling" as const,
+          seamlessMode: false,
         })),
     })),
     {
@@ -343,6 +360,7 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
         advancedMode: state.advancedMode,
         advancedSegments: state.advancedSegments,
         videoProvider: state.videoProvider,
+        seamlessMode: state.seamlessMode,
         hooksCount: state.hooksCount,
         bodiesCount: state.bodiesCount,
         ctasCount: state.ctasCount,

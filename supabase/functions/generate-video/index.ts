@@ -504,7 +504,6 @@ function buildFallbackScript(
   ctasCount: number,
   _language: string,
 ): GeneratedScript {
-  const variantCount = Math.max(hooksCount, bodiesCount, ctasCount);
   const productNameRaw =
     typeof product.name === "string" && product.name.trim().length > 0
       ? product.name.trim()
@@ -794,7 +793,7 @@ async function generatePoseVariantComposites(
 ): Promise<string> {
   // Variant 1 = hook pose, 2 = body pose, 3 = CTA pose
   // Each appends only a pose suffix to the existing prompt — nothing else changes.
-  const [hookComposite, bodyComposite, ctaComposite] = await Promise.all(
+  const variantResults = await Promise.allSettled(
     ([1, 2, 3] as const).map((variant) =>
       withRetry(
         () => generateCompositeFromImages(
@@ -810,6 +809,21 @@ async function generatePoseVariantComposites(
       )
     ),
   );
+
+  const [hookResult, bodyResult, ctaResult] = variantResults;
+
+  if (hookResult.status === "rejected" && bodyResult.status === "rejected" && ctaResult.status === "rejected") {
+    throw new Error(
+      `All 3 pose variant composites failed: hook=${hookResult.reason}, body=${bodyResult.reason}, cta=${ctaResult.reason}`,
+    );
+  }
+
+  // Find the first successful composite to use as fallback for failed variants
+  const firstSuccess = variantResults.find((r): r is PromiseFulfilledResult<{ data: Uint8Array; mimeType: string }> => r.status === "fulfilled")!.value;
+
+  const hookComposite = hookResult.status === "fulfilled" ? hookResult.value : (console.warn("[generate-video] hook pose variant failed — using fallback composite"), firstSuccess);
+  const bodyComposite = bodyResult.status === "fulfilled" ? bodyResult.value : (console.warn("[generate-video] body pose variant failed — using fallback composite"), firstSuccess);
+  const ctaComposite = ctaResult.status === "fulfilled" ? ctaResult.value : (console.warn("[generate-video] cta pose variant failed — using fallback composite"), firstSuccess);
 
   // Upload all 3 in parallel
   const uploadVariant = async (composite: { data: Uint8Array; mimeType: string }, label: string) => {
@@ -1137,6 +1151,9 @@ Deno.serve(async (req: Request) => {
         // Only works when pose-variant composites are available (poseVariantPaths !== null).
         // Seamless Mode is silently skipped for Sora provider (no image_tail support).
         let seamlessTailUrls: SeamlessTailUrls | undefined;
+        if (requestedSeamlessMode && !poseVariantPaths) {
+          console.warn("[generate-video] seamless_mode requested but pose variant composites unavailable — falling back to standard mode");
+        }
         if (requestedSeamlessMode && provider === "kling" && klingModel === "kling-v3" && poseVariantPaths) {
           seamlessTailUrls = {
             hook: segmentImageUrls.body,  // hook ends → body start pose
