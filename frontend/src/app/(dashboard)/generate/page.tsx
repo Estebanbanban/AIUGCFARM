@@ -637,6 +637,11 @@ export default function GeneratePage() {
     setBConfirmed(false);
   }, [store.productId, store.personaId]);
 
+  // Reset B confirmation when video settings change (stale checkmark fix)
+  useEffect(() => {
+    setBConfirmed(false);
+  }, [store.quality, store.mode, store.format, store.videoProvider, store.seamlessMode]);
+
   async function handleBrandSummaryUpdate(updated: BrandSummary) {
     if (!store.productId) return;
     const supabase = createClient();
