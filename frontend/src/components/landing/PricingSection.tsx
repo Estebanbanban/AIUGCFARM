@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { Check, Clock, Loader2, Shield, RefreshCw, Star } from "lucide-react";
@@ -70,13 +70,6 @@ export function PricingSection() {
   const router = useRouter();
   const { isSignedIn } = useAuth();
   const offer = useFirstPurchaseOffer();
-
-  // Auto-start the offer for any visitor to the pricing page.
-  // startOffer() is idempotent: no-op if already started or used.
-  useEffect(() => {
-    offer.startOffer();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   async function handlePlanClick(planKey: PlanTier) {
     trackCtaClicked("pricing", planKey);

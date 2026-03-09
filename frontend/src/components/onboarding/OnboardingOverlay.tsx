@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import type { Product, BrandSummary, Persona } from "@/types/database";
 import type { ScrapeResponseData } from "@/types/api";
+import { useFirstPurchaseOffer } from "@/hooks/use-first-purchase-offer";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ const STEPS = [
 
 export function OnboardingOverlay() {
   const router = useRouter();
+  const offer = useFirstPurchaseOffer();
   const { isLoaded: authLoaded } = useAuth();
   const [view, setView] = useState<WizardView>("checklist");
   const [skipped, setSkipped] = useState(false);
@@ -243,6 +245,7 @@ export function OnboardingOverlay() {
         if (!wizardStore.format) wizardStore.setFormat("9:16");
         wizardStore.setStep(2);
         setView("banner");
+        offer.startOffer();
         router.push("/generate");
       } else {
         // Multiple products - show picker modal
@@ -250,6 +253,7 @@ export function OnboardingOverlay() {
       }
     } else {
       setView("banner");
+      offer.startOffer();
       router.push("/generate");
     }
   };
@@ -261,6 +265,7 @@ export function OnboardingOverlay() {
     wizardStore.setStep(2);
     setShowProductPicker(false);
     setView("banner");
+    offer.startOffer();
     router.push("/generate");
   };
 
@@ -324,7 +329,7 @@ export function OnboardingOverlay() {
       <AnimatePresence>
         <GuideBanner
           key="guide-banner"
-          onGoGenerate={() => router.push("/generate")}
+          onGoGenerate={() => { offer.startOffer(); router.push("/generate"); }}
           onDismiss={handleSkip}
         />
       </AnimatePresence>

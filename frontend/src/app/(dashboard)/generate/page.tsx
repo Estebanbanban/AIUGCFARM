@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -447,14 +447,6 @@ export default function GeneratePage() {
   const buyCredits = useBuyCredits();
   const offer = useFirstPurchaseOffer();
 
-  // Ensure offer activates before the browser paints when any paywall opens.
-  // useLayoutEffect fires synchronously after DOM mutation but before paint,
-  // so discounted prices are visible on the very first frame.
-  useLayoutEffect(() => {
-    if (showPaywall || showPersonaLimitPaywall) {
-      offer.startOffer();
-    }
-  }, [showPaywall, showPersonaLimitPaywall]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: generations } = useGenerations();
   const { data: lastPendingGeneration } = useLastPendingGeneration();
@@ -736,14 +728,7 @@ export default function GeneratePage() {
   const creditsRemaining = credits?.remaining ?? 0;
   const isUnlimitedCredits = credits?.is_unlimited === true;
 
-  // Auto-start offer when page loads for users with 0 credits.
-  // startOffer() is idempotent: no-op if already started or used.
-  useEffect(() => {
-    if (!creditsLoading && !isUnlimitedCredits && creditsRemaining === 0) {
-      offer.startOffer();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [creditsLoading, isUnlimitedCredits, creditsRemaining]);
+
 
   const userPlan = profile?.plan ?? "free";
   const canUseHD = true; // HD is available to all users with credits
@@ -1184,7 +1169,6 @@ export default function GeneratePage() {
     if (!store.pendingGenerationId || !store.pendingScript) return;
     if (!hasEnoughCredits) {
       trackPaywallShown("insufficient_credits");
-      offer.startOffer();
       // Set default tab based on generation context
       setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
       setShowPaywall(true);
@@ -1228,7 +1212,6 @@ export default function GeneratePage() {
             (err.code === "INSUFFICIENT_CREDITS" || err.status === 402)
           ) {
             trackPaywallShown("insufficient_credits");
-            offer.startOffer();
             setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
             setShowPaywall(true);
           } else if (
@@ -1430,7 +1413,6 @@ export default function GeneratePage() {
           action: {
             label: "Grab it",
             onClick: () => {
-              offer.startOffer();
               setShowPaywall(true);
             },
           },
