@@ -65,12 +65,11 @@ export default function SlideshowsPage() {
   const exportedCount = exported.length;
   const draftCount = drafts.length;
 
-  // Current filtered list based on tab
-  const filtered = activeTab === "exported" ? exported : drafts;
-
-  // Pagination
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
-  const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  // Separate pagination per tab
+  const activeList = activeTab === "exported" ? exported : drafts;
+  const totalPages = Math.max(1, Math.ceil(activeList.length / ITEMS_PER_PAGE));
+  const exportedPaged = exported.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const draftsPaged = drafts.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
   const hasSlideshows = slideshows.length > 0;
 
@@ -145,10 +144,10 @@ export default function SlideshowsPage() {
             </TabsList>
 
             {/* Exported tab */}
-            <TabsContent value="exported">
-              {paged.length > 0 ? (
+            <TabsContent value="exported" forceMount className={activeTab !== "exported" ? "hidden" : ""}>
+              {exportedPaged.length > 0 ? (
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-                  {paged.map((slideshow) => (
+                  {exportedPaged.map((slideshow) => (
                     <ExportedSlideshowCard
                       key={slideshow.id}
                       slideshow={slideshow}
@@ -174,10 +173,10 @@ export default function SlideshowsPage() {
             </TabsContent>
 
             {/* Drafts tab */}
-            <TabsContent value="drafts">
-              {paged.length > 0 ? (
+            <TabsContent value="drafts" forceMount className={activeTab !== "drafts" ? "hidden" : ""}>
+              {draftsPaged.length > 0 ? (
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-                  {paged.map((slideshow) => (
+                  {draftsPaged.map((slideshow) => (
                     <SlideshowCard
                       key={slideshow.id}
                       slideshow={slideshow}

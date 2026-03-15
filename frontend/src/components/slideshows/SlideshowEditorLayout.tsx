@@ -27,7 +27,18 @@ export function SlideshowEditorLayout() {
         hook_text: store.hookText ?? undefined,
       },
       {
-        onSuccess: () => toast.success("Slideshow saved"),
+        onSuccess: () => {
+          store.loadSlideshow(
+            store.slideshowId!,
+            store.name,
+            store.settings,
+            store.slides,
+            store.hookText,
+            store.productId,
+            store.status,
+          );
+          toast.success("Slideshow saved");
+        },
         onError: (err) => toast.error(err.message || "Failed to save"),
       },
     );

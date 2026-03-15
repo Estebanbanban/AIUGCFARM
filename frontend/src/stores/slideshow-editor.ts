@@ -90,6 +90,7 @@ export const useSlideshowEditorStore = create<SlideshowEditorState>()(
           state.selectedSlideIndex = 0;
           state.isDirty = false;
           state.isPlaying = false;
+          state.selectedCollectionId = null; // Reset so auto-select runs for new slideshow
         }),
 
       setName: (name) =>

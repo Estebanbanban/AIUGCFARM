@@ -87,15 +87,14 @@ export function SlideshowGallery({ currentSlideshowId }: { currentSlideshowId?: 
             />
           ))}
 
-          {/* Ghost slots to fill the row */}
-          {activeList.length < 6 &&
-            Array.from({ length: Math.max(0, 6 - activeList.length) }).map((_, i) => (
-              <div
-                key={`ghost-${i}`}
-                className="rounded-lg border-2 border-dashed border-border/30"
-                style={{ aspectRatio: "9 / 16" }}
-              />
-            ))}
+          {/* Plus button to create new */}
+          <button
+            className="rounded-lg border-2 border-dashed border-border/40 hover:border-primary/40 transition-colors flex items-center justify-center"
+            style={{ aspectRatio: "9 / 16" }}
+            onClick={handleNewSlideshow}
+          >
+            <Plus className="size-8 text-muted-foreground/40" />
+          </button>
         </div>
       ) : (
         <div className="rounded-lg border border-dashed border-border p-8 text-center">

@@ -16,9 +16,13 @@ export function GenerateButton() {
   const { data: credits } = useCredits();
   const [copyLength, setCopyLength] = useState<"short" | "long">("long");
 
+  const bodySlideCount = store.slides.filter(
+    (s) => s.type === "body" || s.type === "cta",
+  ).length;
+
   const canGenerate =
     !!store.hookText &&
-    store.slides.length > 1 &&
+    bodySlideCount > 0 &&
     !generateCopy.isPending;
 
   const handleGenerate = () => {
