@@ -9,7 +9,7 @@ let ffmpegSingleton: FFmpeg | null = null;
 // Mutex - FFmpeg WASM is single-threaded; only one stitch can run at a time
 let ffmpegBusy = false;
 
-async function getFFmpeg(): Promise<FFmpeg> {
+export async function getFFmpeg(): Promise<FFmpeg> {
   if (ffmpegSingleton?.loaded) return ffmpegSingleton;
 
   const [{ FFmpeg: FFmpegClass }, { toBlobURL }] = await Promise.all([

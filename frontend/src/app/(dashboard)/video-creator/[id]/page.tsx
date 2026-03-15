@@ -35,6 +35,8 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
+import { Loader2, Scissors } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { useSingleVideoStatus } from "@/hooks/use-single-video";
 import { useGeneration } from "@/hooks/use-generations";
 import { useVideoCreatorStore } from "@/stores/video-creator-store";
@@ -181,6 +183,9 @@ function CompletedScreen({
 }) {
   const [scriptExpanded, setScriptExpanded] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [isTrimming, setIsTrimming] = useState(false);
+  const [trimmedUrl, setTrimmedUrl] = useState<string | null>(null);
+  const [trimStatus, setTrimStatus] = useState("");
 
   const modelLabel =
     soraModel === "sora-2-pro" ? "Sora 2 Pro" : "Sora 2 Standard";
@@ -194,23 +199,140 @@ function CompletedScreen({
           ? "Custom Image"
           : "None";
 
+  // Trim silence from the video using FFmpeg WASM
+  const handleTrimSilence = useCallback(async () => {
+    setIsTrimming(true);
+    setTrimStatus("Loading FFmpeg...");
+    try {
+      // Dynamic import to avoid loading FFmpeg WASM until needed
+      const stitcherModule = await import("@/hooks/use-video-stitcher");
+      const { fetchFile } = await import("@ffmpeg/util");
+      const ffmpeg = await stitcherModule.getFFmpeg();
+
+      setTrimStatus("Downloading video...");
+      const videoData = await fetchFile(videoUrl);
+      ffmpeg.writeFile("input.mp4", videoData);
+
+      // Detect silence
+      setTrimStatus("Detecting silence...");
+      let logBuffer = "";
+      const logHandler = ({ message }: { message: string }) => {
+        logBuffer += message + "\n";
+      };
+      ffmpeg.on("log", logHandler);
+      await ffmpeg.exec(["-i", "input.mp4", "-af", "silencedetect=n=-30dB:d=0.1", "-f", "null", "-"]);
+      ffmpeg.off("log", logHandler);
+
+      // Parse duration
+      const durMatch = logBuffer.match(/Duration:\s*(\d+):(\d+):(\d+)\.(\d+)/);
+      const totalDuration = durMatch
+        ? parseInt(durMatch[1]) * 3600 + parseInt(durMatch[2]) * 60 + parseInt(durMatch[3]) + parseInt(durMatch[4]) / 100
+        : 0;
+
+      if (totalDuration <= 0) {
+        toast.error("Could not parse video duration");
+        return;
+      }
+
+      // Parse silence regions
+      const silenceStarts: number[] = [];
+      const silenceEnds: number[] = [];
+      for (const line of logBuffer.split("\n")) {
+        const startMatch = line.match(/silence_start:\s*([\d.]+)/);
+        if (startMatch) silenceStarts.push(parseFloat(startMatch[1]));
+        const endMatch = line.match(/silence_end:\s*([\d.]+)/);
+        if (endMatch) silenceEnds.push(parseFloat(endMatch[1]));
+      }
+
+      // Build trim bounds (remove leading + trailing silence)
+      const BUFFER = 0.15;
+      const MIN_SILENCE = 0.5;
+      let speechStart = 0;
+      let speechEnd = totalDuration;
+
+      // Trim leading silence
+      if (silenceStarts.length > 0 && silenceStarts[0] < 0.1) {
+        speechStart = (silenceEnds[0] ?? 0) - BUFFER;
+        if (speechStart < 0) speechStart = 0;
+      }
+
+      // Trim trailing silence
+      if (silenceStarts.length > 0) {
+        const lastStart = silenceStarts[silenceStarts.length - 1];
+        if (totalDuration - lastStart < MIN_SILENCE + 0.5) {
+          speechEnd = lastStart + BUFFER;
+        }
+      }
+
+      const trimDuration = speechEnd - speechStart;
+      if (trimDuration >= totalDuration - 0.3) {
+        toast.info("No significant silence found to trim");
+        return;
+      }
+
+      // Encode trimmed clip
+      setTrimStatus("Trimming...");
+      await ffmpeg.exec([
+        "-i", "input.mp4",
+        "-ss", String(speechStart),
+        "-t", String(trimDuration),
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+        "-c:a", "aac", "-b:a", "128k",
+        "trimmed.mp4",
+      ]);
+
+      const output = await ffmpeg.readFile("trimmed.mp4");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const trimmedBlob = new Blob([output as any], { type: "video/mp4" });
+      const url = URL.createObjectURL(trimmedBlob);
+      setTrimmedUrl(url);
+
+      // Cleanup virtual FS
+      try {
+        await ffmpeg.deleteFile("input.mp4");
+        await ffmpeg.deleteFile("trimmed.mp4");
+      } catch { /* ignore cleanup errors */ }
+
+      toast.success(`Trimmed! ${totalDuration.toFixed(1)}s -> ${trimDuration.toFixed(1)}s`);
+    } catch (err) {
+      console.error("Trim failed:", err);
+      toast.error("Failed to trim silence. Try downloading the original.");
+    } finally {
+      setIsTrimming(false);
+      setTrimStatus("");
+    }
+  }, [videoUrl]);
+
+  // Use trimmed version if available
+  const activeVideoUrl = trimmedUrl ?? videoUrl;
+
   const handleDownload = useCallback(async () => {
     try {
-      const response = await fetch(videoUrl);
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `cinerads-video-${Date.now()}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      if (trimmedUrl) {
+        // Trimmed version is already a blob URL — download directly
+        const a = document.createElement("a");
+        a.href = trimmedUrl;
+        a.download = `cinerads-video-trimmed-${Date.now()}.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else {
+        const response = await fetch(videoUrl);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `cinerads-video-${Date.now()}.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
       toast.success("Video downloaded!");
     } catch {
       toast.error("Failed to download video. Please try again.");
     }
-  }, [videoUrl]);
+  }, [videoUrl, trimmedUrl]);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 py-8">
@@ -220,7 +342,7 @@ function CompletedScreen({
           <div className="relative aspect-[9/16] w-full overflow-hidden rounded-xl bg-black">
             <video
               ref={videoRef}
-              src={videoUrl}
+              src={activeVideoUrl}
               controls
               autoPlay
               loop
@@ -228,14 +350,41 @@ function CompletedScreen({
               className="absolute inset-0 h-full w-full object-contain"
             />
           </div>
+          {trimmedUrl && (
+            <p className="text-center text-xs text-green-600 mt-2">
+              Silence trimmed — playing edited version
+            </p>
+          )}
         </div>
       </Card>
 
+      {/* Trim progress */}
+      {isTrimming && (
+        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          {trimStatus}
+        </div>
+      )}
+
       {/* Action buttons */}
-      <div className="flex justify-center gap-3">
+      <div className="flex flex-wrap justify-center gap-3">
         <Button onClick={handleDownload} size="lg" className="gap-2">
           <Download className="size-4" />
-          Download MP4
+          {trimmedUrl ? "Download Trimmed" : "Download MP4"}
+        </Button>
+        <Button
+          onClick={handleTrimSilence}
+          size="lg"
+          variant="secondary"
+          className="gap-2"
+          disabled={isTrimming}
+        >
+          {isTrimming ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Scissors className="size-4" />
+          )}
+          Trim Silence
         </Button>
         <Button
           onClick={onCreateAnother}
