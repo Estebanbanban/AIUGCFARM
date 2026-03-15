@@ -497,10 +497,11 @@ Keep it under 100 words. Return ONLY the prompt text, no JSON, no quotes.`;
         return errorResponse(ErrorCodes.INVALID_INPUT, "sora_model must be 'sora-2' or 'sora-2-pro'", 400, cors);
       }
 
+      // Clamp duration to nearest valid Sora value (4, 8, 12)
       const validDurations = [4, 8, 12];
-      if (!duration || !validDurations.includes(duration)) {
-        return errorResponse(ErrorCodes.INVALID_INPUT, "duration must be 4, 8, or 12", 400, cors);
-      }
+      const clampedDuration = validDurations.reduce((prev, curr) =>
+        Math.abs(curr - (duration || 12)) < Math.abs(prev - (duration || 12)) ? curr : prev
+      );
 
       const validRefTypes = ["composite", "persona", "custom", "none"];
       if (!reference_type || !validRefTypes.includes(reference_type)) {
@@ -703,7 +704,7 @@ Keep it under 100 words. Return ONLY the prompt text, no JSON, no quotes.`;
         const soraResult = await submitSoraJob({
           prompt: soraPrompt,
           model: sora_model as "sora-2" | "sora-2-pro",
-          seconds: duration,
+          seconds: clampedDuration,
           size: targetSize,
           input_reference_blob: inputReferenceBlob,
         });
@@ -714,7 +715,7 @@ Keep it under 100 words. Return ONLY the prompt text, no JSON, no quotes.`;
           .update({
             external_job_ids: { video: soraResult.job_id },
             sora_model: sora_model,
-            duration: duration,
+            duration: clampedDuration,
             reference_type: reference_type,
             reference_image_path: reference_image_path || composite_image_path || null,
             status: "generating_segments",
