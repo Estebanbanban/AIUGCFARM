@@ -37,7 +37,7 @@ export function useSubmitSingleVideo() {
     mutationFn: async (input: {
       generation_id: string;
       sora_model: "sora-2" | "sora-2-pro";
-      duration: 4 | 8 | 12;
+      duration: 4 | 8 | 12 | 16 | 20;
       reference_type: "composite" | "persona" | "custom" | "none";
       reference_image_path?: string;
       composite_image_path?: string;

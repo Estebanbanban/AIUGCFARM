@@ -50,8 +50,8 @@ export async function submitSoraJob(params: {
 }): Promise<SoraSubmitResult> {
   const apiKey = getOpenAIKey();
   const model = params.model ?? "sora-2";
-  // Sora API accepts "4", "8", or "12" as string values only
-  const validSeconds = ["4", "8", "12"];
+  // Sora API accepts seconds as string values
+  const validSeconds = ["4", "8", "12", "16", "20"];
   const rawSeconds = String(params.seconds ?? 12);
   const seconds = validSeconds.includes(rawSeconds) ? rawSeconds : "12";
   // sora-2: 720x1280 (portrait) or 1280x720 (landscape)
