@@ -41,24 +41,26 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const softCtaInstruction = soft_cta && productName
-      ? `Slide ${slide_count} MUST naturally mention '${productName}' in the action line as the solution. Don't force it — make it feel genuine.`
-      : "";
+    const productMention = soft_cta && productName
+      ? `\nPRODUCT MENTION RULE (CRITICAL):
+- ONLY the LAST slide (slide ${slide_count}) may mention "${productName}" in its action line — as a natural recommendation, not an ad.
+- ALL OTHER slides MUST NOT mention "${productName}" or any product/app/tool name. Their action lines should describe generic real-world actions (what "I" physically did — not what app I used).
+- If you mention the product on more than one slide, the output is WRONG.`
+      : `\nPRODUCT MENTION RULE: Do NOT mention any specific product, app, or tool name in any slide. Keep all action lines about real-world actions.`;
 
     const systemPrompt = `Generate slide text for a TikTok slideshow carousel.
 
 Hook (first slide text): ${hook_text}
-Product: ${productName || "N/A"} - ${productDescription || "N/A"}
+${productName ? `Product context (for reference only): ${productName} - ${productDescription}` : ""}
 Number of body slides to generate: ${slide_count}
 
 Each body slide has THREE text elements:
 ${copy_length === "long" ? `1. "title" — a numbered point (the main takeaway). Format: "[number]. [detailed action statement]" — 8-14 words. Be specific and descriptive.
 2. "subtitle" — the relatable complaint/context. What the person was struggling with. 12-20 words. Paint a picture.
-3. "action" — the specific thing they did to fix it, with detail. 14-22 words. Include the concrete method or tool.` : `1. "title" — a numbered point (the main takeaway). Format: "[number]. [short action statement]" — Max 8 words.
+3. "action" — what they actually did about it. A real action, not a product pitch. 14-22 words.` : `1. "title" — a numbered point (the main takeaway). Format: "[number]. [short action statement]" — Max 8 words.
 2. "subtitle" — the relatable complaint/context. What the person was struggling with. Max 12 words.
 3. "action" — the specific simple thing they did to fix it. Max 14 words.`}
-
-${softCtaInstruction}
+${productMention}
 
 Rules:
 - ALL lowercase, no capitalization anywhere
@@ -68,6 +70,7 @@ Rules:
 - No motivational-poster words: "chaos", "clarity", "aligned", "reclaim", "journey"
 - Be specific, not generic. Real actions, not vibes.
 - Each slide builds on the previous — there should be a narrative arc
+- The action lines should feel like real things a person did, NOT like app store descriptions
 
 Output ONLY a JSON object with a "slides" key containing an array of objects: [{ "type": "body", "title": "...", "subtitle": "...", "action": "...", "order": 1 }]`;
 
