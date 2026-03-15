@@ -232,35 +232,41 @@ export function DashboardShell({ children, className }: { children: React.ReactN
       </Sheet>
 
       <div className="flex flex-1 flex-col overflow-hidden bg-background-secondary">
-        <header
-          className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between border-b border-border bg-background/75 px-4 backdrop-blur-xl md:px-6"
-        >
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden"
-              onClick={() => setMobileOpen(true)}
-            >
-              <Menu className="size-5" />
-              <span className="sr-only">Open menu</span>
-            </Button>
-            <h1 className="text-xl font-semibold text-foreground">{pageTitle}</h1>
-          </div>
+        {!pathname.startsWith("/slideshows") && (
+          <header
+            className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between border-b border-border bg-background/75 px-4 backdrop-blur-xl md:px-6"
+          >
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden"
+                onClick={() => setMobileOpen(true)}
+              >
+                <Menu className="size-5" />
+                <span className="sr-only">Open menu</span>
+              </Button>
+              <h1 className="text-xl font-semibold text-foreground">{pageTitle}</h1>
+            </div>
 
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Button asChild size="sm">
-              <Link href="/generate">
-                <Plus className="size-4" />
-                New Generation
-              </Link>
-            </Button>
-          </div>
-        </header>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <Button asChild size="sm">
+                <Link href="/generate">
+                  <Plus className="size-4" />
+                  New Generation
+                </Link>
+              </Button>
+            </div>
+          </header>
+        )}
 
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 md:p-8">{children}</div>
+          {pathname.startsWith("/slideshows") ? (
+            <div className="h-full">{children}</div>
+          ) : (
+            <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 md:p-8">{children}</div>
+          )}
         </main>
       </div>
     </div>

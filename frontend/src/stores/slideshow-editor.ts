@@ -126,9 +126,23 @@ export const useSlideshowEditorStore = create<SlideshowEditorState>()(
             imageId: null,
             imageUrl: null,
             text: "",
+            textContent: type === "body" || type === "cta" ? { title: "", subtitle: "", action: "" } : undefined,
           };
-          state.slides.push(newSlide);
-          state.selectedSlideIndex = state.slides.length - 1;
+
+          // Insert before the last CTA slide (if exists)
+          const lastCtaIndex = state.slides.findLastIndex((s) => s.type === "cta");
+          if (lastCtaIndex >= 0 && type !== "cta") {
+            state.slides.splice(lastCtaIndex, 0, newSlide);
+          } else {
+            state.slides.push(newSlide);
+          }
+
+          // Reorder all slides
+          state.slides.forEach((s, i) => { s.order = i; });
+
+          // Select the new slide
+          const newIndex = state.slides.findIndex((s) => s.id === newSlide.id);
+          state.selectedSlideIndex = newIndex >= 0 ? newIndex : state.slides.length - 1;
           state.isDirty = true;
         }),
 

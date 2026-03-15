@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Download } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { useSlideshows, useCreateSlideshow } from "@/hooks/use-slideshows";
 import { ExportedSlideshowCard } from "./ExportedSlideshowCard";
 import type { Slide } from "@/types/slideshow";
@@ -14,11 +13,14 @@ export function SlideshowGallery({ currentSlideshowId }: { currentSlideshowId?: 
   const { data } = useSlideshows();
   const slideshows = data?.slideshows ?? [];
   const createSlideshow = useCreateSlideshow();
-  const [activeTab, setActiveTab] = useState<"exported" | "drafts">("exported");
 
-  const exported = slideshows.filter((s) => s.exported_at);
-  const drafts = slideshows.filter((s) => !s.exported_at);
-  const activeList = activeTab === "exported" ? exported : drafts;
+  const allSlideshows = useMemo(
+    () =>
+      [...slideshows].sort(
+        (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+      ),
+    [slideshows],
+  );
 
   const handleNewSlideshow = () => {
     const defaultSlides: Slide[] = [
@@ -38,29 +40,9 @@ export function SlideshowGallery({ currentSlideshowId }: { currentSlideshowId?: 
 
   return (
     <div className="border-t border-border bg-card/30 px-6 py-5 space-y-4">
-      {/* Tabs + New button */}
+      {/* Title + New button */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button
-            className={cn(
-              "text-lg font-semibold transition-colors",
-              activeTab === "exported" ? "text-foreground" : "text-muted-foreground/50 hover:text-muted-foreground",
-            )}
-            onClick={() => setActiveTab("exported")}
-          >
-            Exported Slideshows ({exported.length})
-          </button>
-          <button
-            className={cn(
-              "text-lg font-semibold transition-colors",
-              activeTab === "drafts" ? "text-foreground" : "text-muted-foreground/50 hover:text-muted-foreground",
-            )}
-            onClick={() => setActiveTab("drafts")}
-          >
-            Drafts ({drafts.length})
-          </button>
-        </div>
-
+        <h2 className="text-lg font-semibold">My Slideshows ({allSlideshows.length})</h2>
         <Button
           variant="outline"
           size="sm"
@@ -72,10 +54,10 @@ export function SlideshowGallery({ currentSlideshowId }: { currentSlideshowId?: 
         </Button>
       </div>
 
-      {/* Card grid */}
-      {activeList.length > 0 ? (
+      {/* Unified grid */}
+      {allSlideshows.length > 0 ? (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-          {activeList.map((slideshow) => (
+          {allSlideshows.map((slideshow) => (
             <ExportedSlideshowCard
               key={slideshow.id}
               slideshow={slideshow}
@@ -99,9 +81,7 @@ export function SlideshowGallery({ currentSlideshowId }: { currentSlideshowId?: 
       ) : (
         <div className="rounded-lg border border-dashed border-border p-8 text-center">
           <p className="text-sm text-muted-foreground">
-            {activeTab === "exported"
-              ? "No exported slideshows yet. Create one and hit Export ZIP."
-              : "No drafts. Click New Slideshow to get started."}
+            No slideshows yet. Click + to create one.
           </p>
         </div>
       )}

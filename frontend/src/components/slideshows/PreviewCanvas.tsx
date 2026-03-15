@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import {
+  Maximize2,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -9,9 +11,11 @@ import { cn } from "@/lib/utils";
 import { useSlideshowEditorStore } from "@/stores/slideshow-editor";
 import { SlidePreview } from "./SlidePreview";
 import { SlideFilmstrip } from "./SlideFilmstrip";
+import { SlideFullscreenModal } from "./SlideFullscreenModal";
 
 export function PreviewCanvas() {
   const store = useSlideshowEditorStore();
+  const [showFullscreen, setShowFullscreen] = useState(false);
 
   return (
     <div className="flex h-full flex-col">
@@ -33,15 +37,29 @@ export function PreviewCanvas() {
                       ? "CTA"
                       : `${index + 1}`}
                 </span>
-                <SlidePreview
-                  slide={slide}
-                  settings={store.settings}
-                  isSelected={store.selectedSlideIndex === index}
-                  scale={slideScale}
-                  onClick={() => store.selectSlide(index)}
-                  captionStyle={store.settings.captionStyle}
-                  showPill={store.settings.showPill}
-                />
+                <div className="group relative">
+                  <SlidePreview
+                    slide={slide}
+                    settings={store.settings}
+                    isSelected={store.selectedSlideIndex === index}
+                    scale={slideScale}
+                    onClick={() => store.selectSlide(index)}
+                    captionStyle={store.settings.captionStyle}
+                    showPill={store.settings.showPill}
+                  />
+                  {/* Magnify button overlay */}
+                  <button
+                    type="button"
+                    className="absolute top-2 right-2 z-10 flex size-7 items-center justify-center rounded-full bg-black/50 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/70"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      store.selectSlide(index);
+                      setShowFullscreen(true);
+                    }}
+                  >
+                    <Maximize2 className="size-3.5" />
+                  </button>
+                </div>
               </div>
             );
           })
@@ -88,6 +106,7 @@ export function PreviewCanvas() {
           <SlideFilmstrip />
         </div>
       )}
+      <SlideFullscreenModal open={showFullscreen} onOpenChange={setShowFullscreen} />
     </div>
   );
 }
