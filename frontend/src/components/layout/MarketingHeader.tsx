@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Menu, X, LayoutDashboard, LogOut } from "lucide-react";
+import { Menu, X, Film, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { useUser, useClerk } from "@clerk/nextjs";
@@ -75,12 +75,12 @@ function UserMenu({ user }: { user: AuthUser }) {
             className="absolute right-0 top-full mt-2 w-44 rounded-xl border border-border bg-background shadow-lg overflow-hidden"
           >
             <Link
-              href="/dashboard"
+              href="/generate"
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 px-4 py-3 text-sm text-foreground hover:bg-muted/60 transition-colors"
             >
-              <LayoutDashboard className="size-4 text-muted-foreground" />
-              Dashboard
+              <Film className="size-4 text-muted-foreground" />
+              Generate
             </Link>
             <div className="border-t border-border" />
             <button
@@ -250,12 +250,12 @@ export function MarketingHeader() {
                       </span>
                     </div>
                     <Link
-                      href="/dashboard"
+                      href="/generate"
                       className="flex items-center gap-2.5 rounded-full border border-border py-3 px-4 text-sm text-foreground"
                       onClick={() => setMobileOpen(false)}
                     >
-                      <LayoutDashboard className="size-4 text-muted-foreground" />
-                      Dashboard
+                      <Film className="size-4 text-muted-foreground" />
+                      Generate
                     </Link>
                     <button
                       onClick={handleMobileSignOut}

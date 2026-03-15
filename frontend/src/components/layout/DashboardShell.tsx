@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
   Film,
   Clock,
   Settings,
@@ -23,9 +22,6 @@ import { useClerk } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { useProfile } from "@/hooks/use-profile";
 import { useCredits } from "@/hooks/use-credits";
-import { useProducts } from "@/hooks/use-products";
-import { usePersonas } from "@/hooks/use-personas";
-import { useGenerations } from "@/hooks/use-generations";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -37,7 +33,6 @@ import { Logo } from "@/components/ui/Logo";
 import { useGenerationNotifications } from "@/hooks/use-generation-notifications";
 
 const navItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Generate", href: "/generate", icon: Film },
   { label: "Video Creator", href: "/video-creator", icon: Video },
   { label: "Slideshows", href: "/slideshows", icon: Layers },
@@ -49,7 +44,6 @@ const navItems = [
 ];
 
 const pageTitles: Record<string, string> = {
-  "/dashboard": "Dashboard",
   "/personas": "AI Creators",
   "/products": "Products",
   "/generate": "Generate",
@@ -75,15 +69,6 @@ function SidebarContent({
   const { signOut } = useClerk();
   const { data: profile } = useProfile();
   const { data: credits, isLoading: creditsLoading } = useCredits();
-  const { data: products } = useProducts();
-  const { data: personas } = usePersonas();
-  const { data: generations } = useGenerations();
-  const onboardingStepsDone = [
-    (products?.length ?? 0) > 0,
-    (personas ?? []).some((p) => p.selected_image_url != null),
-    (generations ?? []).some((g) => g.status === "completed"),
-  ].filter(Boolean).length;
-  const allOnboardingDone = onboardingStepsDone === 3;
   const userEmail = profile?.email ?? "";
 
   async function handleSignOut() {
@@ -112,8 +97,7 @@ function SidebarContent({
           );
           const isActive =
             pathname === item.href ||
-            (item.href !== "/dashboard" &&
-              pathname.startsWith(item.href) &&
+            (pathname.startsWith(item.href) &&
               !hasMoreSpecificMatch);
 
           return (
@@ -136,23 +120,6 @@ function SidebarContent({
           );
         })}
       </nav>
-
-      {!allOnboardingDone && !collapsed && (
-        <div className="px-3 pb-3">
-          <button
-            onClick={() => {
-              onNavigate?.();
-              window.dispatchEvent(new CustomEvent("onboarding:resume"));
-            }}
-            className="flex w-full items-center gap-2.5 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15"
-          >
-            <span className="flex-1 text-left">Get Started</span>
-            <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums">
-              {onboardingStepsDone}/3
-            </span>
-          </button>
-        </div>
-      )}
 
       {onToggleCollapse && (
         <button
@@ -218,7 +185,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/products/")) return "Product Detail";
   if (pathname.startsWith("/generate/")) return "Generation";
   if (pathname.startsWith("/video-creator/")) return "Video Creator";
-  return "Dashboard";
+  return "Generate";
 }
 
 export function DashboardShell({ children, className }: { children: React.ReactNode; className?: string }) {

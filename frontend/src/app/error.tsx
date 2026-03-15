@@ -27,7 +27,7 @@ export default function GlobalError({
             Try again
           </Button>
           <Button asChild>
-            <Link href="/dashboard">Go to Dashboard</Link>
+            <Link href="/generate">Go to Generate</Link>
           </Button>
         </div>
       </body>

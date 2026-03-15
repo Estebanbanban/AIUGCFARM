@@ -75,7 +75,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       {/* Bottom */}
       <div className="px-3 py-4 border-t border-border flex flex-col gap-1">
         <Link
-          href="/dashboard"
+          href="/generate"
           onClick={onClose}
           className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-white/5 hover:text-foreground transition-colors"
         >

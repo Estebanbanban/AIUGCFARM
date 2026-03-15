@@ -163,15 +163,15 @@ export function CheckoutSuccessHandler() {
     if (expectedPlan) {
       setPlan(expectedPlan as PlanTier);
       setOpen(true);
-      router.replace("/dashboard");
+      router.replace("/generate");
     } else if (packParam && packParam in CREDIT_PACKS) {
       setPack(packParam as CreditPackKey);
       setOpen(true);
-      router.replace("/dashboard");
+      router.replace("/generate");
     } else if (packParam && packParam in SINGLE_VIDEO_PACKS) {
       setPack(packParam as SingleVideoPackKey);
       setOpen(true);
-      router.replace("/dashboard");
+      router.replace("/generate");
     }
 
     return () => {
@@ -183,7 +183,7 @@ export function CheckoutSuccessHandler() {
   const handleClose = () => {
     setOpen(false);
     if (!isOnGeneratePage) {
-      router.replace("/dashboard");
+      router.replace("/generate");
     }
   };
 

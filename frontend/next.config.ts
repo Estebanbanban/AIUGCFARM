@@ -4,6 +4,15 @@ import { withSentryConfig } from "@sentry/nextjs";
 const isDev = process.env.NODE_ENV === "development";
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      {
+        source: "/dashboard",
+        destination: "/generate",
+        permanent: false,
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {
