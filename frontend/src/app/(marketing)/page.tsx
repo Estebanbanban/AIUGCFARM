@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
-import { PricingSection } from "@/components/landing/PricingSection";
-import { FaqSection } from "@/components/landing/FaqSection";
-import { FinalCtaSection } from "@/components/landing/FinalCtaSection";
+import { WaitlistSection } from "@/components/landing/WaitlistSection";
 
 export const metadata: Metadata = {
   title: "CineRads - Make Your Product Go Viral",
@@ -149,9 +147,7 @@ export default function LandingPage() {
       />
       <HeroSection />
       <HowItWorksSection />
-      <PricingSection />
-      <FaqSection />
-      <FinalCtaSection />
+      <WaitlistSection />
     </>
   );
 }
