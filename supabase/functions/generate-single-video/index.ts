@@ -670,7 +670,8 @@ Keep it under 100 words. Return ONLY the prompt text, no JSON, no quotes.`;
 
         // ── 7. Resize reference image to match Sora's required dimensions ──
         // Sora requires input_reference to exactly match the target size.
-        const targetSize = sora_model === "sora-2-pro" ? "1080x1920" : "720x1280";
+        // Sora valid portrait size: 1080x1920 (only documented 9:16 option)
+        const targetSize = "1080x1920";
         const [targetW, targetH] = targetSize.split("x").map(Number);
 
         if (inputReferenceBlob) {
