@@ -83,23 +83,31 @@ export function EditorControlPanel() {
   useEffect(() => {
     const images = collectionData?.images ?? [];
     if (images.length === 0) return;
+    if (store.slides.length === 0) return;
 
-    const hasEmptySlides = store.slides.some((s) => !s.imageUrl);
-    if (!hasEmptySlides) return;
+    const emptySlides = store.slides
+      .map((s, i) => ({ slide: s, index: i }))
+      .filter(({ slide }) => !slide.imageUrl);
+    if (emptySlides.length === 0) return;
 
-    // Auto-fill empty slides with random images
-    const shuffled = [...images].sort(() => Math.random() - 0.5);
-    let imgIdx = 0;
-    store.slides.forEach((slide, slideIdx) => {
-      if (!slide.imageUrl && imgIdx < shuffled.length) {
-        const img = shuffled[imgIdx];
-        if (img.url) {
-          store.updateSlideImage(slideIdx, img.id, img.url);
-          imgIdx++;
-        }
+    // Pick unique images not already used
+    const usedIds = new Set(store.slides.map((s) => s.imageId).filter(Boolean));
+    const available = images.filter((img) => !usedIds.has(img.id) && img.url);
+
+    // Fisher-Yates shuffle
+    const pool = [...(available.length >= emptySlides.length ? available : images.filter((img) => img.url))];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+
+    emptySlides.forEach(({ index }, i) => {
+      const img = pool[i % pool.length];
+      if (img?.url) {
+        store.updateSlideImage(index, img.id, img.url);
       }
     });
-  }, [collectionData]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [collectionData, store.slides.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-assign random images from collection to slides that don't have images
   const autoAssignImages = () => {

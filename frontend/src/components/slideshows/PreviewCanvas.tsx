@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useSlideshowEditorStore } from "@/stores/slideshow-editor";
+import { useCollectionImages } from "@/hooks/use-collections";
 import { SlidePreview } from "./SlidePreview";
 import { SlideFilmstrip } from "./SlideFilmstrip";
 import { SlideFullscreenModal } from "./SlideFullscreenModal";
@@ -16,6 +17,28 @@ import { SlideFullscreenModal } from "./SlideFullscreenModal";
 export function PreviewCanvas() {
   const store = useSlideshowEditorStore();
   const [showFullscreen, setShowFullscreen] = useState(false);
+  const { data: collectionData } = useCollectionImages(store.selectedCollectionId);
+
+  const handleAddSlide = () => {
+    store.addSlide("body");
+
+    // Auto-assign a random image from the collection to the new slide
+    const images = collectionData?.images ?? [];
+    if (images.length === 0) return;
+
+    // Find images not already used by other slides
+    const usedImageIds = new Set(store.slides.map((s) => s.imageId).filter(Boolean));
+    const available = images.filter((img) => !usedImageIds.has(img.id) && img.url);
+    const pick = available.length > 0
+      ? available[Math.floor(Math.random() * available.length)]
+      : images[Math.floor(Math.random() * images.length)];
+
+    if (pick?.url) {
+      // The new slide is now the selected one (addSlide selects it)
+      const newIdx = store.selectedSlideIndex;
+      store.updateSlideImage(newIdx, pick.id, pick.url);
+    }
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -85,7 +108,7 @@ export function PreviewCanvas() {
                 variant="outline"
                 size="sm"
                 className="h-7 text-xs"
-                onClick={() => store.addSlide("body")}
+                onClick={handleAddSlide}
               >
                 <Plus className="size-3" />
                 Add Slide

@@ -78,6 +78,7 @@ export function SlideshowGallery({ currentSlideshowId }: { currentSlideshowId?: 
                     router.push(`/slideshows/${slideshow.id}`);
                   }
                 }}
+                onDelete={() => {}}
               />
             )
           )}
