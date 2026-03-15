@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/nextjs";
 import { callEdge } from "@/lib/api";
-import type { Generation } from "@/types/database";
+import type { Generation, HookLibraryItem } from "@/types/database";
 import type {
   CompositeImagesResponse,
   CreateGenerationResponse,
@@ -280,6 +280,36 @@ export function useRegenLimit() {
     enabled: isLoaded && isSignedIn === true,
     staleTime: 30_000,
     retry: false,
+  });
+}
+
+/** Fetch pre-recorded hooks from the hook library (SaaS Demo Mode). */
+export function useHookLibrary() {
+  const { isLoaded, isSignedIn } = useAuth();
+  return useQuery<HookLibraryItem[]>({
+    queryKey: ["hook-library"],
+    queryFn: async () => {
+      const res = await callEdge<{ data: HookLibraryItem[] }>("list-hook-library", { method: "GET" });
+      return res.data;
+    },
+    enabled: isLoaded && isSignedIn === true,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/** Update the screen recording URL on a generation (SaaS Demo Mode). */
+export function useUpdateScreenRecording() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ generationId, screenRecordingPath }: { generationId: string; screenRecordingPath: string | null }) => {
+      const res = await callEdge<{ data: { ok: boolean } }>("update-screen-recording", {
+        body: { generation_id: generationId, screen_recording_url: screenRecordingPath },
+      });
+      return res.data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["generation-progress", variables.generationId] });
+    },
   });
 }
 
