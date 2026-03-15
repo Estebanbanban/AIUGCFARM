@@ -52,9 +52,12 @@ export function SlideshowEditorLayout() {
           >
             <ArrowLeft className="size-4" />
           </Button>
-          <h1 className="text-sm font-semibold truncate max-w-[200px]">
-            {store.name || "Untitled Slideshow"}
-          </h1>
+          <input
+            className="text-sm font-semibold truncate max-w-[200px] bg-transparent border-none outline-none focus:ring-1 focus:ring-primary/30 rounded px-1 -ml-1"
+            value={store.name}
+            onChange={(e) => store.setName(e.target.value)}
+            placeholder="Untitled Slideshow"
+          />
           <Badge variant={statusColor[store.status]}>
             {store.status}
           </Badge>

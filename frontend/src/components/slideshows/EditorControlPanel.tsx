@@ -30,17 +30,45 @@ export function EditorControlPanel() {
 
   // Auto-select product if user only has one
   useEffect(() => {
-    if (products.length === 1 && !store.productId) {
+    if (products.length >= 1 && !store.productId) {
       store.setProductId(products[0].id);
     }
-  }, [products]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [products, store.productId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-select a collection if none selected and collections exist
+  // Auto-select best collection based on product name, or first available
   useEffect(() => {
-    if (!store.selectedCollectionId && collections.length > 0) {
-      store.setSelectedCollectionId(collections[0].id);
+    if (collections.length === 0) return;
+    if (store.selectedCollectionId) return; // already picked
+
+    // Try to match product to a collection by keyword
+    const selectedProduct = products.find((p) => p.id === store.productId);
+    const productText = (selectedProduct?.name ?? "").toLowerCase() + " " + (selectedProduct?.description ?? "").toLowerCase();
+
+    const nicheKeywords: Record<string, string[]> = {
+      education: ["education", "study", "university", "student", "learn", "course", "tutor", "interview", "case", "mba", "consulting", "mckinsey", "bain", "bcg"],
+      business: ["business", "startup", "entrepreneur", "saas", "company", "agency", "freelance"],
+      coaching: ["coach", "mentor", "self-help", "personal development", "therapy", "mindset"],
+      fitness: ["fitness", "gym", "workout", "health", "nutrition", "yoga", "run"],
+      ecommerce: ["ecommerce", "shop", "store", "product", "dropship", "amazon", "shopify"],
+      tech: ["tech", "code", "software", "developer", "programming", "app", "ai", "saas"],
+      lifestyle: ["lifestyle", "travel", "morning", "routine", "aesthetic"],
+    };
+
+    let bestCollection = collections[0];
+    if (productText.trim()) {
+      for (const coll of collections) {
+        const collName = coll.name.toLowerCase();
+        for (const [niche, keywords] of Object.entries(nicheKeywords)) {
+          if (collName.includes(niche) && keywords.some((kw) => productText.includes(kw))) {
+            bestCollection = coll;
+            break;
+          }
+        }
+      }
     }
-  }, [collections]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    store.setSelectedCollectionId(bestCollection.id);
+  }, [collections, store.productId, products, store.selectedCollectionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-assign images when collection data loads and slides have no images
   useEffect(() => {
@@ -87,14 +115,8 @@ export function EditorControlPanel() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="space-y-4 p-4">
-        {/* Name + Product */}
+        {/* Product */}
         <div className="space-y-2">
-          <Input
-            value={store.name}
-            onChange={(e) => store.setName(e.target.value)}
-            placeholder="Slideshow name"
-            className="text-sm font-medium"
-          />
           <Select
             value={store.productId ?? "none"}
             onValueChange={(v) => store.setProductId(v === "none" ? null : v)}
