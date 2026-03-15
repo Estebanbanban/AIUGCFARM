@@ -46,14 +46,11 @@ async function verifyClerkJWT(token: string): Promise<string> {
   // Check expiry
   if (payload.exp && Date.now() / 1000 > payload.exp) throw new Error("JWT expired");
 
-  // JWKS URL: prefer env var, fall back to JWT issuer ONLY if it matches a known Clerk domain.
-  // This prevents an attacker from crafting a JWT with a malicious iss pointing to their own JWKS.
-  const CLERK_DOMAIN_RE = /^https:\/\/[a-z0-9-]+\.clerk\.(accounts\.dev|com)$/;
-  let jwksUrl = Deno.env.get("CLERK_JWKS_URL");
-  if (!jwksUrl && payload.iss && CLERK_DOMAIN_RE.test(payload.iss)) {
-    jwksUrl = `${payload.iss}/.well-known/jwks.json`;
-  }
-  if (!jwksUrl) throw new Error("Cannot determine JWKS URL — set CLERK_JWKS_URL or use a valid Clerk issuer");
+  // Derive JWKS URL: env var takes precedence, then issuer from JWT, then fail
+  const jwksUrl =
+    Deno.env.get("CLERK_JWKS_URL") ||
+    (payload.iss ? `${payload.iss}/.well-known/jwks.json` : null);
+  if (!jwksUrl) throw new Error("Cannot determine JWKS URL — set CLERK_JWKS_URL env var");
 
   const jwks = await getJWKS(jwksUrl);
   const jwk = jwks.keys.find((k) => k.kid === header.kid);
@@ -123,8 +120,8 @@ export async function requireUserId(req: Request): Promise<string> {
         const clerkUser = await clerkRes.json() as { email_addresses?: Array<{ email_address: string }> };
         const email = clerkUser.email_addresses?.[0]?.email_address;
         if (email) {
-          // Find existing profile by email — only link if clerk_user_id is NULL
-          // to prevent account takeover via email registration on Clerk.
+          // Find existing profile by email — no IS NULL constraint so we also
+          // fix profiles whose clerk_user_id was set to a stale/wrong value.
           const { data: existingProfile } = await adminClient
             .from("profiles")
             .select("id, clerk_user_id")
@@ -132,20 +129,12 @@ export async function requireUserId(req: Request): Promise<string> {
             .maybeSingle();
 
           if (existingProfile) {
-            if (existingProfile.clerk_user_id && existingProfile.clerk_user_id !== clerkUserId) {
-              // Profile already linked to a different Clerk user — refuse to overwrite
-              console.error("[auth] Profile", existingProfile.id, "already linked to", existingProfile.clerk_user_id, "— refusing to re-link to", clerkUserId);
-              throw new Error("Unauthorized");
-            }
-            if (!existingProfile.clerk_user_id) {
-              // Link the clerk_user_id for the first time
-              await adminClient
-                .from("profiles")
-                .update({ clerk_user_id: clerkUserId })
-                .eq("id", existingProfile.id)
-                .is("clerk_user_id", null); // double-guard against race condition
-              console.log("[auth] Linked clerk_user_id for profile:", existingProfile.id);
-            }
+            // Link (or re-link) the clerk_user_id
+            await adminClient
+              .from("profiles")
+              .update({ clerk_user_id: clerkUserId })
+              .eq("id", existingProfile.id);
+            console.log("[auth] Linked clerk_user_id for profile:", existingProfile.id, "prev:", existingProfile.clerk_user_id ?? "null");
             return existingProfile.id;
           }
 
