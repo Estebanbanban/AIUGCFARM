@@ -151,44 +151,47 @@ function BodyTextOverlay({
 
   const titleSize = Math.round(14 * scale);
   const bodySize = Math.round(12 * scale);
-  const gap = Math.round(16 * scale);
+  const gap = Math.round(8 * scale);
   const letterSpacing = captionStyle === "tiktok" ? "-0.01em" : "0em";
 
   const subtitleShadow = "0 2px 10px rgba(0,0,0,0.8), 0 0px 3px rgba(0,0,0,0.5)";
 
-  // Inline pill — wraps tightly around text, not a full-width box
-  const pillRadius = Math.round(999); // fully rounded
   const pillPadX = Math.round(10 * scale);
   const pillPadY = Math.round(3 * scale);
+  const pillRadius = Math.round(6 * scale);
 
   return (
     <div
       className="absolute inset-0 flex flex-col items-center px-[5%] pt-[20%]"
       style={{ gap: `${gap}px`, fontFamily }}
     >
-      {/* Title — connected pill (one bg across line breaks) or plain text */}
+      {/* Title — single div pill (no per-line padding doubling) */}
       {title && (
         <div className="text-center max-w-[90%]">
           {showPill ? (
-            <span
-              className="text-black font-bold leading-[1.25] lowercase"
+            <div
+              className="inline-block"
               style={{
-                fontSize: `${titleSize}px`,
-                letterSpacing,
                 background: "white",
-                borderRadius: `${Math.round(6 * scale)}px`,
+                borderRadius: `${pillRadius}px`,
                 padding: `${pillPadY}px ${pillPadX}px`,
-                boxDecorationBreak: "clone",
-                WebkitBoxDecorationBreak: "clone",
                 boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                WebkitFontSmoothing: "antialiased",
               }}
             >
-              {title}
-            </span>
+              <p
+                className="text-black font-bold leading-tight lowercase"
+                style={{
+                  fontSize: `${titleSize}px`,
+                  letterSpacing,
+                  WebkitFontSmoothing: "antialiased",
+                }}
+              >
+                {title}
+              </p>
+            </div>
           ) : (
             <p
-              className="text-white font-bold leading-snug lowercase"
+              className="text-white font-bold leading-tight lowercase"
               style={{
                 fontSize: `${titleSize}px`,
                 letterSpacing,
