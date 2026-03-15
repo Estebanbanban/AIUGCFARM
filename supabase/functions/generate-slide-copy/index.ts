@@ -13,7 +13,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const userId = await requireUserId(req);
-    const { hook_text, product_id, slide_count = 4, soft_cta } = await req.json();
+    const { hook_text, product_id, slide_count = 4, soft_cta, copy_length = "long" } = await req.json();
 
     if (!hook_text || typeof hook_text !== "string") {
       return json({ detail: "hook_text is required" }, cors, 400);
@@ -52,9 +52,11 @@ Product: ${productName || "N/A"} - ${productDescription || "N/A"}
 Number of body slides to generate: ${slide_count}
 
 Each body slide has THREE text elements:
-1. "title" — a numbered point (the main takeaway). Format: "[number]. [short action statement]" — Max 8 words.
+${copy_length === "long" ? `1. "title" — a numbered point (the main takeaway). Format: "[number]. [detailed action statement]" — 8-14 words. Be specific and descriptive.
+2. "subtitle" — the relatable complaint/context. What the person was struggling with. 12-20 words. Paint a picture.
+3. "action" — the specific thing they did to fix it, with detail. 14-22 words. Include the concrete method or tool.` : `1. "title" — a numbered point (the main takeaway). Format: "[number]. [short action statement]" — Max 8 words.
 2. "subtitle" — the relatable complaint/context. What the person was struggling with. Max 12 words.
-3. "action" — the specific simple thing they did to fix it. Max 14 words.
+3. "action" — the specific simple thing they did to fix it. Max 14 words.`}
 
 ${softCtaInstruction}
 

@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { useSlideshowEditorStore } from "@/stores/slideshow-editor";
 import { useGenerateSlideCopy } from "@/hooks/use-slide-copy";
 import { useCredits } from "@/hooks/use-credits";
@@ -12,6 +14,7 @@ export function GenerateButton() {
   const store = useSlideshowEditorStore();
   const generateCopy = useGenerateSlideCopy();
   const { data: credits } = useCredits();
+  const [copyLength, setCopyLength] = useState<"short" | "long">("long");
 
   const canGenerate =
     !!store.hookText &&
@@ -38,6 +41,7 @@ export function GenerateButton() {
         hook_text: store.hookText,
         product_id: store.productId ?? undefined,
         slide_count: bodySlideCount,
+        copy_length: copyLength,
       },
       {
         onSuccess: (slides) => {
@@ -53,15 +57,33 @@ export function GenerateButton() {
 
   return (
     <div className="space-y-2">
+      {/* Copy length toggle */}
+      <div className="flex items-center gap-1.5">
+        {(["short", "long"] as const).map((len) => (
+          <button
+            key={len}
+            className={cn(
+              "flex-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors capitalize",
+              copyLength === len
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border bg-background text-muted-foreground hover:border-primary/40",
+            )}
+            onClick={() => setCopyLength(len)}
+          >
+            {len === "short" ? "Short copy" : "Detailed copy"}
+          </button>
+        ))}
+      </div>
+
       <Button
-        className="w-full h-12 text-base font-semibold gap-2"
+        className="w-full h-10 text-sm font-semibold gap-2"
         onClick={handleGenerate}
         disabled={!canGenerate}
       >
         {generateCopy.isPending ? (
-          <Loader2 className="size-5 animate-spin" />
+          <Loader2 className="size-4 animate-spin" />
         ) : (
-          <Sparkles className="size-5" />
+          <Sparkles className="size-4" />
         )}
         Generate Body Copy
         {credits && (

@@ -111,9 +111,9 @@ function HookTextOverlay({
   const letterSpacing = captionStyle === "tiktok" ? "-0.02em" : "0em";
 
   return (
-    <div className="absolute inset-0 flex items-start justify-center px-[6%] pt-[18%]">
+    <div className="absolute inset-0 flex items-start justify-center px-[6%] pt-[28%]">
       <p
-        className="text-white text-center font-extrabold leading-[1.2] lowercase"
+        className="text-white text-center font-extrabold leading-[1.15] lowercase"
         style={{
           fontFamily,
           fontSize: `${fontSize}px`,
@@ -163,7 +163,7 @@ function BodyTextOverlay({
 
   return (
     <div
-      className="absolute inset-0 flex flex-col items-center px-[5%] pt-[18%]"
+      className="absolute inset-0 flex flex-col items-center px-[5%] pt-[20%]"
       style={{ gap: `${gap}px`, fontFamily }}
     >
       {/* Title — connected pill (one bg across line breaks) or plain text */}
@@ -171,7 +171,7 @@ function BodyTextOverlay({
         <div className="text-center max-w-[90%]">
           {showPill ? (
             <span
-              className="text-black font-bold leading-[1.6] lowercase"
+              className="text-black font-bold leading-[1.25] lowercase"
               style={{
                 fontSize: `${titleSize}px`,
                 letterSpacing,
