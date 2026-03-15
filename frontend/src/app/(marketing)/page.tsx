@@ -6,12 +6,12 @@ import { FaqSection } from "@/components/landing/FaqSection";
 import { FinalCtaSection } from "@/components/landing/FinalCtaSection";
 
 export const metadata: Metadata = {
-  title: "CineRads - AI Video Slideshows for E-Commerce",
+  title: "CineRads - Make Your Product Go Viral",
   description:
-    "Turn product photos into scroll-stopping video slideshows. Upload images, pick a hook, let AI write the copy. Export for TikTok, Reels, and Shorts.",
+    "Turn your product photos into viral video slideshows. Upload images, pick a hook, AI writes the copy. Export for TikTok, Reels, and Shorts.",
   openGraph: {
-    title: "CineRads - AI Video Slideshows for E-Commerce",
-    description: "Turn product photos into scroll-stopping video slideshows.",
+    title: "CineRads - Make Your Product Go Viral",
+    description: "Turn your product photos into viral video slideshows for TikTok, Reels, and Shorts.",
   },
 };
 

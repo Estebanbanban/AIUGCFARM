@@ -17,9 +17,9 @@ export function HeroSection() {
             transition={{ duration: 0.75, ease: [0.25, 0.4, 0.25, 1] }}
             className="mx-auto max-w-5xl text-[clamp(2.4rem,7vw,5.8rem)] font-semibold leading-[1.02] tracking-[-0.03em] text-foreground"
           >
-            <span className="block whitespace-nowrap">Turn Product Photos</span>
+            <span className="block whitespace-nowrap">Make Your Product</span>
             <span className="block whitespace-nowrap">
-              Into <span className="font-serif italic text-primary">Video Slideshows.</span>
+              <span className="font-serif italic text-primary">Go Viral.</span>
             </span>
           </motion.h1>
 
@@ -29,7 +29,7 @@ export function HeroSection() {
             transition={{ duration: 0.5, delay: 0.45, ease: [0.25, 0.4, 0.25, 1] }}
             className="mt-6 text-lg text-[#999] max-w-lg mx-auto text-center leading-relaxed"
           >
-            Upload your images, pick a hook, let AI write the copy. Export scroll-stopping slideshows for TikTok, Reels, and Shorts.
+            Upload your images, pick a viral hook, let AI write the copy. Export scroll-stopping slideshows for TikTok, Reels, and Shorts in minutes.
           </motion.p>
 
           <motion.div

@@ -10,7 +10,7 @@ const steps = [
     number: "01",
     title: "Upload Your Product Images",
     description:
-      "Drop your product photos into a collection. Import from Pinterest, upload from desktop, or scrape directly from your store URL.",
+      "Drop your product photos into a collection. Import from Pinterest, upload from desktop, or grab them from your store URL.",
     mediaType: "image" as const,
     mediaSrc:
       "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&w=1200&q=80",
@@ -28,9 +28,9 @@ const steps = [
   },
   {
     number: "03",
-    title: "Export as Video Slideshow",
+    title: "Post & Go Viral",
     description:
-      "Your slides become a ready-to-post video for TikTok, Reels, and Shorts. Timed transitions, text animations, and music-ready format.",
+      "Your slides become a ready-to-post video for TikTok, Reels, and Shorts. Timed transitions, bold text, optimized for the algorithm.",
     mediaType: "animation" as const,
   },
 ];
@@ -43,8 +43,8 @@ export function HowItWorksSection() {
         <FadeInUp className="text-center mb-12">
           <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground mb-3">Process</p>
           <h2 className="text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-tight text-foreground">
-            Create Scroll-Stopping{" "}
-            <span className="font-serif italic text-primary">Video Slideshows</span>
+            3 Steps to{" "}
+            <span className="font-serif italic text-primary">Go Viral</span>
           </h2>
         </FadeInUp>
 
