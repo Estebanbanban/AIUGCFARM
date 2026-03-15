@@ -5,12 +5,12 @@ import { useSlideshow, useUpdateSlideshow } from "@/hooks/use-slideshows";
 import { useSlideshowEditorStore } from "@/stores/slideshow-editor";
 import { useEffect, useRef } from "react";
 import { SlideshowEditorLayout } from "@/components/slideshows/SlideshowEditorLayout";
+import { SlideshowGallery } from "@/components/slideshows/SlideshowGallery";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function EditorSkeleton() {
   return (
-    <div className="flex h-full flex-col">
-      {/* Top bar skeleton */}
+    <div className="flex flex-col" style={{ height: "70vh" }}>
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-3">
           <Skeleton className="h-8 w-8 rounded-md" />
@@ -19,21 +19,17 @@ function EditorSkeleton() {
         </div>
         <Skeleton className="h-9 w-20" />
       </div>
-
-      {/* Main content skeleton */}
       <div className="flex flex-1 min-h-0">
-        {/* Left panel */}
-        <div className="w-[440px] shrink-0 border-r border-border p-5 space-y-6">
+        <div className="w-[400px] shrink-0 border-r border-border p-5 space-y-6">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-12 w-full" />
         </div>
-        {/* Right panel */}
         <div className="flex-1 p-5 flex items-start justify-center gap-4">
-          <Skeleton className="w-[230px] rounded-lg" style={{ aspectRatio: "9 / 16" }} />
-          <Skeleton className="w-[230px] rounded-lg" style={{ aspectRatio: "9 / 16" }} />
+          <Skeleton className="w-[180px] rounded-lg" style={{ aspectRatio: "9 / 16" }} />
+          <Skeleton className="w-[180px] rounded-lg" style={{ aspectRatio: "9 / 16" }} />
         </div>
       </div>
     </div>
@@ -81,7 +77,15 @@ export default function SlideshowEditorPage() {
     };
   }, [store.isDirty, store.slides, store.settings, store.name, store.hookText]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (isLoading) return <EditorSkeleton />;
+  return (
+    <div className="flex flex-col">
+      {/* Editor section — fixed height */}
+      <div style={{ height: "70vh", minHeight: "550px" }}>
+        {isLoading ? <EditorSkeleton /> : <SlideshowEditorLayout />}
+      </div>
 
-  return <SlideshowEditorLayout />;
+      {/* Gallery section — below editor */}
+      <SlideshowGallery currentSlideshowId={id} />
+    </div>
+  );
 }
