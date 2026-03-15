@@ -155,8 +155,8 @@ export interface GenerationProgressResponse {
 /** A single generation item returned by generation-history */
 export interface GenerationHistoryItem {
   id: string;
-  product_id: string;
-  persona_id: string;
+  product_id: string | null;
+  persona_id: string | null;
   mode: string;
   type?: string;
   video_quality: Generation["video_quality"];

@@ -181,7 +181,11 @@ export default function HistoryPage() {
   const router = useRouter();
   const wizard = useGenerationWizardStore();
 
-  function handleTryAgain(gen: { product_id: string; persona_id: string; mode: string; video_quality?: string | null }) {
+  function handleTryAgain(gen: { product_id: string | null; persona_id: string | null; mode: string; video_quality?: string | null; type?: string }) {
+    if (gen.type === "single-video") {
+      router.push("/video-creator");
+      return;
+    }
     wizard.reset();
     if (gen.product_id) wizard.setProductId(gen.product_id);
     if (gen.persona_id) wizard.setPersonaId(gen.persona_id);
@@ -191,9 +195,9 @@ export default function HistoryPage() {
     router.push("/generate");
   }
 
-  function handleResumeScript(gen: { id: string; product_id: string; persona_id: string; mode: string; video_quality?: string | null }) {
-    wizard.setProductId(gen.product_id);
-    wizard.setPersonaId(gen.persona_id);
+  function handleResumeScript(gen: { id: string; product_id: string | null; persona_id: string | null; mode: string; video_quality?: string | null }) {
+    if (gen.product_id) wizard.setProductId(gen.product_id);
+    if (gen.persona_id) wizard.setPersonaId(gen.persona_id);
     wizard.setMode(gen.mode as "single" | "triple");
     if (gen.video_quality) wizard.setQuality(gen.video_quality as "standard" | "hd");
     // Set pendingGenerationId so the generate page's mount validation restores the script from DB
