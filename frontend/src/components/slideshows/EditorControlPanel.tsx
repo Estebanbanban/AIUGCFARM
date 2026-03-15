@@ -1,9 +1,12 @@
 "use client";
 
+import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Shuffle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -14,7 +17,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useSlideshowEditorStore } from "@/stores/slideshow-editor";
 import { useProducts } from "@/hooks/use-products";
-import { useCollections } from "@/hooks/use-collections";
+import { useCollections, useCollectionImages } from "@/hooks/use-collections";
 import { HookSelector } from "./HookSelector";
 import { SlideTextEditor } from "./SlideTextEditor";
 import { GenerateButton } from "./GenerateButton";
@@ -23,11 +26,39 @@ export function EditorControlPanel() {
   const store = useSlideshowEditorStore();
   const { data: products = [] } = useProducts();
   const { data: collections = [] } = useCollections();
+  const { data: collectionData } = useCollectionImages(store.selectedCollectionId);
+
+  // Auto-select product if user only has one
+  useEffect(() => {
+    if (products.length === 1 && !store.productId) {
+      store.setProductId(products[0].id);
+    }
+  }, [products]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-assign random images from collection to slides that don't have images
+  const autoAssignImages = () => {
+    const images = collectionData?.images ?? [];
+    if (images.length === 0) return;
+
+    // Shuffle images
+    const shuffled = [...images].sort(() => Math.random() - 0.5);
+    let imgIdx = 0;
+
+    store.slides.forEach((slide, slideIdx) => {
+      if (!slide.imageUrl && imgIdx < shuffled.length) {
+        const img = shuffled[imgIdx];
+        if (img.url) {
+          store.updateSlideImage(slideIdx, img.id, img.url);
+          imgIdx++;
+        }
+      }
+    });
+  };
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="space-y-4 p-4">
-        {/* Name + Product in a compact row */}
+        {/* Name + Product */}
         <div className="space-y-2">
           <Input
             value={store.name}
@@ -55,7 +86,7 @@ export function EditorControlPanel() {
 
         <Separator />
 
-        {/* Hook Selector + Generate in one section */}
+        {/* Hook + Generate */}
         <HookSelector />
         <GenerateButton />
 
@@ -76,11 +107,9 @@ export function EditorControlPanel() {
 
         <Separator />
 
-        {/* Style section — collapsed */}
+        {/* Style */}
         <div className="space-y-3">
           <Label className="text-sm font-medium">Style</Label>
-
-          {/* Caption Style */}
           <div className="grid grid-cols-3 gap-1.5">
             {(["tiktok", "instagram", "inter"] as const).map((style) => (
               <button
@@ -97,8 +126,6 @@ export function EditorControlPanel() {
               </button>
             ))}
           </div>
-
-          {/* Pill toggle */}
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">White badge on titles</span>
             <button
@@ -116,8 +143,6 @@ export function EditorControlPanel() {
               />
             </button>
           </div>
-
-          {/* Overlay */}
           <div className="flex items-center gap-3">
             <div className="flex-1 space-y-1">
               <div className="flex items-center justify-between">
@@ -149,9 +174,22 @@ export function EditorControlPanel() {
 
         <Separator />
 
-        {/* Collection + Duration compact */}
+        {/* Collection + auto-assign */}
         <div className="space-y-2">
-          <Label className="text-xs">Image Collection</Label>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs">Image Collection</Label>
+            {store.selectedCollectionId && (collectionData?.images?.length ?? 0) > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-[10px] gap-1"
+                onClick={autoAssignImages}
+              >
+                <Shuffle className="size-3" />
+                Auto-fill images
+              </Button>
+            )}
+          </div>
           <Select
             value={store.selectedCollectionId ?? "none"}
             onValueChange={(v) =>

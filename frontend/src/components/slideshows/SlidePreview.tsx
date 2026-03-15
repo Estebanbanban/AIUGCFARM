@@ -166,17 +166,17 @@ function BodyTextOverlay({
       className="absolute inset-0 flex flex-col items-center px-[5%] pt-[18%]"
       style={{ gap: `${gap}px`, fontFamily }}
     >
-      {/* Title — inline pill or plain text */}
+      {/* Title — connected pill (one bg across line breaks) or plain text */}
       {title && (
         <div className="text-center max-w-[90%]">
           {showPill ? (
             <span
-              className="text-black font-bold leading-snug lowercase inline"
+              className="text-black font-bold leading-[1.6] lowercase"
               style={{
                 fontSize: `${titleSize}px`,
                 letterSpacing,
                 background: "white",
-                borderRadius: `${pillRadius}px`,
+                borderRadius: `${Math.round(6 * scale)}px`,
                 padding: `${pillPadY}px ${pillPadX}px`,
                 boxDecorationBreak: "clone",
                 WebkitBoxDecorationBreak: "clone",

@@ -1,13 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Loader2, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Save, Loader2, CheckCircle2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSlideshowEditorStore } from "@/stores/slideshow-editor";
 import { useUpdateSlideshow } from "@/hooks/use-slideshows";
 import { EditorControlPanel } from "./EditorControlPanel";
 import { PreviewCanvas } from "./PreviewCanvas";
+import { ExportButton } from "./ExportButton";
 import { toast } from "sonner";
 
 export function SlideshowEditorLayout() {
@@ -64,6 +65,7 @@ export function SlideshowEditorLayout() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <ExportButton />
           <Button
             variant="outline"
             size="sm"
