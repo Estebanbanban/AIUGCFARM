@@ -376,10 +376,10 @@ export default function HistoryPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-foreground">
-                          {gen.products?.name ?? `Product ${gen.product_id.slice(0, 8)}...`}
+                          {gen.products?.name ?? (gen.product_id ? `Product ${gen.product_id.slice(0, 8)}...` : gen.type === "single-video" ? "Video Creator" : "No product")}
                         </p>
                         <p className="truncate text-xs text-muted-foreground">
-                          {gen.personas?.name ?? `Persona ${gen.persona_id.slice(0, 8)}...`}
+                          {gen.personas?.name ?? (gen.persona_id ? `Persona ${gen.persona_id.slice(0, 8)}...` : gen.type === "single-video" ? "Sora 2" : "No persona")}
                         </p>
                       </div>
                       {/* Delete button - hidden while in-progress */}
