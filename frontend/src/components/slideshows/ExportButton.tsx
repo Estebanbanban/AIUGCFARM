@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSlideshowEditorStore } from "@/stores/slideshow-editor";
+import { useUpdateSlideshow } from "@/hooks/use-slideshows";
 import { SlidePreview } from "./SlidePreview";
 import { toast } from "sonner";
 import { createRoot } from "react-dom/client";
@@ -34,6 +35,7 @@ async function waitForImages(el: HTMLElement, timeoutMs = 5000): Promise<void> {
 
 export function ExportButton() {
   const store = useSlideshowEditorStore();
+  const updateSlideshow = useUpdateSlideshow();
   const [exporting, setExporting] = useState(false);
 
   const handleExport = useCallback(async () => {
@@ -111,6 +113,19 @@ export function ExportButton() {
       const filename = `${store.name || "slideshow"}-slides.zip`.replace(/[^a-zA-Z0-9_\-\.]/g, "_");
       saveAs(zipBlob, filename);
 
+      // Mark slideshow as exported with timestamp
+      if (store.slideshowId) {
+        try {
+          await updateSlideshow.mutateAsync({
+            id: store.slideshowId,
+            exported_at: new Date().toISOString(),
+          });
+        } catch {
+          // Non-critical: export succeeded even if marking fails
+          console.warn("Failed to mark slideshow as exported");
+        }
+      }
+
       toast.success(`Exported ${store.slides.length} slides`);
     } catch (err) {
       console.error("Export error:", err);
@@ -118,7 +133,7 @@ export function ExportButton() {
     } finally {
       setExporting(false);
     }
-  }, [store.slides, store.settings, store.name]);
+  }, [store.slides, store.settings, store.name, store.slideshowId, updateSlideshow]);
 
   return (
     <Button

@@ -13,7 +13,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const userId = await requireUserId(req);
-    const { id, name, settings, slides, status, hook_text } = await req.json();
+    const { id, name, settings, slides, status, hook_text, exported_at } = await req.json();
 
     if (!id || typeof id !== "string") {
       return json({ detail: "Missing slideshow id" }, cors, 400);
@@ -41,6 +41,7 @@ Deno.serve(async (req: Request) => {
     if (slides !== undefined) updates.slides = slides;
     if (status !== undefined) updates.status = status;
     if (hook_text !== undefined) updates.hook_text = hook_text;
+    if (exported_at !== undefined) updates.exported_at = exported_at;
 
     const { data: slideshow, error: updateErr } = await sb
       .from("slideshows")

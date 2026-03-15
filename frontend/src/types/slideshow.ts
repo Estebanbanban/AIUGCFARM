@@ -75,6 +75,7 @@ export interface Slideshow {
   video_duration_seconds: number | null;
   product_id: string | null;
   hook_text: string | null;
+  exported_at: string | null;
   created_at: string;
   updated_at: string;
   thumbnail_url?: string; // signed URL for first slide

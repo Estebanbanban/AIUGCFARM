@@ -50,7 +50,7 @@ export function useCreateSlideshow() {
 export function useUpdateSlideshow() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { id: string; name?: string; settings?: Partial<SlideshowSettings>; slides?: Slide[]; status?: string; hook_text?: string }) => {
+    mutationFn: async (data: { id: string; name?: string; settings?: Partial<SlideshowSettings>; slides?: Slide[]; status?: string; hook_text?: string; exported_at?: string }) => {
       const res = await callEdge<{ data: Slideshow }>("update-slideshow", { body: data });
       return res.data;
     },

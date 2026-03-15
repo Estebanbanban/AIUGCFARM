@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SlideshowCard } from "@/components/slideshows/SlideshowCard";
+import { ExportedSlideshowCard } from "@/components/slideshows/ExportedSlideshowCard";
 import type { Slideshow } from "@/types/slideshow";
 
 const ITEMS_PER_PAGE = 12;
@@ -45,24 +46,27 @@ export default function SlideshowsPage() {
   const { data: slideshowsData, isLoading, error } = useSlideshows();
   const deleteSlideshow = useDeleteSlideshow();
 
-  const [activeTab, setActiveTab] = useState<"all" | "complete" | "draft">("all");
+  const [activeTab, setActiveTab] = useState<"exported" | "drafts">("exported");
   const [page, setPage] = useState(1);
   const [slideshowToDelete, setSlideshowToDelete] = useState<Slideshow | null>(null);
 
   const slideshows = slideshowsData?.slideshows ?? [];
 
-  // Filter by tab
-  const filtered = slideshows.filter((s) => {
-    if (activeTab === "all") return true;
-    if (activeTab === "complete") return s.status === "complete";
-    if (activeTab === "draft") return s.status === "draft";
-    return true;
-  });
+  // Separate exported from drafts
+  // Exported = has exported_at timestamp (regardless of status)
+  // Drafts = everything without exported_at
+  const exported = slideshows
+    .filter((s) => s.exported_at)
+    .sort((a, b) => new Date(b.exported_at!).getTime() - new Date(a.exported_at!).getTime());
+  const drafts = slideshows
+    .filter((s) => !s.exported_at)
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
-  // Count per tab
-  const allCount = slideshows.length;
-  const exportedCount = slideshows.filter((s) => s.status === "complete").length;
-  const draftCount = slideshows.filter((s) => s.status === "draft").length;
+  const exportedCount = exported.length;
+  const draftCount = drafts.length;
+
+  // Current filtered list based on tab
+  const filtered = activeTab === "exported" ? exported : drafts;
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
@@ -82,7 +86,7 @@ export default function SlideshowsPage() {
   }
 
   function handleTabChange(value: string) {
-    setActiveTab(value as "all" | "complete" | "draft");
+    setActiveTab(value as "exported" | "drafts");
     setPage(1);
   }
 
@@ -96,7 +100,7 @@ export default function SlideshowsPage() {
             {isLoading ? (
               <Skeleton className="inline-block h-4 w-32" />
             ) : (
-              `${allCount} slideshow${allCount !== 1 ? "s" : ""}`
+              `${slideshows.length} slideshow${slideshows.length !== 1 ? "s" : ""}`
             )}
           </span>
         </div>
@@ -119,7 +123,7 @@ export default function SlideshowsPage() {
 
       {/* Loading skeletons */}
       {isLoading && (
-        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
             <SlideshowCardSkeleton key={i} />
           ))}
@@ -132,20 +136,47 @@ export default function SlideshowsPage() {
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList>
-              <TabsTrigger value="all">
-                All ({allCount})
+              <TabsTrigger value="exported">
+                Exported Slideshows ({exportedCount})
               </TabsTrigger>
-              <TabsTrigger value="complete">
-                Exported ({exportedCount})
-              </TabsTrigger>
-              <TabsTrigger value="draft">
+              <TabsTrigger value="drafts">
                 Drafts ({draftCount})
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value={activeTab}>
+            {/* Exported tab */}
+            <TabsContent value="exported">
               {paged.length > 0 ? (
-                <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                  {paged.map((slideshow) => (
+                    <ExportedSlideshowCard
+                      key={slideshow.id}
+                      slideshow={slideshow}
+                      onClick={() => router.push(`/slideshows/${slideshow.id}`)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="flex flex-col items-center gap-4 py-12">
+                    <div className="flex size-14 items-center justify-center rounded-full bg-primary/10">
+                      <Film className="size-7 text-primary" />
+                    </div>
+                    <div className="text-center">
+                      <h3 className="font-semibold">No exported slideshows yet</h3>
+                      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                        Open a slideshow and click &quot;Export ZIP&quot; to see it here.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            {/* Drafts tab */}
+            <TabsContent value="drafts">
+              {paged.length > 0 ? (
+                <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
                   {paged.map((slideshow) => (
                     <SlideshowCard
                       key={slideshow.id}
@@ -159,7 +190,7 @@ export default function SlideshowsPage() {
                 <Card>
                   <CardContent className="flex flex-col items-center gap-3 py-8">
                     <p className="text-sm text-muted-foreground">
-                      No {activeTab === "complete" ? "exported" : activeTab === "draft" ? "draft" : ""} slideshows found.
+                      No draft slideshows found.
                     </p>
                   </CardContent>
                 </Card>
