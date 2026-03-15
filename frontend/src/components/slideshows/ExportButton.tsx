@@ -88,8 +88,14 @@ export function ExportButton() {
               pixelRatio: 1,
             });
 
-            const response = await fetch(dataUrl);
-            const blob = await response.blob();
+            // Convert data URL to blob without fetch (avoids CSP connect-src restriction)
+            const base64 = dataUrl.split(",")[1];
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let j = 0; j < binary.length; j++) {
+              bytes[j] = binary.charCodeAt(j);
+            }
+            const blob = new Blob([bytes], { type: "image/png" });
 
             // Unique filename: slide_0_hook.png, slide_1_body.png, etc.
             zip.file(`slide_${i}_${slide.type}.png`, blob);

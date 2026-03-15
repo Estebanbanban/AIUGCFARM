@@ -35,6 +35,35 @@ export function EditorControlPanel() {
     }
   }, [products]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-select a collection if none selected and collections exist
+  useEffect(() => {
+    if (!store.selectedCollectionId && collections.length > 0) {
+      store.setSelectedCollectionId(collections[0].id);
+    }
+  }, [collections]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-assign images when collection data loads and slides have no images
+  useEffect(() => {
+    const images = collectionData?.images ?? [];
+    if (images.length === 0) return;
+
+    const hasEmptySlides = store.slides.some((s) => !s.imageUrl);
+    if (!hasEmptySlides) return;
+
+    // Auto-fill empty slides with random images
+    const shuffled = [...images].sort(() => Math.random() - 0.5);
+    let imgIdx = 0;
+    store.slides.forEach((slide, slideIdx) => {
+      if (!slide.imageUrl && imgIdx < shuffled.length) {
+        const img = shuffled[imgIdx];
+        if (img.url) {
+          store.updateSlideImage(slideIdx, img.id, img.url);
+          imgIdx++;
+        }
+      }
+    });
+  }, [collectionData]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Auto-assign random images from collection to slides that don't have images
   const autoAssignImages = () => {
     const images = collectionData?.images ?? [];

@@ -1,55 +1,56 @@
 import { join } from "path";
 
-// Predefined niche queries -- each niche has multiple search terms to get variety
+// UGC-style queries — targeting phone-taken, candid, TikTok/Instagram slideshow backgrounds
+// Key modifiers: "iphone", "pov", "faceless", "that girl", "dark academia", "tiktok", "real"
 const NICHES: Record<string, string[]> = {
   education: [
-    "pov studying at my desk laptop coffee candid",
-    "messy study desk real student life aesthetic",
-    "that girl studying library candid faceless",
-    "day in my life student study session real",
-    "candid hands writing notebook laptop study",
+    "pov studying at night dark academia iphone",
+    "messy desk studying tiktok faceless iphone photo",
+    "that girl study session coffee laptop iphone candid",
+    "dark academia library studying aesthetic tiktok",
+    "faceless study desk notes coffee real iphone pov",
   ],
   business: [
-    "pov working from cafe laptop candid real",
-    "messy desk entrepreneur real workspace",
-    "faceless working from home laptop candid",
-    "day in my life remote work aesthetic real",
-    "candid hands laptop coffee shop working",
+    "pov working laptop coffee shop iphone candid faceless",
+    "faceless typing laptop desk real iphone photo",
+    "that girl work from home aesthetic tiktok iphone",
+    "pov hands laptop morning coffee work iphone",
+    "messy desk working late night laptop iphone faceless",
   ],
   coaching: [
-    "journaling morning routine candid real",
-    "personal growth books coffee real photo",
-    "pov planning my week journal candid",
-    "that girl morning routine self care real",
-    "candid hands journal planner coffee aesthetic",
+    "pov journaling morning coffee iphone candid real",
+    "that girl self care morning routine iphone aesthetic",
+    "faceless journal planning desk coffee iphone pov",
+    "pov reading self help book coffee cozy iphone",
+    "dark feminine journal candle desk aesthetic iphone faceless",
   ],
   fitness: [
-    "pov gym workout candid real aesthetic",
-    "day in my life healthy lifestyle real",
-    "candid workout gym selfie mirror real",
-    "meal prep real kitchen candid aesthetic",
-    "morning run candid real athletic aesthetic",
+    "pov gym mirror selfie aesthetic iphone real",
+    "faceless gym workout tiktok aesthetic iphone",
+    "that girl healthy meal prep real iphone photo",
+    "pov running morning sunrise iphone candid real",
+    "faceless yoga mat morning routine iphone aesthetic",
   ],
   ecommerce: [
-    "pov unboxing package candid hands real",
-    "aesthetic flat lay real desk items candid",
-    "candid hands holding product real lifestyle",
-    "day in my life small business owner real",
-    "pov online shopping laptop coffee candid",
+    "pov unboxing haul iphone candid real hands",
+    "faceless hands holding product iphone real aesthetic",
+    "that girl shopping haul aesthetic tiktok iphone",
+    "pov desk flat lay items real iphone photo candid",
+    "faceless packaging small business iphone real aesthetic",
   ],
   tech: [
-    "pov coding at night dark desk real candid",
-    "messy programmer desk dual monitor real",
-    "day in my life software developer real",
-    "candid hands typing laptop code dark",
-    "faceless developer workspace real aesthetic",
+    "pov coding at night dark desk iphone real faceless",
+    "faceless programmer laptop dual screen iphone dark aesthetic",
+    "messy desk developer late night iphone real candid",
+    "pov hands typing code laptop dark iphone",
+    "that girl tech setup aesthetic iphone faceless desk",
   ],
   lifestyle: [
-    "pov morning coffee routine candid real",
-    "that girl aesthetic apartment real candid",
-    "day in my life candid faceless real moments",
-    "candid cozy evening reading real photo",
-    "pov hands coffee book cozy candid real",
+    "pov morning coffee routine iphone candid real faceless",
+    "that girl apartment aesthetic tiktok iphone real",
+    "faceless cozy night in bed iphone candid aesthetic",
+    "pov cooking dinner aesthetic iphone real candid",
+    "faceless walking city sunset iphone real aesthetic tiktok",
   ],
 };
 
@@ -66,7 +67,7 @@ if (selectedNiche && !NICHES[selectedNiche]) {
   process.exit(1);
 }
 
-console.log("Pinterest Bulk Scraper");
+console.log("Pinterest Bulk Scraper (UGC-style queries)");
 console.log(`Niches: ${Object.keys(nichesToScrape).join(", ")}`);
 console.log(`Images per query: ${IMAGES_PER_QUERY}\n`);
 
@@ -111,5 +112,8 @@ for (const [niche, queries] of Object.entries(nichesToScrape)) {
 
 console.log("\n\nBulk scrape complete!");
 console.log(
-  "Run 'bun run upload-to-supabase.ts <admin-user-uuid>' to upload images to CineRads collections."
+  "Run 'bun run filter-images.ts' to AI-filter non-UGC images."
+);
+console.log(
+  "Run 'bun run upload-to-supabase.ts <admin-user-uuid>' to upload to CineRads."
 );

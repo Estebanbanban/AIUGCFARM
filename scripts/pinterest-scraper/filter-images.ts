@@ -24,28 +24,30 @@ if (!OPENROUTER_API_KEY) {
   process.exit(1);
 }
 
-const SYSTEM_PROMPT = `You are an image classifier for a UGC (user-generated content) slideshow tool.
-Classify whether this image is suitable as a background for TikTok/Instagram style carousel slideshows.
+const SYSTEM_PROMPT = `You classify images for TikTok/Instagram carousel slideshows. These slideshows use REAL, phone-taken, candid photos as backgrounds — the kind of photos a 22-year-old would take on their iPhone and post to their story.
 
-KEEP if the image is:
-- A real candid photo of a workspace, desk, laptop, coffee shop, study area
-- A lifestyle photo that feels authentic and "that girl" aesthetic
-- A person working, studying, reading, in a cozy setting (faceless or not)
-- A real photo with natural lighting, slightly messy or lived-in feel
-- POV-style photo (hands typing, holding coffee, etc.)
+KEEP only if ALL of these are true:
+- Looks like it was taken on a phone (not a professional camera)
+- Has natural, imperfect lighting (slightly dark, warm, moody is OK)
+- Shows a real scene: desk, laptop, coffee, hands, workspace, gym, kitchen, city walk
+- Feels candid/unposed — messy desk, real apartment, actual person's space
+- Could realistically be a TikTok slideshow background
+- POV or faceless shots are ideal (hands holding things, desk from above, etc.)
 
-REJECT if the image is:
-- An infographic, chart, diagram, or data visualization
-- A graphic design, illustration, or digital art
-- A slideshow slide, presentation, or text-heavy image
-- A screenshot of an app, website, or social media
-- A product photo on a white/clean background (catalog style)
-- A collage or multi-image composite
-- A meme or image with large overlaid text
-- An overly polished/staged professional photo (magazine quality)
-- A stock photo that looks obviously staged
-- Low resolution or blurry
-- Not a photograph (cartoon, 3D render, etc.)
+REJECT if ANY of these are true:
+- Professional photography (DSLR quality, studio lighting, shallow depth of field from a big lens)
+- Stock photo vibes (too clean, too perfect, models posing naturally)
+- Infographic, chart, diagram, graphic design, illustration
+- Text overlay, slideshow slide, screenshot, meme
+- Product photo on clean/white background
+- Collage or multi-image composite
+- 3D render, cartoon, digital art, AI-generated looking
+- Interior design / architecture photo (too staged)
+- Overly styled flat lay (too perfect arrangement)
+- Food photography that looks professional (restaurant quality plating)
+- Fitness photos that look like a professional shoot (perfect lighting, posed)
+
+When in doubt, REJECT. We want only the most authentic phone-taken photos.
 
 Reply with ONLY one word: KEEP or REJECT`;
 
