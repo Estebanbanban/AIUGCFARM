@@ -72,12 +72,7 @@ const LANGUAGES = [
   { value: "hi", label: "Hindi" },
 ];
 
-const REFERENCE_OPTIONS: { value: ReferenceType; label: string; description: string }[] = [
-  { value: "none", label: "None", description: "No reference image" },
-  { value: "custom", label: "Custom Upload", description: "Upload your own image" },
-  { value: "persona", label: "Persona Image", description: "Use a persona's face" },
-  { value: "composite", label: "Composite", description: "Persona + Product blend" },
-];
+// Reference options simplified — Sora blocks human faces, so no persona/composite image options
 
 function creditCost(model: SoraModel): number {
   return model === "sora-2-pro" ? 10 : 5;
@@ -386,7 +381,8 @@ export default function VideoCreatorPage() {
         generation_id: genId,
         sora_model: store.soraModel,
         duration: store.duration,
-        reference_type: store.referenceType,
+        // Only "none" and "custom" are valid — fallback for cached persona/composite values
+        reference_type: store.referenceType === "custom" ? "custom" : "none",
         reference_image_path:
           store.referenceType === "custom"
             ? store.customReferenceImagePath ?? undefined
@@ -431,7 +427,89 @@ export default function VideoCreatorPage() {
         {/* LEFT PANEL — Configuration                                     */}
         {/* ============================================================= */}
         <div className="lg:col-span-3 flex flex-col gap-6">
-          {/* Section 1: Script */}
+          {/* Section 1: Context — Persona & Product (FIRST so auto-generate works) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Context</CardTitle>
+              <CardDescription>
+                Select a persona and/or product to power AI script generation and video style
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <Label className="text-xs text-muted-foreground">
+                    Persona
+                  </Label>
+                  <Select
+                    value={store.personaId ?? "__none__"}
+                    onValueChange={(v) => store.setPersonaId(v === "__none__" ? null : v)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">None</SelectItem>
+                      {personas?.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          <User className="size-3.5 text-muted-foreground" />
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedPersona && personaImageUrl && (
+                    <img
+                      src={personaImageUrl}
+                      alt={selectedPersona.name}
+                      className="h-16 w-16 rounded-lg object-cover border border-border"
+                    />
+                  )}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label className="text-xs text-muted-foreground">
+                    Product
+                  </Label>
+                  <Select
+                    value={store.productId ?? "__none__"}
+                    onValueChange={(v) => store.setProductId(v === "__none__" ? null : v)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">None</SelectItem>
+                      {products?.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          <Package className="size-3.5 text-muted-foreground" />
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {/* SaaS toggle — always visible when product is selected */}
+              {store.productId && (
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={store.isSaas}
+                    onCheckedChange={store.setIsSaas}
+                  />
+                  <Label className="text-sm cursor-pointer">
+                    SaaS product (screen demo style — no physical product in video)
+                  </Label>
+                </div>
+              )}
+              {selectedPersona && (
+                <p className="text-xs text-muted-foreground">
+                  Persona appearance (age, style, hair) will be described in the video prompt for visual consistency.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Section 2: Script */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Script</CardTitle>
@@ -477,7 +555,7 @@ export default function VideoCreatorPage() {
                   </Button>
                   {!canAutoGenerate && (
                     <p className="text-xs text-muted-foreground">
-                      Select a persona or product below to enable AI generation
+                      Select a persona or product above to enable AI generation
                     </p>
                   )}
                 </TabsContent>
@@ -539,9 +617,9 @@ export default function VideoCreatorPage() {
                       )}
                       Auto-generate
                     </Button>
-                    {!canAutoGenerate && store.scriptFormat === "structured" && (
+                    {!canAutoGenerate && (
                       <p className="text-xs text-muted-foreground">
-                        Select a persona or product below to enable auto-generation
+                        Select a persona or product above to enable auto-generation
                       </p>
                     )}
                   </div>
@@ -550,32 +628,40 @@ export default function VideoCreatorPage() {
             </CardContent>
           </Card>
 
-          {/* Section 2: Reference Image */}
+          {/* Section 3: Reference Image (simplified — no persona/composite since Sora blocks faces) */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Reference Image</CardTitle>
               <CardDescription>
-                Optionally provide an image to guide the video style
+                Optionally upload a scene or product image as the video&apos;s first frame (no human faces — Sora blocks them)
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              {/* Reference type selector — styled button group since no RadioGroup */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {REFERENCE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => store.setReferenceType(opt.value)}
-                    className={cn(
-                      "flex flex-col items-center gap-1 rounded-lg border px-3 py-3 text-center transition-all text-sm",
-                      store.referenceType === opt.value
-                        ? "border-primary bg-primary/5 text-foreground ring-1 ring-primary/30"
-                        : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
-                    )}
-                  >
-                    <span className="font-medium text-xs">{opt.label}</span>
-                  </button>
-                ))}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => store.setReferenceType("none")}
+                  className={cn(
+                    "flex flex-col items-center gap-1 rounded-lg border px-3 py-3 text-center transition-all text-sm",
+                    store.referenceType === "none"
+                      ? "border-primary bg-primary/5 text-foreground ring-1 ring-primary/30"
+                      : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  )}
+                >
+                  <span className="font-medium text-xs">None</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => store.setReferenceType("custom")}
+                  className={cn(
+                    "flex flex-col items-center gap-1 rounded-lg border px-3 py-3 text-center transition-all text-sm",
+                    store.referenceType === "custom"
+                      ? "border-primary bg-primary/5 text-foreground ring-1 ring-primary/30"
+                      : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  )}
+                >
+                  <span className="font-medium text-xs">Custom Upload</span>
+                </button>
               </div>
 
               {/* Custom Upload */}
@@ -607,7 +693,7 @@ export default function VideoCreatorPage() {
                         : "Drop an image here or click to browse"}
                     </p>
                     <p className="text-xs text-muted-foreground/60">
-                      JPEG, PNG, or WebP up to 10MB
+                      JPEG, PNG, or WebP — no human faces (product shots, scenes, backgrounds)
                     </p>
                     <input
                       ref={fileInputRef}
@@ -642,155 +728,10 @@ export default function VideoCreatorPage() {
                   )}
                 </div>
               )}
-
-              {/* Persona Image */}
-              {store.referenceType === "persona" && (
-                <div className="flex flex-col gap-3">
-                  <p className="text-xs text-amber-600 dark:text-amber-400">
-                    Sora cannot use human face images as reference. The persona&apos;s appearance will be described via the text prompt instead for visual consistency.
-                  </p>
-                  <Label className="text-xs text-muted-foreground">
-                    Select Persona
-                  </Label>
-                  <Select
-                    value={store.personaId ?? ""}
-                    onValueChange={(v) => store.setPersonaId(v || null)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Choose a persona..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {personasLoading && (
-                        <SelectItem value="_loading" disabled>
-                          Loading...
-                        </SelectItem>
-                      )}
-                      {personas?.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          <User className="size-3.5 text-muted-foreground" />
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                      {!personasLoading && (!personas || personas.length === 0) && (
-                        <SelectItem value="_none" disabled>
-                          No personas created yet
-                        </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  {selectedPersona && personaImageUrl && (
-                    <img
-                      src={personaImageUrl}
-                      alt={selectedPersona.name}
-                      className="h-24 w-24 rounded-lg object-cover border border-border"
-                    />
-                  )}
-                </div>
-              )}
-
-              {/* Composite (Persona + Product) */}
-              {store.referenceType === "composite" && (
-                <div className="flex flex-col gap-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Persona picker */}
-                    <div className="flex flex-col gap-2">
-                      <Label className="text-xs text-muted-foreground">
-                        Persona
-                      </Label>
-                      <Select
-                        value={store.personaId ?? ""}
-                        onValueChange={(v) => store.setPersonaId(v || null)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Choose a persona..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {personasLoading && (
-                            <SelectItem value="_loading" disabled>
-                              Loading...
-                            </SelectItem>
-                          )}
-                          {personas?.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              <User className="size-3.5 text-muted-foreground" />
-                              {p.name}
-                            </SelectItem>
-                          ))}
-                          {!personasLoading &&
-                            (!personas || personas.length === 0) && (
-                              <SelectItem value="_none" disabled>
-                                No personas yet
-                              </SelectItem>
-                            )}
-                        </SelectContent>
-                      </Select>
-                      {selectedPersona && personaImageUrl && (
-                        <img
-                          src={personaImageUrl}
-                          alt={selectedPersona.name}
-                          className="h-16 w-16 rounded-lg object-cover border border-border"
-                        />
-                      )}
-                    </div>
-
-                    {/* Product picker */}
-                    <div className="flex flex-col gap-2">
-                      <Label className="text-xs text-muted-foreground">
-                        Product
-                      </Label>
-                      <Select
-                        value={store.productId ?? ""}
-                        onValueChange={(v) => store.setProductId(v || null)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Choose a product..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {productsLoading && (
-                            <SelectItem value="_loading" disabled>
-                              Loading...
-                            </SelectItem>
-                          )}
-                          {products?.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              <Package className="size-3.5 text-muted-foreground" />
-                              {p.name}
-                            </SelectItem>
-                          ))}
-                          {!productsLoading &&
-                            (!products || products.length === 0) && (
-                              <SelectItem value="_none" disabled>
-                                No products yet
-                              </SelectItem>
-                            )}
-                        </SelectContent>
-                      </Select>
-                      {selectedProduct && productImageUrl && (
-                        <img
-                          src={productImageUrl}
-                          alt={selectedProduct.name}
-                          className="h-16 w-16 rounded-lg object-cover border border-border"
-                        />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* SaaS toggle */}
-                  <div className="flex items-center gap-3">
-                    <Switch
-                      checked={store.isSaas}
-                      onCheckedChange={store.setIsSaas}
-                    />
-                    <Label className="text-sm cursor-pointer">
-                      SaaS product (screen demo style)
-                    </Label>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
 
-          {/* Section 3: Settings */}
+          {/* Section 4: Settings */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Settings</CardTitle>
@@ -866,66 +807,6 @@ export default function VideoCreatorPage() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Persona & Product context (when not using composite — useful for script gen) */}
-          {store.referenceType !== "composite" && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Context (optional)</CardTitle>
-                <CardDescription>
-                  Select a persona and/or product to improve script generation
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-xs text-muted-foreground">
-                      Persona
-                    </Label>
-                    <Select
-                      value={store.personaId ?? "__none__"}
-                      onValueChange={(v) => store.setPersonaId(v === "__none__" ? null : v)}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="None" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">None</SelectItem>
-                        {personas?.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            <User className="size-3.5 text-muted-foreground" />
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-xs text-muted-foreground">
-                      Product
-                    </Label>
-                    <Select
-                      value={store.productId ?? "__none__"}
-                      onValueChange={(v) => store.setProductId(v === "__none__" ? null : v)}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="None" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">None</SelectItem>
-                        {products?.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            <Package className="size-3.5 text-muted-foreground" />
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
 
         {/* ============================================================= */}
