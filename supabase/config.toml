@@ -114,3 +114,24 @@ verify_jwt = false
 
 [functions.regenerate-segment]
 verify_jwt = false
+
+[functions.youtube-connect]
+verify_jwt = false
+
+[functions.youtube-callback]
+verify_jwt = false
+
+[functions.youtube-disconnect]
+verify_jwt = false
+
+[functions.list-youtube-connections]
+verify_jwt = false
+
+[functions.publish-youtube]
+verify_jwt = false
+
+[functions.youtube-publish-status]
+verify_jwt = false
+
+[functions.upload-stitched-video]
+verify_jwt = false

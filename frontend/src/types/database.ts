@@ -201,6 +201,22 @@ export interface AdvancedSegmentsConfig {
   ctas: AdvancedSegmentConfig[];
 }
 
+// ── Hook Library ──────────────────────────────────────────────────────────
+
+export interface HookLibraryItem {
+  id: string;
+  title: string;
+  style: "tiktok" | "instagram";
+  description: string | null;
+  storage_path: string;
+  thumbnail_path: string | null;
+  video_url: string;
+  thumbnail_url: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
 // ── YouTube Publishing ────────────────────────────────────────────────────
 
 export interface YouTubeConnection {

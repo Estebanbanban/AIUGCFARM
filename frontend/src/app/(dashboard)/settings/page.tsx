@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { callEdge } from "@/lib/api";
 import { toast } from "sonner";
-import { ArrowRight, CreditCard, User, Lock } from "lucide-react";
+import { ArrowRight, CreditCard, User, Lock, Youtube, Plus, Trash2, Loader2, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { useYouTubeConnections, useYouTubeConnectUrl, useYouTubeDisconnect } from "@/hooks/use-youtube";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +40,31 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const { data: youtubeConnections, isLoading: loadingYT } = useYouTubeConnections();
+  const connectYouTube = useYouTubeConnectUrl();
+  const disconnectYouTube = useYouTubeDisconnect();
+  const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
+
+  async function handleConnectYouTube() {
+    try {
+      const { url } = await connectYouTube.mutateAsync();
+      window.location.href = url;
+    } catch {
+      toast.error("Failed to start YouTube connection");
+    }
+  }
+
+  async function handleDisconnectYouTube(connectionId: string) {
+    setDisconnectingId(connectionId);
+    try {
+      await disconnectYouTube.mutateAsync(connectionId);
+      toast.success("YouTube channel disconnected");
+    } catch {
+      toast.error("Failed to disconnect channel");
+    } finally {
+      setDisconnectingId(null);
+    }
+  }
 
   async function handleDeleteAccount() {
     setDeleting(true);
@@ -104,6 +130,118 @@ export default function SettingsPage() {
               <ArrowRight className="size-4" />
             </Link>
           </Button>
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      {/* Connected Accounts */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-red-500/10">
+              <Youtube className="size-5 text-red-500" />
+            </div>
+            <div className="flex-1">
+              <CardTitle className="text-base">Connected Accounts</CardTitle>
+              <CardDescription>
+                Connect your YouTube channels to publish videos directly.
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/settings/youtube-setup">
+                  <HelpCircle className="size-4" />
+                  Setup Guide
+                </Link>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleConnectYouTube}
+                disabled={connectYouTube.isPending}
+              >
+                {connectYouTube.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Plus className="size-4" />
+                )}
+                Add Channel
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingYT ? (
+            <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Loading connections...
+            </div>
+          ) : !youtubeConnections?.length ? (
+            <div className="flex flex-col items-center gap-3 py-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                No YouTube channels connected yet.
+              </p>
+              <div className="flex items-center gap-2">
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/settings/youtube-setup">
+                    View Setup Guide
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleConnectYouTube}
+                  disabled={connectYouTube.isPending}
+                >
+                  <Youtube className="size-4 text-red-500" />
+                  Connect YouTube
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {youtubeConnections.map((conn) => (
+                <div
+                  key={conn.id}
+                  className="flex items-center gap-3 rounded-lg border border-border/50 px-4 py-3"
+                >
+                  {conn.channel_thumbnail ? (
+                    <img
+                      src={conn.channel_thumbnail}
+                      alt={conn.channel_title}
+                      className="size-9 rounded-full"
+                    />
+                  ) : (
+                    <div className="flex size-9 items-center justify-center rounded-full bg-red-500/10">
+                      <Youtube className="size-4 text-red-500" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {conn.channel_title}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      YouTube Channel
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => handleDisconnectYouTube(conn.id)}
+                    disabled={disconnectingId === conn.id}
+                  >
+                    {disconnectingId === conn.id ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="size-4" />
+                    )}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

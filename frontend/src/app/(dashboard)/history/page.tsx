@@ -16,6 +16,7 @@ import {
   FileText,
   Trash2,
   User,
+  Youtube,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
@@ -34,6 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useGenerationHistory, useDeleteGeneration } from "@/hooks/use-generations";
+import { YouTubePublishModal } from "@/components/youtube/YouTubePublishModal";
 import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
 import type { GenerationStatus } from "@/types/database";
 /**
@@ -170,6 +172,10 @@ export default function HistoryPage() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>("all");
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [publishTarget, setPublishTarget] = useState<{
+    generationId: string;
+    productName: string;
+  } | null>(null);
   const { data, isLoading, error } = useGenerationHistory(page);
   const deleteGeneration = useDeleteGeneration();
   const router = useRouter();
@@ -419,6 +425,22 @@ export default function HistoryPage() {
                           segments
                         </span>
                       )}
+                      {gen.status === "completed" && (
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/5 px-2 py-0.5 text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPublishTarget({
+                              generationId: gen.id,
+                              productName: gen.products?.name ?? "Video",
+                            });
+                          }}
+                        >
+                          <Youtube className="size-3" />
+                          Publish
+                        </button>
+                      )}
                     </div>
 
                     {/* Awaiting approval: prompt user to resume */}
@@ -529,6 +551,15 @@ export default function HistoryPage() {
           )}
         </>
       )}
+
+      {/* YouTube Publish Modal */}
+      <YouTubePublishModal
+        open={!!publishTarget}
+        onOpenChange={(open) => { if (!open) setPublishTarget(null); }}
+        generationId={publishTarget?.generationId ?? ""}
+        defaultTitle={publishTarget?.productName ?? ""}
+        defaultDescription={`UGC ad for ${publishTarget?.productName ?? "product"}`}
+      />
     </div>
   );
 }

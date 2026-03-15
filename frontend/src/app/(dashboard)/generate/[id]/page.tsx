@@ -30,6 +30,7 @@ import {
   Square,
   Sparkles,
   Zap,
+  Monitor,
   LayoutDashboard,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -46,8 +47,13 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { useGenerationStatus, useRegenerateSegment, useApproveAndGenerate } from "@/hooks/use-generations";
+import { useGenerationStatus, useRegenerateSegment, useApproveAndGenerate, useUpdateScreenRecording, useHookLibrary } from "@/hooks/use-generations";
 import { useCredits } from "@/hooks/use-credits";
+import { useUser } from "@clerk/nextjs";
+import { useSaasDemoStitcher, SAAS_DEMO_STATUS_LABELS } from "@/hooks/use-saas-demo-stitcher";
+import type { SaasDemoStitchStatus } from "@/hooks/use-saas-demo-stitcher";
+import { ScreenRecordingUpload } from "@/components/screen-recording-upload";
+import type { HookLibraryItem } from "@/types/database";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { GenerationStatus, ScriptSegment, SegmentVideo } from "@/types/database";
 import { generateSrt, buildWordCues, type WordCue } from "@/lib/srt";
@@ -748,6 +754,9 @@ function CombinationPreview({
   ctaScript,
   autoStitch = false,
   allCombos = [],
+  screenRecordingUrl = null,
+  libraryHookUrl = null,
+  format = "9:16",
 }: {
   hookVideo: SegmentVideo | undefined;
   bodyVideo: SegmentVideo | undefined;
@@ -759,6 +768,9 @@ function CombinationPreview({
   ctaScript?: ScriptSegment;
   autoStitch?: boolean;
   allCombos?: Array<{ hookIdx: number; bodyIdx: number; ctaIdx: number }>;
+  screenRecordingUrl?: string | null;
+  libraryHookUrl?: string | null;
+  format?: "9:16" | "16:9";
 }) {
   const hookRef = useRef<HTMLVideoElement>(null);
   const bodyRef = useRef<HTMLVideoElement>(null);
@@ -775,6 +787,18 @@ function CombinationPreview({
 
   const { stitch, reset, status: stitchStatus, progress: stitchProgress, stitchedUrl, error: stitchError } =
     useVideoStitcher();
+
+  // SaaS Demo stitcher (used when screenRecordingUrl is provided)
+  const {
+    stitch: saasStitch,
+    reset: saasReset,
+    status: saasStitchStatus,
+    progress: saasStitchProgress,
+    stitchedUrl: saasStitchedUrl,
+    error: saasStitchError,
+  } = useSaasDemoStitcher();
+
+  const isSaasMode = !!screenRecordingUrl;
 
   // ── Stitch URL cache ──────────────────────────────────────────────────────
   // Blob URLs keyed by "hookUrl|bodyUrl|ctaUrl" — persist across combo switches
@@ -946,10 +970,9 @@ function CombinationPreview({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stitchStatus]);
 
-  const isStitching =
-    stitchStatus !== "idle" &&
-    stitchStatus !== "done" &&
-    stitchStatus !== "error";
+  const isStitching = isSaasMode
+    ? (saasStitchStatus !== "idle" && saasStitchStatus !== "done" && saasStitchStatus !== "error")
+    : (stitchStatus !== "idle" && stitchStatus !== "done" && stitchStatus !== "error");
 
   const stopAll = useCallback(() => {
     hookRef.current?.pause();
@@ -1045,7 +1068,9 @@ function CombinationPreview({
 
   // Effective stitched URL: prefer displayedStitchedUrl (set synchronously on cache HIT)
   // over stitchedUrl which may be stale from a previous combo until reset() clears it
-  const effectiveStitchedUrl = displayedStitchedUrl ?? stitchedUrl;
+  const effectiveStitchedUrl = isSaasMode
+    ? saasStitchedUrl
+    : (displayedStitchedUrl ?? stitchedUrl);
 
   function handleStitch() {
     if (!hookVideo || !bodyVideo || !ctaVideo) return;
@@ -1058,7 +1083,19 @@ function CombinationPreview({
     stitchCache.current.delete(comboKey);
     setDisplayedStitchedUrl(null);
     stitchingForKey.current = comboKey;
-    stitch(hookVideo.url, bodyVideo.url, ctaVideo.url);
+
+    if (isSaasMode && screenRecordingUrl) {
+      // In SaaS mode: use library hook URL if selected, otherwise the AI-generated hook
+      saasStitch({
+        hookUrl: libraryHookUrl ?? hookVideo.url,
+        bodyUrl: bodyVideo.url,
+        ctaUrl: ctaVideo.url,
+        screenRecordingUrl,
+        format,
+      });
+    } else {
+      stitch(hookVideo.url, bodyVideo.url, ctaVideo.url);
+    }
   }
 
   function handleDownloadStitched() {
@@ -1345,14 +1382,16 @@ function CombinationPreview({
       )}
 
       {/* ── Stitch bar ── */}
-      <div className={`w-full rounded-lg border px-4 py-3 ${stitchStatus === "error" ? "border-red-500/50 bg-red-500/5" : "border-border bg-muted/40"}`}>
+      <div className={`w-full rounded-lg border px-4 py-3 ${(isSaasMode ? saasStitchStatus : stitchStatus) === "error" ? "border-red-500/50 bg-red-500/5" : "border-border bg-muted/40"}`}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-col gap-0.5">
             <p className="text-xs font-medium text-foreground">
-              Stitch &amp; Export
+              {isSaasMode ? "SaaS Demo Stitch" : "Stitch & Export"}
             </p>
             <p className="text-xs text-muted-foreground">
-              Trims silence, joins Hook → Body → CTA into one file
+              {isSaasMode
+                ? "Extracts voiceover, overlays on screen recording, joins with hook & CTA"
+                : "Trims silence, joins Hook → Body → CTA into one file"}
             </p>
           </div>
 
@@ -1363,27 +1402,29 @@ function CombinationPreview({
                   <Download className="size-3.5" />
                   Download
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleDownloadPack}
-                  disabled={isPackZipping}
-                  title="Download stitched video + all raw segments as a ZIP"
-                >
-                  {isPackZipping ? (
-                    <>
-                      <Loader2 className="size-3.5 animate-spin" />
-                      {packZipStatus === "fetching"
-                        ? `Fetching… ${packFetched}/${packTotal}`
-                        : "Zipping…"}
-                    </>
-                  ) : (
-                    <>
-                      <Download className="size-3.5" />
-                      Download All (ZIP)
-                    </>
-                  )}
-                </Button>
+                {!isSaasMode && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleDownloadPack}
+                    disabled={isPackZipping}
+                    title="Download stitched video + all raw segments as a ZIP"
+                  >
+                    {isPackZipping ? (
+                      <>
+                        <Loader2 className="size-3.5 animate-spin" />
+                        {packZipStatus === "fetching"
+                          ? `Fetching… ${packFetched}/${packTotal}`
+                          : "Zipping…"}
+                      </>
+                    ) : (
+                      <>
+                        <Download className="size-3.5" />
+                        Download All (ZIP)
+                      </>
+                    )}
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -1399,17 +1440,19 @@ function CombinationPreview({
               <Button
                 size="sm"
                 onClick={handleStitch}
-                disabled={isStitching}
+                disabled={isStitching || (isSaasMode && !screenRecordingUrl)}
               >
                 {isStitching ? (
                   <>
                     <Loader2 className="size-3.5 animate-spin" />
-                    {STITCH_STATUS_LABELS[stitchStatus]}
+                    {isSaasMode
+                      ? SAAS_DEMO_STATUS_LABELS[saasStitchStatus as SaasDemoStitchStatus]
+                      : STITCH_STATUS_LABELS[stitchStatus]}
                   </>
                 ) : (
                   <>
                     <Scissors className="size-3.5" />
-                    {STITCH_STATUS_LABELS[stitchStatus]}
+                    {isSaasMode ? "Stitch SaaS Demo" : STITCH_STATUS_LABELS[stitchStatus]}
                   </>
                 )}
               </Button>
@@ -1420,17 +1463,17 @@ function CombinationPreview({
         {isStitching && (
           <div className="mt-2">
             <Progress
-              value={stitchProgress}
+              value={isSaasMode ? saasStitchProgress : stitchProgress}
               className="h-1.5 bg-muted [&>[data-slot=progress-indicator]]:bg-primary"
             />
-            <p className="mt-1 text-xs text-muted-foreground text-right">{stitchProgress}%</p>
+            <p className="mt-1 text-xs text-muted-foreground text-right">{isSaasMode ? saasStitchProgress : stitchProgress}%</p>
           </div>
         )}
 
-        {stitchStatus === "error" && stitchError && (
+        {(isSaasMode ? saasStitchStatus : stitchStatus) === "error" && (isSaasMode ? saasStitchError : stitchError) && (
           <div className="mt-2 flex items-start gap-1.5 text-red-400">
             <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
-            <p className="text-xs">{stitchError}</p>
+            <p className="text-xs">{isSaasMode ? saasStitchError : stitchError}</p>
           </div>
         )}
       </div>
@@ -1565,6 +1608,35 @@ export default function GenerationDetailPage() {
 
   const { batchStitch, status: batchStatus, progress: batchProgress, currentLabel: batchCurrentLabel, error: batchError, isActive: isBatching } =
     useBatchStitcher();
+
+  // ── SaaS Demo Mode + Hook Library ──────────────────────────────────────
+  const { user } = useUser();
+  const clerkUserId = user?.id ?? "";
+  const [saasMode, setSaasMode] = useState(false);
+  const [screenRecordingPath, setScreenRecordingPath] = useState<string | null>(null);
+  const [selectedLibraryHookId, setSelectedLibraryHookId] = useState<string | null>(null);
+  const updateScreenRecording = useUpdateScreenRecording();
+  const { data: hookLibrary } = useHookLibrary();
+
+  // Initialize SaaS mode from generation record
+  useEffect(() => {
+    if (gen?.screen_recording_url) {
+      setSaasMode(true);
+    }
+  }, [gen?.screen_recording_url]);
+
+  const screenRecordingSignedUrl = gen?.screen_recording_url ?? null;
+  const selectedLibraryHook = hookLibrary?.find((h) => h.id === selectedLibraryHookId) ?? null;
+
+  function handleScreenRecordingUpload(path: string) {
+    setScreenRecordingPath(path);
+    updateScreenRecording.mutate({ generationId, screenRecordingPath: path });
+  }
+
+  function handleScreenRecordingRemove() {
+    setScreenRecordingPath(null);
+    updateScreenRecording.mutate({ generationId, screenRecordingPath: null });
+  }
 
   function toggleBatchSelection(
     set: Set<number>,
@@ -2267,6 +2339,121 @@ export default function GenerationDetailPage() {
       {isComplete && segments && (
         <>
           {/* ============================================================ */}
+          {/*  SaaS Demo Mode — hook library + screen recording             */}
+          {/* ============================================================ */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Monitor className="size-4 text-purple-400" />
+                  <CardTitle className="text-foreground text-base">
+                    SaaS Demo Mode
+                  </CardTitle>
+                  <Badge variant="secondary" className="bg-purple-500/10 text-purple-400 text-xs">
+                    Beta
+                  </Badge>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Toggle SaaS Demo Mode"
+                  onClick={() => {
+                    const next = !saasMode;
+                    setSaasMode(next);
+                    if (!next) {
+                      handleScreenRecordingRemove();
+                      setSelectedLibraryHookId(null);
+                    }
+                  }}
+                  className="relative flex h-6 w-10 items-center rounded-full transition-colors"
+                  style={{ backgroundColor: saasMode ? "hsl(var(--primary))" : "hsl(var(--muted))" }}
+                >
+                  <span
+                    className={cn(
+                      "inline-block size-4 rounded-full bg-white transition-transform",
+                      saasMode ? "translate-x-5" : "translate-x-1",
+                    )}
+                  />
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Replace hook + body with a pre-recorded hook and screen recording. Keeps the AI voiceover.
+              </p>
+            </CardHeader>
+            {saasMode && (
+              <CardContent className="space-y-4 pt-0">
+                {/* Hook Library Selector */}
+                <div>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    1. Choose a hook
+                  </p>
+                  {hookLibrary && hookLibrary.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {hookLibrary.map((hook) => (
+                        <button
+                          key={hook.id}
+                          type="button"
+                          onClick={() => setSelectedLibraryHookId(
+                            selectedLibraryHookId === hook.id ? null : hook.id
+                          )}
+                          className={cn(
+                            "flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors",
+                            selectedLibraryHookId === hook.id
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-primary/50"
+                          )}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <Badge
+                              variant="secondary"
+                              className={cn(
+                                "text-[10px] px-1.5 py-0",
+                                hook.style === "tiktok"
+                                  ? "bg-black text-white"
+                                  : "bg-gradient-to-r from-purple-500 to-pink-500 text-white"
+                              )}
+                            >
+                              {hook.style === "tiktok" ? "TikTok" : "IG Reel"}
+                            </Badge>
+                            {selectedLibraryHookId === hook.id && (
+                              <Check className="size-3 text-primary" />
+                            )}
+                          </div>
+                          <p className="text-sm font-medium leading-tight">
+                            {hook.title}
+                          </p>
+                          {hook.description && (
+                            <p className="text-xs text-muted-foreground line-clamp-2">
+                              {hook.description}
+                            </p>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">
+                      No pre-recorded hooks available yet. Upload hooks to the hook library.
+                    </p>
+                  )}
+                </div>
+
+                {/* Screen Recording Upload */}
+                <div>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    2. Upload your app demo
+                  </p>
+                  <ScreenRecordingUpload
+                    userId={clerkUserId}
+                    storagePath={screenRecordingPath}
+                    onUpload={handleScreenRecordingUpload}
+                    onRemove={handleScreenRecordingRemove}
+                    disabled={!clerkUserId}
+                  />
+                </div>
+              </CardContent>
+            )}
+          </Card>
+
+          {/* ============================================================ */}
           {/*  Full Ad Preview — auto-stitched on load                      */}
           {/* ============================================================ */}
           <Card>
@@ -2276,8 +2463,10 @@ export default function GenerationDetailPage() {
                   <CardTitle className="text-foreground">
                     Full Ad Preview
                   </CardTitle>
-                  <Badge variant="secondary" className="bg-primary/10 text-primary text-xs">
-                    Hook + Body + CTA
+                  <Badge variant="secondary" className={cn("text-xs", saasMode && screenRecordingSignedUrl ? "bg-purple-500/10 text-purple-400" : "bg-primary/10 text-primary")}>
+                    {saasMode && screenRecordingSignedUrl
+                      ? (selectedLibraryHook ? "Library Hook + Demo + CTA" : "Hook + Demo + CTA")
+                      : "Hook + Body + CTA"}
                   </Badge>
                 </div>
                 <div className="flex items-center gap-2">
@@ -2324,8 +2513,11 @@ export default function GenerationDetailPage() {
                 hookScript={script?.hooks?.[selectedHook]}
                 bodyScript={script?.bodies?.[selectedBody]}
                 ctaScript={script?.ctas?.[selectedCta]}
-                autoStitch={true}
+                autoStitch={!saasMode || !screenRecordingSignedUrl}
                 allCombos={allCombos}
+                screenRecordingUrl={saasMode ? screenRecordingSignedUrl : null}
+                libraryHookUrl={saasMode ? selectedLibraryHook?.video_url ?? null : null}
+                format={wizard.format ?? "9:16"}
               />
             </CardContent>
           </Card>
