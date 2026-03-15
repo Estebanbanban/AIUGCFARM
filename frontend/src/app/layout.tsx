@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, DM_Sans } from "next/font/google";
+import { TikTok_Sans } from "next/font/google";
 import "./globals.css";
 import Script from "next/script";
 import NextTopLoader from "nextjs-toploader";
@@ -12,6 +13,8 @@ import { ClerkProvider } from "@clerk/nextjs";
 
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const tiktokSans = TikTok_Sans({ subsets: ["latin"], variable: "--font-tiktok", weight: ["400", "500", "600", "700", "800"] });
+const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans", weight: ["400", "500", "600", "700"] });
 
 export const metadata: Metadata = {
   title: "CineRads - AI UGC Video Ad Generator for Shopify & DTC Brands",
@@ -57,7 +60,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans min-h-screen bg-background text-foreground antialiased`}>
+      <body className={`${inter.variable} ${tiktokSans.variable} ${dmSans.variable} font-sans min-h-screen bg-background text-foreground antialiased`}>
         <ClerkProvider
           signInUrl="/sign-in"
           signUpUrl="/sign-up"

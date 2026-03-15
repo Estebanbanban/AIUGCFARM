@@ -1,0 +1,73 @@
+import { getCorsHeaders } from "../_shared/cors.ts";
+import { requireUserId } from "../_shared/auth.ts";
+import { json } from "../_shared/response.ts";
+import { getAdminClient } from "../_shared/supabase.ts";
+
+Deno.serve(async (req: Request) => {
+  const cors = getCorsHeaders(req);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+
+  try {
+    if (req.method !== "POST") {
+      return json({ detail: "Method not allowed" }, cors, 405);
+    }
+
+    const userId = await requireUserId(req);
+    const { id } = await req.json();
+
+    if (!id || typeof id !== "string") {
+      return json({ detail: "Missing image id" }, cors, 400);
+    }
+
+    const sb = getAdminClient();
+
+    // Fetch the image and verify it belongs to the user via the collection
+    const { data: image, error: fetchErr } = await sb
+      .from("collection_images")
+      .select("id, storage_path, collection_id")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (fetchErr) throw new Error(fetchErr.message);
+    if (!image) {
+      return json({ detail: "Image not found" }, cors, 404);
+    }
+
+    // Verify the collection belongs to the user
+    const { data: collection, error: colErr } = await sb
+      .from("image_collections")
+      .select("id")
+      .eq("id", image.collection_id)
+      .eq("owner_id", userId)
+      .maybeSingle();
+
+    if (colErr) throw new Error(colErr.message);
+    if (!collection) {
+      return json({ detail: "Image not found" }, cors, 404);
+    }
+
+    // Delete from storage
+    const { error: removeErr } = await sb.storage
+      .from("slideshow-images")
+      .remove([image.storage_path]);
+
+    if (removeErr) {
+      console.error("Storage delete error:", removeErr.message);
+    }
+
+    // Delete DB row (trigger auto-decrements image_count)
+    const { error: deleteErr } = await sb
+      .from("collection_images")
+      .delete()
+      .eq("id", id);
+
+    if (deleteErr) throw new Error(deleteErr.message);
+
+    return json({ data: { success: true } }, cors);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg === "Unauthorized") return json({ detail: "Unauthorized" }, cors, 401);
+    console.error("delete-collection-image error:", e);
+    return json({ detail: "Internal error" }, cors, 500);
+  }
+});

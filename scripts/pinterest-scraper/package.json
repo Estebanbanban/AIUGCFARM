@@ -1,0 +1,14 @@
+{
+  "name": "pinterest-scraper",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "scrape": "bun run scrape.ts",
+    "bulk-scrape": "bun run bulk-scrape.ts",
+    "categorize": "bun run categorize.ts",
+    "upload": "bun run upload-to-supabase.ts"
+  },
+  "dependencies": {
+    "playwright": "^1.58.0"
+  }
+}
