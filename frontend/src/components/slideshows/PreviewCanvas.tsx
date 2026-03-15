@@ -16,64 +16,33 @@ import { SlideFilmstrip } from "./SlideFilmstrip";
 
 export function PreviewCanvas() {
   const store = useSlideshowEditorStore();
-  const hookSlide = store.slides.find((s) => s.type === "hook");
-  const selectedSlide = store.slides[store.selectedSlideIndex];
-
-  // Show hook on left, selected body slide on right
-  const leftSlide = hookSlide;
-  const rightSlide =
-    selectedSlide?.type !== "hook" ? selectedSlide : store.slides[1];
 
   return (
     <div className="flex h-full flex-col gap-4 p-5">
-      {/* Preview area */}
-      <div className="flex-1 flex items-start justify-center gap-4 overflow-hidden">
-        {/* Hook preview (left) */}
-        {leftSlide ? (
-          <div className="flex flex-col items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Hook
-            </span>
-            <SlidePreview
-              slide={leftSlide}
-              settings={store.settings}
-              isSelected={store.selectedSlideIndex === 0}
-              scale={0.85}
-              onClick={() => store.selectSlide(0)}
-              captionStyle={store.settings.captionStyle}
-              showPill={store.settings.showPill}
-            />
-          </div>
-        ) : null}
-
-        {/* Selected body slide preview (right) */}
-        {rightSlide ? (
-          <div className="flex flex-col items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Slide {rightSlide.order + 1}
-            </span>
-            <SlidePreview
-              slide={rightSlide}
-              settings={store.settings}
-              isSelected={
-                store.selectedSlideIndex ===
-                store.slides.findIndex((s) => s.id === rightSlide.id)
-              }
-              scale={0.85}
-              onClick={() => {
-                const idx = store.slides.findIndex(
-                  (s) => s.id === rightSlide.id,
-                );
-                if (idx >= 0) store.selectSlide(idx);
-              }}
-              captionStyle={store.settings.captionStyle}
-              showPill={store.settings.showPill}
-            />
-          </div>
-        ) : null}
-
-        {/* Empty state */}
-        {store.slides.length === 0 && (
+      {/* Preview area — all slides in a scrollable row */}
+      <div className="flex-1 flex items-start justify-center gap-3 overflow-x-auto overflow-y-hidden py-2">
+        {store.slides.length > 0 ? (
+          store.slides.map((slide, index) => (
+            <div key={slide.id} className="flex flex-col items-center gap-1.5 shrink-0">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                {slide.type === "hook"
+                  ? "Hook"
+                  : slide.type === "cta"
+                    ? "CTA"
+                    : `Slide ${index + 1}`}
+              </span>
+              <SlidePreview
+                slide={slide}
+                settings={store.settings}
+                isSelected={store.selectedSlideIndex === index}
+                scale={store.slides.length <= 3 ? 0.75 : store.slides.length <= 5 ? 0.55 : 0.45}
+                onClick={() => store.selectSlide(index)}
+                captionStyle={store.settings.captionStyle}
+                showPill={store.settings.showPill}
+              />
+            </div>
+          ))
+        ) : (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="rounded-2xl border-2 border-dashed border-border p-8 mb-4">
               <RectangleHorizontal className="size-12 text-muted-foreground/30" />

@@ -5,7 +5,9 @@ import { ChevronLeft, ChevronRight, List, Sparkles, Loader2 } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useSlideshowHooks, useGenerateHooks } from "@/hooks/use-slideshow-hooks";
+import { useGenerateSlideCopy } from "@/hooks/use-slide-copy";
 import { useSlideshowEditorStore } from "@/stores/slideshow-editor";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +19,7 @@ export function HookSelector() {
   const store = useSlideshowEditorStore();
   const { data: hooks = [], isLoading } = useSlideshowHooks(store.productId ?? undefined);
   const generateHooks = useGenerateHooks();
+  const generateCopy = useGenerateSlideCopy();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAllHooks, setShowAllHooks] = useState(false);
 
@@ -36,6 +39,30 @@ export function HookSelector() {
   const selectHook = (text: string) => {
     store.applyHookToFirstSlide(text);
     setShowAllHooks(false);
+
+    // Auto-generate body copy for all slides
+    const bodySlideCount = store.slides.filter(
+      (s) => s.type === "body" || s.type === "cta",
+    ).length;
+
+    if (bodySlideCount > 0 && !generateCopy.isPending) {
+      generateCopy.mutate(
+        {
+          hook_text: text,
+          product_id: store.productId ?? undefined,
+          slide_count: bodySlideCount,
+        },
+        {
+          onSuccess: (slides) => {
+            store.applyGeneratedCopy(slides);
+            toast.success("Body copy generated for all slides");
+          },
+          onError: (err) => {
+            toast.error(err.message || "Failed to auto-generate copy");
+          },
+        },
+      );
+    }
   };
 
   const handleGenerate = () => {

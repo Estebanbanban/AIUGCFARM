@@ -58,7 +58,7 @@ export function SlidePreview({
       }}
       onClick={onClick}
     >
-      {/* Background image */}
+      {/* Background image or dark placeholder */}
       {slide.imageUrl ? (
         <img
           src={slide.imageUrl}
@@ -67,8 +67,8 @@ export function SlidePreview({
           draggable={false}
         />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted">
-          <ImageIcon className="size-8 text-muted-foreground/40" />
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-neutral-700 to-neutral-900">
+          <ImageIcon className="size-8 text-white/15" />
         </div>
       )}
 
