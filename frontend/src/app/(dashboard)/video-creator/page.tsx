@@ -646,6 +646,9 @@ export default function VideoCreatorPage() {
               {/* Persona Image */}
               {store.referenceType === "persona" && (
                 <div className="flex flex-col gap-3">
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Sora cannot use human face images as reference. The persona&apos;s appearance will be described via the text prompt instead for visual consistency.
+                  </p>
                   <Label className="text-xs text-muted-foreground">
                     Select Persona
                   </Label>

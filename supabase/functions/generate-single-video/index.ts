@@ -631,28 +631,10 @@ Keep it under 100 words. Return ONLY the prompt text, no JSON, no quotes.`;
           if (!imgRes.ok) throw new Error(`Failed to download composite image: HTTP ${imgRes.status}`);
           inputReferenceBlob = await imgRes.blob();
         } else if (reference_type === "persona") {
-          // Load persona to get selected_image_url (a storage path, not a full URL)
-          if (!gen.persona_id) {
-            throw new Error("No persona_id on generation for persona reference type");
-          }
-          const { data: persona, error: persErr } = await sb
-            .from("personas")
-            .select("selected_image_url")
-            .eq("id", gen.persona_id)
-            .single();
-          if (persErr || !persona?.selected_image_url) {
-            throw new Error("Persona or selected_image_url not found");
-          }
-          // selected_image_url is a storage path like "userId/uuid.jpg" — sign it
-          const { data: personaSignedUrl, error: personaUrlErr } = await sb.storage
-            .from("persona-images")
-            .createSignedUrl(persona.selected_image_url, 7200);
-          if (personaUrlErr || !personaSignedUrl?.signedUrl) {
-            throw new Error(`Failed to sign persona image: ${personaUrlErr?.message}`);
-          }
-          const imgRes = await fetch(personaSignedUrl.signedUrl);
-          if (!imgRes.ok) throw new Error(`Failed to download persona image: HTTP ${imgRes.status}`);
-          inputReferenceBlob = await imgRes.blob();
+          // Sora rejects input images containing human faces (even AI-generated).
+          // Persona appearance is already described in the text prompt via buildSoraVideoPrompt(),
+          // so we skip the image reference and let the prompt handle visual consistency.
+          console.log("Skipping persona image as input_reference — Sora blocks human face images. Using text prompt description instead.");
         } else if (reference_type === "custom") {
           if (!reference_image_path) {
             throw new Error("reference_image_path is required for custom reference type");
