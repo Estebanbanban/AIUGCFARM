@@ -64,8 +64,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ClerkProvider
           signInUrl="/sign-in"
           signUpUrl="/sign-up"
-          signInFallbackRedirectUrl="/dashboard"
-          signUpFallbackRedirectUrl="/dashboard"
+          signInFallbackRedirectUrl="/generate"
+          signUpFallbackRedirectUrl="/generate"
         >
           <NextTopLoader color="hsl(var(--primary))" showSpinner={false} height={3} />
           <Script
