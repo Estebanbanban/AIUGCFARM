@@ -8,29 +8,29 @@ import { VideoGenerationAnimation } from "./VideoGenerationAnimation";
 const steps = [
   {
     number: "01",
-    title: "Paste Your Product URL",
+    title: "Upload Your Product Images",
     description:
-      "Drop any Shopify or store URL. Our AI UGC video generator imports everything - name, images, price, description - in seconds.",
+      "Drop your product photos into a collection. Import from Pinterest, upload from desktop, or scrape directly from your store URL.",
     mediaType: "image" as const,
     mediaSrc:
       "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&w=1200&q=80",
-    mediaAlt: "Online fashion store products",
+    mediaAlt: "Product image collection",
   },
   {
     number: "02",
-    title: "Design Your AI Spokesperson",
+    title: "Pick a Hook & Write Your Copy",
     description:
-      "Configure your virtual brand spokesperson with 9 attributes. Tone, energy, style, age. Saved and reused across every campaign.",
+      "Choose a TikTok or Instagram-style text hook. AI writes scroll-stopping copy for each slide, or write your own. Native fonts, branded look.",
     mediaType: "image" as const,
     mediaSrc:
-      "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=1200&q=80",
-    mediaAlt: "Creator portrait for persona generation",
+      "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=1200&q=80",
+    mediaAlt: "Slideshow hook with text overlay",
   },
   {
     number: "03",
-    title: "Get 27 Unique Video Ads",
+    title: "Export as Video Slideshow",
     description:
-      "AI writes Hook, Body, and CTA scripts. Generate 3 of each type, then mix any combination for 27 ready-to-run TikTok and Meta ad creatives.",
+      "Your slides become a ready-to-post video for TikTok, Reels, and Shorts. Timed transitions, text animations, and music-ready format.",
     mediaType: "animation" as const,
   },
 ];
@@ -43,8 +43,8 @@ export function HowItWorksSection() {
         <FadeInUp className="text-center mb-12">
           <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground mb-3">Process</p>
           <h2 className="text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-tight text-foreground">
-            How Cinerads Generates Your{" "}
-            <span className="font-serif italic text-primary">UGC Video Ads</span>
+            Create Scroll-Stopping{" "}
+            <span className="font-serif italic text-primary">Video Slideshows</span>
           </h2>
         </FadeInUp>
 

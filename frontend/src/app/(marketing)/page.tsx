@@ -1,20 +1,17 @@
 import type { Metadata } from "next";
 import { HeroSection } from "@/components/landing/HeroSection";
-import { VideoCarousel } from "@/components/landing/VideoCarousel";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
-import { FeaturesSection } from "@/components/landing/FeaturesSection";
-import { CombinationCalculatorSection } from "@/components/landing/CombinationCalculatorSection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FaqSection } from "@/components/landing/FaqSection";
 import { FinalCtaSection } from "@/components/landing/FinalCtaSection";
 
 export const metadata: Metadata = {
-  title: "CineRads - AI UGC Video Ads for E-Commerce",
+  title: "CineRads - AI Video Slideshows for E-Commerce",
   description:
-    "Create AI-powered UGC video ads in minutes. Import your products, build AI personas, and generate short-form video ads for TikTok, Reels, and Shorts.",
+    "Turn product photos into scroll-stopping video slideshows. Upload images, pick a hook, let AI write the copy. Export for TikTok, Reels, and Shorts.",
   openGraph: {
-    title: "CineRads - AI UGC Video Ads for E-Commerce",
-    description: "Create AI-powered UGC video ads in minutes.",
+    title: "CineRads - AI Video Slideshows for E-Commerce",
+    description: "Turn product photos into scroll-stopping video slideshows.",
   },
 };
 
@@ -151,10 +148,7 @@ export default function LandingPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
       <HeroSection />
-      <VideoCarousel />
       <HowItWorksSection />
-<CombinationCalculatorSection />
-      <FeaturesSection />
       <PricingSection />
       <FaqSection />
       <FinalCtaSection />
