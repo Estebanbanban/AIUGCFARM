@@ -315,6 +315,29 @@ export default function VideoCreatorPage() {
     }
   }, [canAutoGenerate, generateScript, store]);
 
+  const handleAutoGenerateFreeform = useCallback(async () => {
+    if (!canAutoGenerate) return;
+
+    try {
+      const result = await generateScript.mutateAsync({
+        script_format: "freeform",
+        product_id: store.productId ?? undefined,
+        persona_id: store.personaId ?? undefined,
+        is_saas: store.isSaas,
+        language: store.language,
+      });
+
+      if (result.freeform_prompt) {
+        store.setFreeformPrompt(result.freeform_prompt);
+      }
+      store.setGenerationId(result.generation_id);
+      store.setCreditsToCharge(result.credits_to_charge);
+      toast.success("Prompt generated! Review and edit as needed.");
+    } catch {
+      toast.error("Failed to generate prompt. Please try again.");
+    }
+  }, [canAutoGenerate, generateScript, store]);
+
   // ---- Video generation ----
 
   const handleGenerate = useCallback(async () => {
@@ -431,13 +454,32 @@ export default function VideoCreatorPage() {
                 </TabsList>
 
                 {/* Freeform tab */}
-                <TabsContent value="freeform" className="mt-4">
+                <TabsContent value="freeform" className="mt-4 flex flex-col gap-3">
                   <Textarea
                     placeholder="Describe your video... e.g., 'A person excitedly unboxing a product and showing it to camera'"
                     value={store.freeformPrompt}
                     onChange={(e) => store.setFreeformPrompt(e.target.value)}
                     className="min-h-[140px] resize-y"
                   />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleAutoGenerateFreeform}
+                    disabled={!canAutoGenerate || generateScript.isPending}
+                    className="self-start"
+                  >
+                    {generateScript.isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Wand2 className="size-4" />
+                    )}
+                    Generate with AI
+                  </Button>
+                  {!canAutoGenerate && (
+                    <p className="text-xs text-muted-foreground">
+                      Select a persona or product below to enable AI generation
+                    </p>
+                  )}
                 </TabsContent>
 
                 {/* Structured tab */}

@@ -217,6 +217,7 @@ export interface SingleVideoScriptResponse {
     generation_id: string;
     status: "awaiting_approval";
     script?: { hook: string; body: string; cta: string; full_text: string };
+    freeform_prompt?: string;
     credits_to_charge: number;
   };
 }

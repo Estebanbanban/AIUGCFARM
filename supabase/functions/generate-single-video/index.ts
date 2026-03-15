@@ -371,15 +371,47 @@ Deno.serve(async (req: Request) => {
         }
       } else {
         // Freeform format
-        if (!freeform_prompt || typeof freeform_prompt !== "string" || !freeform_prompt.trim()) {
-          return errorResponse(
-            ErrorCodes.INVALID_INPUT,
-            "freeform_prompt is required for freeform format",
-            400,
-            cors,
+        if (freeform_prompt && typeof freeform_prompt === "string" && freeform_prompt.trim()) {
+          // User-provided freeform prompt
+          freeformPromptValue = freeform_prompt.trim();
+        } else {
+          // Auto-generate a freeform video prompt via OpenRouter
+          const freeformSystemPrompt = `You are a creative video director writing a single prompt for an AI video generator (Sora 2).
+Write one detailed, vivid paragraph describing a UGC-style talking-head video scene.
+Include: the person's energy/emotion, what they're saying (paraphrased, not scripted word-for-word), the setting, lighting, camera movement, and overall mood.
+The output should read like a cinematic scene description, NOT a script.
+Keep it under 100 words. Return ONLY the prompt text, no JSON, no quotes.`;
+
+          const freeformUserParts: string[] = [];
+          if (productData) {
+            const bs = (productData.brand_summary ?? {}) as Record<string, unknown>;
+            freeformUserParts.push(`Product: ${productData.name ?? ""}`);
+            freeformUserParts.push(`Description: ${productData.description ?? ""}`);
+            if (bs.tone) freeformUserParts.push(`Brand tone: ${bs.tone}`);
+            if (bs.selling_points) {
+              const sp = Array.isArray(bs.selling_points) ? (bs.selling_points as string[]).join(", ") : String(bs.selling_points);
+              freeformUserParts.push(`Key selling points: ${sp}`);
+            }
+          }
+          if (personaData) {
+            freeformUserParts.push(`Persona: ${personaData.name ?? "UGC creator"}`);
+          }
+          if (is_saas) freeformUserParts.push("This is a SaaS product — use a screen demo / workspace setting.");
+          if (freeformUserParts.length === 0) {
+            freeformUserParts.push("Create a generic UGC-style product review video scene.");
+          }
+          freeformUserParts.push("\nWrite a single vivid video prompt for this product.");
+
+          const freeformLlmResponse = await callOpenRouter(
+            [
+              { role: "system", content: freeformSystemPrompt },
+              { role: "user", content: freeformUserParts.join("\n") },
+            ],
+            { maxTokens: 200 },
           );
+
+          freeformPromptValue = freeformLlmResponse.trim();
         }
-        freeformPromptValue = freeform_prompt.trim();
       }
 
       // ── Create generation record ─────────────────────────────────
@@ -412,12 +444,29 @@ Deno.serve(async (req: Request) => {
       // Default credit estimate (sora-2)
       const creditsToCharge = CREDIT_COST["sora-2"];
 
+      // Return flat script format for frontend consumption
+      const flatScript = script
+        ? {
+            hook: script.hooks[0]?.text ?? "",
+            body: script.bodies[0]?.text ?? "",
+            cta: script.ctas[0]?.text ?? "",
+            full_text: [
+              script.hooks[0]?.text,
+              script.bodies[0]?.text,
+              script.ctas[0]?.text,
+            ]
+              .filter(Boolean)
+              .join(" "),
+          }
+        : undefined;
+
       return json(
         {
           data: {
             generation_id: generation.id,
             status: "awaiting_approval",
-            script: script,
+            script: flatScript,
+            freeform_prompt: freeformPromptValue,
             credits_to_charge: creditsToCharge,
           },
         },
