@@ -37,20 +37,23 @@ function getOpenAIKey(): string {
  *
  * @param params.prompt - Video generation prompt
  * @param params.model - "sora-2" (standard) or "sora-2-pro" (pro)
- * @param params.seconds - Duration: 16 or 20 seconds
+ * @param params.seconds - Duration: "4", "8", or "12" (string)
  * @param params.size - Resolution e.g. "720x1280" or "1080x1920"
  * @param params.input_reference_blob - Optional image blob for image-to-video
  */
 export async function submitSoraJob(params: {
   prompt: string;
   model?: SoraModel;
-  seconds?: number;
+  seconds?: number | string;
   size?: string;
   input_reference_blob?: Blob;
 }): Promise<SoraSubmitResult> {
   const apiKey = getOpenAIKey();
   const model = params.model ?? "sora-2";
-  const seconds = params.seconds ?? 20;
+  // Sora API accepts "4", "8", or "12" as string values only
+  const validSeconds = ["4", "8", "12"];
+  const rawSeconds = String(params.seconds ?? 12);
+  const seconds = validSeconds.includes(rawSeconds) ? rawSeconds : "12";
   // Default: 9:16 vertical for UGC content
   const size = params.size ?? (model === "sora-2-pro" ? "1080x1920" : "720x1280");
 
@@ -82,7 +85,7 @@ export async function submitSoraJob(params: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ model, prompt: params.prompt, seconds, size }),
+        body: JSON.stringify({ model, prompt: params.prompt, seconds: seconds, size }),
         signal: controller.signal,
       });
     }

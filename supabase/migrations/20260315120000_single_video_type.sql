@@ -26,4 +26,4 @@ ALTER TABLE generations DROP CONSTRAINT IF EXISTS chk_reference_type;
 ALTER TABLE generations ADD CONSTRAINT chk_reference_type CHECK (reference_type IS NULL OR reference_type IN ('composite', 'persona', 'custom', 'none'));
 
 ALTER TABLE generations DROP CONSTRAINT IF EXISTS chk_duration;
-ALTER TABLE generations ADD CONSTRAINT chk_duration CHECK (duration IS NULL OR duration IN (16, 20));
+ALTER TABLE generations ADD CONSTRAINT chk_duration CHECK (duration IS NULL OR duration IN (4, 8, 12));

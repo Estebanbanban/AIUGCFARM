@@ -823,15 +823,16 @@ export default function VideoCreatorPage() {
                   <Select
                     value={String(store.duration)}
                     onValueChange={(v) =>
-                      store.setDuration(Number(v) as 16 | 20)
+                      store.setDuration(Number(v) as 4 | 8 | 12)
                     }
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="16">16 seconds</SelectItem>
-                      <SelectItem value="20">20 seconds</SelectItem>
+                      <SelectItem value="4">4 seconds</SelectItem>
+                      <SelectItem value="8">8 seconds</SelectItem>
+                      <SelectItem value="12">12 seconds</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

@@ -99,7 +99,7 @@ function GeneratingScreen({
 
   const modelLabel =
     soraModel === "sora-2-pro" ? "Sora 2 Pro" : "Sora 2 Standard";
-  const durationLabel = duration ? `${duration}s` : "20s";
+  const durationLabel = duration ? `${duration}s` : "12s";
 
   return (
     <div className="mx-auto max-w-2xl py-8">
@@ -184,7 +184,7 @@ function CompletedScreen({
 
   const modelLabel =
     soraModel === "sora-2-pro" ? "Sora 2 Pro" : "Sora 2 Standard";
-  const durationLabel = duration ? `${duration}s` : "20s";
+  const durationLabel = duration ? `${duration}s` : "12s";
   const refLabel =
     referenceType === "composite"
       ? "Composite"

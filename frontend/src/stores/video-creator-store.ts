@@ -23,7 +23,7 @@ interface VideoCreatorState {
   isSaas: boolean;
   // Video settings
   soraModel: SoraModel;
-  duration: 16 | 20;
+  duration: 4 | 8 | 12;
   // Reference image
   referenceType: ReferenceType;
   customReferenceImagePath: string | null;
@@ -43,7 +43,7 @@ interface VideoCreatorState {
   setPersonaId: (id: string | null) => void;
   setIsSaas: (enabled: boolean) => void;
   setSoraModel: (model: SoraModel) => void;
-  setDuration: (duration: 16 | 20) => void;
+  setDuration: (duration: 4 | 8 | 12) => void;
   setReferenceType: (type: ReferenceType) => void;
   setCustomReferenceImagePath: (path: string | null) => void;
   setCustomReferencePreviewUrl: (url: string | null) => void;
@@ -61,7 +61,7 @@ const initialState = {
   personaId: null,
   isSaas: false,
   soraModel: "sora-2" as SoraModel,
-  duration: 20 as 16 | 20,
+  duration: 12 as 4 | 8 | 12,
   referenceType: "none" as ReferenceType,
   customReferenceImagePath: null,
   customReferencePreviewUrl: null,

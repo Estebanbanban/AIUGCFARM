@@ -497,9 +497,9 @@ Keep it under 100 words. Return ONLY the prompt text, no JSON, no quotes.`;
         return errorResponse(ErrorCodes.INVALID_INPUT, "sora_model must be 'sora-2' or 'sora-2-pro'", 400, cors);
       }
 
-      const validDurations = [16, 20];
+      const validDurations = [4, 8, 12];
       if (!duration || !validDurations.includes(duration)) {
-        return errorResponse(ErrorCodes.INVALID_INPUT, "duration must be 16 or 20", 400, cors);
+        return errorResponse(ErrorCodes.INVALID_INPUT, "duration must be 4, 8, or 12", 400, cors);
       }
 
       const validRefTypes = ["composite", "persona", "custom", "none"];
