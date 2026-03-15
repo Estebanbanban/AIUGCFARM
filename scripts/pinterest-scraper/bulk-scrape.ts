@@ -95,7 +95,10 @@ for (const [niche, queries] of Object.entries(nichesToScrape)) {
           stdio: ["inherit", "inherit", "inherit"],
         }
       );
-      await proc.exited;
+      const exitCode = await proc.exited;
+      if (exitCode !== 0) {
+        console.log(`  [WARN] Scrape exited with code ${exitCode}`);
+      }
     } catch (err) {
       console.error(`  [FAIL] query: ${query}`);
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSlideshowEditorStore } from "@/stores/slideshow-editor";
@@ -10,6 +10,27 @@ import { createRoot } from "react-dom/client";
 import { toPng } from "html-to-image";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
+
+/** Wait for all images inside an element to finish loading */
+async function waitForImages(el: HTMLElement, timeoutMs = 5000): Promise<void> {
+  const images = el.querySelectorAll("img");
+  if (images.length === 0) return;
+
+  await Promise.race([
+    Promise.all(
+      Array.from(images).map(
+        (img) =>
+          img.complete
+            ? Promise.resolve()
+            : new Promise<void>((resolve) => {
+                img.onload = () => resolve();
+                img.onerror = () => resolve(); // Don't block on broken images
+              }),
+      ),
+    ),
+    new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+  ]);
+}
 
 export function ExportButton() {
   const store = useSlideshowEditorStore();
@@ -29,8 +50,6 @@ export function ExportButton() {
 
       for (let i = 0; i < store.slides.length; i++) {
         const slide = store.slides[i];
-
-        // Create a hidden container for rendering at full resolution
         const container = document.createElement("div");
         container.style.position = "fixed";
         container.style.left = "-9999px";
@@ -40,47 +59,48 @@ export function ExportButton() {
         container.style.overflow = "hidden";
         document.body.appendChild(container);
 
-        // Render the slide at full scale (1080x1920)
-        const root = createRoot(container);
-        await new Promise<void>((resolve) => {
-          root.render(
-            <SlidePreview
-              slide={slide}
-              settings={store.settings}
-              scale={4} // 270 * 4 = 1080px
-              captionStyle={store.settings.captionStyle}
-              showPill={store.settings.showPill}
-            />,
-          );
-          // Wait for render + image load
-          setTimeout(resolve, 500);
-        });
+        let root: ReturnType<typeof createRoot> | null = null;
 
-        // Capture as PNG
-        const slideEl = container.firstElementChild as HTMLElement;
-        if (slideEl) {
-          const dataUrl = await toPng(slideEl, {
-            width: 1080,
-            height: 1920,
-            pixelRatio: 1,
+        try {
+          root = createRoot(container);
+          await new Promise<void>((resolve) => {
+            root!.render(
+              <SlidePreview
+                slide={slide}
+                settings={store.settings}
+                scale={4}
+                captionStyle={store.settings.captionStyle}
+                showPill={store.settings.showPill}
+              />,
+            );
+            // Give React a frame to paint
+            requestAnimationFrame(() => setTimeout(resolve, 100));
           });
 
-          // Convert data URL to blob
-          const response = await fetch(dataUrl);
-          const blob = await response.blob();
+          // Wait for images to load (up to 5s)
+          await waitForImages(container);
 
-          const label =
-            slide.type === "hook" ? "hook" :
-            slide.type === "cta" ? "cta" :
-            `slide_${i}`;
-          zip.file(`${label}.png`, blob);
+          const slideEl = container.firstElementChild as HTMLElement;
+          if (slideEl) {
+            const dataUrl = await toPng(slideEl, {
+              width: 1080,
+              height: 1920,
+              pixelRatio: 1,
+            });
+
+            const response = await fetch(dataUrl);
+            const blob = await response.blob();
+
+            // Unique filename: slide_0_hook.png, slide_1_body.png, etc.
+            zip.file(`slide_${i}_${slide.type}.png`, blob);
+          }
+        } finally {
+          // Always clean up, even if rendering/capture fails
+          if (root) root.unmount();
+          if (container.parentNode) document.body.removeChild(container);
         }
-
-        root.unmount();
-        document.body.removeChild(container);
       }
 
-      // Generate and download the zip
       const zipBlob = await zip.generateAsync({ type: "blob" });
       const filename = `${store.name || "slideshow"}-slides.zip`.replace(/[^a-zA-Z0-9_\-\.]/g, "_");
       saveAs(zipBlob, filename);

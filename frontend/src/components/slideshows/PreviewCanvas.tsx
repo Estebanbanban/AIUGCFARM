@@ -31,7 +31,7 @@ export function PreviewCanvas() {
                     ? "Hook"
                     : slide.type === "cta"
                       ? "CTA"
-                      : `${index}`}
+                      : `${index + 1}`}
                 </span>
                 <SlidePreview
                   slide={slide}
