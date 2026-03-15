@@ -54,9 +54,21 @@ async function getCompositeSignedUrl(
 ): Promise<string | null> {
   if (storagePath.startsWith("http")) return storagePath;
 
+  // Handle legacy pose-variant JSON paths: {"hook":"...","body":"...","cta":"..."}
+  // Extract just the hook path as the representative composite image.
+  let resolvedPath = storagePath;
+  if (storagePath.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(storagePath) as Record<string, unknown>;
+      resolvedPath = (parsed.hook ?? parsed.body ?? parsed.cta) as string;
+    } catch {
+      // Not valid JSON — use as-is
+    }
+  }
+
   const { data, error } = await sb.storage
     .from("composite-images")
-    .createSignedUrl(storagePath, 3600);
+    .createSignedUrl(resolvedPath, 3600);
 
   if (error || !data?.signedUrl) {
     console.error("Failed to sign composite image URL:", error?.message);
