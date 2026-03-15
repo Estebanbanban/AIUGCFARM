@@ -4,17 +4,6 @@ import { cn } from "@/lib/utils";
 import type { Slide, SlideshowSettings } from "@/types/slideshow";
 import { ImageIcon } from "lucide-react";
 
-/**
- * TikTok/Instagram caption font mapping.
- *
- * TikTok's native caption font is "TikTok Display" (proprietary).
- * Closest free alternatives ranked by similarity:
- * 1. Plus Jakarta Sans — geometric, rounded, very close to TikTok Display
- * 2. DM Sans — clean geometric sans-serif, Instagram-like
- * 3. Inter — fallback, clean but less character
- *
- * The font CSS variables are loaded in layout.tsx via next/font/google.
- */
 const CAPTION_FONTS: Record<string, string> = {
   "tiktok": "var(--font-tiktok), 'TikTok Sans', sans-serif",
   "instagram": "var(--font-dm-sans), 'DM Sans', sans-serif",
@@ -28,7 +17,7 @@ interface SlidePreviewProps {
   scale?: number;
   onClick?: () => void;
   captionStyle?: "tiktok" | "instagram" | "inter";
-  showPill?: boolean; // Toggle white pill/badge on body slides
+  showPill?: boolean;
 }
 
 export function SlidePreview({
@@ -117,21 +106,19 @@ function HookTextOverlay({
   captionStyle: string;
 }) {
   if (!text) return null;
-  const fontSize = Math.round(28 * scale);
+  // Reference: ~36px at 1080w full res. At 270px preview = 270/1080 * 36 = 9px base, then * scale
+  const fontSize = Math.round(20 * scale);
   const letterSpacing = captionStyle === "tiktok" ? "-0.02em" : "0em";
 
   return (
-    <div className="absolute inset-0 flex items-start justify-center px-[8%] pt-[15%]">
+    <div className="absolute inset-0 flex items-start justify-center px-[6%] pt-[18%]">
       <p
-        className="text-white text-center font-extrabold leading-[1.15] lowercase"
+        className="text-white text-center font-extrabold leading-[1.2] lowercase"
         style={{
           fontFamily,
           fontSize: `${fontSize}px`,
           letterSpacing,
-          textShadow:
-            captionStyle === "instagram"
-              ? "0 1px 3px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.25)"
-              : "0 2px 8px rgba(0,0,0,0.6), 0 0px 2px rgba(0,0,0,0.3)",
+          textShadow: "0 2px 12px rgba(0,0,0,0.7), 0 0px 4px rgba(0,0,0,0.4)",
           WebkitFontSmoothing: "antialiased",
         }}
       >
@@ -162,77 +149,63 @@ function BodyTextOverlay({
 
   if (!title && !subtitle && !action) return null;
 
-  const titleSize = Math.round(15 * scale);
-  const bodySize = Math.round(14 * scale);
-  const gap = Math.round(20 * scale);
+  const titleSize = Math.round(14 * scale);
+  const bodySize = Math.round(12 * scale);
+  const gap = Math.round(16 * scale);
   const letterSpacing = captionStyle === "tiktok" ? "-0.01em" : "0em";
 
-  // Pill/badge style settings per caption style
-  const pillStyles: Record<string, React.CSSProperties> = {
-    tiktok: {
-      background: "white",
-      borderRadius: `${Math.round(20 * scale)}px`,
-      padding: `${Math.round(4 * scale)}px ${Math.round(14 * scale)}px`,
-      boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-    },
-    instagram: {
-      background: "rgba(255,255,255,0.95)",
-      borderRadius: `${Math.round(12 * scale)}px`,
-      padding: `${Math.round(5 * scale)}px ${Math.round(16 * scale)}px`,
-      boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
-    },
-    inter: {
-      background: "white",
-      borderRadius: `${Math.round(10 * scale)}px`,
-      padding: `${Math.round(4 * scale)}px ${Math.round(12 * scale)}px`,
-      boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
-    },
-  };
+  const subtitleShadow = "0 2px 10px rgba(0,0,0,0.8), 0 0px 3px rgba(0,0,0,0.5)";
 
-  const subtitleShadow =
-    captionStyle === "instagram"
-      ? "0 1px 4px rgba(0,0,0,0.5), 0 2px 10px rgba(0,0,0,0.3)"
-      : "0 1px 6px rgba(0,0,0,0.8), 0 0px 2px rgba(0,0,0,0.4)";
+  // Inline pill — wraps tightly around text, not a full-width box
+  const pillRadius = Math.round(999); // fully rounded
+  const pillPadX = Math.round(10 * scale);
+  const pillPadY = Math.round(3 * scale);
 
   return (
     <div
-      className="absolute inset-0 flex flex-col items-center px-[7%] pt-[12%]"
+      className="absolute inset-0 flex flex-col items-center px-[5%] pt-[18%]"
       style={{ gap: `${gap}px`, fontFamily }}
     >
-      {/* Title — either white pill/badge or plain white text */}
+      {/* Title — inline pill or plain text */}
       {title && (
-        showPill ? (
-          <div className="max-w-[85%]" style={pillStyles[captionStyle] || pillStyles.tiktok}>
-            <p
-              className="text-black text-center font-bold leading-snug lowercase"
+        <div className="text-center max-w-[90%]">
+          {showPill ? (
+            <span
+              className="text-black font-bold leading-snug lowercase inline"
               style={{
                 fontSize: `${titleSize}px`,
                 letterSpacing,
+                background: "white",
+                borderRadius: `${pillRadius}px`,
+                padding: `${pillPadY}px ${pillPadX}px`,
+                boxDecorationBreak: "clone",
+                WebkitBoxDecorationBreak: "clone",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                WebkitFontSmoothing: "antialiased",
+              }}
+            >
+              {title}
+            </span>
+          ) : (
+            <p
+              className="text-white font-bold leading-snug lowercase"
+              style={{
+                fontSize: `${titleSize}px`,
+                letterSpacing,
+                textShadow: subtitleShadow,
                 WebkitFontSmoothing: "antialiased",
               }}
             >
               {title}
             </p>
-          </div>
-        ) : (
-          <p
-            className="text-white text-center font-bold leading-snug lowercase max-w-[85%]"
-            style={{
-              fontSize: `${titleSize}px`,
-              letterSpacing,
-              textShadow: subtitleShadow,
-              WebkitFontSmoothing: "antialiased",
-            }}
-          >
-            {title}
-          </p>
-        )
+          )}
+        </div>
       )}
 
       {/* Subtitle — context/complaint */}
       {subtitle && (
         <p
-          className="text-white text-center font-semibold leading-snug lowercase max-w-[80%]"
+          className="text-white text-center font-semibold leading-snug lowercase max-w-[85%]"
           style={{
             fontSize: `${bodySize}px`,
             letterSpacing,
@@ -247,7 +220,7 @@ function BodyTextOverlay({
       {/* Action line */}
       {action && (
         <p
-          className="text-white text-center font-semibold leading-snug lowercase max-w-[80%]"
+          className="text-white text-center font-semibold leading-snug lowercase max-w-[85%]"
           style={{
             fontSize: `${bodySize}px`,
             letterSpacing,
