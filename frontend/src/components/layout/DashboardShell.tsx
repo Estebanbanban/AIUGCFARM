@@ -232,6 +232,19 @@ export function DashboardShell({ children, className }: { children: React.ReactN
       </Sheet>
 
       <div className="flex flex-1 flex-col overflow-hidden bg-background-secondary">
+        {/* Mobile hamburger — always visible on slideshow routes where full header is hidden */}
+        {pathname.startsWith("/slideshows") && (
+          <div className="flex lg:hidden h-12 shrink-0 items-center px-4 border-b border-border bg-background/75">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMobileOpen(true)}
+            >
+              <Menu className="size-5" />
+              <span className="sr-only">Open menu</span>
+            </Button>
+          </div>
+        )}
         {!pathname.startsWith("/slideshows") && (
           <header
             className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between border-b border-border bg-background/75 px-4 backdrop-blur-xl md:px-6"

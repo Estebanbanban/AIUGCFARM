@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSlideshows, useCreateSlideshow } from "@/hooks/use-slideshows";
 import { ExportedSlideshowCard } from "./ExportedSlideshowCard";
+import { SlideshowCard } from "./SlideshowCard";
 import type { Slide } from "@/types/slideshow";
 
 export function SlideshowGallery({ currentSlideshowId }: { currentSlideshowId?: string }) {
@@ -57,17 +58,29 @@ export function SlideshowGallery({ currentSlideshowId }: { currentSlideshowId?: 
       {/* Unified grid */}
       {allSlideshows.length > 0 ? (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-          {allSlideshows.map((slideshow) => (
-            <ExportedSlideshowCard
-              key={slideshow.id}
-              slideshow={slideshow}
-              onClick={() => {
-                if (slideshow.id !== currentSlideshowId) {
-                  router.push(`/slideshows/${slideshow.id}`);
-                }
-              }}
-            />
-          ))}
+          {allSlideshows.map((slideshow) =>
+            slideshow.exported_at ? (
+              <ExportedSlideshowCard
+                key={slideshow.id}
+                slideshow={slideshow}
+                onClick={() => {
+                  if (slideshow.id !== currentSlideshowId) {
+                    router.push(`/slideshows/${slideshow.id}`);
+                  }
+                }}
+              />
+            ) : (
+              <SlideshowCard
+                key={slideshow.id}
+                slideshow={slideshow}
+                onEdit={() => {
+                  if (slideshow.id !== currentSlideshowId) {
+                    router.push(`/slideshows/${slideshow.id}`);
+                  }
+                }}
+              />
+            )
+          )}
 
           {/* Plus button to create new */}
           <button

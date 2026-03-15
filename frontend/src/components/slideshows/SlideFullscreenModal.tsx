@@ -28,21 +28,22 @@ export function SlideFullscreenModal({ open, onOpenChange }: SlideFullscreenModa
     if (!isLast) store.selectSlide(store.selectedSlideIndex + 1);
   }
 
-  // Keyboard navigation
+  // Keyboard navigation — read store directly to avoid stale closures
   useEffect(() => {
     if (!open) return;
     function handleKey(e: KeyboardEvent) {
-      // Don't navigate when typing in an input/textarea
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
 
       if (e.key === "Escape") onOpenChange(false);
-      if (e.key === "ArrowLeft") handlePrev();
-      if (e.key === "ArrowRight") handleNext();
+      if (e.key === "ArrowLeft" && store.selectedSlideIndex > 0)
+        store.selectSlide(store.selectedSlideIndex - 1);
+      if (e.key === "ArrowRight" && store.selectedSlideIndex < store.slides.length - 1)
+        store.selectSlide(store.selectedSlideIndex + 1);
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [open, store.selectedSlideIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, store.selectedSlideIndex, store.slides.length, onOpenChange, store]);
 
   if (!open || !slide) return null;
 
