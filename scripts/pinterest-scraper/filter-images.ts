@@ -6,13 +6,15 @@
  * - REJECT: Infographic, graphic design, slideshow, illustration, stock photo, product shot,
  *           collage, text-heavy image, screenshot, meme, or overly polished/staged photo
  *
+ * Saves classification data (verdict, AI description, timestamp) into _metadata.json.
+ *
  * Usage:
- *   ANTHROPIC_API_KEY=sk-... bun run filter-images.ts [category]
- *   ANTHROPIC_API_KEY=sk-... bun run filter-images.ts education
- *   ANTHROPIC_API_KEY=sk-... bun run filter-images.ts          # all categories
+ *   OPENROUTER_API_KEY=sk-... bun run filter-images.ts [category]
+ *   OPENROUTER_API_KEY=sk-... bun run filter-images.ts education
+ *   OPENROUTER_API_KEY=sk-... bun run filter-images.ts          # all categories
  */
 
-import { readdir, readFile, unlink, rename, mkdir } from "fs/promises";
+import { readdir, readFile, writeFile, unlink, rename, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import { join, extname } from "path";
 
@@ -22,6 +24,11 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 if (!OPENROUTER_API_KEY) {
   console.error("Set OPENROUTER_API_KEY env var");
   process.exit(1);
+}
+
+interface ClassificationResult {
+  verdict: "KEEP" | "REJECT";
+  description: string;
 }
 
 const SYSTEM_PROMPT = `You classify images for TikTok/Instagram carousel slideshows. These slideshows use REAL, phone-taken, candid photos as backgrounds — the kind of photos a 22-year-old would take on their iPhone and post to their story.
@@ -49,9 +56,9 @@ REJECT if ANY of these are true:
 
 When in doubt, REJECT. We want only the most authentic phone-taken photos.
 
-Reply with ONLY one word: KEEP or REJECT`;
+Reply with ONLY valid JSON (no markdown, no code fences): {"verdict":"KEEP","description":"a cozy desk with laptop and coffee, dark moody lighting"} or {"verdict":"REJECT","description":"professional studio product shot on white background"}`;
 
-async function classifyImage(imagePath: string): Promise<"KEEP" | "REJECT"> {
+async function classifyImage(imagePath: string): Promise<ClassificationResult> {
   const buffer = await readFile(imagePath);
   const base64 = buffer.toString("base64");
   const ext = extname(imagePath).slice(1).toLowerCase();
@@ -66,7 +73,7 @@ async function classifyImage(imagePath: string): Promise<"KEEP" | "REJECT"> {
     },
     body: JSON.stringify({
       model: "openrouter/healer-alpha",
-      max_tokens: 5,
+      max_tokens: 100,
       temperature: 0,
       messages: [
         {
@@ -78,7 +85,7 @@ async function classifyImage(imagePath: string): Promise<"KEEP" | "REJECT"> {
             },
             {
               type: "text",
-              text: `${SYSTEM_PROMPT}\n\nClassify this image. Reply with ONLY one word: KEEP or REJECT.`,
+              text: `${SYSTEM_PROMPT}\n\nClassify this image. Reply with ONLY valid JSON.`,
             },
           ],
         },
@@ -89,15 +96,26 @@ async function classifyImage(imagePath: string): Promise<"KEEP" | "REJECT"> {
   if (!response.ok) {
     const err = await response.text();
     console.error(`  API error: ${response.status} ${err.slice(0, 200)}`);
-    return "KEEP"; // Don't delete on API errors
+    return { verdict: "KEEP", description: "" }; // Don't delete on API errors
   }
 
   const body = await response.json();
-  const text = body?.choices?.[0]?.message?.content?.trim().toUpperCase() ?? "";
-  return text.includes("REJECT") ? "REJECT" : "KEEP";
+  const text = body?.choices?.[0]?.message?.content?.trim() ?? "";
+
+  // Try to parse JSON response
+  try {
+    const parsed = JSON.parse(text);
+    const verdict = String(parsed.verdict).toUpperCase().includes("REJECT") ? "REJECT" : "KEEP";
+    const description = String(parsed.description || "").slice(0, 200);
+    return { verdict: verdict as "KEEP" | "REJECT", description };
+  } catch {
+    // Fallback: parse as plain text
+    const verdict = text.toUpperCase().includes("REJECT") ? "REJECT" : "KEEP";
+    return { verdict: verdict as "KEEP" | "REJECT", description: "" };
+  }
 }
 
-async function classifyWithRetry(imagePath: string, retries = 2): Promise<"KEEP" | "REJECT"> {
+async function classifyWithRetry(imagePath: string, retries = 2): Promise<ClassificationResult> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       return await classifyImage(imagePath);
@@ -107,11 +125,11 @@ async function classifyWithRetry(imagePath: string, retries = 2): Promise<"KEEP"
         await new Promise((r) => setTimeout(r, 3000));
       } else {
         console.error(`  Failed after ${retries + 1} attempts, keeping image`);
-        return "KEEP";
+        return { verdict: "KEEP", description: "" };
       }
     }
   }
-  return "KEEP";
+  return { verdict: "KEEP", description: "" };
 }
 
 // --- CLI ---
@@ -151,6 +169,16 @@ for (const category of categories) {
     await mkdir(rejectedDir, { recursive: true });
   }
 
+  // Load existing _metadata.json
+  const metadataPath = join(categoryPath, "_metadata.json");
+  let metadata: any = {};
+  try {
+    const raw = await readFile(metadataPath, "utf-8");
+    metadata = JSON.parse(raw);
+  } catch {
+    // No metadata file yet — that's fine
+  }
+
   const files = (await readdir(categoryPath)).filter((f) =>
     [".jpg", ".jpeg", ".png", ".webp"].includes(extname(f).toLowerCase())
   );
@@ -164,13 +192,23 @@ for (const category of categories) {
     const file = files[i];
     const filePath = join(categoryPath, file);
 
-    const verdict = await classifyWithRetry(filePath);
+    const result = await classifyWithRetry(filePath);
 
-    if (verdict === "REJECT") {
+    // Update _metadata.json pin entry with classification data
+    if (metadata.pins && Array.isArray(metadata.pins)) {
+      const pinEntry = metadata.pins.find((p: any) => p.filename === file);
+      if (pinEntry) {
+        pinEntry.verdict = result.verdict;
+        pinEntry.description_ai = result.description;
+        pinEntry.filtered_at = new Date().toISOString();
+      }
+    }
+
+    if (result.verdict === "REJECT") {
       // Move to _rejected folder instead of deleting
       await rename(filePath, join(rejectedDir, file));
       rejected++;
-      console.log(`  [REJECT] ${file} (${i + 1}/${files.length})`);
+      console.log(`  [REJECT] ${file} — ${result.description || "no desc"} (${i + 1}/${files.length})`);
     } else {
       kept++;
       if ((i + 1) % 20 === 0) {
@@ -182,6 +220,12 @@ for (const category of categories) {
     await new Promise((r) => setTimeout(r, 500));
   }
 
+  // Save updated _metadata.json after processing each category
+  if (metadata.pins) {
+    await writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+    console.log(`  Metadata updated: ${metadataPath}`);
+  }
+
   totalKept += kept;
   totalRejected += rejected;
   console.log(`  Result: ${kept} kept, ${rejected} rejected`);
@@ -189,3 +233,4 @@ for (const category of categories) {
 
 console.log(`\n\nDone! Total: ${totalKept} kept, ${totalRejected} rejected`);
 console.log("Rejected images moved to _rejected/ folders (not deleted).");
+console.log("Classification data (verdict, description_ai, filtered_at) saved to _metadata.json files.");

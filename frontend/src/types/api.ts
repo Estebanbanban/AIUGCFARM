@@ -158,6 +158,7 @@ export interface GenerationHistoryItem {
   product_id: string;
   persona_id: string;
   mode: string;
+  type?: string;
   video_quality: Generation["video_quality"];
   kling_model?: Generation["kling_model"];
   status: GenerationStatus;

@@ -45,23 +45,32 @@ export function EditorControlPanel() {
     const productText = (selectedProduct?.name ?? "").toLowerCase() + " " + (selectedProduct?.description ?? "").toLowerCase();
 
     const nicheKeywords: Record<string, string[]> = {
-      education: ["education", "study", "university", "student", "learn", "course", "tutor", "interview", "case", "mba", "consulting", "mckinsey", "bain", "bcg"],
-      business: ["business", "startup", "entrepreneur", "saas", "company", "agency", "freelance"],
-      coaching: ["coach", "mentor", "self-help", "personal development", "therapy", "mindset"],
-      fitness: ["fitness", "gym", "workout", "health", "nutrition", "yoga", "run"],
-      ecommerce: ["ecommerce", "shop", "store", "product", "dropship", "amazon", "shopify"],
-      tech: ["tech", "code", "software", "developer", "programming", "app", "ai", "saas"],
-      lifestyle: ["lifestyle", "travel", "morning", "routine", "aesthetic"],
+      education: ["education", "study", "university", "student", "learn", "course", "tutor", "interview", "case", "mba", "consulting", "mckinsey", "bain", "bcg", "college", "academic"],
+      tech: ["tech", "code", "software", "developer", "programming", "app", "ai", "saas", "productivity", "automation"],
+      fitness_women: ["fitness women", "pilates", "yoga women", "running women", "wellness women"],
+      fitness_gym: ["fitness", "gym", "workout", "muscle", "bodybuilding", "protein", "crossfit"],
+      skincare: ["skincare", "beauty", "skin", "cosmetic", "routine", "derma", "glow", "serum"],
+      luxury: ["luxury", "premium", "high-end", "designer", "wealthy", "rich", "exclusive"],
+      business: ["business", "startup", "entrepreneur", "saas", "company", "agency", "freelance", "founder"],
+      coaching: ["coach", "mentor", "self-help", "personal development", "therapy", "mindset", "growth"],
+      ecommerce: ["ecommerce", "shop", "store", "product", "dropship", "amazon", "shopify", "retail"],
+      lifestyle: ["lifestyle", "travel", "morning", "routine", "aesthetic", "daily"],
+      food: ["food", "restaurant", "recipe", "cooking", "chef", "meal", "nutrition", "diet"],
+      travel: ["travel", "hotel", "flight", "vacation", "trip", "adventure", "explore", "tourism"],
+      finance: ["finance", "investing", "money", "budget", "trading", "crypto", "wealth", "savings"],
     };
 
+    let bestScore = 0;
     let bestCollection = collections[0];
     if (productText.trim()) {
       for (const coll of collections) {
         const collName = coll.name.toLowerCase();
         for (const [niche, keywords] of Object.entries(nicheKeywords)) {
-          if (collName.includes(niche) && keywords.some((kw) => productText.includes(kw))) {
+          if (!collName.includes(niche.replace("_", " ")) && !collName.includes(niche.split("_")[0])) continue;
+          const score = keywords.filter((kw) => productText.includes(kw)).length;
+          if (score > bestScore) {
+            bestScore = score;
             bestCollection = coll;
-            break;
           }
         }
       }

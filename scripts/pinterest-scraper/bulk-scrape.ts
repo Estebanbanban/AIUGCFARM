@@ -3,54 +3,109 @@ import { join } from "path";
 // UGC-style queries — targeting phone-taken, candid, TikTok/Instagram slideshow backgrounds
 // Key modifiers: "iphone", "pov", "faceless", "that girl", "dark academia", "tiktok", "real"
 const NICHES: Record<string, string[]> = {
+  // Education
   education: [
-    "pov studying at night dark academia iphone",
-    "messy desk studying tiktok faceless iphone photo",
-    "that girl study session coffee laptop iphone candid",
-    "dark academia library studying aesthetic tiktok",
-    "faceless study desk notes coffee real iphone pov",
+    "university aesthetic study desk iphone candid",
+    "dark academia library studying real iphone",
+    "that girl study session notes coffee iphone faceless",
+    "pov studying late night desk lamp iphone",
+    "college student dorm room study aesthetic iphone",
   ],
-  business: [
-    "pov working laptop coffee shop iphone candid faceless",
-    "faceless typing laptop desk real iphone photo",
-    "that girl work from home aesthetic tiktok iphone",
-    "pov hands laptop morning coffee work iphone",
-    "messy desk working late night laptop iphone faceless",
-  ],
-  coaching: [
-    "pov journaling morning coffee iphone candid real",
-    "that girl self care morning routine iphone aesthetic",
-    "faceless journal planning desk coffee iphone pov",
-    "pov reading self help book coffee cozy iphone",
-    "dark feminine journal candle desk aesthetic iphone faceless",
-  ],
-  fitness: [
-    "pov gym mirror selfie aesthetic iphone real",
-    "faceless gym workout tiktok aesthetic iphone",
-    "that girl healthy meal prep real iphone photo",
-    "pov running morning sunrise iphone candid real",
-    "faceless yoga mat morning routine iphone aesthetic",
-  ],
-  ecommerce: [
-    "pov unboxing haul iphone candid real hands",
-    "faceless hands holding product iphone real aesthetic",
-    "that girl shopping haul aesthetic tiktok iphone",
-    "pov desk flat lay items real iphone photo candid",
-    "faceless packaging small business iphone real aesthetic",
-  ],
+  // Tech / Productivity
   tech: [
-    "pov coding at night dark desk iphone real faceless",
-    "faceless programmer laptop dual screen iphone dark aesthetic",
-    "messy desk developer late night iphone real candid",
-    "pov hands typing code laptop dark iphone",
-    "that girl tech setup aesthetic iphone faceless desk",
+    "productivity aesthetic desk setup iphone",
+    "pov coding dark room dual monitor iphone real",
+    "programmer desk night aesthetic iphone faceless",
+    "macbook coffee shop working aesthetic iphone candid",
+    "tech setup desk dark aesthetic real iphone",
   ],
+  // Fitness - Women
+  fitness_women: [
+    "sports aesthetic girl workout iphone candid",
+    "that girl gym aesthetic iphone faceless real",
+    "pilates yoga aesthetic girl iphone candid",
+    "running girl morning aesthetic iphone real candid",
+    "healthy meal prep aesthetic girl iphone real",
+  ],
+  // Fitness - Men / Gym
+  fitness_gym: [
+    "gym men aesthetic workout iphone real candid",
+    "working out aesthetic gym dark iphone faceless",
+    "pov gym mirror selfie men aesthetic iphone",
+    "fitness lifestyle men aesthetic iphone candid real",
+    "protein shake gym bag aesthetic iphone real",
+  ],
+  // Skincare / Beauty
+  skincare: [
+    "skincare aesthetic iphone candid real routine",
+    "skincare aesthetic girl morning routine iphone",
+    "pov skincare products bathroom aesthetic iphone",
+    "that girl skincare night routine iphone faceless",
+    "clean girl aesthetic skincare iphone real candid",
+  ],
+  // Luxury / Rich lifestyle
+  luxury: [
+    "lifestyle luxury aesthetic iphone real candid",
+    "rich aesthetic apartment morning coffee iphone",
+    "luxury car interior aesthetic iphone pov",
+    "designer desk setup aesthetic iphone real",
+    "that girl luxury lifestyle aesthetic iphone candid",
+  ],
+  // Business / Entrepreneur
+  business: [
+    "entrepreneur desk laptop coffee iphone candid real",
+    "small business owner packing orders iphone aesthetic",
+    "pov working from home laptop iphone faceless",
+    "startup office desk aesthetic iphone real candid",
+    "freelancer coffee shop working iphone candid real",
+  ],
+  // Coaching / Self-improvement
+  coaching: [
+    "journaling morning routine coffee iphone candid",
+    "self improvement books desk aesthetic iphone real",
+    "pov planning week journal coffee iphone faceless",
+    "vision board desk aesthetic iphone real candid",
+    "that girl morning routine self care iphone aesthetic",
+  ],
+  // Ecommerce / Products
+  ecommerce: [
+    "pov unboxing haul iphone real hands candid",
+    "flat lay desk items aesthetic iphone real",
+    "small business packaging aesthetic iphone candid",
+    "product photography iphone real aesthetic hands",
+    "online shopping aesthetic laptop iphone pov candid",
+  ],
+  // Lifestyle / General
   lifestyle: [
-    "pov morning coffee routine iphone candid real faceless",
-    "that girl apartment aesthetic tiktok iphone real",
-    "faceless cozy night in bed iphone candid aesthetic",
-    "pov cooking dinner aesthetic iphone real candid",
-    "faceless walking city sunset iphone real aesthetic tiktok",
+    "pov morning coffee routine aesthetic iphone candid",
+    "cozy apartment evening aesthetic iphone real",
+    "that girl daily routine aesthetic iphone faceless",
+    "cooking dinner aesthetic kitchen iphone real candid",
+    "walking city sunset aesthetic iphone pov real",
+  ],
+  // Food / Restaurant
+  food: [
+    "aesthetic food photography iphone real candid",
+    "brunch aesthetic coffee restaurant iphone pov",
+    "cooking aesthetic kitchen real iphone candid",
+    "healthy food prep aesthetic iphone real",
+    "coffee shop aesthetic latte art iphone candid",
+  ],
+  // Travel
+  travel: [
+    "travel aesthetic airport iphone candid real",
+    "pov window seat airplane aesthetic iphone",
+    "hotel room morning aesthetic iphone real candid",
+    "exploring city aesthetic iphone faceless real",
+    "beach sunset aesthetic iphone candid real pov",
+  ],
+  // Finance / Money
+  finance: [
+    "finance aesthetic desk laptop iphone real candid",
+    "budgeting journal coffee aesthetic iphone pov",
+    "investing aesthetic laptop charts iphone real",
+    "pov working on finances desk aesthetic iphone",
+    "money mindset journal aesthetic iphone candid real",
   ],
 };
 

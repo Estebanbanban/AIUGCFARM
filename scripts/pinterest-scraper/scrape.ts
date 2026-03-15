@@ -1,7 +1,8 @@
 import { chromium } from "playwright";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, writeFile, readFile } from "fs/promises";
 import { existsSync } from "fs";
 import { join } from "path";
+import { createHash } from "crypto";
 
 const OUTPUT_DIR = join(import.meta.dir, "../../pinterest-images");
 
@@ -11,6 +12,7 @@ interface ScrapedPin {
   description: string;
   width: number;
   height: number;
+  content_hash?: string;
 }
 
 async function scrapePinterest(
@@ -46,6 +48,12 @@ async function scrapePinterest(
           const imgUrl =
             pin?.images?.orig?.url || pin?.images?.["736x"]?.url;
           if (imgUrl && !seenUrls.has(imgUrl)) {
+            const pinWidth = pin?.images?.orig?.width || 0;
+            const pinHeight = pin?.images?.orig?.height || 0;
+            // Reject pins with dimensions below 600px
+            if (pinWidth > 0 && pinHeight > 0 && (pinWidth < 600 || pinHeight < 600)) {
+              continue;
+            }
             seenUrls.add(imgUrl);
             pins.push({
               id:
@@ -53,8 +61,8 @@ async function scrapePinterest(
                 `pin-${Date.now()}-${Math.random().toString(36).slice(2)}`,
               imageUrl: imgUrl,
               description: pin.description || pin.grid_title || "",
-              width: pin?.images?.orig?.width || 0,
-              height: pin?.images?.orig?.height || 0,
+              width: pinWidth,
+              height: pinHeight,
             });
           }
         }
@@ -217,6 +225,13 @@ for (const pin of pins) {
 
   const success = await downloadImage(pin.imageUrl, filepath);
   if (success) {
+    // Compute content hash after download
+    try {
+      const fileBuffer = await readFile(filepath);
+      pin.content_hash = createHash("sha256").update(fileBuffer).digest("hex");
+    } catch {
+      // Ignore hash errors
+    }
     downloaded++;
     console.log(`  [ok] ${filename} (${downloaded}/${pins.length})`);
   } else {
@@ -243,6 +258,7 @@ const metadata = {
     width: p.width,
     height: p.height,
     sourceUrl: p.imageUrl,
+    content_hash: p.content_hash || null,
   })),
 };
 
