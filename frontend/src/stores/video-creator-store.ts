@@ -28,6 +28,11 @@ interface VideoCreatorState {
   referenceType: ReferenceType;
   customReferenceImagePath: string | null;
   customReferencePreviewUrl: string | null;
+  // SaaS Demo Mode
+  screenRecordingPath: string | null;
+  screenRecordingPreviewUrl: string | null;
+  demoInsertStartSec: number;
+  demoInsertEndSec: number | null;
   // Misc
   language: string;
   // Generation state
@@ -42,6 +47,10 @@ interface VideoCreatorState {
   setProductId: (id: string | null) => void;
   setPersonaId: (id: string | null) => void;
   setIsSaas: (enabled: boolean) => void;
+  setScreenRecordingPath: (path: string | null) => void;
+  setScreenRecordingPreviewUrl: (url: string | null) => void;
+  setDemoInsertStartSec: (sec: number) => void;
+  setDemoInsertEndSec: (sec: number | null) => void;
   setSoraModel: (model: SoraModel) => void;
   setDuration: (duration: 4 | 8 | 12 | 16 | 20) => void;
   setReferenceType: (type: ReferenceType) => void;
@@ -60,6 +69,10 @@ const initialState = {
   productId: null,
   personaId: null,
   isSaas: false,
+  screenRecordingPath: null,
+  screenRecordingPreviewUrl: null,
+  demoInsertStartSec: 3,
+  demoInsertEndSec: null,
   soraModel: "sora-2" as SoraModel,
   duration: 12 as 4 | 8 | 12 | 16 | 20,
   referenceType: "none" as ReferenceType,
@@ -105,6 +118,22 @@ export const useVideoCreatorStore = create<VideoCreatorState>()(
       setIsSaas: (enabled) =>
         set((state) => {
           state.isSaas = enabled;
+        }),
+      setScreenRecordingPath: (path) =>
+        set((state) => {
+          state.screenRecordingPath = path;
+        }),
+      setScreenRecordingPreviewUrl: (url) =>
+        set((state) => {
+          state.screenRecordingPreviewUrl = url;
+        }),
+      setDemoInsertStartSec: (sec) =>
+        set((state) => {
+          state.demoInsertStartSec = sec;
+        }),
+      setDemoInsertEndSec: (sec) =>
+        set((state) => {
+          state.demoInsertEndSec = sec;
         }),
       setSoraModel: (model) =>
         set((state) => {
@@ -165,6 +194,9 @@ export const useVideoCreatorStore = create<VideoCreatorState>()(
         productId: state.productId,
         personaId: state.personaId,
         isSaas: state.isSaas,
+        screenRecordingPath: state.screenRecordingPath,
+        demoInsertStartSec: state.demoInsertStartSec,
+        demoInsertEndSec: state.demoInsertEndSec,
         soraModel: state.soraModel,
         duration: state.duration,
         referenceType: state.referenceType,

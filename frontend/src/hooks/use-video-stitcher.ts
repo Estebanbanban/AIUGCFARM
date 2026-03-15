@@ -304,6 +304,41 @@ export async function stitchToBlob(
   }
 }
 
+/**
+ * Trim all silence from a single video (leading, trailing, AND internal dead air).
+ * Uses the same pipeline as the multi-segment stitcher: silencedetect → encodeSegment → concat.
+ * Returns a Blob of the trimmed MP4.
+ */
+export async function trimSingleVideoToBlob(videoUrl: string): Promise<Blob> {
+  if (ffmpegBusy) throw new Error("FFmpeg is already in use - wait for the current operation to finish.");
+  ffmpegBusy = true;
+
+  try {
+    const [ffmpeg, { fetchFile }] = await Promise.all([
+      getFFmpeg(),
+      import("@ffmpeg/util"),
+    ]);
+
+    const videoData = await fetchFile(videoUrl);
+    await ffmpeg.writeFile("input.mp4", videoData);
+
+    // prepareClip does the full pipeline: silencedetect → find speech segments → encode each → concat
+    const tempFiles = await prepareClip(ffmpeg, "input.mp4", "trimmed.mp4");
+
+    const data = (await ffmpeg.readFile("trimmed.mp4")) as Uint8Array;
+    const blob = new Blob([data.buffer as ArrayBuffer], { type: "video/mp4" });
+
+    // Cleanup
+    for (const f of [...new Set(["input.mp4", ...tempFiles])]) {
+      try { await ffmpeg.deleteFile(f); } catch { /* ignore */ }
+    }
+
+    return blob;
+  } finally {
+    ffmpegBusy = false;
+  }
+}
+
 // ─── Public API ─────────────────────────────────────────────────────────────
 
 export type StitchStatus =

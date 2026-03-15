@@ -35,12 +35,17 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Scissors } from "lucide-react";
+import { Loader2, Scissors, Monitor, Upload } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import { useSingleVideoStatus } from "@/hooks/use-single-video";
 import { useGeneration } from "@/hooks/use-generations";
 import { useVideoCreatorStore } from "@/stores/video-creator-store";
 import { NanoBananaLoader } from "@/components/ui/nano-loader";
+import { ScreenRecordingUpload } from "@/components/screen-recording-upload";
+import { useUser } from "@clerk/nextjs";
 
 /* -------------------------------------------------------------------------- */
 /*  Loading skeleton                                                          */
@@ -187,6 +192,19 @@ function CompletedScreen({
   const [trimmedUrl, setTrimmedUrl] = useState<string | null>(null);
   const [trimStatus, setTrimStatus] = useState("");
 
+  // SaaS Demo Insert state
+  const { user } = useUser();
+  const store = useVideoCreatorStore();
+  const [demoMode, setDemoMode] = useState(false);
+  const [localScreenPath, setLocalScreenPath] = useState<string | null>(store.screenRecordingPath);
+  const [insertStart, setInsertStart] = useState(store.demoInsertStartSec);
+  const [insertEnd, setInsertEnd] = useState<number | null>(store.demoInsertEndSec);
+  const [isDemoStitching, setIsDemoStitching] = useState(false);
+  const [demoStitchStatus, setDemoStitchStatus] = useState("");
+  const [demoStitchProgress, setDemoStitchProgress] = useState(0);
+  const [demoStitchedUrl, setDemoStitchedUrl] = useState<string | null>(null);
+  const videoDuration = duration ?? 12;
+
   const modelLabel =
     soraModel === "sora-2-pro" ? "Sora 2 Pro" : "Sora 2 Standard";
   const durationLabel = duration ? `${duration}s` : "12s";
@@ -199,104 +217,21 @@ function CompletedScreen({
           ? "Custom Image"
           : "None";
 
-  // Trim silence from the video using FFmpeg WASM
+  // Trim ALL silence (leading, trailing, AND internal dead air) using the same
+  // pipeline as the Kling stitcher: silencedetect -30dB, find speech segments,
+  // encode each with I-frame start, concat. Removes all pauses > 500ms.
   const handleTrimSilence = useCallback(async () => {
     setIsTrimming(true);
-    setTrimStatus("Loading FFmpeg...");
+    setTrimStatus("Loading FFmpeg & trimming all silence...");
     try {
-      // Dynamic import to avoid loading FFmpeg WASM until needed
-      const stitcherModule = await import("@/hooks/use-video-stitcher");
-      const { fetchFile } = await import("@ffmpeg/util");
-      const ffmpeg = await stitcherModule.getFFmpeg();
-
-      setTrimStatus("Downloading video...");
-      const videoData = await fetchFile(videoUrl);
-      ffmpeg.writeFile("input.mp4", videoData);
-
-      // Detect silence
-      setTrimStatus("Detecting silence...");
-      let logBuffer = "";
-      const logHandler = ({ message }: { message: string }) => {
-        logBuffer += message + "\n";
-      };
-      ffmpeg.on("log", logHandler);
-      await ffmpeg.exec(["-i", "input.mp4", "-af", "silencedetect=n=-30dB:d=0.1", "-f", "null", "-"]);
-      ffmpeg.off("log", logHandler);
-
-      // Parse duration
-      const durMatch = logBuffer.match(/Duration:\s*(\d+):(\d+):(\d+)\.(\d+)/);
-      const totalDuration = durMatch
-        ? parseInt(durMatch[1]) * 3600 + parseInt(durMatch[2]) * 60 + parseInt(durMatch[3]) + parseInt(durMatch[4]) / 100
-        : 0;
-
-      if (totalDuration <= 0) {
-        toast.error("Could not parse video duration");
-        return;
-      }
-
-      // Parse silence regions
-      const silenceStarts: number[] = [];
-      const silenceEnds: number[] = [];
-      for (const line of logBuffer.split("\n")) {
-        const startMatch = line.match(/silence_start:\s*([\d.]+)/);
-        if (startMatch) silenceStarts.push(parseFloat(startMatch[1]));
-        const endMatch = line.match(/silence_end:\s*([\d.]+)/);
-        if (endMatch) silenceEnds.push(parseFloat(endMatch[1]));
-      }
-
-      // Build trim bounds (remove leading + trailing silence)
-      const BUFFER = 0.15;
-      const MIN_SILENCE = 0.5;
-      let speechStart = 0;
-      let speechEnd = totalDuration;
-
-      // Trim leading silence
-      if (silenceStarts.length > 0 && silenceStarts[0] < 0.1) {
-        speechStart = (silenceEnds[0] ?? 0) - BUFFER;
-        if (speechStart < 0) speechStart = 0;
-      }
-
-      // Trim trailing silence
-      if (silenceStarts.length > 0) {
-        const lastStart = silenceStarts[silenceStarts.length - 1];
-        if (totalDuration - lastStart < MIN_SILENCE + 0.5) {
-          speechEnd = lastStart + BUFFER;
-        }
-      }
-
-      const trimDuration = speechEnd - speechStart;
-      if (trimDuration >= totalDuration - 0.3) {
-        toast.info("No significant silence found to trim");
-        return;
-      }
-
-      // Encode trimmed clip
-      setTrimStatus("Trimming...");
-      await ffmpeg.exec([
-        "-i", "input.mp4",
-        "-ss", String(speechStart),
-        "-t", String(trimDuration),
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-        "-c:a", "aac", "-b:a", "128k",
-        "trimmed.mp4",
-      ]);
-
-      const output = await ffmpeg.readFile("trimmed.mp4");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const trimmedBlob = new Blob([output as any], { type: "video/mp4" });
-      const url = URL.createObjectURL(trimmedBlob);
+      const { trimSingleVideoToBlob } = await import("@/hooks/use-video-stitcher");
+      const blob = await trimSingleVideoToBlob(videoUrl);
+      const url = URL.createObjectURL(blob);
       setTrimmedUrl(url);
-
-      // Cleanup virtual FS
-      try {
-        await ffmpeg.deleteFile("input.mp4");
-        await ffmpeg.deleteFile("trimmed.mp4");
-      } catch { /* ignore cleanup errors */ }
-
-      toast.success(`Trimmed! ${totalDuration.toFixed(1)}s -> ${trimDuration.toFixed(1)}s`);
+      toast.success("All silence removed — internal pauses trimmed!");
     } catch (err) {
       console.error("Trim failed:", err);
-      toast.error("Failed to trim silence. Try downloading the original.");
+      toast.error(err instanceof Error ? err.message : "Failed to trim silence.");
     } finally {
       setIsTrimming(false);
       setTrimStatus("");
@@ -334,6 +269,39 @@ function CompletedScreen({
     }
   }, [videoUrl, trimmedUrl]);
 
+  // Handle demo insert stitch
+  const handleDemoInsert = useCallback(async () => {
+    if (!localScreenPath || !videoUrl) return;
+
+    setIsDemoStitching(true);
+    setDemoStitchProgress(0);
+    setDemoStitchStatus("Loading editor…");
+
+    try {
+      const { demoInsertStitchToBlob } = await import("@/hooks/use-demo-insert-stitcher");
+      setDemoStitchStatus("Processing…");
+      const blob = await demoInsertStitchToBlob({
+        videoUrl: activeVideoUrl,
+        screenRecordingUrl: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/screen-recordings/${localScreenPath}`,
+        startSec: insertStart,
+        endSec: insertEnd,
+        format: "9:16",
+      });
+      const url = URL.createObjectURL(blob);
+      setDemoStitchedUrl(url);
+      toast.success("Demo inserted successfully!");
+    } catch (err) {
+      console.error("Demo insert failed:", err);
+      toast.error(err instanceof Error ? err.message : "Failed to insert demo");
+    } finally {
+      setIsDemoStitching(false);
+      setDemoStitchStatus("");
+    }
+  }, [activeVideoUrl, localScreenPath, insertStart, insertEnd]);
+
+  // Use demo-inserted version if available, then trimmed, then original
+  const finalVideoUrl = demoStitchedUrl ?? trimmedUrl ?? videoUrl;
+
   return (
     <div className="mx-auto max-w-2xl space-y-6 py-8">
       {/* Video player */}
@@ -342,7 +310,7 @@ function CompletedScreen({
           <div className="relative aspect-[9/16] w-full overflow-hidden rounded-xl bg-black">
             <video
               ref={videoRef}
-              src={activeVideoUrl}
+              src={finalVideoUrl}
               controls
               autoPlay
               loop
@@ -350,9 +318,9 @@ function CompletedScreen({
               className="absolute inset-0 h-full w-full object-contain"
             />
           </div>
-          {trimmedUrl && (
+          {(trimmedUrl || demoStitchedUrl) && (
             <p className="text-center text-xs text-green-600 mt-2">
-              Silence trimmed — playing edited version
+              {demoStitchedUrl ? "Demo inserted — playing edited version" : "Silence trimmed — playing edited version"}
             </p>
           )}
         </div>
@@ -396,6 +364,175 @@ function CompletedScreen({
           Create Another
         </Button>
       </div>
+
+      {/* SaaS Demo Insert */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Monitor className="size-4 text-purple-400" />
+              <CardTitle className="text-sm">SaaS Demo Insert</CardTitle>
+              <Badge variant="secondary" className="bg-purple-500/10 text-purple-400 text-[10px]">Beta</Badge>
+            </div>
+            <Switch
+              checked={demoMode}
+              onCheckedChange={(checked) => {
+                setDemoMode(checked);
+                if (!checked) {
+                  setLocalScreenPath(null);
+                  store.setScreenRecordingPath(null);
+                  setDemoStitchedUrl(null);
+                }
+              }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Insert a screen recording of your app at a specific timestamp in the video.
+          </p>
+        </CardHeader>
+        {demoMode && (
+          <CardContent className="space-y-4 pt-0">
+            {/* Screen recording upload */}
+            <div>
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">Screen Recording</Label>
+              <div className="mt-1.5">
+                <ScreenRecordingUpload
+                  userId={user?.id ?? ""}
+                  storagePath={localScreenPath}
+                  onUpload={(path) => {
+                    setLocalScreenPath(path);
+                    store.setScreenRecordingPath(path);
+                  }}
+                  onRemove={() => {
+                    setLocalScreenPath(null);
+                    store.setScreenRecordingPath(null);
+                  }}
+                  disabled={!user?.id}
+                />
+              </div>
+            </div>
+
+            {/* Time range controls */}
+            {localScreenPath && (
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <Label className="text-xs text-muted-foreground">Insert starts at</Label>
+                    <span className="text-xs font-mono tabular-nums text-foreground">{insertStart.toFixed(1)}s</span>
+                  </div>
+                  <Slider
+                    min={0}
+                    max={videoDuration}
+                    step={0.5}
+                    value={[insertStart]}
+                    onValueChange={([v]) => {
+                      setInsertStart(v);
+                      store.setDemoInsertStartSec(v);
+                    }}
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <Label className="text-xs text-muted-foreground">Insert ends at</Label>
+                    <span className="text-xs font-mono tabular-nums text-foreground">
+                      {insertEnd !== null ? `${insertEnd.toFixed(1)}s` : "End of video"}
+                    </span>
+                  </div>
+                  <Slider
+                    min={insertStart + 0.5}
+                    max={videoDuration}
+                    step={0.5}
+                    value={[insertEnd ?? videoDuration]}
+                    onValueChange={([v]) => {
+                      const end = v >= videoDuration - 0.1 ? null : v;
+                      setInsertEnd(end);
+                      store.setDemoInsertEndSec(end);
+                    }}
+                  />
+                </div>
+
+                {/* Preview bar */}
+                <div className="rounded-lg bg-muted/50 p-2">
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-1">
+                    <span>0s</span>
+                    <span className="flex-1" />
+                    <span>{videoDuration}s</span>
+                  </div>
+                  <div className="relative h-6 rounded bg-muted overflow-hidden">
+                    {/* Original video portion */}
+                    <div
+                      className="absolute inset-y-0 left-0 bg-primary/30 rounded-l"
+                      style={{ width: `${(insertStart / videoDuration) * 100}%` }}
+                    />
+                    {/* Demo insert portion */}
+                    <div
+                      className="absolute inset-y-0 bg-purple-500/50"
+                      style={{
+                        left: `${(insertStart / videoDuration) * 100}%`,
+                        width: `${(((insertEnd ?? videoDuration) - insertStart) / videoDuration) * 100}%`,
+                      }}
+                    />
+                    {/* Remaining original */}
+                    {insertEnd !== null && (
+                      <div
+                        className="absolute inset-y-0 right-0 bg-primary/30 rounded-r"
+                        style={{ width: `${((videoDuration - insertEnd) / videoDuration) * 100}%` }}
+                      />
+                    )}
+                    {/* Labels */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-[9px] font-medium text-foreground/70">
+                        Hook ({insertStart}s) → Demo ({((insertEnd ?? videoDuration) - insertStart).toFixed(1)}s)
+                        {insertEnd !== null && ` → CTA (${(videoDuration - insertEnd).toFixed(1)}s)`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stitch button */}
+                <Button
+                  onClick={handleDemoInsert}
+                  disabled={isDemoStitching || !localScreenPath}
+                  className="w-full gap-2"
+                  variant="default"
+                >
+                  {isDemoStitching ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      {demoStitchStatus}
+                    </>
+                  ) : (
+                    <>
+                      <Monitor className="size-4" />
+                      Insert Demo Recording
+                    </>
+                  )}
+                </Button>
+
+                {isDemoStitching && (
+                  <Progress value={demoStitchProgress} className="h-1.5" />
+                )}
+
+                {demoStitchedUrl && (
+                  <Button
+                    onClick={() => {
+                      const a = document.createElement("a");
+                      a.href = demoStitchedUrl;
+                      a.download = `cinerads-demo-insert-${Date.now()}.mp4`;
+                      a.click();
+                    }}
+                    variant="outline"
+                    className="w-full gap-2"
+                  >
+                    <Download className="size-4" />
+                    Download Demo Version
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
 
       {/* Metadata card */}
       <Card>
