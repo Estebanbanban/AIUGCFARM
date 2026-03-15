@@ -79,8 +79,8 @@ export default function SlideshowEditorPage() {
 
   return (
     <div className="flex flex-col">
-      {/* Editor section — fixed height */}
-      <div style={{ height: "70vh", minHeight: "550px" }}>
+      {/* Editor section — full viewport height */}
+      <div style={{ height: "100vh", minHeight: "700px" }}>
         {isLoading ? <EditorSkeleton /> : <SlideshowEditorLayout />}
       </div>
 
