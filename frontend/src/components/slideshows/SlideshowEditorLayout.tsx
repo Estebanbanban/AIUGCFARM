@@ -84,13 +84,13 @@ export function SlideshowEditorLayout() {
 
       {/* Main content: two-column layout */}
       <div className="flex flex-1 min-h-0">
-        {/* Left panel - controls */}
-        <div className="w-[440px] shrink-0 border-r border-border bg-card overflow-hidden">
+        {/* Left panel - controls (scrollable) */}
+        <div className="w-[400px] shrink-0 border-r border-border bg-card overflow-y-auto">
           <EditorControlPanel />
         </div>
 
-        {/* Right panel - preview */}
-        <div className="flex-1 bg-background overflow-auto">
+        {/* Right panel - preview (sticky, fills remaining height) */}
+        <div className="flex-1 bg-background overflow-hidden">
           <PreviewCanvas />
         </div>
       </div>

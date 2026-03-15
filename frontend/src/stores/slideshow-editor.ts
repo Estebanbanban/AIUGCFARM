@@ -49,6 +49,9 @@ interface SlideshowEditorState {
   // Collection
   setSelectedCollectionId: (id: string | null) => void;
 
+  // Product
+  setProductId: (id: string | null) => void;
+
   // Status
   setStatus: (status: "draft" | "rendering" | "complete" | "failed") => void;
 
@@ -255,10 +258,16 @@ export const useSlideshowEditorStore = create<SlideshowEditorState>()(
           state.selectedCollectionId = id;
         }),
 
+      setProductId: (id) =>
+        set((state) => {
+          state.productId = id;
+          state.isDirty = true;
+        }),
+
       setStatus: (status) =>
         set((state) => {
           state.status = status;
-          state.isDirty = true;
+          // Don't mark dirty — status reflects server state, not user edits
         }),
 
       reset: () =>
@@ -286,8 +295,7 @@ export const useSlideshowEditorStore = create<SlideshowEditorState>()(
         hookText: state.hookText,
         productId: state.productId,
         status: state.status,
-        isDirty: state.isDirty,
-        selectedCollectionId: state.selectedCollectionId,
+        // isDirty intentionally NOT persisted — always false on reload
       }),
       version: 1,
     },

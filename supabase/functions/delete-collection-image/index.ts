@@ -21,28 +21,16 @@ Deno.serve(async (req: Request) => {
 
     const sb = getAdminClient();
 
-    // Fetch the image and verify it belongs to the user via the collection
+    // Fetch the image — enforce owner_id in the query itself
     const { data: image, error: fetchErr } = await sb
       .from("collection_images")
       .select("id, storage_path, collection_id")
       .eq("id", id)
+      .eq("owner_id", userId)
       .maybeSingle();
 
     if (fetchErr) throw new Error(fetchErr.message);
     if (!image) {
-      return json({ detail: "Image not found" }, cors, 404);
-    }
-
-    // Verify the collection belongs to the user
-    const { data: collection, error: colErr } = await sb
-      .from("image_collections")
-      .select("id")
-      .eq("id", image.collection_id)
-      .eq("owner_id", userId)
-      .maybeSingle();
-
-    if (colErr) throw new Error(colErr.message);
-    if (!collection) {
       return json({ detail: "Image not found" }, cors, 404);
     }
 

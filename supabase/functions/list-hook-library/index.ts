@@ -8,6 +8,10 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {
+    if (req.method !== "GET") {
+      return json({ detail: "Method not allowed" }, cors, 405);
+    }
+
     // Auth required but we don't filter by user — hook library is global
     await requireUserId(req);
     const sb = getAdminClient();

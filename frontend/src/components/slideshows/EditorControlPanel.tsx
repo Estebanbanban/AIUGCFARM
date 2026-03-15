@@ -12,7 +12,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSlideshowEditorStore } from "@/stores/slideshow-editor";
 import { useProducts } from "@/hooks/use-products";
 import { useCollections } from "@/hooks/use-collections";
@@ -26,42 +25,22 @@ export function EditorControlPanel() {
   const { data: collections = [] } = useCollections();
 
   return (
-    <ScrollArea className="h-full">
-      <div className="space-y-6 p-5">
-        {/* Slideshow Name */}
+    <div className="h-full overflow-y-auto">
+      <div className="space-y-4 p-4">
+        {/* Name + Product in a compact row */}
         <div className="space-y-2">
-          <Label htmlFor="slideshow-name">Name</Label>
           <Input
-            id="slideshow-name"
             value={store.name}
             onChange={(e) => store.setName(e.target.value)}
-            placeholder="My Slideshow"
-            className="text-sm"
+            placeholder="Slideshow name"
+            className="text-sm font-medium"
           />
-        </div>
-
-        <Separator />
-
-        {/* Product Selector */}
-        <div className="space-y-2">
-          <Label>Product</Label>
           <Select
             value={store.productId ?? "none"}
-            onValueChange={(v) => {
-              const id = v === "none" ? null : v;
-              store.loadSlideshow(
-                store.slideshowId!,
-                store.name,
-                store.settings,
-                store.slides,
-                store.hookText,
-                id,
-                store.status,
-              );
-            }}
+            onValueChange={(v) => store.setProductId(v === "none" ? null : v)}
           >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a product" />
+            <SelectTrigger className="w-full text-xs h-8">
+              <SelectValue placeholder="Link a product" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">No product</SelectItem>
@@ -76,8 +55,9 @@ export function EditorControlPanel() {
 
         <Separator />
 
-        {/* Hook Selector */}
+        {/* Hook Selector + Generate in one section */}
         <HookSelector />
+        <GenerateButton />
 
         <Separator />
 
@@ -96,56 +76,11 @@ export function EditorControlPanel() {
 
         <Separator />
 
-        {/* Generate Body Copy */}
-        <GenerateButton />
-
-        <Separator />
-
-        {/* Overlay Controls */}
-        <div className="space-y-4">
-          <Label className="text-sm font-medium">Overlay</Label>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Opacity</span>
-              <span className="text-xs font-mono text-muted-foreground">
-                {Math.round(store.settings.overlay.opacity * 100)}%
-              </span>
-            </div>
-            <Slider
-              min={0}
-              max={100}
-              step={5}
-              value={[Math.round(store.settings.overlay.opacity * 100)]}
-              onValueChange={([v]) => store.setOverlayOpacity(v / 100)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <span className="text-xs text-muted-foreground">Color</span>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={store.settings.overlay.color}
-                onChange={(e) =>
-                  store.setSettings({
-                    overlay: { ...store.settings.overlay, color: e.target.value },
-                  })
-                }
-                className="h-8 w-12 cursor-pointer rounded border border-border bg-transparent"
-              />
-              <span className="text-xs font-mono text-muted-foreground">
-                {store.settings.overlay.color}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* Caption Style */}
+        {/* Style section — collapsed */}
         <div className="space-y-3">
-          <Label className="text-sm font-medium">Caption Style</Label>
+          <Label className="text-sm font-medium">Style</Label>
+
+          {/* Caption Style */}
           <div className="grid grid-cols-3 gap-1.5">
             {(["tiktok", "instagram", "inter"] as const).map((style) => (
               <button
@@ -163,7 +98,7 @@ export function EditorControlPanel() {
             ))}
           </div>
 
-          {/* Show Pill Toggle */}
+          {/* Pill toggle */}
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">White badge on titles</span>
             <button
@@ -181,43 +116,49 @@ export function EditorControlPanel() {
               />
             </button>
           </div>
-        </div>
 
-        <Separator />
-
-        {/* Duration Control */}
-        <div className="space-y-2">
-          <Label>Slide Duration (seconds)</Label>
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              min={1}
-              max={10}
-              step={0.5}
-              value={store.settings.slideDuration}
+          {/* Overlay */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Overlay</span>
+                <span className="text-xs font-mono text-muted-foreground">
+                  {Math.round(store.settings.overlay.opacity * 100)}%
+                </span>
+              </div>
+              <Slider
+                min={0}
+                max={100}
+                step={5}
+                value={[Math.round(store.settings.overlay.opacity * 100)]}
+                onValueChange={([v]) => store.setOverlayOpacity(v / 100)}
+              />
+            </div>
+            <input
+              type="color"
+              value={store.settings.overlay.color}
               onChange={(e) =>
-                store.setSettings({ slideDuration: Number(e.target.value) })
+                store.setSettings({
+                  overlay: { ...store.settings.overlay, color: e.target.value },
+                })
               }
-              className="w-24 text-sm"
+              className="h-7 w-7 cursor-pointer rounded border border-border bg-transparent shrink-0"
             />
-            <span className="text-xs text-muted-foreground">
-              Total: {(store.settings.slideDuration * store.slides.length).toFixed(1)}s
-            </span>
           </div>
         </div>
 
         <Separator />
 
-        {/* Collection Selector */}
+        {/* Collection + Duration compact */}
         <div className="space-y-2">
-          <Label>Image Collection</Label>
+          <Label className="text-xs">Image Collection</Label>
           <Select
             value={store.selectedCollectionId ?? "none"}
             onValueChange={(v) =>
               store.setSelectedCollectionId(v === "none" ? null : v)
             }
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full text-xs h-8">
               <SelectValue placeholder="Select a collection" />
             </SelectTrigger>
             <SelectContent>
@@ -231,14 +172,24 @@ export function EditorControlPanel() {
           </Select>
         </div>
 
-        {/* Aspect Ratio (read-only) */}
-        <div className="space-y-2">
-          <Label>Aspect Ratio</Label>
-          <div className="flex h-9 items-center rounded-lg border border-border bg-muted/50 px-3 text-sm text-muted-foreground">
-            {store.settings.aspectRatio}
-          </div>
+        <div className="flex items-center gap-2">
+          <Label className="text-xs shrink-0">Duration</Label>
+          <Input
+            type="number"
+            min={1}
+            max={10}
+            step={0.5}
+            value={store.settings.slideDuration}
+            onChange={(e) =>
+              store.setSettings({ slideDuration: Number(e.target.value) })
+            }
+            className="w-16 text-xs h-8"
+          />
+          <span className="text-xs text-muted-foreground">
+            = {(store.settings.slideDuration * store.slides.length).toFixed(1)}s
+          </span>
         </div>
       </div>
-    </ScrollArea>
+    </div>
   );
 }

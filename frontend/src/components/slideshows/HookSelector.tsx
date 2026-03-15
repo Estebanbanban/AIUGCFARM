@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, List, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -24,16 +24,29 @@ export function HookSelector() {
   const [showAllHooks, setShowAllHooks] = useState(false);
 
   const totalHooks = hooks.length;
+
+  // Reset index when hooks data changes (e.g. after generation)
+  useEffect(() => {
+    if (currentIndex >= totalHooks && totalHooks > 0) {
+      setCurrentIndex(0);
+    }
+  }, [totalHooks, currentIndex]);
+
   const currentHook = hooks[currentIndex];
 
   const goNext = () => {
     if (totalHooks === 0) return;
-    setCurrentIndex((prev) => (prev + 1) % totalHooks);
+    const next = (currentIndex + 1) % totalHooks;
+    setCurrentIndex(next);
+    // Auto-apply hook text when browsing
+    if (hooks[next]) store.applyHookToFirstSlide(hooks[next].text);
   };
 
   const goPrev = () => {
     if (totalHooks === 0) return;
-    setCurrentIndex((prev) => (prev - 1 + totalHooks) % totalHooks);
+    const prev = (currentIndex - 1 + totalHooks) % totalHooks;
+    setCurrentIndex(prev);
+    if (hooks[prev]) store.applyHookToFirstSlide(hooks[prev].text);
   };
 
   const selectHook = (text: string) => {
