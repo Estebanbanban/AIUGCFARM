@@ -18,7 +18,8 @@ export function useSlideshowHooks(productId?: string) {
       return res.data.hooks;
     },
     enabled: isLoaded && isSignedIn === true,
-    retry: false,
+    retry: 2,
+    retryDelay: 1000,
   });
 }
 

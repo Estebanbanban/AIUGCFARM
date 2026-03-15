@@ -17,7 +17,8 @@ export function useSlideshows() {
       return res.data;
     },
     enabled: isLoaded && isSignedIn === true,
-    retry: false,
+    retry: 2,
+    retryDelay: 1000,
   });
 }
 
@@ -30,7 +31,8 @@ export function useSlideshow(id: string | null) {
       return res.data;
     },
     enabled: isLoaded && isSignedIn === true && !!id,
-    retry: false,
+    retry: 2,
+    retryDelay: 1000,
   });
 }
 

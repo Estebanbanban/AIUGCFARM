@@ -14,7 +14,8 @@ export function useCollections() {
       return res.data;
     },
     enabled: isLoaded && isSignedIn === true,
-    retry: false,
+    retry: 2,
+    retryDelay: 1000,
   });
 }
 
@@ -51,7 +52,8 @@ export function useCollectionImages(collectionId: string | null) {
       return res.data;
     },
     enabled: isLoaded && isSignedIn === true && !!collectionId,
-    retry: false,
+    retry: 2,
+    retryDelay: 1000,
   });
 }
 
