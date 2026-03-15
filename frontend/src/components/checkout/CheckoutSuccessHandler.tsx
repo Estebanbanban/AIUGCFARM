@@ -24,6 +24,18 @@ export function CheckoutSuccessHandler() {
   const isOnGeneratePage = pathname?.startsWith("/generate");
   const approveAndGenerate = useApproveAndGenerate();
 
+  // Handle cancelled checkout — clean URL and show a gentle nudge
+  useEffect(() => {
+    if (searchParams.get("checkout") !== "cancelled") return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("checkout");
+    router.replace(`${pathname}${params.size ? `?${params}` : ""}`, { scroll: false });
+    toast("No worries — your progress is saved. Come back whenever you're ready.", {
+      duration: 6000,
+      icon: "💾",
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const checkout = searchParams.get("checkout");
     if (checkout !== "success") return;
@@ -127,9 +139,19 @@ export function CheckoutSuccessHandler() {
       // resume immediately after payment rather than making them click again.
       const pendingGenId = useGenerationWizardStore.getState().pendingGenerationId;
       const pendingScript = useGenerationWizardStore.getState().pendingScript;
+      const compositeImagePath = useGenerationWizardStore.getState().compositeImagePath;
+      const productId = useGenerationWizardStore.getState().productId;
+
       if (pendingGenId && pendingScript) {
+        // User had a fully submitted generation — approve and generate immediately
         setOnGenerateNow(() => () => {
           approveAndGenerate.mutate({ generation_id: pendingGenId });
+        });
+      } else if (compositeImagePath || productId) {
+        // User was mid-flow (has composite or product selected) — just close modal,
+        // their state is restored from localStorage, they're already on /generate
+        setOnGenerateNow(() => () => {
+          // no-op: closing modal is enough, wizard state is already restored
         });
       }
 

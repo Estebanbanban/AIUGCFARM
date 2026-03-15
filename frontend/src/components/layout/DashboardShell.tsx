@@ -42,7 +42,7 @@ const navItems = [
   { label: "Video Creator", href: "/video-creator", icon: Video },
   { label: "Slideshows", href: "/slideshows", icon: Layers },
   { label: "Collections", href: "/collections", icon: ImageIcon },
-  { label: "Personas", href: "/personas", icon: Users },
+  { label: "AI Creators", href: "/personas", icon: Users },
   { label: "Products", href: "/products", icon: Package },
   { label: "History", href: "/history", icon: Clock },
   { label: "Settings", href: "/settings", icon: Settings },
@@ -50,7 +50,7 @@ const navItems = [
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
-  "/personas": "Personas",
+  "/personas": "AI Creators",
   "/products": "Products",
   "/generate": "Generate",
   "/slideshows": "Slideshows",
@@ -213,8 +213,8 @@ function SidebarContent({
 
 function getPageTitle(pathname: string): string {
   if (pageTitles[pathname]) return pageTitles[pathname];
-  if (pathname === "/personas/new") return "Create Persona";
-  if (pathname.startsWith("/personas/")) return "Persona Detail";
+  if (pathname === "/personas/new") return "Create AI Creator";
+  if (pathname.startsWith("/personas/")) return "AI Creator";
   if (pathname.startsWith("/products/")) return "Product Detail";
   if (pathname.startsWith("/generate/")) return "Generation";
   if (pathname.startsWith("/video-creator/")) return "Video Creator";

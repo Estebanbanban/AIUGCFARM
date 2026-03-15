@@ -14,8 +14,8 @@ import {
   AlertCircle,
   RefreshCw,
   FileText,
-  LayoutDashboard,
   Trash2,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
@@ -78,7 +78,7 @@ function HistoryThumbnail({
     return () => { cancelled = true; };
   }, [compositeUrl, productPath, useFallback]);
 
-  if (!src) return null;
+  if (!src) return <User className="size-5 text-muted-foreground" />;
   return (
     <img
       src={src}
@@ -182,6 +182,17 @@ export default function HistoryPage() {
     if (gen.mode) wizard.setMode(gen.mode as "single" | "triple");
     if (gen.video_quality) wizard.setQuality(gen.video_quality as "standard" | "hd");
     wizard.setStep(2);
+    router.push("/generate");
+  }
+
+  function handleResumeScript(gen: { id: string; product_id: string; persona_id: string; mode: string; video_quality?: string | null }) {
+    wizard.setProductId(gen.product_id);
+    wizard.setPersonaId(gen.persona_id);
+    wizard.setMode(gen.mode as "single" | "triple");
+    if (gen.video_quality) wizard.setQuality(gen.video_quality as "standard" | "hd");
+    // Set pendingGenerationId so the generate page's mount validation restores the script from DB
+    wizard.setPendingGenerationId(gen.id);
+    wizard.setStep(5);
     router.push("/generate");
   }
 
@@ -419,16 +430,16 @@ export default function HistoryPage() {
                         <FileText className="mt-0.5 size-3.5 shrink-0 text-amber-400" />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-xs text-amber-400">
-                            Script ready. No credits charged yet
+                            Script prêt · aucun crédit débité
                           </p>
-                          <Link
-                            href="/dashboard"
+                          <button
+                            type="button"
                             className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-1 rounded transition-colors"
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); handleResumeScript(gen); }}
                           >
-                            <LayoutDashboard className="size-3" />
-                            Approve &amp; Generate
-                          </Link>
+                            <FileText className="size-3" />
+                            Reprendre et approuver
+                          </button>
                         </div>
                       </div>
                     )}

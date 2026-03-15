@@ -193,6 +193,23 @@ Deno.serve(async (req: Request) => {
       reason: "composite_generation",
     });
 
+    // Persist composite paths to composite_cache so the frontend can restore them
+    // after Stripe redirects, localStorage clears, or browser restarts.
+    // Fire-and-forget — a cache miss is acceptable, a failed response is not.
+    sb.from("composite_cache").upsert(
+      {
+        user_id: userId,
+        product_id,
+        persona_id,
+        format,
+        paths: uploadedPaths,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,product_id,persona_id,format" },
+    ).then(({ error }) => {
+      if (error) console.error("[composite_cache] upsert failed:", error.message);
+    });
+
     return json({ data: { images: results } }, cors, 200);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

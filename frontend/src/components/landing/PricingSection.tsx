@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { Check, Loader2, Shield, RefreshCw, Star } from "lucide-react";
+import { Check, Clock, Loader2, Shield, RefreshCw, Star } from "lucide-react";
 import { toast } from "sonner";
 import { ScaleIn, FadeInUp } from "@/lib/motion";
 import { callEdge } from "@/lib/api";
 import { PLANS } from "@/lib/stripe";
 import type { PlanTier } from "@/lib/stripe";
 import { trackCtaClicked } from "@/lib/datafast";
+import { useFirstPurchaseOffer } from "@/hooks/use-first-purchase-offer";
 
 // Landing-page-only metadata that does not exist in stripe.ts.
 // Price, credits, name, and features always come from PLANS in stripe.ts.
@@ -68,6 +69,7 @@ export function PricingSection() {
   const [loadingPlan, setLoadingPlan] = useState<PlanTier | null>(null);
   const router = useRouter();
   const { isSignedIn } = useAuth();
+  const offer = useFirstPurchaseOffer();
 
   async function handlePlanClick(planKey: PlanTier) {
     trackCtaClicked("pricing", planKey);
@@ -78,9 +80,11 @@ export function PricingSection() {
 
     setLoadingPlan(planKey);
     try {
+      const couponId = offer.getSubscriptionCoupon(planKey);
       const res = await callEdge<{ data: { url: string } }>("stripe-checkout", {
-        body: { plan: planKey, billing: annual ? "annual" : "monthly" },
+        body: { plan: planKey, billing: annual ? "annual" : "monthly", ...(couponId ? { couponId } : {}) },
       });
+      if (couponId) offer.markUsed();
       window.location.href = res.data.url;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Checkout failed. Please try again.");
@@ -141,7 +145,11 @@ export function PricingSection() {
 
         <div className="grid md:grid-cols-3 gap-4">
           {plans.map((plan, i) => {
-            const price = annual ? plan.annualPrice : plan.monthlyPrice;
+            const isStarter = plan.key === "starter";
+            const displayPrice = annual
+              ? (offer.isActive ? Math.floor((isStarter ? plan.annualPrice * 0.5 : plan.annualPrice * 0.7)) : plan.annualPrice)
+              : (offer.isActive ? (isStarter ? offer.discountedStarterPrice(plan.monthlyPrice) : offer.discountedPrice(plan.monthlyPrice)) : plan.monthlyPrice);
+            const originalPrice = annual ? plan.annualPrice : plan.monthlyPrice;
             const isLoading = loadingPlan === plan.key;
             return (
               <ScaleIn key={plan.name} delay={i * 0.1}>
@@ -168,11 +176,23 @@ export function PricingSection() {
                   </div>
 
                   <div className="mb-2">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-5xl font-bold text-foreground">${price}</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-5xl font-bold text-foreground">${displayPrice}</span>
                       <span className="text-muted-foreground text-lg">/mo</span>
+                      {offer.isActive && (
+                        <span className="text-sm line-through text-muted-foreground">${originalPrice}</span>
+                      )}
                     </div>
-                    {annual && (
+                    {offer.isActive && (
+                      <div className="mt-1 flex items-center gap-2 text-xs">
+                        <span className="font-semibold text-primary">{isStarter ? "-50%" : "-30%"}</span>
+                        <span className="font-mono text-muted-foreground flex items-center gap-1">
+                          <Clock className="size-3" />
+                          {offer.timeDisplay}
+                        </span>
+                      </div>
+                    )}
+                    {annual && !offer.isActive && (
                       <p className="text-xs text-muted-foreground mt-1">
                         billed annually · save ${plan.annualSavings}/yr
                       </p>

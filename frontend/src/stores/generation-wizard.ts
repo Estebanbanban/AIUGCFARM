@@ -88,6 +88,7 @@ interface GenerationWizardState {
   clearCompositePreviewCache: (key?: string) => void;
   updateScriptSection: (type: "hooks" | "bodies" | "ctas", index: number, text: string) => void;
   clearPendingScript: () => void;
+  setPendingGenerationId: (id: string) => void;
   setAdvancedMode: (enabled: boolean) => void;
   setAdvancedSegments: (segments: AdvancedSegmentsConfig | null) => void;
   setHooksCount: (n: number) => void;
@@ -232,6 +233,10 @@ export const useGenerationWizardStore = create<GenerationWizardState>()(
           state.pendingGenerationId = null;
           state.pendingScript = null;
           state.creditsToCharge = null;
+        }),
+      setPendingGenerationId: (id) =>
+        set((state) => {
+          state.pendingGenerationId = id;
         }),
       setAdvancedMode: (enabled) =>
         set((state) => {

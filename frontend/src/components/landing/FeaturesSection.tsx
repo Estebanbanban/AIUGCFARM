@@ -212,7 +212,7 @@ function AnimationPersonaBuilder() {
         <g className="pb-loop">
           {/* ── Left panel ── */}
           <rect x="40" y="40" width="260" height="340" rx="16" fill="#09090b" stroke="#2a2a2b" strokeWidth="1.5" />
-          <text x="64" y="85" fill="#fff" fontSize="20" fontWeight="700">Simulate Persona</text>
+          <text x="64" y="85" fill="#fff" fontSize="20" fontWeight="700">AI Creator</text>
           <line x1="40" y1="110" x2="300" y2="110" stroke="#2a2a2b" strokeWidth="1.5" />
 
           <text x="64" y="145" fill="#71717a" fontSize="11" fontWeight="700" letterSpacing="1">SKIN TONE</text>

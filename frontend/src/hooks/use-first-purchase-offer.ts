@@ -3,9 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 // Stripe coupon IDs (server-side validated - safe to reference client-side)
-// Stripe coupon ID for the new-user 30% discount offer.
-// To rotate: create a new coupon in Stripe Dashboard → copy the coupon ID → update this value.
-// Current coupon: 30% off, applies to Growth/Scale subscription first purchase.
 export const COUPON_30_OFF = "promo_1T5XZZDofGNcXNHKRrssNcdE"; // 30% off Growth/Scale subscriptions
 export const COUPON_50_OFF_STARTER = "promo_1T5Xb9DofGNcXNHKgaXOtdxQ"; // 50% off Starter subscription
 export const COUPON_50_OFF_FIRST_VIDEO = "promo_1T7tW2DofGNcXNHKHTRW79iU"; // 50% off any single video during promo
@@ -14,24 +11,19 @@ const OFFER_KEY_STARTED = "cr_offer_started_at";
 const OFFER_KEY_USED = "cr_offer_used";
 const OFFER_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
+// Custom event dispatched whenever the offer state changes in localStorage.
+// Allows all hook instances on the same page to update instantly (no 1s delay).
+const OFFER_CHANGE_EVENT = "cr-offer-change";
+
 export interface FirstPurchaseOffer {
-  /** Is the offer currently active (started, not expired, not used) */
   isActive: boolean;
-  /** Seconds remaining on the timer */
   secondsLeft: number;
-  /** Minutes:seconds formatted string e.g. "23:41" */
   timeDisplay: string;
-  /** Discounted price for Growth/Scale plans (30% off) */
   discountedPrice: (original: number) => number;
-  /** Discounted price for Starter plan (50% off) */
   discountedStarterPrice: (original: number) => number;
-  /** Discounted price for single videos (50% off) */
   discountedVideoPrice: (original: number) => number;
-  /** Returns the coupon ID to use for a subscription plan, or undefined if offer is not active */
   getSubscriptionCoupon: (plan: string) => string | undefined;
-  /** Start the timer (idempotent - only sets once) */
   startOffer: () => void;
-  /** Mark offer as permanently used */
   markUsed: () => void;
 }
 
@@ -46,8 +38,10 @@ function readOfferFromStorage(): { isActive: boolean; secondsLeft: number } {
 }
 
 export function useFirstPurchaseOffer(): FirstPurchaseOffer {
-  const [secondsLeft, setSecondsLeft] = useState(() => readOfferFromStorage().secondsLeft);
-  const [isActive, setIsActive] = useState(() => readOfferFromStorage().isActive);
+  // Start false/0 to match server render (no localStorage on server).
+  // The useEffect below syncs the real state after hydration.
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [isActive, setIsActive] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const computeState = useCallback(() => {
@@ -80,27 +74,33 @@ export function useFirstPurchaseOffer(): FirstPurchaseOffer {
   }, []);
 
   useEffect(() => {
+    // Sync immediately on mount (handles returning users with active offer)
     computeState();
+    // Listen for instant cross-instance updates (e.g. startOffer called from another component)
+    window.addEventListener(OFFER_CHANGE_EVENT, computeState);
+    // Tick every second to update the countdown display
     intervalRef.current = setInterval(computeState, 1000);
     return () => {
+      window.removeEventListener(OFFER_CHANGE_EVENT, computeState);
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [computeState]);
 
   const startOffer = useCallback(() => {
     if (typeof window === "undefined") return;
-    const used = localStorage.getItem(OFFER_KEY_USED) === "true";
-    if (used) return;
-    // Only start once - never reset if already started
+    if (localStorage.getItem(OFFER_KEY_USED) === "true") return;
     if (!localStorage.getItem(OFFER_KEY_STARTED)) {
       localStorage.setItem(OFFER_KEY_STARTED, Date.now().toString());
     }
+    // Notify all hook instances immediately (no 1s delay)
+    window.dispatchEvent(new Event(OFFER_CHANGE_EVENT));
     computeState();
   }, [computeState]);
 
   const markUsed = useCallback(() => {
     if (typeof window === "undefined") return;
     localStorage.setItem(OFFER_KEY_USED, "true");
+    window.dispatchEvent(new Event(OFFER_CHANGE_EVENT));
     setIsActive(false);
     setSecondsLeft(0);
   }, []);

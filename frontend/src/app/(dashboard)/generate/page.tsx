@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -72,7 +72,7 @@ import { VideoGenerationAnimation } from "@/components/landing/VideoGenerationAn
 import { useProducts, useScrapeProduct } from "@/hooks/use-products";
 import { isExternalUrl, getSignedImageUrl, getSignedImageUrls } from "@/lib/storage";
 import { usePersonas, resolvePersonaImageUrl, useSelectPersonaImage } from "@/hooks/use-personas";
-import type { Persona, Product, BrandSummary, ScriptSegment } from "@/types/database";
+import type { Persona, Product, BrandSummary, ScriptSegment, GenerationScript } from "@/types/database";
 import { useCredits } from "@/hooks/use-credits";
 import {
   useEditCompositeImage,
@@ -83,6 +83,9 @@ import {
 } from "@/hooks/use-generations";
 import { useCheckout, useBuyCredits } from "@/hooks/use-checkout";
 import { useProfile, ADVANCED_MODE_PLANS } from "@/hooks/use-profile";
+import { useLeaveGuard } from "@/hooks/use-leave-guard";
+import { useCompositeCache } from "@/hooks/use-composite-cache";
+import { useLastPendingGeneration } from "@/hooks/use-last-pending-generation";
 import { ManualUploadForm } from "@/components/products/ManualUploadForm";
 import { ScrapeResults } from "@/components/products/ScrapeResults";
 import {
@@ -306,9 +309,9 @@ function BrandIntelligenceRow({
 }
 
 const PLAN_BENEFITS: Record<PlanTier, string[]> = {
-  starter: ["Rendering queue", "Watermark-free exports", "Commercial use license", "Standard support"],
-  growth: ["Fast rendering priority", "Watermark-free exports", "Commercial use license", "Priority support"],
-  scale: ["Highest rendering priority", "Watermark-free exports", "Commercial use license", "Dedicated manager", "Custom API limits"],
+  starter: ["~5 videos/month included", "Watermark-free exports", "Commercial use license", "Email support"],
+  growth: ["~12 videos/month included", "Priority rendering (2× faster)", "Watermark-free exports", "Priority support"],
+  scale: ["~30 videos/month included", "Fastest rendering priority", "Watermark-free exports", "Dedicated account manager"],
 };
 
 const VIDEO_GEN_STEPS = [
@@ -321,23 +324,33 @@ export default function GeneratePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const store = useGenerationWizardStore();
+  const isDirty = !!(store.productId || store.personaId || store.pendingScript || store.compositeImagePath || store.selectedProductImages.length > 0);
+  const { showDialog: showLeaveDialog, confirmLeave, cancelLeave } = useLeaveGuard(isDirty);
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallTab, setPaywallTab] = useState<"single" | "subscription">("single");
 
   // Validate persisted pendingGenerationId against DB on mount.
+  // Also restores the script from DB if pendingScript was somehow lost (e.g., localStorage
+  // cleared, version migration, or network error on a previous visit that wiped the script).
   useEffect(() => {
-    if (!store.pendingGenerationId) return;
+    const genId = store.pendingGenerationId;
+    if (!genId) return;
     const supabase = createClient();
     supabase
       .from("generations")
-      .select("status")
-      .eq("id", store.pendingGenerationId)
+      .select("status, script")
+      .eq("id", genId)
       .maybeSingle()
-      .then(({ data }: { data: { status: string } | null }) => {
+      .then(({ data, error }: { data: { status: string; script: GenerationScript | null } | null; error: unknown }) => {
+        // Network / RLS error — keep existing state, do NOT clear the script.
+        if (error) return;
         if (!data || data.status !== "awaiting_approval") {
           store.clearPendingScript();
           // Reset to section 3 (step 4) if we were on old step 5
           if (store.step >= 5) store.setStep(4);
+        } else if (!store.pendingScript && data.script) {
+          // Script was lost from localStorage (version bump, cache clear, etc.) — restore from DB.
+          store.setPendingScript(genId, data.script, store.creditsToCharge ?? 0);
         }
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -434,16 +447,58 @@ export default function GeneratePage() {
   const buyCredits = useBuyCredits();
   const offer = useFirstPurchaseOffer();
 
-  // Ensure offer activates before the browser paints when any paywall opens.
-  // useLayoutEffect fires synchronously after DOM mutation but before paint,
-  // so discounted prices are visible on the very first frame.
-  useLayoutEffect(() => {
-    if (showPaywall || showPersonaLimitPaywall) {
-      offer.startOffer();
-    }
-  }, [showPaywall, showPersonaLimitPaywall]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: generations } = useGenerations();
+  const { data: lastPendingGeneration } = useLastPendingGeneration();
+
+  // Auto-restore full wizard state from DB when localStorage has been cleared.
+  // This handles the Stripe redirect scenario on mobile where localStorage is wiped
+  // but the generation record (with product_id, persona_id, script, etc.) still exists in DB.
+  // Only runs when the user has NO active wizard state.
+  useEffect(() => {
+    if (store.pendingGenerationId || store.productId) return; // active session — don't overwrite
+    if (!lastPendingGeneration) return;
+    if (compositeImages.length > 0) return; // user already has active previews
+
+    const gen = lastPendingGeneration;
+    const script = gen.script;
+    if (!script) return;
+
+    // Restore core wizard state via resumeFromGeneration
+    store.resumeFromGeneration({
+      generationId: gen.id,
+      script,
+      creditsToCharge: gen.credits_to_charge ?? 0,
+      productId: gen.product_id,
+      personaId: gen.persona_id,
+      mode: gen.mode,
+      quality: gen.video_quality,
+    });
+
+    // Restore extended fields (added by backend task #1 — nullable for older records)
+    if (gen.format === "9:16" || gen.format === "16:9") {
+      store.setFormat(gen.format);
+    }
+    if (gen.cta_style) {
+      store.setCtaStyle(gen.cta_style as Parameters<typeof store.setCtaStyle>[0]);
+    }
+    if (gen.language) {
+      store.setLanguage(gen.language);
+    }
+    if (gen.video_provider === "kling" || gen.video_provider === "sora") {
+      store.setVideoProvider(gen.video_provider);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastPendingGeneration]);
+
+  // DB-backed composite cache — persistent fallback for when localStorage is empty
+  // (Stripe redirect, mobile browser cache clear, new device, etc.)
+  const { data: dbCompositeCache } = useCompositeCache(
+    store.productId,
+    store.personaId,
+    store.format,
+  );
+
   const previewContextKey = useMemo(() => {
     if (!store.productId || !store.personaId || !store.format) return null;
     const refs =
@@ -550,6 +605,17 @@ export default function GeneratePage() {
     store.setCompositeImagePath,
   ]);
 
+  // DB → localStorage sync: when the DB cache loads and the local cache is empty,
+  // populate it so the restore effect above can sign & display the images.
+  // This is the key fix for Stripe redirects and mobile localStorage clears.
+  useEffect(() => {
+    if (!dbCompositeCache?.paths?.length || !previewContextKey) return;
+    const localPaths = store.compositePreviewCache[previewContextKey] ?? [];
+    if (localPaths.length === 0) {
+      store.setCompositePreviewCache(previewContextKey, dbCompositeCache.paths);
+    }
+  }, [dbCompositeCache, previewContextKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Restore advanced segment custom image signed URLs after page navigation.
   // imagePath is persisted but imageSignedUrl expires — re-sign on mount.
   useEffect(() => {
@@ -595,8 +661,8 @@ export default function GeneratePage() {
 
   // Cycling progress messages while composites generate
   const COMPOSITE_MESSAGES = [
-    "Placing your persona in the scene...",
-    "Compositing product and persona...",
+    "Placing your AI Creator in the scene...",
+    "Compositing product and AI Creator...",
     "Rendering lighting and style...",
     "Finalising preview images...",
     "Almost ready...",
@@ -661,6 +727,9 @@ export default function GeneratePage() {
 
   const creditsRemaining = credits?.remaining ?? 0;
   const isUnlimitedCredits = credits?.is_unlimited === true;
+
+
+
   const userPlan = profile?.plan ?? "free";
   const canUseHD = true; // HD is available to all users with credits
   const canUseAdvanced = ADVANCED_MODE_PLANS.has(userPlan) || profile?.role === "admin";
@@ -719,21 +788,40 @@ export default function GeneratePage() {
 
     try {
       const limited = generatedPaths.slice(0, 4);
-      const resolved = await Promise.all(
-        limited.map(async (path, imageIndex) => {
-          const signedUrl = await resolvePersonaImageUrl(path);
-          return signedUrl ? { imageIndex, signedUrl } : null;
-        }),
-      );
-      const options = resolved.filter(
-        (item): item is { imageIndex: number; signedUrl: string } => item !== null,
-      );
-      setPickerOptions(options);
-      if (options.length === 0) {
-        toast.error("Couldn't load generated portraits. Please try again.");
+      // Separate external URLs (already signed) from storage paths (need batch signing)
+      const externalItems: { imageIndex: number; signedUrl: string }[] = [];
+      const pathItems: { imageIndex: number; path: string }[] = [];
+      limited.forEach((img, imageIndex) => {
+        if (img.startsWith("http")) {
+          externalItems.push({ imageIndex, signedUrl: img });
+        } else {
+          pathItems.push({ imageIndex, path: img });
+        }
+      });
+
+      let signedItems: { imageIndex: number; signedUrl: string }[] = [...externalItems];
+      if (pathItems.length > 0) {
+        const supabase = createClient();
+        const { data } = await supabase.storage
+          .from("persona-images")
+          .createSignedUrls(pathItems.map((p) => p.path), 3600);
+        if (data) {
+          data.forEach((item: { signedUrl?: string | null }, i: number) => {
+            if (item.signedUrl) {
+              signedItems.push({ imageIndex: pathItems[i].imageIndex, signedUrl: item.signedUrl });
+            }
+          });
+        }
+      }
+
+      // Sort by original imageIndex to preserve display order
+      signedItems.sort((a, b) => a.imageIndex - b.imageIndex);
+      setPickerOptions(signedItems);
+      if (signedItems.length === 0) {
+        toast.error("Couldn't load portrait images. Go to Personas to reconfigure.");
       }
     } catch {
-      toast.error("Couldn't load generated portraits. Please try again.");
+      toast.error("Couldn't load portrait images. Please try again.");
     } finally {
       setPickerLoading(false);
     }
@@ -755,7 +843,7 @@ export default function GeneratePage() {
       setPickerPersona(null);
       setPickerOptions([]);
       setPickerSelectedImageIndex(null);
-      toast.success("Persona selected. Generating scene previews...");
+      toast.success("AI Creator selected. Generating scene previews...");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to save persona image";
       toast.error(message);
@@ -920,9 +1008,10 @@ export default function GeneratePage() {
     setShowPreviewEditor(false);
     const path = compositeImages[idx].path;
     store.setCompositeImagePath(path);
-    // If switching to a different image after a script was already generated, clear it
-    // so the user knows they need to click "Generate Script" again.
-    if (idx !== selectedCompositeIdx && store.pendingScript) {
+    // If the user MANUALLY switches to a different image after a script was already generated,
+    // clear it so they know to regenerate. Do NOT clear when auto-selecting on restore
+    // (selectedCompositeIdx === null means it's an initial/restore selection, not a manual switch).
+    if (idx !== selectedCompositeIdx && selectedCompositeIdx !== null && store.pendingScript) {
       store.clearPendingScript();
       setScriptConfigChanged(false);
     }
@@ -1080,7 +1169,6 @@ export default function GeneratePage() {
     if (!store.pendingGenerationId || !store.pendingScript) return;
     if (!hasEnoughCredits) {
       trackPaywallShown("insufficient_credits");
-      offer.startOffer();
       // Set default tab based on generation context
       setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
       setShowPaywall(true);
@@ -1124,7 +1212,6 @@ export default function GeneratePage() {
             (err.code === "INSUFFICIENT_CREDITS" || err.status === 402)
           ) {
             trackPaywallShown("insufficient_credits");
-            offer.startOffer();
             setPaywallTab(creditCost > CREDITS_PER_SINGLE_HD ? "subscription" : "single");
             setShowPaywall(true);
           } else if (
@@ -1241,7 +1328,7 @@ export default function GeneratePage() {
 
   async function handleCheckout(plan: PlanTier) {
     const couponId = offer.getSubscriptionCoupon(plan);
-    checkout.mutate({ plan, couponId }, {
+    checkout.mutate({ plan, couponId, return_path: "/generate" }, {
       onSuccess: (url) => {
         trackCheckoutStarted(plan);
         if (couponId) offer.markUsed();
@@ -1255,7 +1342,7 @@ export default function GeneratePage() {
     const isSingleVideo = pack === "single_standard" || pack === "single_hd";
     // Single videos: -50% during promo window. Credit packs: never discounted.
     const couponId = isSingleVideo && offer.isActive ? COUPON_50_OFF_FIRST_VIDEO : undefined;
-    buyCredits.mutate({ pack, couponId, generation_id: store.pendingGenerationId ?? undefined }, {
+    buyCredits.mutate({ pack, couponId, generation_id: store.pendingGenerationId ?? undefined, return_path: "/generate" }, {
       onSuccess: (url) => {
         if (pack in { pack_10: 1, pack_30: 1, pack_100: 1 }) {
           trackCreditsPurchased(pack as CreditPackKey);
@@ -1307,14 +1394,14 @@ export default function GeneratePage() {
 
   const paywallHeadline =
     videosGenerated === 0
-      ? "Create your first UGC ad in seconds."
+      ? "Your AI Creator is staged. Generate your first video now."
       : videosGenerated === 1
       ? "It works. Now scale your production."
       : "Scale your ad production.";
 
   const paywallSublineStatic =
     videosGenerated === 0
-      ? "AI writes the script, composites your persona, and renders the video. No filming needed."
+      ? "Traditional UGC costs $150–$500 per video. Yours: a fraction of that — ready in minutes, not weeks."
       : null;
 
   function handlePaywallClose(open: boolean) {
@@ -1326,7 +1413,6 @@ export default function GeneratePage() {
           action: {
             label: "Grab it",
             onClick: () => {
-              offer.startOffer();
               setShowPaywall(true);
             },
           },
@@ -1755,7 +1841,7 @@ export default function GeneratePage() {
                     <span className="text-foreground truncate max-w-[200px] sm:max-w-none">{selectedPersona.name}</span>
                   </span>
                 ) : (
-                  "AI Spokesperson"
+                  "AI Creator"
                 )}
               </span>
             </div>
@@ -1832,6 +1918,7 @@ export default function GeneratePage() {
                                       className="size-full rounded-full object-cover"
                                       loading="lazy"
                                       decoding="async"
+                                      onError={(e) => { e.currentTarget.style.display = "none"; }}
                                     />
                                   ) : (
                                     <User className="size-8 text-muted-foreground" />
@@ -1883,7 +1970,7 @@ export default function GeneratePage() {
                               <Plus className="size-6 text-muted-foreground" />
                             </div>
                             <div className="text-center">
-                              <p className="text-sm font-medium">New Persona</p>
+                              <p className="text-sm font-medium">New AI Creator</p>
                               {atLimit && (
                                 <p className="mt-0.5 text-xs text-muted-foreground">
                                   {personaLimit}/{personaLimit} used · upgrade to add more
@@ -1901,11 +1988,11 @@ export default function GeneratePage() {
                   <CardContent className="flex flex-col items-center gap-3 py-10">
                     <User className="size-8 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
-                      No personas yet. Create one first before generating a video.
+                      No AI Creators yet. Create one first before generating a video.
                     </p>
                     <Button asChild variant="outline" size="sm">
                       <Link href="/personas/new?returnTo=/generate">
-                        Create your first persona →
+                        Create your first AI Creator →
                       </Link>
                     </Button>
                   </CardContent>
@@ -1942,7 +2029,7 @@ export default function GeneratePage() {
                 </button>
               </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-2.5 py-1">
-                <span className="text-muted-foreground">Persona</span>
+                <span className="text-muted-foreground">AI Creator</span>
                 <span className="max-w-[150px] truncate font-medium text-foreground">
                   {selectedPersona?.name ?? "Not selected"}
                 </span>
@@ -2840,7 +2927,7 @@ export default function GeneratePage() {
       >
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Choose your persona portrait</DialogTitle>
+            <DialogTitle>Choose your AI Creator portrait</DialogTitle>
             <DialogDescription>
               Pick one portrait to continue. You can go back to persona editing if needed.
             </DialogDescription>
@@ -3186,7 +3273,7 @@ export default function GeneratePage() {
       {/* ── Persona limit paywall dialog ─────────────────────────────── */}
       <Dialog open={showPersonaLimitPaywall} onOpenChange={setShowPersonaLimitPaywall}>
         <DialogContent className="sm:max-w-4xl p-0 overflow-hidden max-h-[92vh] flex flex-col">
-          <DialogTitle className="sr-only">Upgrade to create more personas</DialogTitle>
+          <DialogTitle className="sr-only">Upgrade to create more AI Creators</DialogTitle>
 
           {offer.isActive && (
             <div className="bg-primary text-primary-foreground px-4 py-2.5 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-sm font-medium shrink-0">
@@ -3207,15 +3294,15 @@ export default function GeneratePage() {
                 <User className="size-7 text-primary" />
               </div>
               <h2 className="text-2xl font-bold tracking-tight">
-                {offer.isActive ? "Unlock More Personas (up to 50% off)" : "Unlock More Personas"}
+                {offer.isActive ? "Unlock More AI Creators (up to 50% off)" : "Unlock More AI Creators"}
               </h2>
               <p className="mt-2 text-muted-foreground max-w-md mx-auto">
                 {(() => {
                   const plan = profile?.plan as PlanTier | undefined;
                   const personaLimit = plan && PLANS[plan] ? PLANS[plan].personas : 1;
                   return plan
-                    ? `Your ${PLANS[plan as PlanTier]?.name ?? "current"} plan is limited to ${personaLimit} persona${personaLimit !== 1 ? "s" : ""}. Upgrade to create more.`
-                    : "The free plan is limited to 1 persona. Upgrade to create more.";
+                    ? `Your ${PLANS[plan as PlanTier]?.name ?? "current"} plan is limited to ${personaLimit} AI Creator${personaLimit !== 1 ? "s" : ""}. Upgrade to create more.`
+                    : "The free plan is limited to 1 AI Creator. Upgrade to create more.";
                 })()}
               </p>
             </div>
@@ -3256,7 +3343,7 @@ export default function GeneratePage() {
                             <span className="text-xs text-muted-foreground">/mo</span>
                           </div>
                           <p className="mt-1 text-xs text-orange-500 font-medium">
-                            Up to {plan.personas} persona{(plan.personas as number) !== 1 ? "s" : ""}
+                            Up to {plan.personas} AI Creator{(plan.personas as number) !== 1 ? "s" : ""}
                           </p>
                         </div>
                         <Button
@@ -3305,7 +3392,7 @@ export default function GeneratePage() {
           <DialogHeader>
             <DialogTitle>Save as Preset</DialogTitle>
             <DialogDescription>
-              Save your current product, persona, and settings for quick access later.
+              Save your current product, AI Creator, and settings for quick access later.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -3334,6 +3421,46 @@ export default function GeneratePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Leave guard dialog */}
+      {showLeaveDialog && (
+        <Dialog open={showLeaveDialog} onOpenChange={(open) => { if (!open) cancelLeave(); }}>
+          <DialogContent className="max-w-sm gap-0 p-0 overflow-hidden">
+            {/* Icon header */}
+            <div className="flex flex-col items-center gap-3 px-6 pt-8 pb-5 text-center">
+              <div className="flex size-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/60">
+                <Bookmark className="size-6 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-semibold">Leave this page?</DialogTitle>
+                <DialogDescription className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
+                  Your progress is <span className="font-medium text-foreground">auto-saved</span> — including your scene preview. Come back anytime to pick up where you left off without regenerating.
+                </DialogDescription>
+              </div>
+            </div>
+            {/* Actions */}
+            <div className="flex flex-col gap-2 border-t border-border bg-muted/30 px-6 py-4">
+              <Button onClick={confirmLeave} className="w-full">
+                Save & Leave
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full text-destructive hover:text-destructive hover:bg-destructive/5 border-destructive/20"
+                onClick={() => { store.reset(); confirmLeave(); }}
+              >
+                Discard & Leave
+              </Button>
+              <button
+                type="button"
+                onClick={cancelLeave}
+                className="w-full py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Stay on page
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

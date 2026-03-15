@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Users, User, Trash2, Loader2, Lock } from "lucide-react";
+import { Plus, Users, User, Trash2, Loader2, Lock, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -116,7 +116,7 @@ export default function PersonasPage() {
 
     deleteMutation.mutate(undefined, {
       onSuccess: () => {
-        toast.success("Persona deleted successfully");
+        toast.success("AI Creator deleted successfully");
         setPersonaToDelete(null);
       },
       onError: (err) => {
@@ -130,27 +130,27 @@ export default function PersonasPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">AI Personas</h1>
+          <h1 className="text-2xl font-bold tracking-tight">AI Creators</h1>
           <span className="mt-1 block text-sm text-muted-foreground" suppressHydrationWarning>
             {isLoading ? (
               <Skeleton className="inline-block h-4 w-32" />
             ) : (
               isAdmin
-                ? `${personas?.length ?? 0} personas · unlimited (admin)`
-                : `Personas this month: ${monthlyUsed}/${monthlyLimit} · Resets ${resetLabel}`
+                ? `${personas?.length ?? 0} AI Creators · unlimited (admin)`
+                : `AI Creators this month: ${monthlyUsed}/${monthlyLimit} · Resets ${resetLabel}`
             )}
           </span>
         </div>
         {atLimit ? (
           <Button disabled>
             <Plus className="size-4" />
-            Create Persona
+            Create AI Creator
           </Button>
         ) : (
           <Button asChild>
             <Link href="/personas/new">
               <Plus className="size-4" />
-              Create Persona
+              Create AI Creator
             </Link>
           </Button>
         )}
@@ -162,7 +162,7 @@ export default function PersonasPage() {
           <Lock className="size-4 text-amber-600 dark:text-amber-400" />
           <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-amber-800 dark:text-amber-200">
-              You&apos;ve reached your monthly persona limit ({monthlyUsed}/{monthlyLimit}).
+              You&apos;ve reached your monthly AI Creator limit ({monthlyUsed}/{monthlyLimit}).
               Resets {resetLabel}. Upgrade your plan for more.
             </span>
             <Button asChild size="sm" variant="default" className="w-fit shrink-0">
@@ -198,6 +198,7 @@ export default function PersonasPage() {
           {personas!.map((persona) => {
             const resolvedUrl = imageMap[persona.id];
             const attrs = persona.attributes;
+            const isIncomplete = !persona.selected_image_url && (persona.generated_images?.length ?? 0) > 0;
 
             return (
               <Link key={persona.id} href={`/personas/${persona.id}`} className="block h-full">
@@ -218,6 +219,11 @@ export default function PersonasPage() {
                       ) : (
                         <User className="size-10 text-muted-foreground" />
                       )}
+                      {isIncomplete && (
+                        <div className="absolute bottom-0 right-0 flex size-7 items-center justify-center rounded-full bg-amber-500 ring-2 ring-background">
+                          <ImageIcon className="size-3.5 text-white" />
+                        </div>
+                      )}
                     </div>
 
                     {/* Name & Info */}
@@ -225,9 +231,15 @@ export default function PersonasPage() {
                       <h3 className="text-lg font-semibold">
                         {persona.name}
                       </h3>
-                      <p className="mt-0.5 text-sm text-muted-foreground">
-                        {attrs.gender} / {attrs.age}
-                      </p>
+                      {isIncomplete ? (
+                        <p className="mt-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                          Choose portrait in Generate →
+                        </p>
+                      ) : (
+                        <p className="mt-0.5 text-sm text-muted-foreground">
+                          {attrs.gender} / {attrs.age}
+                        </p>
+                      )}
                     </div>
 
                     {/* Attribute Badges */}
@@ -321,7 +333,7 @@ export default function PersonasPage() {
               <Users className="size-7 text-primary" />
             </div>
             <div className="text-center">
-              <h3 className="font-semibold">Create your first AI persona</h3>
+              <h3 className="font-semibold">Create your first AI Creator</h3>
               <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                 Build a custom AI avatar to star in your UGC video ads.
                 Customize appearance, style, and more.
@@ -330,7 +342,7 @@ export default function PersonasPage() {
             <Button asChild>
               <Link href="/personas/new">
                 <Plus className="size-4" />
-                Create Persona
+                Create AI Creator
               </Link>
             </Button>
           </CardContent>

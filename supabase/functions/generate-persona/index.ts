@@ -737,7 +737,7 @@ Deno.serve(async (req: Request) => {
         .update({
           name,
           attributes: attributesToSave,
-          generated_images: storagePaths,
+          generated_images: [...existingGeneratedImages, ...storagePaths],
           selected_image_url: null,
           regen_count: existingRegenCount + 1,
         })
@@ -752,7 +752,7 @@ Deno.serve(async (req: Request) => {
           .update({
             name,
             attributes: attributesToSave,
-            generated_images: storagePaths,
+            generated_images: [...existingGeneratedImages, ...storagePaths],
             selected_image_url: null,
           })
           .eq("id", persona_id)
@@ -767,6 +767,42 @@ Deno.serve(async (req: Request) => {
         persona = data;
       }
     } else {
+      // New persona with images (Quick Create, imageCount > 0).
+      // Enforce monthly creation limit here (same as init mode) since select-persona-image
+      // no longer tracks monthly quota — it is always handled at persona creation time.
+      if (!isAdmin) {
+        const monthYear = new Date().toISOString().slice(0, 7);
+        const { data: monthlyRow } = await sb
+          .from("persona_monthly_limits")
+          .select("personas_created")
+          .eq("owner_id", userId)
+          .eq("month_year", monthYear)
+          .maybeSingle();
+        const monthlyUsed = monthlyRow?.personas_created ?? 0;
+        const monthlyLimit = MONTHLY_PERSONA_LIMITS[plan] ?? 1;
+        if (monthlyUsed >= monthlyLimit) {
+          return json(
+            {
+              detail:
+                plan === "free"
+                  ? `Free plan allows 1 persona per month. Upgrade to create more.`
+                  : `Your ${plan} plan allows ${monthlyLimit} persona(s) per month. Resets next month.`,
+            },
+            cors,
+            403,
+          );
+        }
+        // Increment monthly count immediately on creation (not deferred to selection).
+        await sb.from("persona_monthly_limits").upsert(
+          {
+            owner_id: userId,
+            month_year: monthYear,
+            personas_created: monthlyUsed + 1,
+          },
+          { onConflict: "owner_id,month_year" },
+        );
+      }
+
       const { data, error } = await sb
         .from("personas")
         .insert({

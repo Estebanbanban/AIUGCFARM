@@ -6,7 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePersonas, useGeneratePersonaImages, useSelectPersonaImage } from "@/hooks/use-personas";
-import { isExternalUrl, getSignedImageUrl } from "@/lib/storage";
+import { isExternalUrl, getSignedImageUrl, getSignedImageUrls } from "@/lib/storage";
 import { useGenerations } from "@/hooks/use-generations";
 import { useProducts, useScrapeProduct } from "@/hooks/use-products";
 import { PersonaBuilderInline } from "@/components/personas/PersonaBuilderInline";
@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import { useGenerationWizardStore } from "@/stores/generation-wizard";
 import type { Product, BrandSummary, Persona } from "@/types/database";
 import type { ScrapeResponseData } from "@/types/api";
+import { useFirstPurchaseOffer } from "@/hooks/use-first-purchase-offer";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -61,7 +62,7 @@ const STEPS = [
   },
   {
     key: "persona" as const,
-    label: "Persona",
+    label: "AI Creator",
     title: "Create your AI creator",
     description: "Create your AI spokesperson. Customize look, style & vibe. They'll star in every video you make. (~5 min)",
     icon: User,
@@ -83,6 +84,7 @@ const STEPS = [
 
 export function OnboardingOverlay() {
   const router = useRouter();
+  const offer = useFirstPurchaseOffer();
   const { isLoaded: authLoaded } = useAuth();
   const [view, setView] = useState<WizardView>("checklist");
   const [skipped, setSkipped] = useState(false);
@@ -94,6 +96,33 @@ export function OnboardingOverlay() {
   const { data: products, isLoading: productsLoading } = useProducts();
   const { data: personas, isLoading: personasLoading } = usePersonas();
   const { data: generations, isLoading: generationsLoading } = useGenerations();
+
+  // Resolve signed URLs for product images in the picker modal
+  const [productImageMap, setProductImageMap] = useState<Record<string, string | null>>({});
+  useEffect(() => {
+    if (!products || products.length === 0) return;
+    let cancelled = false;
+    async function resolve() {
+      const result: Record<string, string | null> = {};
+      const toSign: { id: string; path: string }[] = [];
+      for (const p of products!) {
+        const raw = p.images?.[0];
+        if (!raw) { result[p.id] = null; }
+        else if (isExternalUrl(raw)) { result[p.id] = raw; }
+        else { result[p.id] = null; toSign.push({ id: p.id, path: raw }); }
+      }
+      if (!cancelled) setProductImageMap({ ...result });
+      if (toSign.length > 0) {
+        const signed = await getSignedImageUrls("product-images", toSign.map(x => x.path));
+        if (!cancelled) {
+          signed.forEach((url, i) => { result[toSign[i].id] = url; });
+          setProductImageMap({ ...result });
+        }
+      }
+    }
+    resolve();
+    return () => { cancelled = true; };
+  }, [products]);
 
   const hasProduct = (products?.length ?? 0) > 0;
   const hasPersonaWithImage = (personas ?? []).some(
@@ -188,7 +217,7 @@ export function OnboardingOverlay() {
   };
 
   const handlePersonaComplete = () => {
-    toast.success("Persona created!");
+    toast.success("AI Creator created!");
     if (!hasCompletedGeneration) {
       setView("step-video");
     } else {
@@ -216,6 +245,7 @@ export function OnboardingOverlay() {
         if (!wizardStore.format) wizardStore.setFormat("9:16");
         wizardStore.setStep(2);
         setView("banner");
+        offer.startOffer();
         router.push("/generate");
       } else {
         // Multiple products - show picker modal
@@ -223,6 +253,7 @@ export function OnboardingOverlay() {
       }
     } else {
       setView("banner");
+      offer.startOffer();
       router.push("/generate");
     }
   };
@@ -234,6 +265,7 @@ export function OnboardingOverlay() {
     wizardStore.setStep(2);
     setShowProductPicker(false);
     setView("banner");
+    offer.startOffer();
     router.push("/generate");
   };
 
@@ -297,7 +329,7 @@ export function OnboardingOverlay() {
       <AnimatePresence>
         <GuideBanner
           key="guide-banner"
-          onGoGenerate={() => router.push("/generate")}
+          onGoGenerate={() => { offer.startOffer(); router.push("/generate"); }}
           onDismiss={handleSkip}
         />
       </AnimatePresence>
@@ -308,37 +340,40 @@ export function OnboardingOverlay() {
   if (showProductPicker) {
     return (
       <Dialog open={showProductPicker} onOpenChange={(open) => { if (!open) setShowProductPicker(false); }}>
-        <DialogContent className="sm:max-w-2xl" showCloseButton={false}>
+        <DialogContent className="sm:max-w-3xl" showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>Which product are you promoting?</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3 pt-1 max-h-[65vh] overflow-y-auto pr-1">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 pt-1 max-h-[65vh] overflow-y-auto pr-1">
             {(products ?? []).map((product) => (
               <button
                 key={product.id}
                 onClick={() => handleProductPickerSelect(product.id)}
-                className="group overflow-hidden rounded-xl border border-border bg-card text-left transition-all hover:border-primary/60 hover:shadow-md"
+                className="group w-full text-left"
               >
-                {/* Image — square, neutral bg so products are clearly visible */}
-                <div className="relative aspect-square w-full overflow-hidden bg-white">
-                  {product.images?.[0] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={product.images[0]}
-                      alt={product.name}
-                      className="size-full object-contain p-3 transition-transform duration-200 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex size-full items-center justify-center bg-muted/40">
-                      <Package className="size-10 text-muted-foreground/40" />
-                    </div>
-                  )}
-                </div>
-                {/* Name */}
-                <div className="border-t border-border/50 bg-muted/20 px-3 py-2.5">
-                  <p className="line-clamp-2 text-xs font-medium leading-snug text-foreground">
-                    {product.name}
-                  </p>
+                <div className="overflow-hidden rounded-xl border border-border transition-all hover:border-primary/60 hover:shadow-md">
+                  {/* Square image */}
+                  <div className="relative aspect-square w-full overflow-hidden bg-muted">
+                    {productImageMap[product.id] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={productImageMap[product.id]!}
+                        alt={product.name}
+                        className="size-full object-cover transition-transform duration-200 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex size-full items-center justify-center">
+                        <Package className="size-6 text-muted-foreground/50" />
+                      </div>
+                    )}
+                  </div>
+                  {/* Name */}
+                  <div className="px-2 py-1.5">
+                    <p className="truncate text-xs font-medium leading-snug">
+                      {product.name}
+                    </p>
+                  </div>
                 </div>
               </button>
             ))}
@@ -971,8 +1006,8 @@ function PersonaView({
           <CheckCircle2 className="size-8 text-emerald-500" />
         </motion.div>
         <div className="text-center">
-          <p className="text-base font-semibold text-foreground">Persona ready!</p>
-          <p className="text-sm text-muted-foreground">Your AI spokesperson is all set...</p>
+          <p className="text-base font-semibold text-foreground">AI Creator ready!</p>
+          <p className="text-sm text-muted-foreground">Your AI Creator is all set...</p>
         </div>
       </div>
     );

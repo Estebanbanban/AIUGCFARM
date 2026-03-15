@@ -57,8 +57,13 @@ Deno.serve(async (req: Request) => {
     const sb = getAdminClient();
 
     const body = await req.json();
-    const { plan, pack, couponId, billing, generation_id } = body;
+    const { plan, pack, couponId, billing, generation_id, return_path } = body;
     const isAnnual = billing === "annual";
+
+    // Whitelist allowed return paths to prevent open redirect
+    const safeReturnPath = (typeof return_path === "string" && (return_path.startsWith("/generate") || return_path.startsWith("/dashboard")))
+      ? return_path
+      : null;
 
     if (!plan && !pack) {
       return json({ detail: "Provide either 'plan' or 'pack'" }, cors, 400);
@@ -178,16 +183,15 @@ Deno.serve(async (req: Request) => {
       }
 
       const isSingleVideo = pack === "single_standard" || pack === "single_hd";
-      const packSuccessUrl = (generation_id || isSingleVideo)
-        ? `${FRONTEND_URL}/generate?checkout=success&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`
-        : `${FRONTEND_URL}/dashboard?checkout=success&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`;
+      const packReturnBase = safeReturnPath ?? (generation_id || isSingleVideo ? "/generate" : "/dashboard");
+      const packSuccessUrl = `${FRONTEND_URL}${packReturnBase}?checkout=success&pack=${pack}&session_id={CHECKOUT_SESSION_ID}`;
 
       const sessionParams: Stripe.Checkout.SessionCreateParams = {
         customer: stripeCustomerId,
         mode: "payment",
         line_items: [{ price: priceId, quantity: 1 }],
         success_url: packSuccessUrl,
-        cancel_url: `${FRONTEND_URL}/settings/billing?checkout=cancelled`,
+        cancel_url: `${FRONTEND_URL}${safeReturnPath ?? "/generate"}?checkout=cancelled`,
         metadata: {
           supabase_user_id: userId,
           pack,
@@ -225,8 +229,8 @@ Deno.serve(async (req: Request) => {
       customer: stripeCustomerId,
       mode: "subscription",
       line_items: [{ price: resolvedPriceId, quantity: 1 }],
-      success_url: `${FRONTEND_URL}/dashboard?checkout=success&plan=${plan}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${FRONTEND_URL}/pricing?checkout=canceled`,
+      success_url: `${FRONTEND_URL}${safeReturnPath ?? "/dashboard"}?checkout=success&plan=${plan}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${FRONTEND_URL}${safeReturnPath ?? "/generate"}?checkout=cancelled`,
       subscription_data: {
         metadata: { supabase_user_id: userId, plan, billing: billing ?? "monthly" },
       },
