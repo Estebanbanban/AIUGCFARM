@@ -630,7 +630,7 @@ Keep it under 100 words. Return ONLY the prompt text, no JSON, no quotes.`;
           if (!imgRes.ok) throw new Error(`Failed to download composite image: HTTP ${imgRes.status}`);
           inputReferenceBlob = await imgRes.blob();
         } else if (reference_type === "persona") {
-          // Load persona to get selected_image_url
+          // Load persona to get selected_image_url (a storage path, not a full URL)
           if (!gen.persona_id) {
             throw new Error("No persona_id on generation for persona reference type");
           }
@@ -642,7 +642,14 @@ Keep it under 100 words. Return ONLY the prompt text, no JSON, no quotes.`;
           if (persErr || !persona?.selected_image_url) {
             throw new Error("Persona or selected_image_url not found");
           }
-          const imgRes = await fetch(persona.selected_image_url);
+          // selected_image_url is a storage path like "userId/uuid.jpg" — sign it
+          const { data: personaSignedUrl, error: personaUrlErr } = await sb.storage
+            .from("persona-images")
+            .createSignedUrl(persona.selected_image_url, 7200);
+          if (personaUrlErr || !personaSignedUrl?.signedUrl) {
+            throw new Error(`Failed to sign persona image: ${personaUrlErr?.message}`);
+          }
+          const imgRes = await fetch(personaSignedUrl.signedUrl);
           if (!imgRes.ok) throw new Error(`Failed to download persona image: HTTP ${imgRes.status}`);
           inputReferenceBlob = await imgRes.blob();
         } else if (reference_type === "custom") {
