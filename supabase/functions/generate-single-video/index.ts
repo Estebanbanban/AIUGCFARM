@@ -497,8 +497,8 @@ Keep it under 100 words. Return ONLY the prompt text, no JSON, no quotes.`;
         return errorResponse(ErrorCodes.INVALID_INPUT, "sora_model must be 'sora-2' or 'sora-2-pro'", 400, cors);
       }
 
-      // Clamp duration to nearest valid Sora value (4, 8, 12)
-      const validDurations = [4, 8, 12];
+      // Clamp duration to nearest valid Sora value
+      const validDurations = [4, 8, 12, 16, 20];
       const clampedDuration = validDurations.reduce((prev, curr) =>
         Math.abs(curr - (duration || 12)) < Math.abs(prev - (duration || 12)) ? curr : prev
       );
@@ -554,25 +554,26 @@ Keep it under 100 words. Return ONLY the prompt text, no JSON, no quotes.`;
 
       // ── 3. Compute credit cost and check/debit ──────────────────
       const creditCost = CREDIT_COST[sora_model] ?? 5;
-
-      const remaining = await checkCredits(userId);
-      if (remaining < creditCost) {
-        // Unlock
-        await sb
-          .from("generations")
-          .update({ status: "awaiting_approval" })
-          .eq("id", generation_id);
-        return errorResponse(
-          ErrorCodes.INSUFFICIENT_CREDITS,
-          `Need ${creditCost} credits, have ${remaining}`,
-          402,
-          cors,
-        );
-      }
-
-      await debitCredits(userId, creditCost, generation_id);
+      let creditDebited = false;
 
       try {
+        const remaining = await checkCredits(userId);
+        if (remaining < creditCost) {
+          // Unlock
+          await sb
+            .from("generations")
+            .update({ status: "awaiting_approval" })
+            .eq("id", generation_id);
+          return errorResponse(
+            ErrorCodes.INSUFFICIENT_CREDITS,
+            `Need ${creditCost} credits, have ${remaining}`,
+            402,
+            cors,
+          );
+        }
+
+        await debitCredits(userId, creditCost, generation_id);
+        creditDebited = true;
         // ── 4. Load persona for rich Sora prompt ────────────────
         let fullPersonaData: Record<string, unknown> | null = null;
         if (gen.persona_id) {
@@ -651,38 +652,15 @@ Keep it under 100 words. Return ONLY the prompt text, no JSON, no quotes.`;
         }
         // reference_type === "none" → no blob
 
-        // ── 7. Resize reference image to match Sora's required dimensions ──
-        // Sora requires input_reference to exactly match the target size.
         // sora-2: 720x1280, sora-2-pro: 1080x1920
         const targetSize = sora_model === "sora-2-pro" ? "1080x1920" : "720x1280";
-        const [targetW, targetH] = targetSize.split("x").map(Number);
 
-        if (inputReferenceBlob) {
-          try {
-            const bitmap = await createImageBitmap(inputReferenceBlob);
-            if (bitmap.width !== targetW || bitmap.height !== targetH) {
-              console.log(`Resizing reference image from ${bitmap.width}x${bitmap.height} to ${targetW}x${targetH}`);
-              const canvas = new OffscreenCanvas(targetW, targetH);
-              const ctx = canvas.getContext("2d")!;
-              // Cover-fit: scale to fill, crop excess
-              const scale = Math.max(targetW / bitmap.width, targetH / bitmap.height);
-              const scaledW = bitmap.width * scale;
-              const scaledH = bitmap.height * scale;
-              const offsetX = (targetW - scaledW) / 2;
-              const offsetY = (targetH - scaledH) / 2;
-              ctx.drawImage(bitmap, offsetX, offsetY, scaledW, scaledH);
-              const resizedBlob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.92 });
-              inputReferenceBlob = resizedBlob;
-            }
-            bitmap.close();
-          } catch (resizeErr) {
-            // If OffscreenCanvas is not available in this Deno runtime, skip reference image
-            console.warn("Image resize failed, submitting without reference image:", resizeErr);
-            inputReferenceBlob = undefined;
-          }
-        }
+        // Note: Sora requires input_reference to match target size exactly.
+        // Deno Deploy does not support OffscreenCanvas for resizing.
+        // If the image dimensions don't match, Sora will reject it and we'll
+        // get a clear error rather than silently dropping the reference.
 
-        // ── 8. Submit Sora job ────────────────────────────────────
+        // ── 7. Submit Sora job ────────────────────────────────────
         const soraResult = await submitSoraJob({
           prompt: soraPrompt,
           model: sora_model as "sora-2" | "sora-2-pro",
@@ -721,22 +699,24 @@ Keep it under 100 words. Return ONLY the prompt text, no JSON, no quotes.`;
           200,
         );
       } catch (err) {
-        // Refund credits on failure
-        console.error("Full phase failed, refunding credits:", err);
+        // Refund credits on failure (only if we actually debited)
+        console.error("Full phase failed:", err);
         captureException(err);
 
-        try {
-          await refundCredits(userId, creditCost, generation_id);
-        } catch (refundErr) {
-          console.error("Credit refund failed:", refundErr);
-          captureException(refundErr);
+        if (creditDebited) {
+          try {
+            await refundCredits(userId, creditCost, generation_id);
+          } catch (refundErr) {
+            console.error("Credit refund failed:", refundErr);
+            captureException(refundErr);
+          }
         }
 
-        // Set status to failed
+        // Reset status: "awaiting_approval" if pre-debit failure (retryable), "failed" if post-debit
         await sb
           .from("generations")
           .update({
-            status: "failed",
+            status: creditDebited ? "failed" : "awaiting_approval",
             error_message: err instanceof Error ? err.message : String(err),
           })
           .eq("id", generation_id);

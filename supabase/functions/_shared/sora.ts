@@ -135,9 +135,23 @@ export async function submitSoraJob(params: {
 export async function checkSoraJob(jobId: string): Promise<SoraJobStatus> {
   const apiKey = getOpenAIKey();
 
-  const res = await fetch(`${SORA_BASE}/${jobId}`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+  let res: Response;
+  try {
+    res = await fetch(`${SORA_BASE}/${jobId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("Sora status check timed out after 30s.");
+    }
+    throw err;
+  }
+  clearTimeout(timeoutId);
 
   if (!res.ok) {
     let errBody: string;
