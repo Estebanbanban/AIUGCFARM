@@ -668,11 +668,42 @@ Keep it under 100 words. Return ONLY the prompt text, no JSON, no quotes.`;
         }
         // reference_type === "none" → no blob
 
-        // ── 6. Submit Sora job ────────────────────────────────────
+        // ── 7. Resize reference image to match Sora's required dimensions ──
+        // Sora requires input_reference to exactly match the target size.
+        const targetSize = sora_model === "sora-2-pro" ? "1080x1920" : "720x1280";
+        const [targetW, targetH] = targetSize.split("x").map(Number);
+
+        if (inputReferenceBlob) {
+          try {
+            const bitmap = await createImageBitmap(inputReferenceBlob);
+            if (bitmap.width !== targetW || bitmap.height !== targetH) {
+              console.log(`Resizing reference image from ${bitmap.width}x${bitmap.height} to ${targetW}x${targetH}`);
+              const canvas = new OffscreenCanvas(targetW, targetH);
+              const ctx = canvas.getContext("2d")!;
+              // Cover-fit: scale to fill, crop excess
+              const scale = Math.max(targetW / bitmap.width, targetH / bitmap.height);
+              const scaledW = bitmap.width * scale;
+              const scaledH = bitmap.height * scale;
+              const offsetX = (targetW - scaledW) / 2;
+              const offsetY = (targetH - scaledH) / 2;
+              ctx.drawImage(bitmap, offsetX, offsetY, scaledW, scaledH);
+              const resizedBlob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.92 });
+              inputReferenceBlob = resizedBlob;
+            }
+            bitmap.close();
+          } catch (resizeErr) {
+            // If OffscreenCanvas is not available in this Deno runtime, skip reference image
+            console.warn("Image resize failed, submitting without reference image:", resizeErr);
+            inputReferenceBlob = undefined;
+          }
+        }
+
+        // ── 8. Submit Sora job ────────────────────────────────────
         const soraResult = await submitSoraJob({
           prompt: soraPrompt,
           model: sora_model as "sora-2" | "sora-2-pro",
           seconds: duration,
+          size: targetSize,
           input_reference_blob: inputReferenceBlob,
         });
 
