@@ -2,6 +2,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
+import { r2PublicUrl } from "../_shared/r2.ts";
 
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req);
@@ -24,7 +25,7 @@ Deno.serve(async (req: Request) => {
 
     if (error) throw new Error(error.message);
 
-    // For each collection, fetch first 4 images and generate signed URLs
+    // For each collection, fetch first 4 images and build public R2 URLs
     const result = await Promise.all(
       (collections ?? []).map(async (col) => {
         const { data: images } = await sb
@@ -34,18 +35,9 @@ Deno.serve(async (req: Request) => {
           .order("created_at", { ascending: false })
           .limit(4);
 
-        const previewImages: string[] = [];
-        if (images && images.length > 0) {
-          const paths = images.map((img) => img.storage_path);
-          for (const path of paths) {
-            const { data: signed } = await sb.storage
-              .from("slideshow-images")
-              .createSignedUrl(path, 3600);
-            if (signed?.signedUrl) {
-              previewImages.push(signed.signedUrl);
-            }
-          }
-        }
+        const previewImages: string[] = (images ?? []).map((img) =>
+          r2PublicUrl(img.storage_path),
+        );
 
         return {
           id: col.id,

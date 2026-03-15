@@ -2,6 +2,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
+import { r2PublicUrl } from "../_shared/r2.ts";
 
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req);
@@ -34,7 +35,7 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "Slideshow not found" }, cors, 404);
     }
 
-    // For each slide that has an imageId, generate a signed URL
+    // For each slide that has an imageId, build a public R2 URL
     const slides = Array.isArray(slideshow.slides) ? slideshow.slides : [];
     const enrichedSlides = await Promise.all(
       slides.map(async (slide: Record<string, unknown>) => {
@@ -49,13 +50,9 @@ Deno.serve(async (req: Request) => {
 
         if (!img?.storage_path) return slide;
 
-        const { data: signed } = await sb.storage
-          .from("slideshow-images")
-          .createSignedUrl(img.storage_path, 3600);
-
         return {
           ...slide,
-          imageUrl: signed?.signedUrl ?? null,
+          imageUrl: r2PublicUrl(img.storage_path),
         };
       }),
     );

@@ -2,6 +2,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
+import { r2Upload, r2Delete } from "../_shared/r2.ts";
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -64,7 +65,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Upload each file and insert DB rows
+    // Upload each file to R2 and insert DB rows
     const uploaded: { id: string; storage_path: string; filename: string }[] = [];
 
     const MIME_TO_EXT: Record<string, string> = {
@@ -76,16 +77,13 @@ Deno.serve(async (req: Request) => {
     for (const file of files) {
       const ext = MIME_TO_EXT[file.type] || "jpg";
       const storagePath = `${userId}/${collectionId}/${crypto.randomUUID()}.${ext}`;
+      const r2Key = `slideshow-images/${storagePath}`;
 
-      const { error: uploadErr } = await sb.storage
-        .from("slideshow-images")
-        .upload(storagePath, file, {
-          contentType: file.type,
-          upsert: false,
-        });
-
-      if (uploadErr) {
-        console.error(`Image upload failed for ${file.name}:`, uploadErr.message);
+      try {
+        const fileBuffer = new Uint8Array(await file.arrayBuffer());
+        await r2Upload(r2Key, fileBuffer, file.type);
+      } catch (err) {
+        console.error(`R2 upload failed for ${file.name}:`, (err as Error).message);
         continue;
       }
 
@@ -103,8 +101,10 @@ Deno.serve(async (req: Request) => {
 
       if (insertErr) {
         console.error(`DB insert failed for ${file.name}:`, insertErr.message);
-        // Clean up the uploaded file
-        await sb.storage.from("slideshow-images").remove([storagePath]);
+        // Clean up the uploaded file from R2
+        try {
+          await r2Delete(r2Key);
+        } catch { /* best effort */ }
         continue;
       }
 

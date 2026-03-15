@@ -2,6 +2,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
+import { r2Delete } from "../_shared/r2.ts";
 
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req);
@@ -34,13 +35,11 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "Image not found" }, cors, 404);
     }
 
-    // Delete from storage
-    const { error: removeErr } = await sb.storage
-      .from("slideshow-images")
-      .remove([image.storage_path]);
-
-    if (removeErr) {
-      console.error("Storage delete error:", removeErr.message);
+    // Delete from R2
+    try {
+      await r2Delete(`slideshow-images/${image.storage_path}`);
+    } catch (err) {
+      console.error("R2 delete error:", (err as Error).message);
     }
 
     // Delete DB row (trigger auto-decrements image_count)

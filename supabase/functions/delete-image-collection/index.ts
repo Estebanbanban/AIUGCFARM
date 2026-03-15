@@ -2,6 +2,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireUserId } from "../_shared/auth.ts";
 import { json } from "../_shared/response.ts";
 import { getAdminClient } from "../_shared/supabase.ts";
+import { r2DeleteMany } from "../_shared/r2.ts";
 
 Deno.serve(async (req: Request) => {
   const cors = getCorsHeaders(req);
@@ -34,21 +35,19 @@ Deno.serve(async (req: Request) => {
       return json({ detail: "Collection not found" }, cors, 404);
     }
 
-    // Fetch all images to delete from storage
+    // Fetch all images to delete from R2
     const { data: images } = await sb
       .from("collection_images")
       .select("storage_path")
       .eq("collection_id", id);
 
-    // Delete files from storage
+    // Delete files from R2
     if (images && images.length > 0) {
-      const paths = images.map((img) => img.storage_path);
-      const { error: removeErr } = await sb.storage
-        .from("slideshow-images")
-        .remove(paths);
-
-      if (removeErr) {
-        console.error("Storage cleanup error:", removeErr.message);
+      const r2Keys = images.map((img) => `slideshow-images/${img.storage_path}`);
+      try {
+        await r2DeleteMany(r2Keys);
+      } catch (err) {
+        console.error("R2 cleanup error:", (err as Error).message);
       }
     }
 
