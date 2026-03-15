@@ -46,11 +46,9 @@ async function verifyClerkJWT(token: string): Promise<string> {
   // Check expiry
   if (payload.exp && Date.now() / 1000 > payload.exp) throw new Error("JWT expired");
 
-  // Derive JWKS URL: env var takes precedence, then issuer from JWT, then fail
-  const jwksUrl =
-    Deno.env.get("CLERK_JWKS_URL") ||
-    (payload.iss ? `${payload.iss}/.well-known/jwks.json` : null);
-  if (!jwksUrl) throw new Error("Cannot determine JWKS URL — set CLERK_JWKS_URL env var");
+  // JWKS URL must come from env — never derived from the JWT payload (attacker-controlled)
+  const jwksUrl = Deno.env.get("CLERK_JWKS_URL");
+  if (!jwksUrl) throw new Error("CLERK_JWKS_URL env var is not set — cannot verify JWT");
 
   const jwks = await getJWKS(jwksUrl);
   const jwk = jwks.keys.find((k) => k.kid === header.kid);
@@ -120,8 +118,8 @@ export async function requireUserId(req: Request): Promise<string> {
         const clerkUser = await clerkRes.json() as { email_addresses?: Array<{ email_address: string }> };
         const email = clerkUser.email_addresses?.[0]?.email_address;
         if (email) {
-          // Find existing profile by email — no IS NULL constraint so we also
-          // fix profiles whose clerk_user_id was set to a stale/wrong value.
+          // Find existing profile by email — only link if clerk_user_id is NULL
+          // to prevent account takeover via email registration on Clerk.
           const { data: existingProfile } = await adminClient
             .from("profiles")
             .select("id, clerk_user_id")
@@ -129,12 +127,20 @@ export async function requireUserId(req: Request): Promise<string> {
             .maybeSingle();
 
           if (existingProfile) {
-            // Link (or re-link) the clerk_user_id
-            await adminClient
-              .from("profiles")
-              .update({ clerk_user_id: clerkUserId })
-              .eq("id", existingProfile.id);
-            console.log("[auth] Linked clerk_user_id for profile:", existingProfile.id, "prev:", existingProfile.clerk_user_id ?? "null");
+            if (existingProfile.clerk_user_id && existingProfile.clerk_user_id !== clerkUserId) {
+              // Profile already linked to a different Clerk user — refuse to overwrite
+              console.error("[auth] Profile", existingProfile.id, "already linked to", existingProfile.clerk_user_id, "— refusing to re-link to", clerkUserId);
+              throw new Error("Unauthorized");
+            }
+            if (!existingProfile.clerk_user_id) {
+              // Link the clerk_user_id for the first time
+              await adminClient
+                .from("profiles")
+                .update({ clerk_user_id: clerkUserId })
+                .eq("id", existingProfile.id)
+                .is("clerk_user_id", null); // double-guard against race condition
+              console.log("[auth] Linked clerk_user_id for profile:", existingProfile.id);
+            }
             return existingProfile.id;
           }
 

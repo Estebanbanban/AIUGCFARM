@@ -47,7 +47,8 @@ Deno.serve(async (req: Request) => {
     const { error: deleteErr } = await sb
       .from("collection_images")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("owner_id", userId);
 
     if (deleteErr) throw new Error(deleteErr.message);
 

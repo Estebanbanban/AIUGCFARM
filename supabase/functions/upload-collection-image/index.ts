@@ -67,8 +67,14 @@ Deno.serve(async (req: Request) => {
     // Upload each file and insert DB rows
     const uploaded: { id: string; storage_path: string; filename: string }[] = [];
 
+    const MIME_TO_EXT: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+    };
+
     for (const file of files) {
-      const ext = file.name.split(".").pop() || "jpg";
+      const ext = MIME_TO_EXT[file.type] || "jpg";
       const storagePath = `${userId}/${collectionId}/${crypto.randomUUID()}.${ext}`;
 
       const { error: uploadErr } = await sb.storage
