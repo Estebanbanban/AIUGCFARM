@@ -140,6 +140,8 @@ export interface GenerationProgressResponse {
     mode?: Generation["mode"];
     script?: GenerationScript | null;
     composite_image_url?: string | null;
+    /** SaaS Demo Mode: signed URL to the uploaded screen recording */
+    screen_recording_url?: string | null;
     progress?: { completed: number; total: number };
     segments?: GenerationSegments | null;
     error_message?: string | null;
@@ -207,4 +209,38 @@ export interface GenerationHistoryResponse {
       has_prev: boolean;
     };
   };
+}
+
+/** Single Video Creator — script generation response */
+export interface SingleVideoScriptResponse {
+  data: {
+    generation_id: string;
+    status: "awaiting_approval";
+    script?: { hook: string; body: string; cta: string; full_text: string };
+    credits_to_charge: number;
+  };
+}
+
+/** Single Video Creator — submit/approval response */
+export interface SingleVideoSubmitResponse {
+  data: {
+    generation_id: string;
+    status: "generating_segments";
+    credits_charged: number;
+  };
+}
+
+/** Single Video Creator — status polling response */
+export interface SingleVideoStatusResponse {
+  data: {
+    status: string;
+    progress: number;
+    video_url?: string;
+    error_message?: string;
+  };
+}
+
+/** Upload reference image response */
+export interface UploadReferenceImageResponse {
+  data: { path: string };
 }

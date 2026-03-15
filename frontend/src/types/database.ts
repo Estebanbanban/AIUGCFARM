@@ -166,9 +166,18 @@ export interface Generation {
   hooks_count: number;
   bodies_count: number;
   ctas_count: number;
+  /** SaaS Demo Mode: storage path to a screen recording that replaces body visuals */
+  screen_recording_url: string | null;
   started_at: string | null;
   completed_at: string | null;
   created_at: string;
+  type?: "multi-segment" | "single-video";
+  sora_model?: "sora-2" | "sora-2-pro" | null;
+  duration?: 16 | 20 | null;
+  reference_type?: "composite" | "persona" | "custom" | "none" | null;
+  reference_image_path?: string | null;
+  is_saas?: boolean;
+  freeform_prompt?: string | null;
 }
 
 // ── Advanced Mode types ────────────────────────────────────────────────────
@@ -190,4 +199,35 @@ export interface AdvancedSegmentsConfig {
   hooks: AdvancedSegmentConfig[];
   bodies: AdvancedSegmentConfig[];
   ctas: AdvancedSegmentConfig[];
+}
+
+// ── YouTube Publishing ────────────────────────────────────────────────────
+
+export interface YouTubeConnection {
+  id: string;
+  channel_id: string;
+  channel_title: string;
+  channel_thumbnail: string | null;
+  token_expires_at: string;
+  scopes: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface YouTubePublish {
+  id: string;
+  owner_id: string;
+  generation_id: string;
+  connection_id: string;
+  youtube_video_id: string | null;
+  youtube_url: string | null;
+  title: string;
+  description: string | null;
+  tags: string[];
+  visibility: "public" | "unlisted" | "private";
+  status: "pending" | "uploading" | "processing" | "completed" | "failed";
+  error_message: string | null;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
 }

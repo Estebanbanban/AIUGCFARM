@@ -13,8 +13,11 @@ import {
   Plus,
   Users,
   Package,
+  Layers,
+  ImageIcon,
   ChevronLeft,
   ChevronRight,
+  Video,
 } from "lucide-react";
 import { useClerk } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
@@ -36,6 +39,9 @@ import { useGenerationNotifications } from "@/hooks/use-generation-notifications
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Generate", href: "/generate", icon: Film },
+  { label: "Video Creator", href: "/video-creator", icon: Video },
+  { label: "Slideshows", href: "/slideshows", icon: Layers },
+  { label: "Collections", href: "/collections", icon: ImageIcon },
   { label: "Personas", href: "/personas", icon: Users },
   { label: "Products", href: "/products", icon: Package },
   { label: "History", href: "/history", icon: Clock },
@@ -47,9 +53,12 @@ const pageTitles: Record<string, string> = {
   "/personas": "Personas",
   "/products": "Products",
   "/generate": "Generate",
+  "/slideshows": "Slideshows",
+  "/collections": "Collections",
   "/history": "History",
   "/settings": "Settings",
   "/settings/billing": "Billing",
+  "/video-creator": "Video Creator",
 };
 
 function SidebarContent({
@@ -208,6 +217,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/personas/")) return "Persona Detail";
   if (pathname.startsWith("/products/")) return "Product Detail";
   if (pathname.startsWith("/generate/")) return "Generation";
+  if (pathname.startsWith("/video-creator/")) return "Video Creator";
   return "Dashboard";
 }
 
@@ -220,9 +230,9 @@ export function DashboardShell({ children, className }: { children: React.ReactN
   useGenerationNotifications();
 
   useEffect(() => {
-    if (pathname.startsWith('/generate') && !userManualOverride) {
+    if ((pathname.startsWith('/generate') || pathname.startsWith('/video-creator')) && !userManualOverride) {
       setSidebarCollapsed(true);
-    } else if (!pathname.startsWith('/generate') && !userManualOverride) {
+    } else if (!pathname.startsWith('/generate') && !pathname.startsWith('/video-creator') && !userManualOverride) {
       setSidebarCollapsed(false);
     }
   }, [pathname, userManualOverride]);

@@ -1,14 +1,24 @@
-const SORA_BASE = "https://api.openai.com/v1/videos/generations";
+/**
+ * Sora 2 Video Generation API client.
+ * Supports text-to-video and image-to-video via the POST /v1/videos endpoint.
+ * Status polling via GET /v1/videos/{id}.
+ * Video download via GET /v1/videos/{id}/content.
+ */
+
+const SORA_BASE = "https://api.openai.com/v1/videos";
+
+export type SoraModel = "sora-2" | "sora-2-pro";
 
 export interface SoraSubmitResult {
   job_id: string;
   status: string;
-  model_name: string;
+  model_name: SoraModel;
 }
 
 export interface SoraJobStatus {
   job_id: string;
   status: "pending" | "processing" | "completed" | "failed";
+  progress: number;
   video_url?: string;
   error_message?: string;
 }
@@ -20,45 +30,66 @@ function getOpenAIKey(): string {
 }
 
 /**
- * Submit a video generation job to Sora (OpenAI image-to-video).
- * Sora requires the image as a file upload (multipart/form-data), not a URL.
+ * Submit a video generation job to Sora 2.
  *
- * @param params.composite_image_path - Supabase Storage path to download & upload to Sora
+ * - If input_reference_blob is provided, sends multipart/form-data (image-to-video).
+ * - Otherwise, sends JSON (text-to-video).
+ *
  * @param params.prompt - Video generation prompt
- * @param params.duration - Duration in seconds (Sora supports 5 or 10)
+ * @param params.model - "sora-2" (standard) or "sora-2-pro" (pro)
+ * @param params.seconds - Duration: 16 or 20 seconds
+ * @param params.size - Resolution e.g. "720x1280" or "1080x1920"
+ * @param params.input_reference_blob - Optional image blob for image-to-video
  */
 export async function submitSoraJob(params: {
-  composite_image_blob: Blob;
   prompt: string;
-  duration: number;
+  model?: SoraModel;
+  seconds?: number;
+  size?: string;
+  input_reference_blob?: Blob;
 }): Promise<SoraSubmitResult> {
   const apiKey = getOpenAIKey();
-
-  // Sora only supports 5s or 10s — round to nearest supported value
-  const duration = params.duration <= 5 ? 5 : 10;
-
-  const form = new FormData();
-  form.append("model", "sora-2");
-  form.append("prompt", params.prompt);
-  form.append("duration", String(duration));
-  form.append("resolution", "720x1280");  // Portrait 9:16
-  form.append("image", params.composite_image_blob, "composite.jpg");
+  const model = params.model ?? "sora-2";
+  const seconds = params.seconds ?? 20;
+  // Default: 9:16 vertical for UGC content
+  const size = params.size ?? (model === "sora-2-pro" ? "1080x1920" : "720x1280");
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 20_000);
+  const timeoutId = setTimeout(() => controller.abort(), 30_000);
 
   let res: Response;
   try {
-    res = await fetch(SORA_BASE, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: form,
-      signal: controller.signal,
-    });
+    if (params.input_reference_blob) {
+      // Multipart form: image-to-video
+      const form = new FormData();
+      form.append("model", model);
+      form.append("prompt", params.prompt);
+      form.append("seconds", String(seconds));
+      form.append("size", size);
+      form.append("input_reference", params.input_reference_blob, "reference.jpg");
+
+      res = await fetch(SORA_BASE, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}` },
+        body: form,
+        signal: controller.signal,
+      });
+    } else {
+      // JSON: text-to-video
+      res = await fetch(SORA_BASE, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ model, prompt: params.prompt, seconds, size }),
+        signal: controller.signal,
+      });
+    }
   } catch (err) {
     clearTimeout(timeoutId);
     if (err instanceof Error && err.name === "AbortError") {
-      throw new Error("Sora API submission timed out after 20s. The service may be under load — please retry.");
+      throw new Error("Sora API submission timed out after 30s. The service may be under load — please retry.");
     }
     throw err;
   }
@@ -81,20 +112,21 @@ export async function submitSoraJob(params: {
     throw new Error("Sora submit returned non-JSON response");
   }
 
-  const jobId = body.id ?? body.job_id;
+  const jobId = body.id;
   if (!jobId || typeof jobId !== "string") {
     throw new Error(`Sora submit: no job id in response: ${JSON.stringify(body)}`);
   }
 
   return {
     job_id: jobId as string,
-    status: (body.status as string) ?? "pending",
-    model_name: "sora-2",
+    status: (body.status as string) ?? "queued",
+    model_name: model,
   };
 }
 
 /**
- * Check the status of a Sora video generation job.
+ * Check the status of a Sora 2 video generation job.
+ * GET /v1/videos/{video_id}
  */
 export async function checkSoraJob(jobId: string): Promise<SoraJobStatus> {
   const apiKey = getOpenAIKey();
@@ -120,39 +152,23 @@ export async function checkSoraJob(jobId: string): Promise<SoraJobStatus> {
     throw new Error("Sora status check returned non-JSON response");
   }
 
-  const rawStatus = (body.status ?? "pending") as string;
+  const rawStatus = (body.status ?? "queued") as string;
 
-  // Normalize OpenAI status strings to internal 4-state enum
+  // Normalize Sora 2 status strings to internal 4-state enum
   let status: SoraJobStatus["status"];
   switch (rawStatus) {
     case "completed":
-    case "succeeded":
       status = "completed";
       break;
     case "failed":
-    case "error":
       status = "failed";
       break;
     case "in_progress":
-    case "processing":
-    case "running":
       status = "processing";
       break;
+    case "queued":
     default:
       status = "pending";
-  }
-
-  // Extract video URL from completed job
-  let videoUrl: string | undefined;
-  if (status === "completed") {
-    // OpenAI Sora response: { generations: [{ url: "..." }] } or { video_url: "..." }
-    const generations = body.generations as Array<Record<string, unknown>> | undefined;
-    if (generations && generations.length > 0) {
-      videoUrl = generations[0].url as string | undefined;
-    }
-    if (!videoUrl) {
-      videoUrl = (body.video_url ?? body.output_url) as string | undefined;
-    }
   }
 
   let errorMessage: string | undefined;
@@ -161,10 +177,57 @@ export async function checkSoraJob(jobId: string): Promise<SoraJobStatus> {
     errorMessage = (err?.message ?? body.error_message ?? body.message) as string | undefined;
   }
 
+  // Sora 2 uses GET /content to download — set a marker URL so callers detect completion
+  let videoUrl: string | undefined;
+  if (status === "completed") {
+    videoUrl = `${SORA_BASE}/${jobId}/content`;
+  }
+
   return {
     job_id: jobId,
     status,
+    progress: (body.progress as number) ?? 0,
     video_url: videoUrl,
     error_message: errorMessage,
   };
+}
+
+/**
+ * Download a completed Sora 2 video as a Blob.
+ * GET /v1/videos/{video_id}/content
+ *
+ * Download URLs are valid for max 1 hour after generation.
+ */
+export async function downloadSoraVideo(jobId: string): Promise<Blob> {
+  const apiKey = getOpenAIKey();
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120_000); // 2 min for large video downloads
+
+  let res: Response;
+  try {
+    res = await fetch(`${SORA_BASE}/${jobId}/content`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("Sora video download timed out after 120s.");
+    }
+    throw err;
+  }
+  clearTimeout(timeoutId);
+
+  if (!res.ok) {
+    let errBody: string;
+    try {
+      errBody = await res.text();
+    } catch {
+      errBody = `HTTP ${res.status}`;
+    }
+    throw new Error(`Sora download error ${res.status}: ${errBody}`);
+  }
+
+  return await res.blob();
 }
