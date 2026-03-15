@@ -46,9 +46,14 @@ async function verifyClerkJWT(token: string): Promise<string> {
   // Check expiry
   if (payload.exp && Date.now() / 1000 > payload.exp) throw new Error("JWT expired");
 
-  // JWKS URL must come from env — never derived from the JWT payload (attacker-controlled)
-  const jwksUrl = Deno.env.get("CLERK_JWKS_URL");
-  if (!jwksUrl) throw new Error("CLERK_JWKS_URL env var is not set — cannot verify JWT");
+  // JWKS URL: prefer env var, fall back to JWT issuer ONLY if it matches a known Clerk domain.
+  // This prevents an attacker from crafting a JWT with a malicious iss pointing to their own JWKS.
+  const CLERK_DOMAIN_RE = /^https:\/\/[a-z0-9-]+\.clerk\.(accounts\.dev|com)$/;
+  let jwksUrl = Deno.env.get("CLERK_JWKS_URL");
+  if (!jwksUrl && payload.iss && CLERK_DOMAIN_RE.test(payload.iss)) {
+    jwksUrl = `${payload.iss}/.well-known/jwks.json`;
+  }
+  if (!jwksUrl) throw new Error("Cannot determine JWKS URL — set CLERK_JWKS_URL or use a valid Clerk issuer");
 
   const jwks = await getJWKS(jwksUrl);
   const jwk = jwks.keys.find((k) => k.kid === header.kid);
