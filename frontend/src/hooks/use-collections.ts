@@ -45,7 +45,7 @@ export function useCollectionImages(collectionId: string | null) {
     queryKey: ["collection-images", collectionId],
     queryFn: async () => {
       const res = await callEdge<{ data: { images: CollectionImage[]; total: number } }>(
-        `list-collection-images?collection_id=${collectionId}`,
+        `list-collection-images?collection_id=${collectionId}&limit=100`,
         { method: "GET" }
       );
       return res.data;
