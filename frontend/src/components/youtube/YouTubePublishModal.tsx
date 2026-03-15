@@ -102,6 +102,10 @@ export function YouTubePublishModal({
       toast.error("Title is required");
       return;
     }
+    if (!generationId) {
+      toast.error("No generation selected");
+      return;
+    }
 
     try {
       await publishMutation.mutateAsync({

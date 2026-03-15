@@ -116,7 +116,7 @@ export function useYouTubePublishes(generationId: string | null) {
     queryKey: ["youtube-publishes", generationId],
     queryFn: async () => {
       const res = await callEdge<{ data: (YouTubePublish & { channel_title?: string })[] }>(
-        `youtube-publish-status?generation_id=${generationId}`,
+        `youtube-publish-status?generation_id=${encodeURIComponent(generationId!)}`,
         { method: "GET" }
       );
       return res.data;

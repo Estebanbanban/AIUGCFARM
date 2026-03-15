@@ -91,12 +91,15 @@ Deno.serve(async (req: Request) => {
     const stitchedPath = `${userId}/${generation_id}/stitched.mp4`;
     let storagePath = stitchedPath;
 
-    // Check if stitched file exists
-    const { data: stitchedCheck } = await db.storage
+    // Check if stitched file actually exists in storage
+    const dirPath = `${userId}/${generation_id}`;
+    const { data: fileList } = await db.storage
       .from("generated-videos")
-      .createSignedUrl(stitchedPath, 60);
+      .list(dirPath, { search: "stitched.mp4" });
 
-    if (!stitchedCheck?.signedUrl) {
+    const stitchedExists = (fileList ?? []).some((f) => f.name === "stitched.mp4");
+
+    if (!stitchedExists) {
       // No stitched video — fall back to first segment
       const videos = generation.videos as StoredVideos | null;
       const firstVideo =
@@ -109,6 +112,36 @@ Deno.serve(async (req: Request) => {
       }
 
       storagePath = firstVideo.storage_path;
+    }
+
+    // Prevent duplicate publishes for the same generation + channel
+    const { data: existingPublish } = await db
+      .from("youtube_publishes")
+      .select("id, status, youtube_url")
+      .eq("generation_id", generation_id)
+      .eq("connection_id", connection_id)
+      .in("status", ["uploading", "completed"])
+      .maybeSingle();
+
+    if (existingPublish) {
+      if (existingPublish.status === "completed") {
+        return json({
+          data: {
+            publish_id: existingPublish.id,
+            status: "completed",
+            youtube_url: existingPublish.youtube_url,
+            message: "Already published to this channel",
+          },
+        }, cors);
+      }
+      // Already uploading — return the existing record
+      return json({
+        data: {
+          publish_id: existingPublish.id,
+          status: "uploading",
+          message: "Upload already in progress",
+        },
+      }, cors);
     }
 
     // Create a publish record with status "uploading"
@@ -178,7 +211,7 @@ Deno.serve(async (req: Request) => {
       });
 
       // Update publish record with success
-      const { data: updatedPublish, error: updateErr } = await db
+      const { error: updateErr } = await db
         .from("youtube_publishes")
         .update({
           youtube_video_id: result.videoId,
@@ -187,9 +220,7 @@ Deno.serve(async (req: Request) => {
           published_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
-        .eq("id", publish.id)
-        .select("*")
-        .single();
+        .eq("id", publish.id);
 
       if (updateErr) {
         console.error("publish-youtube update error:", updateErr);
@@ -201,7 +232,6 @@ Deno.serve(async (req: Request) => {
           status: "completed",
           youtube_video_id: result.videoId,
           youtube_url: result.youtubeUrl,
-          ...(updatedPublish ?? {}),
         },
       }, cors);
     } catch (uploadErr) {

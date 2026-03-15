@@ -16,12 +16,22 @@ export default function YouTubeCallbackPage() {
   const [state, setState] = useState<CallbackState>("processing");
   const [errorMsg, setErrorMsg] = useState("");
   const callback = useYouTubeCallback();
-  // Guard against React Strict Mode double-mount (OAuth codes are single-use)
-  const hasFired = useRef(false);
+  // Guard against React Strict Mode double-mount AND back/forward navigation
+  // (OAuth codes are single-use — second exchange always fails)
+  const hasFired = useRef(
+    typeof sessionStorage !== "undefined" &&
+    sessionStorage.getItem("yt_callback_fired") === "1"
+  );
 
   useEffect(() => {
-    if (hasFired.current) return;
+    if (hasFired.current) {
+      // Already processed — redirect to settings
+      setState("success");
+      setTimeout(() => router.push("/settings"), 1000);
+      return;
+    }
     hasFired.current = true;
+    try { sessionStorage.setItem("yt_callback_fired", "1"); } catch {};
 
     const code = searchParams.get("code");
     const stateParam = searchParams.get("state");
@@ -49,6 +59,7 @@ export default function YouTubeCallbackPage() {
         onSuccess: () => {
           setState("success");
           toast.success("YouTube channel connected!");
+          try { sessionStorage.removeItem("yt_callback_fired"); } catch {};
           setTimeout(() => router.push("/settings"), 2000);
         },
         onError: (err) => {

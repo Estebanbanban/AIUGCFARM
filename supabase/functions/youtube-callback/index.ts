@@ -42,8 +42,11 @@ Deno.serve(async (req: Request) => {
       return errorResponse(ErrorCodes.UNAUTHORIZED, "State mismatch - userId does not match", 403, cors);
     }
 
-    // Verify and consume the single-use nonce
-    if (statePayload.nonce) {
+    // Verify and consume the single-use nonce (required — reject if absent)
+    if (!statePayload.nonce) {
+      return errorResponse(ErrorCodes.INVALID_INPUT, "Missing CSRF nonce in state", 400, cors);
+    }
+    {
       const { data: nonceRow, error: nonceErr } = await db
         .from("youtube_oauth_states")
         .select("id, expires_at")
