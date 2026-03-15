@@ -54,10 +54,9 @@ export async function submitSoraJob(params: {
   const validSeconds = ["4", "8", "12"];
   const rawSeconds = String(params.seconds ?? 12);
   const seconds = validSeconds.includes(rawSeconds) ? rawSeconds : "12";
-  // Sora valid sizes: 1280x720, 1920x1080, 1080x1920
-  // For 9:16 vertical UGC: use 1080x1920 (only portrait option available)
-  // For landscape: 1280x720 (sora-2) or 1920x1080 (sora-2-pro)
-  const size = params.size ?? "1080x1920";
+  // sora-2: 720x1280 (portrait) or 1280x720 (landscape)
+  // sora-2-pro: 1080x1920 (portrait) or 1920x1080 (landscape)
+  const size = params.size ?? (model === "sora-2-pro" ? "1080x1920" : "720x1280");
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30_000);
