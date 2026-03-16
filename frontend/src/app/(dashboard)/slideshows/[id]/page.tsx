@@ -43,9 +43,9 @@ export default function SlideshowEditorPage() {
   const store = useSlideshowEditorStore();
   const updateSlideshow = useUpdateSlideshow();
 
-  // Load slideshow into store on first load
+  // Always load slideshow from server (prevents stale localStorage data)
   useEffect(() => {
-    if (slideshow && store.slideshowId !== slideshow.id) {
+    if (slideshow) {
       store.loadSlideshow(
         slideshow.id,
         slideshow.name,
@@ -56,7 +56,7 @@ export default function SlideshowEditorPage() {
         slideshow.status,
       );
     }
-  }, [slideshow]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [slideshow?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-save debounced
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);

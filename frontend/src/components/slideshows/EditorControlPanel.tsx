@@ -28,56 +28,126 @@ export function EditorControlPanel() {
   const { data: collections = [] } = useCollections();
   const { data: collectionData } = useCollectionImages(store.selectedCollectionId);
 
-  // Auto-select product if user only has one
+  // Combined: auto-select product THEN auto-select collection (no race condition)
   useEffect(() => {
+    // Step 1: Auto-select product if not set
     if (products.length >= 1 && !store.productId) {
       store.setProductId(products[0].id);
+      return; // Let the effect re-fire with the new productId
     }
-  }, [products, store.productId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-select best collection based on product name, or first available
-  useEffect(() => {
+    // Step 2: Auto-select collection (only after product is resolved)
     if (collections.length === 0) return;
     if (store.selectedCollectionId) return; // already picked
 
-    // Try to match product to a collection by keyword
-    const selectedProduct = products.find((p) => p.id === store.productId);
-    const productText = (selectedProduct?.name ?? "").toLowerCase() + " " + (selectedProduct?.description ?? "").toLowerCase();
+    // Wait for product to be set before matching
+    if (products.length > 0 && !store.productId) return;
 
-    const nicheKeywords: Record<string, string[]> = {
-      education: ["education", "study", "university", "student", "learn", "course", "tutor", "interview", "case", "mba", "consulting", "mckinsey", "bain", "bcg", "college", "academic"],
-      tech: ["tech", "code", "software", "developer", "programming", "app", "ai", "saas", "productivity", "automation"],
-      fitness_women: ["fitness women", "pilates", "yoga women", "running women", "wellness women"],
-      fitness_gym: ["fitness", "gym", "workout", "muscle", "bodybuilding", "protein", "crossfit"],
-      skincare: ["skincare", "beauty", "skin", "cosmetic", "routine", "derma", "glow", "serum"],
-      luxury: ["luxury", "premium", "high-end", "designer", "wealthy", "rich", "exclusive"],
-      business: ["business", "startup", "entrepreneur", "saas", "company", "agency", "freelance", "founder"],
-      coaching: ["coach", "mentor", "self-help", "personal development", "therapy", "mindset", "growth"],
-      ecommerce: ["ecommerce", "shop", "store", "product", "dropship", "amazon", "shopify", "retail"],
-      lifestyle: ["lifestyle", "travel", "morning", "routine", "aesthetic", "daily"],
-      food: ["food", "restaurant", "recipe", "cooking", "chef", "meal", "nutrition", "diet"],
-      travel: ["travel", "hotel", "flight", "vacation", "trip", "adventure", "explore", "tourism"],
-      finance: ["finance", "investing", "money", "budget", "trading", "crypto", "wealth", "savings"],
+    // Build search text from ALL product fields
+    const selectedProduct = products.find((p) => p.id === store.productId);
+    const productFields = [
+      selectedProduct?.name ?? "",
+      selectedProduct?.description ?? "",
+      (selectedProduct as any)?.category ?? "",
+      (selectedProduct as any)?.brand_summary?.product_category ?? "",
+      (selectedProduct as any)?.brand_summary?.tone ?? "",
+      (selectedProduct as any)?.store_url ?? "",
+    ];
+    const productText = productFields.join(" ").toLowerCase();
+
+    // Niche keywords — each niche maps to its collection name pattern AND search keywords
+    const nicheKeywords: Record<string, { collectionPatterns: string[]; keywords: string[] }> = {
+      education: {
+        collectionPatterns: ["education"],
+        keywords: ["education", "study", "university", "student", "learn", "course", "tutor", "interview", "case", "mba", "consulting", "mckinsey", "bain", "bcg", "college", "academic", "exam", "school", "prep"],
+      },
+      tech: {
+        collectionPatterns: ["tech"],
+        keywords: ["tech", "code", "software", "developer", "programming", "app", "ai", "saas", "productivity", "automation", "platform", "tool", "api"],
+      },
+      fitness_women: {
+        collectionPatterns: ["fitness_women", "fitness women"],
+        keywords: ["fitness women", "pilates", "yoga", "wellness", "women workout"],
+      },
+      fitness_gym: {
+        collectionPatterns: ["fitness_gym", "fitness gym"],
+        keywords: ["gym", "workout", "muscle", "bodybuilding", "protein", "crossfit", "weightlifting"],
+      },
+      fitness: {
+        collectionPatterns: ["fitness"],
+        keywords: ["fitness", "exercise", "health", "active", "sport", "athletic"],
+      },
+      skincare: {
+        collectionPatterns: ["skincare"],
+        keywords: ["skincare", "beauty", "skin", "cosmetic", "derma", "glow", "serum", "cream"],
+      },
+      luxury: {
+        collectionPatterns: ["luxury"],
+        keywords: ["luxury", "premium", "high-end", "designer", "wealthy", "rich", "exclusive"],
+      },
+      business: {
+        collectionPatterns: ["business"],
+        keywords: ["business", "startup", "entrepreneur", "company", "agency", "freelance", "founder", "b2b"],
+      },
+      coaching: {
+        collectionPatterns: ["coaching"],
+        keywords: ["coach", "mentor", "self-help", "personal development", "therapy", "mindset", "growth"],
+      },
+      ecommerce: {
+        collectionPatterns: ["ecommerce"],
+        keywords: ["ecommerce", "shop", "store", "dropship", "amazon", "shopify", "retail", "cart"],
+      },
+      lifestyle: {
+        collectionPatterns: ["lifestyle"],
+        keywords: ["lifestyle", "morning", "routine", "aesthetic", "daily", "habit"],
+      },
+      food: {
+        collectionPatterns: ["food"],
+        keywords: ["food", "restaurant", "recipe", "cooking", "chef", "meal", "nutrition", "diet"],
+      },
+      travel: {
+        collectionPatterns: ["travel"],
+        keywords: ["travel", "hotel", "flight", "vacation", "trip", "adventure", "explore", "tourism"],
+      },
+      finance: {
+        collectionPatterns: ["finance"],
+        keywords: ["finance", "investing", "money", "budget", "trading", "crypto", "wealth", "savings"],
+      },
     };
 
-    let bestScore = 0;
+    // Score each collection against the product
+    let bestScore = -1;
     let bestCollection = collections[0];
-    if (productText.trim()) {
-      for (const coll of collections) {
-        const collName = coll.name.toLowerCase();
-        for (const [niche, keywords] of Object.entries(nicheKeywords)) {
-          if (!collName.includes(niche.replace("_", " ")) && !collName.includes(niche.split("_")[0])) continue;
-          const score = keywords.filter((kw) => productText.includes(kw)).length;
-          if (score > bestScore) {
-            bestScore = score;
-            bestCollection = coll;
-          }
+
+    for (const coll of collections) {
+      const collName = coll.name.toLowerCase();
+
+      for (const [, config] of Object.entries(nicheKeywords)) {
+        // Check if this collection matches this niche
+        const matchesCollection = config.collectionPatterns.some((p) => collName.includes(p));
+        if (!matchesCollection) continue;
+
+        // Score: how many keywords match the product text
+        const score = productText
+          ? config.keywords.filter((kw) => productText.includes(kw)).length
+          : 0;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestCollection = coll;
         }
       }
     }
 
+    // Only auto-select if we found a real match (score > 0), otherwise pick education or first
+    if (bestScore <= 0 && productText) {
+      // Fallback: find "Education" collection as safe default for unknown niches
+      const eduColl = collections.find((c) => c.name.toLowerCase().includes("education"));
+      if (eduColl) bestCollection = eduColl;
+    }
+
     store.setSelectedCollectionId(bestCollection.id);
-  }, [collections, store.productId, products, store.selectedCollectionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [products, collections, store.productId, store.selectedCollectionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-assign images when collection data loads and slides have no images
   useEffect(() => {
