@@ -211,13 +211,19 @@ Output ONLY a JSON object: { "slides": [{ "type": "body", "title": "...", "subti
       throw new Error("No slides generated");
     }
 
-    // Post-generation fix: ensure product name is at the Two-Thirds position
+    // Post-generation fix: ensure product name appears at the target position
     if (productName && slides.length > 0) {
       const targetIdx = Math.min(productSlideIndex - 1, slides.length - 1);
       const targetSlide = slides[targetIdx] as Record<string, unknown>;
       const action = String(targetSlide.action ?? "");
       if (!action.toLowerCase().includes(productName.toLowerCase())) {
-        targetSlide.action = `i found ${productName} and it honestly made this so much easier. worth trying if you're stuck.`;
+        // Inject a natural mention — keep the existing action and weave in the product
+        const fallbacks = [
+          `someone put me on ${productName} and i haven't looked back since`,
+          `i stumbled on ${productName} and it clicked almost immediately`,
+          `honestly ${productName} is the thing that finally made this work for me`,
+        ];
+        targetSlide.action = fallbacks[Math.floor(Math.random() * fallbacks.length)];
       }
     }
 
