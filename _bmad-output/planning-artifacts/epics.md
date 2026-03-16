@@ -41,8 +41,9 @@ Complete epic and story breakdown for AIUGC. Originally decomposed from PRD v2.0
 | 11 | Multi-Segment Silence Removal | P1 | Epic 6 | 1 | 🔲 Planned |
 | 12 | Saved Generation Presets | P1 | Epic 5, 7 | 1 | ✅ Complete |
 | 13 | Custom Segment Counts (Variable Matrix) | P1 | Epic 5, 6, 10 | 1 | ✅ Complete |
+| 14 | TikTok Slideshow Generator | P1 | Epic 2, 4 | 15 | ✅ Phase 1 Complete (12/15) |
 
-**Total: 13 epics, 63 stories**
+**Total: 14 epics, 78 stories**
 
 **Dependency Graph:**
 ```
@@ -51,7 +52,7 @@ Epic 1 (Products) ────────────────────�
 Epic 2 (Auth) ──→ Epic 3 (Personas) ──┤                                      │
               └──→ Epic 4 (Billing) ──┘                                      │
               └──→ Epic 8 (Admin) ──→ Epic 9 (Observability)                 │
-                                                                             └─→ Epic 10 (Variations)
+              └──→ Epic 14 (Slideshow Generator) ← Phase 1 ✅                └─→ Epic 10 (Variations)
 ```
 
 ---
@@ -709,6 +710,61 @@ Remove silence gaps anywhere within a generated video clip, not just at the begi
 
 ---
 
+## Epic 14: TikTok Slideshow Generator
+
+TikTok/Instagram carousel creator. Users create 5-slide carousels (Hook + 4 Body/CTA) with AI-generated hooks and body copy, Pinterest-scraped background images filtered by AI vision, and export as ZIP of 1080x1920 PNGs.
+
+**Depends on:** Epic 2, 4 | **Arch:** Cloudflare R2, OpenRouter (gpt-4o), Zustand, html-to-image, JSZip | **Full spec:** `epic-14-slideshow-generator.md`
+
+> **Phase 1 Complete (2026-03-15).** 12 of 15 stories implemented. 3 Phase 2 stories (stock photos, templates, automation) remain planned.
+
+### [DONE] Story 14.1: Image Collections — Database & Edge Functions
+DB tables `image_collections` + `collection_images` with Cloudflare R2 storage (not Supabase Storage — needed 10GB free tier for 2.6GB of scraped images). Edge functions: `create-image-collection`, `list-image-collections`, `delete-image-collection`. SHA-256 content hash for dedup. `image_count` auto-updated by trigger.
+
+### [DONE] Story 14.2: Image Upload & Management
+`upload-collection-image` (multipart via aws4fetch to R2), `list-collection-images` (paginated, limit up to 500), `delete-collection-image` (R2 + DB, owner_id enforced).
+
+### [DONE] Story 14.3: Image Collections UI
+Collections managed inline in slideshow editor (not standalone routes). `EditorControlPanel` has collection selector dropdown. `SlideFilmstrip` shows collection images in scrollable strip with upload button.
+
+### [DONE] Story 14.4: AI Hook Generation Engine
+`generate-slideshow-hooks` generates 10 hooks via OpenRouter (gpt-4o). First-person "I" voice, lowercase, relatable tone. `list-slideshow-hooks` filtered by product. `list-hook-library` for pre-seeded templates.
+
+### [DONE] Story 14.5: AI Body Copy Generation Engine
+`generate-slide-copy` with 5 narrative styles (tips_list, story_arc, myth_busting, before_after, open_loop). Short/long copy modes. Product name injection at ~67% position. Post-generation fallback injects product name if LLM missed it.
+
+### [DONE] Story 14.6: Format Instructions Manager
+`format_instructions` table created. No CRUD UI — descoped in favor of 5 built-in narrative styles in `generate-slide-copy`.
+
+### [DONE] Story 14.7: Slideshow Data Model & CRUD
+All 5 CRUD edge functions: `create-slideshow`, `get-slideshow`, `update-slideshow`, `list-slideshows`, `delete-slideshow`. JSONB settings + slides. Manual Save button + isDirty tracking.
+
+### [DONE] Story 14.8: Slideshow Editor — Slide Panel & Image Assignment
+Full-page editor at `/slideshows/[id]`. Two-panel layout (400px left controls + flex right preview). Add slide inserts before CTA. Auto-populate: product-to-collection matching via keyword scoring + Fisher-Yates shuffled image assignment.
+
+### [DONE] Story 14.9: Slideshow Editor — Text Overlay System
+Three caption styles: TikTok Sans, DM Sans, Inter. Hook text at 28% from top (TikTok safe zone). Body title as white pill/badge div. Text shadow for readability. Dark overlay on images.
+
+### [DONE] Story 14.10: Slideshow Editor — Live Preview & AI Integration
+`HookSelector` carousel with generate + browse + apply. `GenerateButton` with short/long toggle. Body copy auto-populates slides. No animated preview player (planned, not implemented).
+
+### [DONE] Story 14.11: Slideshow Export (ZIP of PNGs)
+Client-side export via html-to-image `toPng` + JSZip. Each slide rendered at scale=4 (1080x1920) using `createRoot` in offscreen container. `atob()` for data URL to blob (CSP bypass). try/finally cleanup. Zero credits (client-side). **Deviated from plan:** ZIP of PNGs instead of MP4 video.
+
+### [DONE] Story 14.12: Slideshow Library Page
+`/slideshows` list page with card grid. `SlideshowGallery` below editor. `ExportedSlideshowCard` with hook text overlay, exported date badge, disabled Quick Publish button.
+
+### Story 14.13: Stock Photo Integration
+**Status:** 🔲 Planned (Phase 2) — Pinterest scraper pipeline currently handles image sourcing.
+
+### Story 14.14: Slideshow Template Library
+**Status:** 🔲 Planned (Phase 2) — `hook_library` table exists but no template gallery UI.
+
+### Story 14.15: Slideshow Automation Engine
+**Status:** 🔲 Planned (Phase 2) — Depends on TikTok API integration.
+
+---
+
 ## Additional Notes
 
 ### AI Model Configuration
@@ -716,18 +772,24 @@ Remove silence gaps anywhere within a generated video clip, not just at the begi
 - **Coherence review:** OpenRouter (same endpoint, second pass)
 - **Composite images:** NanoBanana/Gemini (`generateCompositeFromImages`, `editCompositeFromReference`)
 - **Video generation:** Kling v2.6 (standard) / Kling v3 (HD)
+- **Slideshow hooks & copy:** OpenRouter (gpt-4o)
+- **Image filtering (Pinterest pipeline):** OpenRouter (healer-alpha, free)
 - **Transactional email:** Resend API
 
-### Edge Functions (20 Total)
+### Edge Functions (35 Total)
 ```
 supabase/functions/
-├── _shared/            # auth, cors, credits, email, kling, nanobanana, openrouter, rate-limit, response, retry, ssrf, supabase
+├── _shared/            # auth, cors, credits, email, kling, nanobanana, openrouter, r2, rate-limit, response, retry, ssrf, supabase
+│
+│   ── Product & Persona ──
 ├── scrape-product/     # Product scraping (Shopify + generic)
 ├── confirm-products/   # Confirm/edit scraped products
 ├── upload-product/     # Manual product upload (multipart)
 ├── generate-persona/   # Persona image generation (2 per call)
 ├── select-persona-image/  # Set selected persona image
 ├── persona-images/     # Batch signed-URL generator for persona images
+│
+│   ── Video Generation ──
 ├── generate-composite-images/  # Generate 4 composite previews (step 3)
 ├── generate-segment-composite/ # Generate 1 composite for Advanced Mode segment
 ├── edit-composite-image/       # Edit composite via natural language prompt
@@ -736,6 +798,26 @@ supabase/functions/
 ├── video-status/       # Poll generation status, download completed segments
 ├── regenerate-segment/ # Regenerate single completed segment (1 credit)
 ├── generation-history/ # Paginated generation history
+│
+│   ── Slideshow (Epic 14) ──
+├── create-slideshow/             # Create with default 5 slides
+├── get-slideshow/                # Slideshow + R2 public URLs
+├── update-slideshow/             # Name, settings, slides, hook_text, exported_at
+├── delete-slideshow/             # Delete + R2 cleanup
+├── list-slideshows/              # Paginated list + R2 thumbnails
+├── generate-slideshow-hooks/     # 10 hooks via OpenRouter (gpt-4o)
+├── list-slideshow-hooks/         # Hooks filtered by product
+├── delete-slideshow-hook/        # Delete hook
+├── list-hook-library/            # Pre-seeded hook library
+├── generate-slide-copy/          # Body copy, 5 styles, short/long
+├── create-image-collection/      # Create collection
+├── list-image-collections/       # Collections + R2 preview URLs
+├── list-collection-images/       # Paginated images, R2 public URLs
+├── upload-collection-image/      # Multipart upload to R2
+├── delete-collection-image/      # Delete from R2 + DB
+├── delete-image-collection/      # Batch delete from R2
+│
+│   ── Billing & Account ──
 ├── credit-balance/     # Credit balance + plan info
 ├── stripe-checkout/    # Stripe checkout (subscriptions + packs)
 ├── stripe-webhook/     # Stripe webhook handler
