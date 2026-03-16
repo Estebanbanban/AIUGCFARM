@@ -46,8 +46,15 @@ export function HookSelector() {
     if (hooks[prev]) store.applyHookToFirstSlide(hooks[prev].text);
   };
 
-  const selectHook = (text: string) => {
+  const selectHook = (text: string, hookIndex?: number) => {
     store.applyHookToFirstSlide(text);
+    // Sync carousel index to the selected hook
+    if (hookIndex !== undefined) {
+      setCurrentIndex(hookIndex);
+    } else {
+      const idx = hooks.findIndex((h) => h.text === text);
+      if (idx >= 0) setCurrentIndex(idx);
+    }
     setShowAllHooks(false);
   };
 
@@ -142,14 +149,14 @@ export function HookSelector() {
             <DialogTitle>All Hooks ({totalHooks})</DialogTitle>
           </DialogHeader>
           <div className="space-y-2 overflow-y-auto max-h-[50vh] pr-1">
-            {hooks.map((hook) => (
+            {hooks.map((hook, idx) => (
               <button
                 key={hook.id}
                 className={cn(
                   "w-full text-left rounded-lg border border-border p-3 text-sm transition-colors hover:border-primary/40 hover:bg-accent/30 lowercase",
                   hook.text === store.hookText && "border-primary bg-primary/5",
                 )}
-                onClick={() => selectHook(hook.text)}
+                onClick={() => selectHook(hook.text, idx)}
               >
                 {hook.text}
               </button>
