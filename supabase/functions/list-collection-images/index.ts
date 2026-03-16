@@ -19,7 +19,7 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const collectionId = url.searchParams.get("collection_id");
     const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1", 10));
-    const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") ?? "20", 10)));
+    const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get("limit") ?? "200", 10)));
 
     if (!collectionId) {
       return json({ detail: "collection_id is required" }, cors, 400);
