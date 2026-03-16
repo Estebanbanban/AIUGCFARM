@@ -75,12 +75,12 @@ Output ONLY a JSON object with a "hooks" key containing an array of strings. No 
         "X-Title": "AI UGC Generator",
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o",
+        model: "xiaomi/mimo-v2-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.9,
+        temperature: 0.75,
         response_format: { type: "json_object" },
       }),
     });

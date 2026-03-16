@@ -85,12 +85,12 @@ Output ONLY a JSON object with a "slides" key containing an array of objects: [{
         "X-Title": "AI UGC Generator",
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o",
+        model: "xiaomi/mimo-v2-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.9,
+        temperature: 0.75,
         response_format: { type: "json_object" },
       }),
     });
