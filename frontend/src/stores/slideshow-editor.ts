@@ -254,10 +254,10 @@ export const useSlideshowEditorStore = create<SlideshowEditorState>()(
 
           // If more generated than existing, add new body slides
           if (generatedSlides.length > bodyCtaSlides.length) {
-            const lastCtaIdx = state.slides.findLastIndex((s) => s.type === "cta");
+            const newSlides: Slide[] = [];
             for (let i = bodyCtaSlides.length; i < generatedSlides.length; i++) {
               const gen = generatedSlides[i];
-              const newSlide: Slide = {
+              newSlides.push({
                 id: crypto.randomUUID(),
                 type: "body",
                 order: 0,
@@ -265,13 +265,14 @@ export const useSlideshowEditorStore = create<SlideshowEditorState>()(
                 imageUrl: null,
                 text: gen.title,
                 textContent: { title: gen.title, subtitle: gen.subtitle, action: gen.action },
-              };
-              if (lastCtaIdx >= 0) {
-                // Insert before CTA, offset by how many we've already inserted
-                state.slides.splice(lastCtaIdx + (i - bodyCtaSlides.length), 0, newSlide);
-              } else {
-                state.slides.push(newSlide);
-              }
+              });
+            }
+            // Find CTA position and insert all new slides before it in one go
+            const lastCtaIdx = state.slides.findLastIndex((s) => s.type === "cta");
+            if (lastCtaIdx >= 0) {
+              state.slides.splice(lastCtaIdx, 0, ...newSlides);
+            } else {
+              state.slides.push(...newSlides);
             }
             // Reorder
             state.slides.forEach((s, idx) => { s.order = idx; });

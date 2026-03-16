@@ -60,7 +60,7 @@ export function HookSelector() {
 
   const handleGenerate = () => {
     generateHooks.mutate({
-      product_id: store.productId ?? undefined,
+      product_id: store.productId || undefined,
       count: 10,
     });
   };
