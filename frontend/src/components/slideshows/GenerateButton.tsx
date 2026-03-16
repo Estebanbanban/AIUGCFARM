@@ -15,6 +15,7 @@ export function GenerateButton() {
   const generateCopy = useGenerateSlideCopy();
   const { data: credits } = useCredits();
   const [copyLength, setCopyLength] = useState<"short" | "long">("long");
+  const [carouselStyle, setCarouselStyle] = useState<string>("random");
 
   const bodySlideCount = store.slides.filter(
     (s) => s.type === "body" || s.type === "cta",
@@ -48,6 +49,7 @@ export function GenerateButton() {
         hook_text: store.hookText,
         product_id: store.productId || undefined,
         copy_length: copyLength,
+        carousel_style: carouselStyle,
       },
       {
         onSuccess: (slides) => {
@@ -79,6 +81,37 @@ export function GenerateButton() {
             {len === "short" ? "Short copy" : "Detailed copy"}
           </button>
         ))}
+      </div>
+
+      {/* Carousel style */}
+      <div className="space-y-1.5">
+        <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+          Carousel Style
+        </label>
+        <div className="grid grid-cols-3 gap-1">
+          {[
+            { value: "random", label: "Random", emoji: "🎲" },
+            { value: "tips_list", label: "Tips List", emoji: "📋" },
+            { value: "story_arc", label: "Story", emoji: "📖" },
+            { value: "myth_busting", label: "Myths", emoji: "💥" },
+            { value: "before_after", label: "Before/After", emoji: "🔄" },
+            { value: "open_loop", label: "Cliffhanger", emoji: "🎣" },
+          ].map((style) => (
+            <button
+              key={style.value}
+              className={cn(
+                "rounded-md border px-1.5 py-1.5 text-[10px] font-medium transition-colors leading-tight text-center",
+                carouselStyle === style.value
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-background text-muted-foreground hover:border-primary/40",
+              )}
+              onClick={() => setCarouselStyle(style.value)}
+            >
+              <span className="block text-sm">{style.emoji}</span>
+              {style.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <Button

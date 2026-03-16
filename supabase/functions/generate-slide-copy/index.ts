@@ -13,7 +13,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const userId = await requireUserId(req);
-    const { hook_text, product_id, slide_count: requestedCount, soft_cta, copy_length = "long" } = await req.json();
+    const { hook_text, product_id, slide_count: requestedCount, soft_cta, copy_length = "long", carousel_style = "random" } = await req.json();
 
     if (!hook_text || typeof hook_text !== "string") {
       return json({ detail: "hook_text is required" }, cors, 400);
@@ -53,49 +53,111 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const productRule = productName
-      ? `\nPRODUCT MENTION:
-- ONLY the LAST slide (slide ${slide_count}) may casually mention "${productName}" in the action line.
-- Use ONLY the short name "${productName}" — never the full title, tagline, or description.
-- Make it feel like a friend's recommendation, not an ad. Examples:
-  - "i started using ${productName} and it clicked"
-  - "someone put me on ${productName} and i wish i'd found it sooner"
-- Slides 1 through ${slide_count - 1}: NO product mentions. Just real advice.`
-      : `\nPRODUCT RULE: Do NOT mention any product, app, or tool name. Every action line should be real-world advice.`;
+    // Carousel narrative frameworks — randomly pick one if "random"
+    const CAROUSEL_STYLES = ["tips_list", "story_arc", "myth_busting", "before_after", "open_loop"] as const;
+    const selectedStyle = carousel_style === "random"
+      ? CAROUSEL_STYLES[Math.floor(Math.random() * CAROUSEL_STYLES.length)]
+      : carousel_style;
 
-    const systemPrompt = `You write TikTok slideshow carousel copy. Your writing sounds like a real person sharing what actually worked for them. Not a marketer. Not an influencer. A friend who figured something out and is telling you about it over coffee.
+    const styleInstructions: Record<string, string> = {
+      tips_list: `CAROUSEL STYLE: Tips List
+- Classic numbered list format. Each slide is one standalone tip.
+- Escalate quality: start with the most accessible tip, build to the most surprising.
+- Each slide should be screenshot-worthy on its own.
+- Arc: relatable setup → practical middle → mind-blowing closer`,
+
+      story_arc: `CAROUSEL STYLE: Story Arc (Star-Story-Solution)
+- Slides tell a personal story with a narrative arc.
+- Slide 1-2: set the scene, the struggle, the "before" state.
+- Slide 3-4: the turning point, what changed, the discovery.
+- Slide 5+: the result, the lesson, what you'd tell your past self.
+- Each slide should make the reader think "and then what happened?"`,
+
+      myth_busting: `CAROUSEL STYLE: Myth Busting / Contrarian
+- Each slide challenges a common belief or "obvious" advice.
+- Format: the myth ("everyone says X") → the reality ("but actually Y") → what to do instead.
+- Be provocative but backed by specifics. Not contrarian for shock value.
+- The reader should finish thinking "wait, i've been doing this wrong"`,
+
+      before_after: `CAROUSEL STYLE: Before/After Transformation
+- Slides alternate between "what i used to do" and "what i do now"
+- Paint the "before" vividly so the reader sees themselves in it.
+- The "after" should feel achievable, not aspirational-influencer.
+- Build toward the biggest transformation on the later slides.`,
+
+      open_loop: `CAROUSEL STYLE: Open Loop / Cliffhanger
+- Each slide opens a mini curiosity gap that the NEXT slide closes.
+- End slides mid-thought: "and the one thing that changed it all was..."
+- Use phrases like "but here's what most people miss" as transitions.
+- The reader should feel compelled to swipe because they NEED the resolution.
+- Close all loops by the final slide. Never leave the reader hanging.`,
+    };
+
+    // Product placement follows Two-Thirds Rule from research
+    const productSlideIndex = Math.max(1, Math.round(slide_count * 0.67));
+    const productRule = productName
+      ? `\nPRODUCT PLACEMENT (Two-Thirds Rule — MANDATORY):
+- Slide ${productSlideIndex} (roughly 2/3 through) should naturally mention "${productName}" in the action line.
+- Use "discovered it" framing: "stumbled on ${productName}," "someone recommended ${productName} to me," "finally found ${productName} and it clicked"
+- Include a hedge for authenticity: "it's not perfect but," "honestly didn't expect this to work," "i was skeptical at first"
+- If the carousel has ${slide_count} slides, the product appears on slide ${productSlideIndex}. NOT on slide 1, 2, or 3.
+- ALL other slides: zero product mentions. Just genuinely useful standalone advice.
+- If slide ${productSlideIndex} does NOT contain "${productName}", the output is WRONG.`
+      : `\nPRODUCT RULE: Do NOT mention any product, app, or tool name. Every action line = real-world advice.`;
+
+    const systemPrompt = `You write viral TikTok slideshow carousel copy. Your writing sounds like a real person sharing what genuinely worked for them. Not a marketer. Not an influencer. A friend who figured something out.
 
 Hook: "${hook_text}"
-${productName ? `Product being promoted: ${productName} — ${productDescription}` : ""}
+${productName ? `Product: ${productName} — ${productDescription}` : ""}
 
-SLIDE COUNT (CRITICAL): Generate EXACTLY ${slide_count} body slides. Not ${slide_count - 1}, not ${slide_count + 1}. Exactly ${slide_count}.
-${hookNumber ? `The hook says "${hookNumber}" — you MUST produce exactly ${hookNumber} slides to match.` : ""}
+SLIDE COUNT: Generate EXACTLY ${slide_count} body slides.${hookNumber ? ` The hook says "${hookNumber}" — match it exactly.` : ""}
 
-VOICE & TONE:
-- Write like you're texting your smartest friend. Casual but sharp.
-- Be opinionated. Take a stance. "this changed everything" > "this might help"
-- Be specific. Real numbers, real actions, real situations. Never vague.
-- Slightly unfiltered. A little raw. The kind of post people screenshot and send to friends.
-- Short punchy sentences. No filler. Every word earns its spot.
+${styleInstructions[selectedStyle] || styleInstructions.tips_list}
+
+VOICE (the "texting a smart friend" system):
+- all lowercase always. no capitals anywhere.
+- first person "i" perspective throughout.
+- contractions always ("don't" not "do not", "it's" not "it is").
+- start at least one slide with "so," "ok," "honestly," or "the thing is"
+- include one parenthetical aside: "(seriously, this one changed everything)"
+- fragment sentences encouraged: "the result? wild." / "game over."
+- include one hedging/vulnerability moment: "not gonna lie, this took me a while"
+- NEVER use em dashes. periods or commas only.
+- phonetic emphasis okay sparingly: "sooo much better"
+
+SPECIFICITY RULES (most important — this is what separates viral from generic):
+1. Replace every abstract noun with a concrete object ("hydration" → "a 40oz bottle on your desk")
+2. Every tip must include at least ONE of: a number, a time, an object, or a named method
+3. Replace adjectives with details: "great routine" → "the 5:30am cold water trick"
+4. Always pair "what to do" with "how specifically to do it"
+5. Use odd specific numbers ($37 not $40, 11 days not 2 weeks, 3 items not "a few")
+6. If a tip could apply to any audience, narrow it with a situation or identity marker
 
 STRUCTURE — each slide has 3 text fields:
-${copy_length === "long" ? `1. "title" — numbered point. Format: "[n]. [specific action or insight]" — 8-14 words. This is the headline people read first.
-2. "subtitle" — the relatable struggle or context. What was going wrong before. 12-20 words. Make the reader think "that's literally me."
-3. "action" — what they actually did. Concrete, specific, no fluff. 14-22 words. This should be genuinely useful advice someone could act on today.` : `1. "title" — numbered point. Format: "[n]. [short punchy takeaway]" — Max 8 words.
-2. "subtitle" — the relatable pain point. Max 12 words.
-3. "action" — what they did about it. Specific and useful. Max 14 words.`}
+${copy_length === "long" ? `1. "title" — numbered point or section label. 5-10 words. the micro-hook people read first.
+2. "subtitle" — the relatable struggle or context. 15-25 words. make the reader think "that's literally me."
+3. "action" — what they actually did. concrete, specific, useful. 15-25 words. someone could act on this today.
+Total per slide: 35-60 words max. one clear point only.` : `1. "title" — numbered point. 3-8 words. punchy.
+2. "subtitle" — the relatable pain point. max 12 words.
+3. "action" — what they did. specific and useful. max 14 words.
+Total per slide: max 34 words.`}
 ${productRule}
 
-HARD RULES:
-- ALL lowercase always. no capitals anywhere.
-- first person "i" perspective throughout.
-- NEVER use em dashes (—). use periods or commas instead.
-- NEVER use these words: chaos, clarity, aligned, reclaim, journey, unlock, elevate, transform, empower, optimize, leverage, game-changer
-- each slide should give genuinely good advice. if someone only read that one slide they should still learn something useful.
-- the slides tell a story. there's a progression. slide 1 sets up the problem, middle slides build momentum, last slide pays it off.
-- be original. no generic self-help platitudes. write something someone hasn't heard before.
+NARRATIVE TENSION:
+- Slide 1 must re-hook (Instagram shows slide 2 to users who skip the hook slide)
+- Include at least one open loop closed 1-2 slides later ("but here's the thing...")
+- Escalate tip quality: most accessible first → most surprising last
+- Include one "pattern interrupt" slide: "but here's what most people miss..."
+- At least 2 slides must be screenshot-worthy as standalone images
 
-EXAMPLE (for reference, don't copy):
+SAVE-WORTHINESS:
+- Design for saves first (saves are weighted 3x higher than likes by algorithms)
+- Include at least one slide with a concrete framework, ratio, or checklist
+- Final body slide should be "the one that matters most" summary
+
+BANNED WORDS: chaos, clarity, aligned, reclaim, journey, unlock, elevate, transform, empower, optimize, leverage, game-changer, hack (unless literally about hacking)
+
+EXAMPLE (reference only):
 { "type": "body", "title": "1. i stopped eating lunch at my desk", "subtitle": "i was answering slack messages between bites and wondering why i was exhausted by 2pm", "action": "now i eat outside with my phone in my bag. 20 minutes. my afternoons are completely different.", "order": 1 }
 
 Output ONLY a JSON object: { "slides": [{ "type": "body", "title": "...", "subtitle": "...", "action": "...", "order": 1 }, ...] }`;
@@ -149,13 +211,13 @@ Output ONLY a JSON object: { "slides": [{ "type": "body", "title": "...", "subti
       throw new Error("No slides generated");
     }
 
-    // Post-generation fix: ensure product name is in the last slide's action
+    // Post-generation fix: ensure product name is at the Two-Thirds position
     if (productName && slides.length > 0) {
-      const lastSlide = slides[slides.length - 1] as Record<string, unknown>;
-      const action = String(lastSlide.action ?? "");
+      const targetIdx = Math.min(productSlideIndex - 1, slides.length - 1);
+      const targetSlide = slides[targetIdx] as Record<string, unknown>;
+      const action = String(targetSlide.action ?? "");
       if (!action.toLowerCase().includes(productName.toLowerCase())) {
-        // Force-inject the product mention into the last slide's action
-        lastSlide.action = `i found ${productName} and it honestly made this so much easier. worth trying if you're stuck.`;
+        targetSlide.action = `i found ${productName} and it honestly made this so much easier. worth trying if you're stuck.`;
       }
     }
 
