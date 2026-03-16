@@ -40,11 +40,13 @@ export function GenerateButton() {
       return;
     }
 
+    // Don't send slide_count — let the server extract it from the hook number
+    // (e.g. "6 ways..." → 6 slides). This prevents the mismatch where the hook
+    // says one number but we generate a different count.
     generateCopy.mutate(
       {
         hook_text: store.hookText,
-        product_id: store.productId ?? undefined,
-        slide_count: bodySlideCount,
+        product_id: store.productId || undefined,
         copy_length: copyLength,
       },
       {

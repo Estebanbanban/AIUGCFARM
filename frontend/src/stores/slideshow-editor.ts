@@ -240,19 +240,43 @@ export const useSlideshowEditorStore = create<SlideshowEditorState>()(
 
       applyGeneratedCopy: (generatedSlides) =>
         set((state) => {
-          // Apply generated copy to body/cta slides in order
+          // Get existing body/cta slides
           const bodyCtaSlides = state.slides.filter((s) => s.type === "body" || s.type === "cta");
+
+          // Apply to existing slides
           generatedSlides.forEach((gen, i) => {
-            const targetSlide = bodyCtaSlides[i]; // index-based matching
-            if (targetSlide) {
-              targetSlide.textContent = {
-                title: gen.title,
-                subtitle: gen.subtitle,
-                action: gen.action,
-              };
-              targetSlide.text = gen.title; // Also set the primary text field
+            if (i < bodyCtaSlides.length) {
+              const target = bodyCtaSlides[i];
+              target.textContent = { title: gen.title, subtitle: gen.subtitle, action: gen.action };
+              target.text = gen.title;
             }
           });
+
+          // If more generated than existing, add new body slides
+          if (generatedSlides.length > bodyCtaSlides.length) {
+            const lastCtaIdx = state.slides.findLastIndex((s) => s.type === "cta");
+            for (let i = bodyCtaSlides.length; i < generatedSlides.length; i++) {
+              const gen = generatedSlides[i];
+              const newSlide: Slide = {
+                id: crypto.randomUUID(),
+                type: "body",
+                order: 0,
+                imageId: null,
+                imageUrl: null,
+                text: gen.title,
+                textContent: { title: gen.title, subtitle: gen.subtitle, action: gen.action },
+              };
+              if (lastCtaIdx >= 0) {
+                // Insert before CTA, offset by how many we've already inserted
+                state.slides.splice(lastCtaIdx + (i - bodyCtaSlides.length), 0, newSlide);
+              } else {
+                state.slides.push(newSlide);
+              }
+            }
+            // Reorder
+            state.slides.forEach((s, idx) => { s.order = idx; });
+          }
+
           state.isDirty = true;
         }),
 
