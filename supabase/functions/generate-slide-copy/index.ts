@@ -42,21 +42,26 @@ Deno.serve(async (req: Request) => {
 
       if (prodErr) throw new Error(prodErr.message);
       if (product) {
-        productName = product.name ?? "";
+        // Clean product name: strip taglines, HTML entities, pipe separators
+        // "Road to Offer | #1 AI Platform for McKinsey, BCG &amp; Bain" → "road to offer"
+        let rawName = product.name ?? "";
+        rawName = rawName.replace(/&amp;/g, "&").replace(/&#\d+;/g, "");
+        rawName = rawName.split("|")[0].split("–")[0].split("-")[0].trim();
+        rawName = rawName.replace(/#\d+\s*/g, "").trim();
+        productName = rawName.toLowerCase();
         productDescription = product.description ?? "";
       }
     }
 
     const productRule = productName
-      ? `\nPRODUCT PROMOTION (MANDATORY — DO NOT SKIP):
-- The LAST slide (slide ${slide_count}) MUST mention "${productName}" in its action line. This is the whole point of the carousel. Examples:
-  - "i started using ${productName} and it honestly changed how i approach this"
-  - "found this app called ${productName} that does exactly this"
-  - "someone recommended ${productName} to me and i haven't looked back"
-- Keep it casual and natural, like a genuine recommendation to a friend. But it MUST be there.
-- ALL OTHER slides (1 through ${slide_count - 1}) must NOT mention "${productName}" or any product. Just real-world advice.
-- If the last slide does NOT contain "${productName}", the output is WRONG and useless.`
-      : `\nPRODUCT RULE: Do NOT mention any product, app, service, or tool name in any slide. Every action line should be real-world advice that stands on its own.`;
+      ? `\nPRODUCT MENTION:
+- ONLY the LAST slide (slide ${slide_count}) may casually mention "${productName}" in the action line.
+- Use ONLY the short name "${productName}" — never the full title, tagline, or description.
+- Make it feel like a friend's recommendation, not an ad. Examples:
+  - "i started using ${productName} and it clicked"
+  - "someone put me on ${productName} and i wish i'd found it sooner"
+- Slides 1 through ${slide_count - 1}: NO product mentions. Just real advice.`
+      : `\nPRODUCT RULE: Do NOT mention any product, app, or tool name. Every action line should be real-world advice.`;
 
     const systemPrompt = `You write TikTok slideshow carousel copy. Your writing sounds like a real person sharing what actually worked for them. Not a marketer. Not an influencer. A friend who figured something out and is telling you about it over coffee.
 
