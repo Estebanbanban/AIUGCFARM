@@ -55,9 +55,14 @@ Deno.serve(async (req: Request) => {
 
     // Carousel narrative frameworks — randomly pick one if "random"
     const CAROUSEL_STYLES = ["tips_list", "story_arc", "myth_busting", "before_after", "open_loop"] as const;
-    const selectedStyle = carousel_style === "random"
+    const VALID_STYLES = new Set<string>(CAROUSEL_STYLES);
+    let selectedStyle = carousel_style === "random"
       ? CAROUSEL_STYLES[Math.floor(Math.random() * CAROUSEL_STYLES.length)]
       : carousel_style;
+    if (!VALID_STYLES.has(selectedStyle)) {
+      console.warn(`Unknown carousel_style: "${selectedStyle}", defaulting to tips_list`);
+      selectedStyle = "tips_list";
+    }
 
     const styleInstructions: Record<string, string> = {
       tips_list: `CAROUSEL STYLE: Tips List
@@ -211,9 +216,11 @@ Output ONLY a JSON object: { "slides": [{ "type": "body", "title": "...", "subti
       throw new Error("No slides generated");
     }
 
-    // Post-generation fix: ensure product name appears at the target position
+    // Post-generation fix: ensure product name appears at Two-Thirds position
+    // Recompute from actual slide count (model may return fewer than requested)
     if (productName && slides.length > 0) {
-      const targetIdx = Math.min(productSlideIndex - 1, slides.length - 1);
+      const actualProductIdx = Math.max(0, Math.round(slides.length * 0.67) - 1);
+      const targetIdx = Math.min(actualProductIdx, slides.length - 1);
       const targetSlide = slides[targetIdx] as Record<string, unknown>;
       const action = String(targetSlide.action ?? "");
       if (!action.toLowerCase().includes(productName.toLowerCase())) {

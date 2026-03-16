@@ -32,10 +32,6 @@ export function GenerateButton() {
       return;
     }
 
-    const bodySlideCount = store.slides.filter(
-      (s) => s.type === "body" || s.type === "cta",
-    ).length;
-
     if (bodySlideCount === 0) {
       toast.error("Add at least one body slide before generating");
       return;
