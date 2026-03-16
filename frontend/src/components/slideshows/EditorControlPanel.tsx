@@ -115,19 +115,17 @@ export function EditorControlPanel() {
       },
     };
 
-    // Score each collection against the product
-    let bestScore = -1;
-    let bestCollection = collections[0];
+    // Score each collection against the product — only real matches (score > 0) count
+    let bestScore = 0;
+    let bestCollection: typeof collections[0] | null = null;
 
     for (const coll of collections) {
       const collName = coll.name.toLowerCase();
 
       for (const [, config] of Object.entries(nicheKeywords)) {
-        // Check if this collection matches this niche
         const matchesCollection = config.collectionPatterns.some((p) => collName.includes(p));
         if (!matchesCollection) continue;
 
-        // Score: how many keywords match the product text
         const score = productText
           ? config.keywords.filter((kw) => productText.includes(kw)).length
           : 0;
@@ -139,11 +137,12 @@ export function EditorControlPanel() {
       }
     }
 
-    // Only auto-select if we found a real match (score > 0), otherwise pick education or first
-    if (bestScore <= 0 && productText) {
-      // Fallback: find "Education" collection as safe default for unknown niches
-      const eduColl = collections.find((c) => c.name.toLowerCase().includes("education"));
-      if (eduColl) bestCollection = eduColl;
+    // Fallback chain: matched collection → education → lifestyle → first
+    if (!bestCollection) {
+      bestCollection =
+        collections.find((c) => c.name.toLowerCase().includes("education")) ??
+        collections.find((c) => c.name.toLowerCase().includes("lifestyle")) ??
+        collections[0];
     }
 
     store.setSelectedCollectionId(bestCollection.id);

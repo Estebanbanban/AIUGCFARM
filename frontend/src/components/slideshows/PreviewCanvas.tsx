@@ -22,20 +22,22 @@ export function PreviewCanvas() {
   const handleAddSlide = () => {
     store.addSlide("body");
 
+    // Read fresh state AFTER addSlide mutated the store (avoids stale closure)
+    const freshState = useSlideshowEditorStore.getState();
+    const newIdx = freshState.selectedSlideIndex;
+
     // Auto-assign a random image from the collection to the new slide
     const images = collectionData?.images ?? [];
     if (images.length === 0) return;
 
     // Find images not already used by other slides
-    const usedImageIds = new Set(store.slides.map((s) => s.imageId).filter(Boolean));
+    const usedImageIds = new Set(freshState.slides.map((s) => s.imageId).filter(Boolean));
     const available = images.filter((img) => !usedImageIds.has(img.id) && img.url);
     const pick = available.length > 0
       ? available[Math.floor(Math.random() * available.length)]
       : images[Math.floor(Math.random() * images.length)];
 
     if (pick?.url) {
-      // The new slide is now the selected one (addSlide selects it)
-      const newIdx = store.selectedSlideIndex;
       store.updateSlideImage(newIdx, pick.id, pick.url);
     }
   };

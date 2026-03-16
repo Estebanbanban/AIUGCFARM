@@ -21,7 +21,7 @@ Deno.serve(async (req: Request) => {
 
     // Extract the first number from the hook text (e.g. "5 things i..." or "here are 6 ways..." → 5/6)
     // Use that as slide_count if the caller didn't specify one
-    const hookNumberMatch = hook_text.match(/(\d+)\s/);
+    const hookNumberMatch = hook_text.match(/\b(\d+)\b/);
     const hookNumber = hookNumberMatch ? parseInt(hookNumberMatch[1], 10) : null;
     const slide_count = requestedCount ?? hookNumber ?? 4;
 
