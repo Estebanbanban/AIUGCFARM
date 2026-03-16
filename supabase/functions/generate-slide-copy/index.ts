@@ -13,11 +13,17 @@ Deno.serve(async (req: Request) => {
     }
 
     const userId = await requireUserId(req);
-    const { hook_text, product_id, slide_count = 4, soft_cta, copy_length = "long" } = await req.json();
+    const { hook_text, product_id, slide_count: requestedCount, soft_cta, copy_length = "long" } = await req.json();
 
     if (!hook_text || typeof hook_text !== "string") {
       return json({ detail: "hook_text is required" }, cors, 400);
     }
+
+    // Extract the number from the hook text (e.g. "5 things i..." → 5)
+    // Use that as slide_count if the caller didn't specify one
+    const hookNumberMatch = hook_text.match(/^(\d+)\s/);
+    const hookNumber = hookNumberMatch ? parseInt(hookNumberMatch[1], 10) : null;
+    const slide_count = requestedCount ?? hookNumber ?? 4;
 
     const sb = getAdminClient();
     const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
@@ -42,17 +48,23 @@ Deno.serve(async (req: Request) => {
     }
 
     const productRule = productName
-      ? `\nPRODUCT MENTION RULE (CRITICAL):
-- EXACTLY ONE slide (pick the last one, slide ${slide_count}) should naturally mention "${productName}" in its action line. Frame it as "i found this thing called ${productName}" or "started using ${productName}" — casual, not salesy.
-- ALL OTHER slides (1 through ${slide_count - 1}) MUST contain genuinely useful, standalone advice. NO product names, NO app names, NO tool names. Just real actions a real person took.
-- If you mention the product on more than one slide, the entire output is WRONG. The reader should get real value from slides 1-${slide_count - 1} even if they never look at the last one.`
+      ? `\nPRODUCT PROMOTION (MANDATORY — DO NOT SKIP):
+- The LAST slide (slide ${slide_count}) MUST mention "${productName}" in its action line. This is the whole point of the carousel. Examples:
+  - "i started using ${productName} and it honestly changed how i approach this"
+  - "found this app called ${productName} that does exactly this"
+  - "someone recommended ${productName} to me and i haven't looked back"
+- Keep it casual and natural, like a genuine recommendation to a friend. But it MUST be there.
+- ALL OTHER slides (1 through ${slide_count - 1}) must NOT mention "${productName}" or any product. Just real-world advice.
+- If the last slide does NOT contain "${productName}", the output is WRONG and useless.`
       : `\nPRODUCT RULE: Do NOT mention any product, app, service, or tool name in any slide. Every action line should be real-world advice that stands on its own.`;
 
     const systemPrompt = `You write TikTok slideshow carousel copy. Your writing sounds like a real person sharing what actually worked for them. Not a marketer. Not an influencer. A friend who figured something out and is telling you about it over coffee.
 
 Hook: "${hook_text}"
-${productName ? `Product (reference only): ${productName} — ${productDescription}` : ""}
-Generate ${slide_count} body slides.
+${productName ? `Product being promoted: ${productName} — ${productDescription}` : ""}
+
+SLIDE COUNT (CRITICAL): Generate EXACTLY ${slide_count} body slides. Not ${slide_count - 1}, not ${slide_count + 1}. Exactly ${slide_count}.
+${hookNumber ? `The hook says "${hookNumber}" — you MUST produce exactly ${hookNumber} slides to match.` : ""}
 
 VOICE & TONE:
 - Write like you're texting your smartest friend. Casual but sharp.
@@ -130,6 +142,16 @@ Output ONLY a JSON object: { "slides": [{ "type": "body", "title": "...", "subti
 
     if (slides.length === 0) {
       throw new Error("No slides generated");
+    }
+
+    // Post-generation fix: ensure product name is in the last slide's action
+    if (productName && slides.length > 0) {
+      const lastSlide = slides[slides.length - 1] as Record<string, unknown>;
+      const action = String(lastSlide.action ?? "");
+      if (!action.toLowerCase().includes(productName.toLowerCase())) {
+        // Force-inject the product mention into the last slide's action
+        lastSlide.action = `i found ${productName} and it honestly made this so much easier. worth trying if you're stuck.`;
+      }
     }
 
     return json({ data: { slides } }, cors);
