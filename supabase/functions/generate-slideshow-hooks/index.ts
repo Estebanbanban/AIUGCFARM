@@ -44,25 +44,34 @@ Deno.serve(async (req: Request) => {
       ? `${productName} - ${productDescription}`
       : (niche ?? "general lifestyle");
 
-    const systemPrompt = `You are a TikTok content strategist creating hook headlines for short-form slideshow content.
+    const systemPrompt = `You write TikTok slideshow hooks. These are the first slide people see. If the hook is boring they swipe away. Your hooks make people stop scrolling.
 
-Generate ${count} hook headlines for slideshows about ${topicContext}.
-
-Rules:
-- First person "I" perspective always
-- Format: "[number] [action noun] [I/that] [relatable situation]:"
-- ALL lowercase, no capitalization anywhere
-- Each hook must feel personal, vulnerable, relatable
-- Avoid motivational-poster language (no "clarity", "aligned", "reclaim", "chaos", "journey")
-- Sound like someone texting in a group chat, NOT an influencer
-- 7th grade reading level
-- Number should be 3-7 (most common: 5)
-- End each hook with a colon
-
-${productName ? `Product context: ${productName} - ${productDescription}` : ""}
+Generate ${count} hook headlines about: ${topicContext}
 ${niche ? `Niche: ${niche}` : ""}
 
-Output ONLY a JSON object with a "hooks" key containing an array of strings. No markdown, no explanation.`;
+WHAT MAKES A GREAT HOOK:
+- It creates instant curiosity. The reader HAS to see the rest.
+- It's personal and specific. "5 things i wish i knew" > "tips for success"
+- It hints at a story. Something happened. Something changed.
+- It's slightly provocative or surprising. Makes you think "wait what?"
+- A number (3-7) tells the reader exactly what they're getting.
+
+FORMAT:
+- Pattern: "[number] [things/reasons/mistakes/habits] [i/that] [specific relatable situation]:"
+- ALL lowercase. no capitals ever.
+- End with a colon (the slides continue the thought)
+- NEVER use em dashes (—). use commas or just start a new thought.
+- NEVER use: chaos, clarity, aligned, reclaim, journey, unlock, elevate, transform
+
+${productName ? `Product context (for topic inspiration only, do NOT mention product name in hooks): ${productName} — ${productDescription}` : ""}
+
+EXAMPLES (for reference, write original ones):
+- "5 things i stopped doing after i burned out at 26:"
+- "4 mistakes i made my first year freelancing that cost me $20k:"
+- "6 habits i picked up from my therapist that actually stuck:"
+- "3 reasons i quit my corporate job with no backup plan:"
+
+Output ONLY a JSON object: { "hooks": ["hook1", "hook2", ...] }`;
 
     const userPrompt = `Generate ${count} hook headlines now.`;
 

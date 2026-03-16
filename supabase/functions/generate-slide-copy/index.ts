@@ -41,38 +41,47 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const productMention = soft_cta && productName
+    const productRule = productName
       ? `\nPRODUCT MENTION RULE (CRITICAL):
-- ONLY the LAST slide (slide ${slide_count}) may mention "${productName}" in its action line — as a natural recommendation, not an ad.
-- ALL OTHER slides MUST NOT mention "${productName}" or any product/app/tool name. Their action lines should describe generic real-world actions (what "I" physically did — not what app I used).
-- If you mention the product on more than one slide, the output is WRONG.`
-      : `\nPRODUCT MENTION RULE: Do NOT mention any specific product, app, or tool name in any slide. Keep all action lines about real-world actions.`;
+- EXACTLY ONE slide (pick the last one, slide ${slide_count}) should naturally mention "${productName}" in its action line. Frame it as "i found this thing called ${productName}" or "started using ${productName}" — casual, not salesy.
+- ALL OTHER slides (1 through ${slide_count - 1}) MUST contain genuinely useful, standalone advice. NO product names, NO app names, NO tool names. Just real actions a real person took.
+- If you mention the product on more than one slide, the entire output is WRONG. The reader should get real value from slides 1-${slide_count - 1} even if they never look at the last one.`
+      : `\nPRODUCT RULE: Do NOT mention any product, app, service, or tool name in any slide. Every action line should be real-world advice that stands on its own.`;
 
-    const systemPrompt = `Generate slide text for a TikTok slideshow carousel.
+    const systemPrompt = `You write TikTok slideshow carousel copy. Your writing sounds like a real person sharing what actually worked for them. Not a marketer. Not an influencer. A friend who figured something out and is telling you about it over coffee.
 
-Hook (first slide text): ${hook_text}
-${productName ? `Product context (for reference only): ${productName} - ${productDescription}` : ""}
-Number of body slides to generate: ${slide_count}
+Hook: "${hook_text}"
+${productName ? `Product (reference only): ${productName} — ${productDescription}` : ""}
+Generate ${slide_count} body slides.
 
-Each body slide has THREE text elements:
-${copy_length === "long" ? `1. "title" — a numbered point (the main takeaway). Format: "[number]. [detailed action statement]" — 8-14 words. Be specific and descriptive.
-2. "subtitle" — the relatable complaint/context. What the person was struggling with. 12-20 words. Paint a picture.
-3. "action" — what they actually did about it. A real action, not a product pitch. 14-22 words.` : `1. "title" — a numbered point (the main takeaway). Format: "[number]. [short action statement]" — Max 8 words.
-2. "subtitle" — the relatable complaint/context. What the person was struggling with. Max 12 words.
-3. "action" — the specific simple thing they did to fix it. Max 14 words.`}
-${productMention}
+VOICE & TONE:
+- Write like you're texting your smartest friend. Casual but sharp.
+- Be opinionated. Take a stance. "this changed everything" > "this might help"
+- Be specific. Real numbers, real actions, real situations. Never vague.
+- Slightly unfiltered. A little raw. The kind of post people screenshot and send to friends.
+- Short punchy sentences. No filler. Every word earns its spot.
 
-Rules:
-- ALL lowercase, no capitalization anywhere
-- First person "I" perspective
-- Sound like texting a friend, not captioning an Instagram post
-- 7th grade reading level — simple words, short sentences
-- No motivational-poster words: "chaos", "clarity", "aligned", "reclaim", "journey"
-- Be specific, not generic. Real actions, not vibes.
-- Each slide builds on the previous — there should be a narrative arc
-- The action lines should feel like real things a person did, NOT like app store descriptions
+STRUCTURE — each slide has 3 text fields:
+${copy_length === "long" ? `1. "title" — numbered point. Format: "[n]. [specific action or insight]" — 8-14 words. This is the headline people read first.
+2. "subtitle" — the relatable struggle or context. What was going wrong before. 12-20 words. Make the reader think "that's literally me."
+3. "action" — what they actually did. Concrete, specific, no fluff. 14-22 words. This should be genuinely useful advice someone could act on today.` : `1. "title" — numbered point. Format: "[n]. [short punchy takeaway]" — Max 8 words.
+2. "subtitle" — the relatable pain point. Max 12 words.
+3. "action" — what they did about it. Specific and useful. Max 14 words.`}
+${productRule}
 
-Output ONLY a JSON object with a "slides" key containing an array of objects: [{ "type": "body", "title": "...", "subtitle": "...", "action": "...", "order": 1 }]`;
+HARD RULES:
+- ALL lowercase always. no capitals anywhere.
+- first person "i" perspective throughout.
+- NEVER use em dashes (—). use periods or commas instead.
+- NEVER use these words: chaos, clarity, aligned, reclaim, journey, unlock, elevate, transform, empower, optimize, leverage, game-changer
+- each slide should give genuinely good advice. if someone only read that one slide they should still learn something useful.
+- the slides tell a story. there's a progression. slide 1 sets up the problem, middle slides build momentum, last slide pays it off.
+- be original. no generic self-help platitudes. write something someone hasn't heard before.
+
+EXAMPLE (for reference, don't copy):
+{ "type": "body", "title": "1. i stopped eating lunch at my desk", "subtitle": "i was answering slack messages between bites and wondering why i was exhausted by 2pm", "action": "now i eat outside with my phone in my bag. 20 minutes. my afternoons are completely different.", "order": 1 }
+
+Output ONLY a JSON object: { "slides": [{ "type": "body", "title": "...", "subtitle": "...", "action": "...", "order": 1 }, ...] }`;
 
     const userPrompt = `Generate ${slide_count} body slides for the hook: "${hook_text}"`;
 
