@@ -176,7 +176,7 @@ export function EditorControlPanel() {
         store.updateSlideImage(index, img.id, img.url);
       }
     });
-  }, [collectionData, store.slides.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [collectionData, store.slides.length, store.slides.filter((s) => !s.imageUrl).length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-assign random images from collection to slides that don't have images
   const autoAssignImages = () => {

@@ -35,7 +35,12 @@ Deno.serve(async (req: Request) => {
 
       if (prodErr) throw new Error(prodErr.message);
       if (product) {
-        productName = product.name ?? "";
+        // Clean product name: strip taglines, HTML entities, pipe separators
+        let rawName = product.name ?? "";
+        rawName = rawName.replace(/&amp;/g, "&").replace(/&#\d+;/g, "");
+        rawName = rawName.split("|")[0].split("–")[0].split("-")[0].trim();
+        rawName = rawName.replace(/#\d+\s*/g, "").trim();
+        productName = rawName.toLowerCase();
         productDescription = product.description ?? "";
       }
     }
