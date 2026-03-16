@@ -63,7 +63,7 @@ FORMAT:
 - NEVER use em dashes (—). use commas or just start a new thought.
 - NEVER use: chaos, clarity, aligned, reclaim, journey, unlock, elevate, transform
 
-${productName ? `Product context (for topic inspiration only, do NOT mention product name in hooks): ${productName} — ${productDescription}` : ""}
+${productName ? `Product being promoted: ${productName} — ${productDescription}\nSome hooks can reference the product naturally (e.g. "5 things i learned after using ${productName} for a month:") but most hooks should focus on the broader topic. Mix it up.` : ""}
 
 EXAMPLES (for reference, write original ones):
 - "5 things i stopped doing after i burned out at 26:"
